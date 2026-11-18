@@ -25,6 +25,15 @@ from quanthus.capabilities.execution import (
     validate_report,
 )
 from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
+from quanthus.product_daily.c13_later_signal import (
+    LaterSignalDecision,
+    LaterSignalPolicy,
+    LaterSignalStatus,
+    OriginalOpportunity,
+    SignalObservation,
+    SyntheticCalendar,
+    evaluate_later_signal,
+)
 from quanthus.product_daily.candidate import CandidateProjection
 from quanthus.product_daily.contracts import (
     CommandEnvelope,
@@ -1054,6 +1063,43 @@ class EntryBridgeResult:
 
 
 @dataclass(frozen=True)
+class LaterAttemptBinding:
+    slot_identity: str
+    parent_opportunity_id: str
+    later_signal_id: str
+    policy_version: str
+    execution_window_id: str
+    attempt_identity: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "slot_identity": self.slot_identity,
+            "parent_opportunity_id": self.parent_opportunity_id,
+            "later_signal_id": self.later_signal_id,
+            "policy_version": self.policy_version,
+            "execution_window_id": self.execution_window_id,
+            "attempt_identity": self.attempt_identity,
+        }
+
+
+@dataclass(frozen=True)
+class LaterEntryRequest:
+    opportunity: OriginalOpportunity
+    prior: SignalObservation | None
+    current: SignalObservation
+    policy: LaterSignalPolicy | None
+    calendar: SyntheticCalendar
+    intent: CycleEntryIntent
+
+
+@dataclass(frozen=True)
+class LaterEntryResult:
+    decision: LaterSignalDecision
+    entry: EntryBridgeResult | None
+    binding: LaterAttemptBinding | None
+
+
+@dataclass(frozen=True)
 class BuyBridgeResult:
     receipt_id: str
     status: str
@@ -1092,7 +1138,11 @@ class FundingBridgePort(Protocol):
         payload: object,
     ) -> None: ...
     def commit_entry(
-        self, context: SyntheticContext, expected: str, result: EntryBridgeResult
+        self,
+        context: SyntheticContext,
+        expected: str,
+        result: EntryBridgeResult,
+        later_binding: LaterAttemptBinding | None = None,
     ) -> BridgeState: ...
     def receive_buy(
         self, context: SyntheticContext, report: ExecutionReport, profile: CycleFillProfile
@@ -1520,6 +1570,13 @@ class FundingBridgeService:
         existing = self._port.replay_entry(context, intent)
         if existing is not None:
             return existing
+        result, expected = self._prepare_entry(context, intent)
+        self._port.commit_entry(context, expected, result)
+        return result
+
+    def _prepare_entry(
+        self, context: SyntheticContext, intent: CycleEntryIntent
+    ) -> tuple[EntryBridgeResult, str]:
         view = self._port.read_snapshot(context)
         state = view.state
         if state.funding.completed_settlements and self._temporal_profile is None:
@@ -1576,8 +1633,55 @@ class FundingBridgeService:
                 "revision": state.account_revision,
             }
         )
-        self._port.commit_entry(context, expected, result)
-        return result
+        return result, expected
+
+    def enter_later(
+        self, context: SyntheticContext, request: LaterEntryRequest
+    ) -> LaterEntryResult:
+        context = self._context_for(context)
+        decision = evaluate_later_signal(
+            opportunity=request.opportunity,
+            prior=request.prior,
+            current=request.current,
+            policy=request.policy,
+            calendar=request.calendar,
+        )
+        if decision.status is not LaterSignalStatus.ELIGIBLE_FOR_ONE_ATTEMPT:
+            return LaterEntryResult(decision, None, None)
+        if decision.candidate is None or decision.slot is None:
+            raise FactError("INVALID_C13_DECISION", "eligible decision lacks planning identity")
+        if decision.slot.account_id != context.account_id:
+            raise FactError("C13_ACCOUNT_MISMATCH", "attempt slot belongs to another account")
+        if (
+            request.intent.candidate.opportunity_id != decision.candidate.identity
+            or request.intent.candidate.security_code != request.opportunity.security_id
+            or request.intent.command.command_id != decision.candidate.identity
+        ):
+            raise FactError(
+                "C13_ATTEMPT_BINDING_MISMATCH",
+                "entry does not bind the planned attempt and security",
+            )
+        expert = request.intent.candidate.expert_entry
+        if expert is None or expert.event_id != request.intent.candidate.opportunity_id:
+            raise FactError("C13_ATTEMPT_BINDING_MISMATCH", "attempt eligibility is missing")
+        if expert.source_digest != decision.candidate.later_signal_id:
+            raise FactError("C13_ATTEMPT_BINDING_MISMATCH", "attempt signal digest differs")
+        binding = LaterAttemptBinding(
+            decision.slot.identity,
+            request.opportunity.opportunity_id,
+            decision.candidate.later_signal_id,
+            decision.candidate.policy_version,
+            decision.candidate.execution_window_id,
+            decision.candidate.identity,
+        )
+        existing = self._port.replay_entry(context, request.intent)
+        if existing is not None:
+            return LaterEntryResult(decision, existing, binding)
+        result, expected = self._prepare_entry(context, request.intent)
+        self._port.commit_entry(context, expected, result, binding)
+        if not result.accepted:
+            return LaterEntryResult(decision, result, None)
+        return LaterEntryResult(decision, result, binding)
 
     def submit_buy(
         self, context: SyntheticContext, report: ExecutionReport, profile: CycleFillProfile

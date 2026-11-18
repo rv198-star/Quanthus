@@ -26,6 +26,7 @@ from quanthus.product_daily.application.funding_bridge import (
     FundingBridgeService,
     LateFeeFact,
     LateFeeResult,
+    LaterAttemptBinding,
     PendingObligation,
     ReductionSellProfile,
     SellExecutionReport,
@@ -189,10 +190,19 @@ class SQLiteCycleBridgeAdapter:
                       digest TEXT NOT NULL,
                       PRIMARY KEY(account_id,mode,sequence),
                       UNIQUE(account_id,mode,transition_id));
-                    PRAGMA user_version=5;
+                    CREATE TABLE bridge_later_attempts(
+                      account_id TEXT NOT NULL, mode TEXT NOT NULL, slot_identity TEXT NOT NULL,
+                      parent_opportunity_id TEXT NOT NULL, later_signal_id TEXT NOT NULL,
+                      policy_version TEXT NOT NULL, execution_window_id TEXT NOT NULL,
+                      attempt_identity TEXT NOT NULL, command_id TEXT NOT NULL,
+                      obligation_id TEXT NOT NULL,
+                      result_digest TEXT NOT NULL, created_at TEXT NOT NULL,
+                      PRIMARY KEY(account_id,mode,slot_identity),
+                      UNIQUE(account_id,mode,obligation_id));
+                    PRAGMA user_version=6;
                     """
                 )
-            elif version == 5:
+            elif version == 6:
                 expected = {
                     "bridge_baseline",
                     "bridge_account",
@@ -209,6 +219,7 @@ class SQLiteCycleBridgeAdapter:
                     "bridge_lots",
                     "bridge_operations",
                     "bridge_journal",
+                    "bridge_later_attempts",
                 }
                 if not expected.issubset({row[0] for row in tables}):
                     raise FactError("STORE_SCHEMA_MISMATCH", "cycle bridge schema is incomplete")
@@ -491,7 +502,11 @@ class SQLiteCycleBridgeAdapter:
                 raise
 
     def commit_entry(
-        self, context: SyntheticContext, expected: str, result: EntryBridgeResult
+        self,
+        context: SyntheticContext,
+        expected: str,
+        result: EntryBridgeResult,
+        later_binding: LaterAttemptBinding | None = None,
     ) -> BridgeState:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -507,7 +522,47 @@ class SQLiteCycleBridgeAdapter:
                 )
                 if actual != expected:
                     raise FactError("ACCOUNT_REVISION_CONFLICT", "entry CAS conflict")
+                if later_binding is not None:
+                    occupied = connection.execute(
+                        "SELECT count(*) FROM bridge_later_attempts "
+                        "WHERE account_id=? AND mode=? AND slot_identity=?",
+                        (context.account_id, context.mode, later_binding.slot_identity),
+                    ).fetchone()[0]
+                    if occupied:
+                        raise FactError(
+                            "LATER_ATTEMPT_ALREADY_CONSUMED",
+                            "one later attempt slot is already consumed",
+                        )
                 if result.accepted:
+                    if later_binding is not None:
+                        if result.obligation is None or result.replayed:
+                            raise FactError(
+                                "INVALID_C13_DECISION", "later reservation lacks a fresh obligation"
+                            )
+                        if self._has_unreconciled_unposted(connection, context):
+                            raise FactError(
+                                "C13_ORIGINAL_FACT_UNRESOLVED",
+                                "unreconciled raw original fact precedes later admission",
+                            )
+                        connection.execute(
+                            "INSERT INTO bridge_later_attempts VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                            (
+                                context.account_id,
+                                context.mode,
+                                later_binding.slot_identity,
+                                later_binding.parent_opportunity_id,
+                                later_binding.later_signal_id,
+                                later_binding.policy_version,
+                                later_binding.execution_window_id,
+                                later_binding.attempt_identity,
+                                result.command_id,
+                                result.obligation.obligation_id,
+                                result.result_digest,
+                                context.as_of.isoformat(),
+                            ),
+                        )
+                        if self._fault_hook is not None:
+                            self._fault_hook("after_later_slot_before_entry")
                     self._write_funding(connection, c, result.funding)
                     self._write_account(
                         connection,
@@ -555,6 +610,9 @@ class SQLiteCycleBridgeAdapter:
                                     entry_intent_to_dict(result.intent)
                                     if result.intent is not None
                                     else None
+                                ),
+                                "later_attempt": (
+                                    later_binding.to_dict() if later_binding is not None else None
                                 ),
                             },
                         )
@@ -759,6 +817,44 @@ class SQLiteCycleBridgeAdapter:
                     connection.commit()
                     raise FactError(
                         "SOURCE_FACT_DUPLICATE", f"source already posted by {source['report_id']}"
+                    )
+                later = connection.execute(
+                    "SELECT parent_opportunity_id,attempt_identity FROM bridge_later_attempts "
+                    "WHERE account_id=? AND mode=? AND obligation_id=?",
+                    (context.account_id, context.mode, obligation.obligation_id),
+                ).fetchone()
+                if later is not None:
+                    # The generic buy report has no order identity to distinguish two attempts.
+                    evidence = {
+                        "report": report.to_dict(),
+                        "parent_opportunity_id": later["parent_opportunity_id"],
+                        "later_attempt_identity": later["attempt_identity"],
+                        "reason": "C13_ORDER_ATTRIBUTION_REQUIRED",
+                    }
+                    self._record_conflict(
+                        connection,
+                        context,
+                        "c13_buy_attribution",
+                        report.report_id,
+                        str(later["attempt_identity"]),
+                        receipt_id,
+                        json.dumps(evidence, sort_keys=True),
+                        scope_key=f"c13:{later['parent_opportunity_id']}",
+                    )
+                    alert_id = f"c13-unattributed-buy:{report.report_id}"
+                    if (
+                        connection.execute(
+                            "SELECT 1 FROM bridge_outbox "
+                            "WHERE account_id=? AND mode=? AND report_id=?",
+                            (context.account_id, context.mode, alert_id),
+                        ).fetchone()
+                        is None
+                    ):
+                        self._outbox(connection, context, alert_id, evidence)
+                    connection.commit()
+                    raise FactError(
+                        "C13_ORDER_ATTRIBUTION_REQUIRED",
+                        "unattributed buy report retained; later reservation remains open",
                     )
                 updated_obligation = connection.execute(
                     "UPDATE bridge_obligations SET status='FILLED',filled_report_id=?,"

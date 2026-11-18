@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from threading import Barrier
@@ -43,7 +43,7 @@ NOW = datetime.fromisoformat("2026-11-18T07:10:00+00:00")
 
 
 def later_request(
-    service, *, selected_policy=None, security_id="security-cn-000001"
+    service, *, selected_policy=None, security_id="security-cn-000001", allow_trial=True
 ) -> LaterEntryRequest:
     parent = opportunity(
         account_id=context().account_id,
@@ -66,7 +66,7 @@ def later_request(
     expert = ExpertEntryEligibility(
         attempt_id,
         parent.security_id,
-        ExpertEntryAction.TRIAL_ENTRY,
+        ExpertEntryAction.TRIAL_ENTRY if allow_trial else ExpertEntryAction.NO_ACTION,
         decision.candidate.later_signal_id,
         Decimal("0.30"),
     )
@@ -104,6 +104,8 @@ def test_a10_a13_later_command_replay_slot_and_atomic_failure(tmp_path: Path) ->
     assert recovered_receipt.entry is not None and recovered_receipt.entry.replayed
     assert recovered_receipt.entry.result_digest == first.entry.result_digest
     assert recovered_receipt.binding == first.binding
+    with pytest.raises(FactError, match="IDEMPOTENCY_CONFLICT: entry attempt binding"):
+        reopened.enter(context(NOW), request.intent)
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT count(*) FROM bridge_later_attempts").fetchone()[0] == 1
         assert db.execute("SELECT count(*) FROM bridge_journal").fetchone()[0] == 1
@@ -251,3 +253,104 @@ def test_a12_later_reservation_retains_hold_on_unmatched_old_fact(tmp_path: Path
             ).fetchone()[0]
             == 1
         )
+
+
+def test_cold_rebuild_restores_missing_slot_and_preserves_exclusion(tmp_path: Path) -> None:
+    path = tmp_path / "cold-later-slot.sqlite"
+    bridge = service(path)
+    first = bridge.enter_later(context(NOW), later_request(bridge))
+    assert first.entry is not None and first.entry.accepted
+    initial = bridge.current(context(NOW))
+    fresh_policy = replace(policy(), policy_version="c13-synthetic-qualified-v2")
+    second = later_request(bridge, selected_policy=fresh_policy)
+    with sqlite3.connect(path) as db:
+        before = db.execute("SELECT * FROM bridge_later_attempts").fetchall()
+        assert len(before) == 1
+        db.execute("DELETE FROM bridge_later_attempts")
+
+    reopened = service(path)
+    with pytest.raises(FactError, match="STORE_PROJECTION_MISMATCH: later slots"):
+        reopened.enter_later(context(NOW), second)
+    assert reopened.rebuild(context(NOW)) == initial
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT * FROM bridge_later_attempts").fetchall() == before
+        assert db.execute("SELECT count(*) FROM bridge_journal").fetchone()[0] == 1
+    with pytest.raises(FactError, match="LATER_ATTEMPT_ALREADY_CONSUMED"):
+        reopened.enter_later(context(NOW), second)
+
+
+def test_later_reservation_refuses_future_decision_and_planned_open(tmp_path: Path) -> None:
+    bridge = service(tmp_path / "decision-window.sqlite")
+    request = later_request(bridge)
+    for at in (NOW - timedelta(minutes=1), datetime.fromisoformat("2026-11-19T09:30:00+08:00")):
+        with pytest.raises(FactError, match="C13_RESERVATION_OUTSIDE_DECISION_WINDOW"):
+            bridge.enter_later(context(at), request)
+    assert bridge.current(context(NOW)).account_revision == 0
+
+
+def test_refused_later_command_replays_without_a_slot_or_journal(tmp_path: Path) -> None:
+    path = tmp_path / "refused-later.sqlite"
+    bridge = service(path)
+    request = later_request(bridge, allow_trial=False)
+    first = bridge.enter_later(context(NOW), request)
+    assert first.entry is not None and not first.entry.accepted and first.binding is None
+    reopened = service(path)
+    same = reopened.enter_later(context(NOW), request)
+    assert same.entry is not None and same.entry.replayed
+    assert same.entry.result_digest == first.entry.result_digest
+    assert not same.entry.accepted and same.binding is None
+    changed = later_request(reopened)
+    assert changed.intent.command.command_id == request.intent.command.command_id
+    with pytest.raises(FactError, match="IDEMPOTENCY_CONFLICT: entry command payload"):
+        reopened.enter_later(context(NOW), changed)
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT count(*) FROM bridge_entry_receipts").fetchone()[0] == 1
+        assert db.execute("SELECT count(*) FROM bridge_later_attempts").fetchone()[0] == 0
+        assert db.execute("SELECT count(*) FROM bridge_journal").fetchone()[0] == 0
+        assert db.execute("SELECT count(*) FROM bridge_obligations").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("delete", [True, False])
+def test_later_buy_refuses_missing_or_changed_slot_before_economic_posting(
+    tmp_path: Path, delete: bool
+) -> None:
+    path = tmp_path / "invalid-later-slot.sqlite"
+    bridge = service(path)
+    result = bridge.enter_later(context(NOW), later_request(bridge, security_id="SYN001"))
+    assert result.entry is not None and result.entry.accepted
+    quantity = result.entry.quantity
+    state = bridge.current(context(NOW))
+    with sqlite3.connect(path) as db:
+        if delete:
+            db.execute("DELETE FROM bridge_later_attempts")
+        else:
+            db.execute("UPDATE bridge_later_attempts SET result_digest='different'")
+
+    report = replace(
+        buy_report("old-without-order", "SYN001", at=NOW, source_sequence="old-without-order"),
+        quantity=quantity,
+        intended_quantity=quantity,
+    )
+    profile = replace(
+        buy_profile("old-without-order"),
+        order_total_quantity=quantity,
+        final_cumulative_fill_quantity=quantity,
+    )
+    with pytest.raises(FactError, match="STORE_PROJECTION_MISMATCH: later slots"):
+        bridge.submit_buy(context(NOW), report, profile)
+    assert bridge.current(context(NOW)) == state
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT status FROM bridge_inbox").fetchone()[0] == "RECEIVED"
+        assert db.execute("SELECT status FROM bridge_obligations").fetchone()[0] == "OPEN"
+    if delete:
+        assert bridge.rebuild(context(NOW)) == state
+        with pytest.raises(FactError, match="C13_ORDER_ATTRIBUTION_REQUIRED"):
+            bridge.submit_buy(context(NOW), report, profile)
+        assert bridge.current(context(NOW)) == state
+    else:
+        with pytest.raises(FactError, match="STORE_PROJECTION_MISMATCH: later slots"):
+            bridge.rebuild(context(NOW))
+        with sqlite3.connect(path) as db:
+            assert db.execute("SELECT result_digest FROM bridge_later_attempts").fetchone()[0] == (
+                "different"
+            )

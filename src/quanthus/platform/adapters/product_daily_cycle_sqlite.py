@@ -45,6 +45,7 @@ from quanthus.product_daily.application.funding_bridge import (
     restore_funding_envelope,
 )
 from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
+from quanthus.product_daily.c13_later_signal import AttemptSlot, PlanningAttempt
 from quanthus.product_daily.contracts import CommandEnvelope, ProcessedCommand, ReasonCode
 from quanthus.product_daily.funding import (
     BucketPhase,
@@ -199,10 +200,10 @@ class SQLiteCycleBridgeAdapter:
                       result_digest TEXT NOT NULL, created_at TEXT NOT NULL,
                       PRIMARY KEY(account_id,mode,slot_identity),
                       UNIQUE(account_id,mode,obligation_id));
-                    PRAGMA user_version=6;
+                    PRAGMA user_version=7;
                     """
                 )
-            elif version == 6:
+            elif version == 7:
                 expected = {
                     "bridge_baseline",
                     "bridge_account",
@@ -293,9 +294,13 @@ class SQLiteCycleBridgeAdapter:
         return BridgeState(account, baseline.funding, 0)
 
     def replay_entry(
-        self, context: SyntheticContext, intent: CycleEntryIntent
+        self,
+        context: SyntheticContext,
+        intent: CycleEntryIntent,
+        later_binding: LaterAttemptBinding | None = None,
     ) -> EntryBridgeResult | None:
         with self._connect() as connection:
+            connection.execute("BEGIN")
             row = connection.execute(
                 "SELECT * FROM bridge_entry_receipts WHERE account_id=? AND mode=? "
                 "AND command_id=?",
@@ -304,7 +309,7 @@ class SQLiteCycleBridgeAdapter:
             if row is None:
                 return None
             journal = connection.execute(
-                "SELECT payload_json FROM bridge_journal WHERE account_id=? AND mode=? "
+                "SELECT payload_json,digest FROM bridge_journal WHERE account_id=? AND mode=? "
                 "AND transition_id=? AND kind='entry'",
                 (
                     context.account_id,
@@ -312,13 +317,52 @@ class SQLiteCycleBridgeAdapter:
                     f"entry:{intent.command.command_id}",
                 ),
             ).fetchone()
+            funding_payload = json.loads(row["funding_json"])
+            cached = json.loads(row["result_json"])
             if journal is None:
-                raise FactError("STORE_PROJECTION_MISMATCH", "entry journal is missing")
-            event = json.loads(journal["payload_json"])
+                if (
+                    later_binding is None
+                    or row["accepted"] != 0
+                    or not isinstance(cached, dict)
+                    or cached.get("accepted") is not False
+                ):
+                    raise FactError("STORE_PROJECTION_MISMATCH", "entry journal is missing")
+                refused = {key: value for key, value in cached.items() if key != "receipt_digest"}
+                if cached.get("receipt_digest") != digest(
+                    {"result": refused, "funding": funding_payload}
+                ):
+                    raise FactError("STORE_PROJECTION_MISMATCH", "later refusal receipt differs")
+                event = refused
+            else:
+                event = json.loads(journal["payload_json"])
+            stored_binding = event.get("later_attempt")
+            expected_binding = later_binding.to_dict() if later_binding is not None else None
+            if stored_binding != expected_binding:
+                raise FactError("IDEMPOTENCY_CONFLICT", "entry attempt binding differs")
+            if later_binding is not None:
+                self._validate_later_slots(connection, context)
+                result_keys = (
+                    "accepted",
+                    "replayed",
+                    "quantity",
+                    "reservation_id",
+                    "account_revision",
+                    "result_digest",
+                    "command_id",
+                )
+                if journal is not None and (
+                    journal["digest"] != digest(event)
+                    or {key: event.get(key) for key in result_keys} != cached
+                    or row["accepted"] != 1
+                    or event.get("funding") != funding_payload
+                ):
+                    raise FactError(
+                        "STORE_PROJECTION_MISMATCH", "later entry receipt differs from journal"
+                    )
             original = restore_entry_intent(event["intent"])
             if original.command.body_digest != intent.command.body_digest:
                 raise FactError("IDEMPOTENCY_CONFLICT", "entry command payload differs")
-            funding = restore_funding_envelope(json.loads(row["funding_json"]))
+            funding = restore_funding_envelope(funding_payload)
             return EntryBridgeResult(
                 bool(row["accepted"]),
                 True,
@@ -523,6 +567,18 @@ class SQLiteCycleBridgeAdapter:
                 if actual != expected:
                     raise FactError("ACCOUNT_REVISION_CONFLICT", "entry CAS conflict")
                 if later_binding is not None:
+                    self._validate_later_slots(connection, context)
+                    if (
+                        connection.execute(
+                            "SELECT 1 FROM bridge_entry_receipts "
+                            "WHERE account_id=? AND mode=? AND command_id=?",
+                            (context.account_id, context.mode, result.command_id),
+                        ).fetchone()
+                        is not None
+                    ):
+                        raise FactError(
+                            "C13_ENTRY_RECEIPT_ALREADY_PRESENT", "retry the original entry command"
+                        )
                     occupied = connection.execute(
                         "SELECT count(*) FROM bridge_later_attempts "
                         "WHERE account_id=? AND mode=? AND slot_identity=?",
@@ -558,7 +614,9 @@ class SQLiteCycleBridgeAdapter:
                                 result.command_id,
                                 result.obligation.obligation_id,
                                 result.result_digest,
-                                context.as_of.isoformat(),
+                                result.intent.snapshot.as_of.isoformat()
+                                if result.intent is not None
+                                else context.as_of.isoformat(),
                             ),
                         )
                         if self._fault_hook is not None:
@@ -616,6 +674,16 @@ class SQLiteCycleBridgeAdapter:
                                 ),
                             },
                         )
+                entry_receipt = self._entry_dict(result)
+                funding_receipt = funding_state_envelope(result.funding)
+                if later_binding is not None and not result.accepted:
+                    if result.intent is None:
+                        raise FactError("INVALID_C13_DECISION", "later refusal lacks an intent")
+                    entry_receipt["intent"] = entry_intent_to_dict(result.intent)
+                    entry_receipt["later_attempt"] = later_binding.to_dict()
+                    entry_receipt["receipt_digest"] = digest(
+                        {"result": entry_receipt, "funding": funding_receipt}
+                    )
                 connection.execute(
                     "INSERT OR IGNORE INTO bridge_entry_receipts VALUES(?,?,?,?,?,?)",
                     (
@@ -623,8 +691,8 @@ class SQLiteCycleBridgeAdapter:
                         c.mode,
                         result.command_id,
                         1 if result.accepted else 0,
-                        json.dumps(self._entry_dict(result), sort_keys=True),
-                        json.dumps(funding_state_envelope(result.funding), sort_keys=True),
+                        json.dumps(entry_receipt, sort_keys=True),
+                        json.dumps(funding_receipt, sort_keys=True),
                     ),
                 )
                 connection.commit()
@@ -818,6 +886,7 @@ class SQLiteCycleBridgeAdapter:
                     raise FactError(
                         "SOURCE_FACT_DUPLICATE", f"source already posted by {source['report_id']}"
                     )
+                self._validate_later_slots(connection, context)
                 later = connection.execute(
                     "SELECT parent_opportunity_id,attempt_identity FROM bridge_later_attempts "
                     "WHERE account_id=? AND mode=? AND obligation_id=?",
@@ -1452,7 +1521,7 @@ class SQLiteCycleBridgeAdapter:
 
     def rebuild(self, context: SyntheticContext) -> BridgeState:
         with self._connect() as connection:
-            connection.execute("BEGIN")
+            connection.execute("BEGIN IMMEDIATE")
             state = self._read(connection, context)
             baseline = connection.execute(
                 "SELECT * FROM bridge_baseline WHERE account_id=? AND mode=?",
@@ -1779,8 +1848,121 @@ class SQLiteCycleBridgeAdapter:
                 for item in derived_lots
             ):
                 raise FactError("STORE_PROJECTION_MISMATCH", "lot projection differs from journal")
+            self._validate_later_slots(connection, context, restore_empty=True)
             connection.commit()
             return BridgeState(account, funding, state.account_revision)
+
+    def _validate_later_slots(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        *,
+        restore_empty: bool = False,
+    ) -> None:
+        derived: dict[str, tuple[str, ...]] = {}
+        obligations: set[str] = set()
+        for row in connection.execute(
+            "SELECT transition_id, payload_json, digest FROM bridge_journal "
+            "WHERE account_id=? AND mode=? AND kind='entry' ORDER BY sequence",
+            (context.account_id, context.mode),
+        ):
+            try:
+                event = json.loads(row["payload_json"])
+                if (
+                    not isinstance(event, dict)
+                    or digest(event) != row["digest"]
+                    or "later_attempt" not in event
+                ):
+                    raise ValueError("invalid entry journal")
+                raw = event["later_attempt"]
+                if raw is None:
+                    continue
+                if not isinstance(raw, dict):
+                    raise ValueError("invalid later slot")
+                fields = (
+                    "slot_identity",
+                    "parent_opportunity_id",
+                    "later_signal_id",
+                    "policy_version",
+                    "execution_window_id",
+                    "attempt_identity",
+                    "execution_at",
+                )
+                if set(raw) != set(fields) or not all(
+                    isinstance(raw[key], str) and raw[key].strip() for key in fields
+                ):
+                    raise ValueError("invalid later slot fields")
+                slot = AttemptSlot(context.account_id, raw["parent_opportunity_id"])
+                execution_at = datetime.fromisoformat(raw["execution_at"])
+                if execution_at.utcoffset() is None:
+                    raise ValueError("missing execution timezone")
+                attempt = PlanningAttempt(
+                    slot,
+                    raw["later_signal_id"],
+                    raw["policy_version"],
+                    raw["execution_window_id"],
+                    execution_at,
+                )
+                intent = restore_entry_intent(event["intent"])
+                command, reservation, result = (
+                    event["command_id"],
+                    event["reservation_id"],
+                    event["result_digest"],
+                )
+                expert = intent.candidate.expert_entry
+                if (
+                    event["accepted"] is not True
+                    or event["replayed"] is not False
+                    or row["transition_id"] != f"entry:{command}"
+                    or command != intent.command.command_id
+                    or command != intent.candidate.opportunity_id
+                    or command != attempt.identity
+                    or command != raw["attempt_identity"]
+                    or slot.identity != raw["slot_identity"]
+                    or expert is None
+                    or expert.source_digest != raw["later_signal_id"]
+                    or not isinstance(reservation, str)
+                    or not reservation
+                    or not isinstance(result, str)
+                    or not result
+                    or slot.identity in derived
+                    or reservation in obligations
+                ):
+                    raise ValueError("later slot binding differs")
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                raise FactError("REBUILD_MISMATCH", "later slot journal is invalid") from exc
+            derived[slot.identity] = (
+                context.account_id,
+                context.mode,
+                slot.identity,
+                slot.parent_opportunity_id,
+                attempt.later_signal_id,
+                attempt.policy_version,
+                attempt.execution_window_id,
+                attempt.identity,
+                command,
+                reservation,
+                result,
+                intent.snapshot.as_of.isoformat(),
+            )
+            obligations.add(reservation)
+        stored = tuple(
+            tuple(row)
+            for row in connection.execute(
+                "SELECT account_id,mode,slot_identity,parent_opportunity_id,later_signal_id,"
+                "policy_version,execution_window_id,attempt_identity,command_id,obligation_id,"
+                "result_digest,created_at FROM bridge_later_attempts "
+                "WHERE account_id=? AND mode=? ORDER BY slot_identity",
+                (context.account_id, context.mode),
+            )
+        )
+        expected = tuple(derived[key] for key in sorted(derived))
+        if expected and not stored and restore_empty:
+            connection.executemany(
+                "INSERT INTO bridge_later_attempts VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", expected
+            )
+        elif expected != stored:
+            raise FactError("STORE_PROJECTION_MISMATCH", "later slots differ from journal")
 
     def _obligation_rows(
         self, connection: sqlite3.Connection, context: SyntheticContext

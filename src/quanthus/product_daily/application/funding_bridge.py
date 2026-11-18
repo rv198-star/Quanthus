@@ -1070,6 +1070,7 @@ class LaterAttemptBinding:
     policy_version: str
     execution_window_id: str
     attempt_identity: str
+    execution_at: datetime
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -1079,6 +1080,7 @@ class LaterAttemptBinding:
             "policy_version": self.policy_version,
             "execution_window_id": self.execution_window_id,
             "attempt_identity": self.attempt_identity,
+            "execution_at": self.execution_at.isoformat(),
         }
 
 
@@ -1112,7 +1114,10 @@ class BuyBridgeResult:
 class FundingBridgePort(Protocol):
     def establish(self, baseline: CycleBaseline) -> BridgeState: ...
     def replay_entry(
-        self, context: SyntheticContext, intent: CycleEntryIntent
+        self,
+        context: SyntheticContext,
+        intent: CycleEntryIntent,
+        later_binding: LaterAttemptBinding | None = None,
     ) -> EntryBridgeResult | None: ...
     def read(self, context: SyntheticContext) -> BridgeState: ...
     def read_snapshot(self, context: SyntheticContext) -> BridgeSnapshot: ...
@@ -1673,10 +1678,16 @@ class FundingBridgeService:
             decision.candidate.policy_version,
             decision.candidate.execution_window_id,
             decision.candidate.identity,
+            decision.candidate.execution_at,
         )
-        existing = self._port.replay_entry(context, request.intent)
+        existing = self._port.replay_entry(context, request.intent, binding)
         if existing is not None:
-            return LaterEntryResult(decision, existing, binding)
+            return LaterEntryResult(decision, existing, binding if existing.accepted else None)
+        if not request.current.decision_cutoff <= context.as_of < binding.execution_at:
+            raise FactError(
+                "C13_RESERVATION_OUTSIDE_DECISION_WINDOW",
+                "later reservation must be after its decision and before its planned open",
+            )
         result, expected = self._prepare_entry(context, request.intent)
         self._port.commit_entry(context, expected, result, binding)
         if not result.accepted:

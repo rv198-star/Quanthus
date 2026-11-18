@@ -1,0 +1,28 @@
+{
+  "schema": "quanthus.r11.c13-synthetic-policy.v1",
+  "status": "SYNTHETIC_VALIDATION_ONLY",
+  "policy": {
+    "policy_version": "c13-synthetic-qualified-v1",
+    "producer_version": "synthetic-qualified-producer-v1",
+    "predicate_version": "neutral-or-fragile-to-stable-v1",
+    "calendar_version": "synthetic-authoritative-calendar-v1",
+    "timezone_name": "Asia/Shanghai",
+    "observation_lifetime_sessions": 1,
+    "execution_window_id": "next-adopted-open-v1",
+    "zero_fill_retry_policy_version": "terminal-zero-fill-v1",
+    "expiry": "2026-11-19T10:00:00+08:00",
+    "attempt_limit": 1
+  },
+  "calendar": {
+    "version": "synthetic-authoritative-calendar-v1",
+    "timezone_name": "Asia/Shanghai",
+    "sessions": ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"],
+    "opens": [
+      "2026-11-16T09:30:00+08:00",
+      "2026-11-17T09:30:00+08:00",
+      "2026-11-18T09:30:00+08:00",
+      "2026-11-19T09:30:00+08:00",
+      "2026-11-20T09:30:00+08:00"
+    ]
+  }
+}

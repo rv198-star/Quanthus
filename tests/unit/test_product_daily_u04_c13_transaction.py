@@ -310,6 +310,49 @@ def test_refused_later_command_replays_without_a_slot_or_journal(tmp_path: Path)
         assert db.execute("SELECT count(*) FROM bridge_obligations").fetchone()[0] == 0
 
 
+def test_caller_claim_cannot_attest_original_terminal_zero_fill(tmp_path: Path) -> None:
+    path = tmp_path / "zero-fill-claim.sqlite"
+    bridge = service(path)
+    request = later_request(bridge)
+    request = replace(
+        request,
+        opportunity=replace(
+            request.opportunity,
+            original_attempt_state=OriginalAttemptState.TERMINAL_ZERO_FILL_RECONCILED,
+        ),
+    )
+    before = bridge.current(context(NOW))
+    with pytest.raises(FactError, match="C13_ORIGINAL_ORDER_FACT_REQUIRED"):
+        bridge.enter_later(context(NOW), request)
+    assert bridge.current(context(NOW)) == before
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT count(*) FROM bridge_later_attempts").fetchone()[0] == 0
+        assert db.execute("SELECT count(*) FROM bridge_obligations").fetchone()[0] == 0
+        assert db.execute("SELECT count(*) FROM bridge_entry_receipts").fetchone()[0] == 0
+
+
+def test_original_reservation_conflicts_with_no_submission_claim(tmp_path: Path) -> None:
+    path = tmp_path / "known-original.sqlite"
+    bridge = service(path)
+    request = later_request(bridge, security_id="SYN001")
+    original = entry_intent(
+        bridge,
+        candidate_entry=candidate(request.opportunity.opportunity_id, "SYN001"),
+        command_id="original-order",
+        expected_revision=0,
+        at=NOW,
+    )
+    assert bridge.enter(context(NOW), original).accepted
+    before = bridge.current(context(NOW))
+    with pytest.raises(FactError, match="C13_ORIGINAL_ORDER_FACT_REQUIRED"):
+        bridge.enter_later(context(NOW), later_request(bridge, security_id="SYN001"))
+    assert bridge.current(context(NOW)) == before
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT count(*) FROM bridge_later_attempts").fetchone()[0] == 0
+        assert db.execute("SELECT status FROM bridge_obligations").fetchall() == [("OPEN",)]
+        assert db.execute("SELECT count(*) FROM bridge_entry_receipts").fetchone()[0] == 1
+
+
 @pytest.mark.parametrize("delete", [True, False])
 def test_later_buy_refuses_missing_or_changed_slot_before_economic_posting(
     tmp_path: Path, delete: bool

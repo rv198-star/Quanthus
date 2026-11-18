@@ -568,6 +568,14 @@ class SQLiteCycleBridgeAdapter:
                     raise FactError("ACCOUNT_REVISION_CONFLICT", "entry CAS conflict")
                 if later_binding is not None:
                     self._validate_later_slots(connection, context)
+                    if any(
+                        reservation.opportunity_id == later_binding.parent_opportunity_id
+                        for reservation in state.funding.entry_reservations
+                    ):
+                        raise FactError(
+                            "C13_ORIGINAL_ORDER_FACT_REQUIRED",
+                            "an original reservation contradicts the no-submission claim",
+                        )
                     if (
                         connection.execute(
                             "SELECT 1 FROM bridge_entry_receipts "

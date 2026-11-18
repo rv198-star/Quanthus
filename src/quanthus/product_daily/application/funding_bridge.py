@@ -29,6 +29,7 @@ from quanthus.product_daily.c13_later_signal import (
     LaterSignalDecision,
     LaterSignalPolicy,
     LaterSignalStatus,
+    OriginalAttemptState,
     OriginalOpportunity,
     SignalObservation,
     SyntheticCalendar,
@@ -1655,6 +1656,14 @@ class FundingBridgeService:
             return LaterEntryResult(decision, None, None)
         if decision.candidate is None or decision.slot is None:
             raise FactError("INVALID_C13_DECISION", "eligible decision lacks planning identity")
+        if (
+            request.opportunity.original_attempt_state
+            is OriginalAttemptState.TERMINAL_ZERO_FILL_RECONCILED
+        ):
+            raise FactError(
+                "C13_ORIGINAL_ORDER_FACT_REQUIRED",
+                "the account bridge cannot attest original terminal zero fill",
+            )
         if decision.slot.account_id != context.account_id:
             raise FactError("C13_ACCOUNT_MISMATCH", "attempt slot belongs to another account")
         if (

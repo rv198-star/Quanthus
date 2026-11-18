@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -219,3 +220,24 @@ def test_original_command_replays_after_actual_buy_and_cold_reopen(tmp_path: Pat
     with pytest.raises((FactError, ProductDailyError)):
         app.enter(later, replace(original, trend_state="fragile"))
     assert reopened.current(later) == before
+
+
+@pytest.mark.parametrize("flag", ["false", 1, 0, None, 0.0])
+def test_invalid_entry_evidence_flag_refuses_before_economic_writes(
+    tmp_path: Path, flag: object
+) -> None:
+    app, bridge = services(tmp_path / "flag.sqlite")
+    before = bridge.current(CONTEXT)
+    with pytest.raises(ProductDailyError, match="invalid_boolean"):
+        # cast keeps the malformed runtime value for the public-boundary test.
+        app.enter(CONTEXT, replace(request(), entry_evidence_ready=cast(bool, flag)))
+    assert bridge.current(CONTEXT) == before
+
+
+def test_actual_false_evidence_remains_no_action_without_economic_change(tmp_path: Path) -> None:
+    app, bridge = services(tmp_path / "false.sqlite")
+    before = bridge.current(CONTEXT)
+    result = app.enter(CONTEXT, replace(request(), entry_evidence_ready=False))
+    assert not result.entry.accepted and result.entry.quantity == 0
+    assert result.decision.action.final_action is GovernedAction.NO_ACTION
+    assert bridge.current(CONTEXT) == before

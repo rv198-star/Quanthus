@@ -13,7 +13,7 @@ from quanthus.product_daily.application.funding_bridge import (
     EntryBridgeResult,
     FundingBridgeService,
 )
-from quanthus.product_daily.contracts import CommandEnvelope
+from quanthus.product_daily.contracts import CommandEnvelope, require_bool
 from quanthus.product_daily.risk import (
     BuyFeeRule,
     CandidateEntry,
@@ -66,6 +66,7 @@ class ExpertEntryService:
 
     def enter(self, context: SyntheticContext, request: ExpertEntryRequest) -> ExpertEntryResult:
         context = validate_context(context)
+        require_bool(request.entry_evidence_ready, "entry_evidence_ready")
         request.expert_context.__post_init__()
         candidate = request.candidate
         if candidate.expert_entry is not None:

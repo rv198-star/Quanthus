@@ -3206,6 +3206,105 @@
         "CP-700-COMPLETE-SYNTHETIC-TWOCYCLE-ACCEPTED-20261118"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R11-ORIGINAL-EXPERT-ENTRY-20261118",
+      "recorded_at": "2026-11-18T04:53:40.127530+00:00",
+      "actor": "Sol after019exactreview/finalnative/ordinary707 andOwner018adoption",
+      "question_id": "R11-U04-ACTUAL-EXPERT-ENTRY-005",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-USE-002",
+      "modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "question": "Can actual originalexpertaggregation feed sharedquantity anddurablereservation withtyped/refusal/replay/cold guards?",
+      "consumer": "P11 comparison adapter and P12 original complete two-cycle engineering",
+      "scope": "Exactb22limitedsyntheticcomposition andordinary707matchingexecutableclosure; historicalpolicyOwneradoption recorded separately.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Internal bounded engineering asset for next synthetic integration; complete R11 research unanswered and daily use incomplete.",
+      "decision_effect": "Reuse acceptedhelper andpriorfull-lotasset; Owneradoptedhistoricalpolicy. Nextonlyprovenminimumresidual-lotadapter, P10andwholeR11gatesremain.",
+      "reopen_conditions": [
+        "Changed transaction semantics require focused/platform and scoped independent fix evidence before a final native closure.",
+        "Result-bearing historical comparison and actual/daily use keep original U01-U08 authority and data/purpose gates; engineering reuse does not reopen parked science."
+      ],
+      "retained_assets": [
+        "Actualoriginalexperteligibility/cap/digest throughatomicentry.",
+        "Strictreadyboolean andexistingidentity/clock/refusal/replay/cold paths.",
+        "Allrejected0b/016/Rootred/019failures/costs plus017/018Owner/sourceactionevidence."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Known finalnative wall953.900225s/scriptCPU940.327005s/peakRSS577458176bytes. Original016dispatch-full1470.605s(over390.605),019794.101s(over434.101),DS2binding1184.256s(over464.256),direction017628.881s; artifactinternal times and fullturn are separate. Original005/008/016red/Rootmypytesttypingfailure/019toolfailures and allR6-R11cost/exposure retained; model/control/unmeasuredtotal unknown_not_zero.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-expert-entry-008/MANIFEST.json",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-expert-entry-review-016/MANIFEST.json",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-019-expert-entry-r1/MANIFEST.json",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-expert-entry-008-control/review-direction-full-turn-cost.json"
+      ],
+      "evidence": [
+        {
+          "id": "EXPERT-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-expert-entry-008-control/native-final/check-receipt.json",
+          "sha256": "14a980b7babb22db43b8af6217e08d38a9efd4242197c49008bd101c3aa1cda5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exactb22Python3.10fullcheck; limitedsynthetichelper."
+        },
+        {
+          "id": "EXPERT-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-expert-entry-008-control/engineering-acceptance.json",
+          "sha256": "834e23a883369e371c328ae9cacece2b24ac6774d2866322618769e7b6f7170c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Boundedoriginalexpertentrycomposition; fullR11purpose/dailyremain."
+        },
+        {
+          "id": "EXPERT-019",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-expert-entry-r1-review-019/review.json",
+          "sha256": "fa710bf8ef401ec95b55a700003056d83debf0dbdb669dabf63d9dbf8d4f3a79",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "EE01closed; reuse016otherchecks."
+        },
+        {
+          "id": "EXPERT-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-expert-entry-008-control/merge707-executable-closure.json",
+          "sha256": "bdc5808e72c24a5f4dd6259777b2e9c2e4437a5ab28228f18ec438391603f431",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary707merge non-governanceclosureidentical."
+        },
+        {
+          "id": "OWNER-USE018",
+          "kind": "authority",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/use-adoption-018/owner-adoption-receipt.v1.json",
+          "sha256": "3348c8b07609e8fdd99c85515ffab2cb6b21ff046adad9c40aad4cb0b7bafc62",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Owneradopts exact controlledhistoricalpolicy; inputs/actions/budgetgatesremain."
+        },
+        {
+          "id": "ACTION-018",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/use-decision-018/root-action-source-verification.json",
+          "sha256": "e651e736c9c811a07df9ca66af282187110d6443a603f6ff4710df73303c1488",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "12source/inputbindings, minimalresidualgap; no newprobeclaimed."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-700-ORIGINAL-EXPERT-ENTRY-ACCEPTED-20261118"
+      ],
+      "supersedes": null
     }
   ]
 }

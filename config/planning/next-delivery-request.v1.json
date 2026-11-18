@@ -1,6 +1,6 @@
 {
   "schema_version": "quanthus.exploration-request.v1",
-  "id": "R10-OVERALL-CONVERGENCE-DELIVERY-001",
+  "id": "R11-U05-REDUCTION-RESIDUAL-020",
   "status": "proposed",
   "grants_authority": false,
   "kind": "delivery",
@@ -17,24 +17,24 @@
     "CLOSEOUT",
     "TRACE"
   ],
-  "question": "Have the actual supervised update, complete decision comparison, usable feedback and final version/direction decision met the approved controlled R10 scope?",
+  "question": "Can one originalstrategyreduction orderfullyfill while sharedaccount/funding preserve residualquantity/cost and laterexit/settle/latefee?",
   "consumer": "Research owner and fullP2 review maintainer",
-  "scope": "Reuse sealed evidence, map original acceptance, resolve feedback dispositions and display explicit19/13 semantics in one read-only entry. At most one non-activated necessary successor contract.",
-  "deliverable": "Overall acceptance map, evidence-supported main explanation and gap dispositions, joined case/recognition/ledger entry, checks/governance/cost and one frozen audit package.",
-  "decision_if_pass": "Submit READY_FOR_R10_OVERALL_REVIEW; audit decides overall convergence and necessary successor, preserveB/v0 and rejectedv1.",
-  "decision_if_fail": "Deliver exact unfulfilled requirement and one executable minimal successor; overall remainsactive, no early closure.",
+  "scope": "OnlyoriginalU05/U06minimal confirmedfull-orderreduction profile andsamepublicpure/UOW/orderedcold paths; original full-lotprofile andpolicies remain.",
+  "deliverable": "Explicitversionedsynthetic reductionpurpose/profile; publicreduction/residualexit/cold/fault/identity evidence withoriginaltestsunchanged.",
+  "decision_if_pass": "Retain bounded originalactionseam forqualifiedU06preparation; P10/C13/expert/wholeusegates remain.",
+  "decision_if_fail": "Precise partial/minimalgroupedseam; preserveacceptedfull-lotasset andcosts, no OMS expansion.",
   "acceptance": [
-    "OriginalA/B/C andR10-owned parent clauses connected to bound actual evidence and approved controlled-purpose amendment.",
-    "G01/G02/G03/G05 concretely treated; one main explanation, no posthoc threshold or relabeling.",
-    "One usable entry answers completion/version/label coverage/next action without joins;19/13 allocation/order/fill/reference states explicit.",
-    "CurrentAGENTS exact closure and affected checks; versioned candidate, actual task/blueprint and cost; one serial submission."
+    "Allpreviousfull-lot/expert112closureunchanged; explicitnewreductionprofileonly, no globalweakening ofoldprofile.",
+    "Publicbuy500/reduce200/fullremaining300/settle/late100 independent expectedcash20985/bucket20000/reserve985; quantities/costs/postingsconserve.",
+    "Atomicraw/CAS/journal/receipts/lot andsamepurecoldcalculation; incompleteheldsettlement refusal, oldsource/clock/unknown/replayguards.",
+    "Focused/static/strict/compile/exactbase checks; authornofullnative, Solreviewthenfixedsourcefinalcheck."
   ],
   "stop_conditions": [
-    "UTC16:47:01-17:47:01;1800CPU seconds,2GiB RSS,256MiB deliverable.",
-    "Newpaid reference/training/market acquisition/capital replay0; no second update or reinterpretation of frozen labels.",
-    "If needed runtime changes require full checks; use docs/ledger reuse only after byte-identical executable/config/test closure and fresh metadata checks."
+    "45minfullturn/300scriptCPU/1GiB/8MiB,last8minpackaging; partialatbound,noautocontinuation.",
+    "Onlynamed2productionmodules/newtest/profile/doc; allothersreadonly, ordinaryappendGitHubcommits.",
+    "No market/P10repair/reference/training/capital/P6/daily/production or genericOMS."
   ],
-  "memory_sha256": "7073c1fa5fb5b0b90549c892784c6c2a642a21e8d69639faec759b41cdf75f14",
+  "memory_sha256": "54f9ab01416989652d3d006244c868a95963fef377ec004fe310aaf374b7a612",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -210,15 +210,20 @@
       "conclusion_id": "CON-R11-COMPLETE-SYNTHETIC-TWOCYCLE-20261118",
       "relation": "respect",
       "rationale": "Retain exact bounded complete synthetic two-cycle asset, old failures/exposure/costs and all original expert/source/purpose/comparison/daily gates. Next original engineering composition does not reopen a market study."
+    },
+    {
+      "conclusion_id": "CON-R11-ORIGINAL-EXPERT-ENTRY-20261118",
+      "relation": "respect",
+      "rationale": "Retain exactaccepted originalexpert/full-lotassets, rejectedsources/costs andOwnerpolicyconditions. This minimaloriginalreductionseam introduces no newmarket/modelstudy or dailyadmission."
     }
   ],
   "cumulative_cost_review": "AllR6-R10 and diagnostic/closeout costs,UNKNOWN and both timing deviations retained. New60minute/1800CPU protection envelope planned by audit within Owner continuation; not itemized Owner numeric approval.",
-  "runtime_authority_boundary": "Verified Owner continuation throughR10 whole convergence; this delivery uses existing evidence and necessary reading improvements only. No new research calls.",
+  "runtime_authority_boundary": "StandingOwnerR11U01-U08 andcurrentroutinecoordinationconfirmation; exactOwner018historicalpolicyadopted. Original017/018identifythisnecessaryactionseam; onlysyntheticengineering, no run/admissionbypass.",
   "budget": {
-    "wall_seconds": 3600,
-    "max_new_bytes": 268435456,
+    "wall_seconds": 2700,
+    "max_new_bytes": 8388608,
     "network_requests": 0,
-    "accounting_owner": "Executionline; GitHub/fixed evidence transport separate, no market/reference network"
+    "accounting_owner": "Sol cumulativeR6-R11/001-019; ordinaryGitHubdistribution separate"
   },
   "execution_receipt": {
     "disposition": "independently_accepted_controlled_result_and_feedback_actual_delivery_closeout",

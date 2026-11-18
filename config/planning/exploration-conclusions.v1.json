@@ -3305,6 +3305,84 @@
         "CP-700-ORIGINAL-EXPERT-ENTRY-ACCEPTED-20261118"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R11-U05-RESIDUAL-LOT-ACCEPTED-20261118",
+      "recorded_at": "2026-11-18T07:42:07.997317+00:00",
+      "actor": "Sol after independent 022 and native acceptance",
+      "question_id": "R11-U05-RESIDUAL-020",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-USE-002",
+      "modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "question": "Can the shared account fact bridge retain quantity and cost after a fully filled reduction and replay the remaining close?",
+      "consumer": "P11 historical comparison and P12 account bridge",
+      "scope": "Confirmed fully filled reduction and later exit, settlement, late fee, and cold rebuild.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Bounded internal synthetic engineering; historical result and daily use still pending.",
+      "decision_effect": "Reuse the scoped action adapter for U06 after the underlying data and purpose gates.",
+      "reopen_conditions": [
+        "A changed journal contract requires cold rebuild and failure-mode evidence."
+      ],
+      "retained_assets": [
+        "DS020 partial and 021 rejection",
+        "Exact 022 independent probe",
+        "Native acceptance and byte-identical merge."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "CN02 完整检查用时 931.3 秒、脚本 CPU 913.4 秒；022 成功见证在复验窗口内完成，封包与最终交接超限（交接至少 323 秒）。原 020/021、报告脚本失败、超时和未知成本全部保留。",
+      "evidence": [
+        {
+          "id": "JR01-022",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/review-022-receive.json",
+          "sha256": "04773129717f8e07f6a0ca88a6a2ce9e7f80bcaae80f4dc0d81b341e5e5fbe07",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Bounded independent decoder re-review; delivery overrun retained."
+        },
+        {
+          "id": "JR01-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/native-final/check-receipt.json",
+          "sha256": "5149645cf90369290673248d66ac92ce42dc09d563a34f6746823c78b186f753",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact 613 native engineering check."
+        },
+        {
+          "id": "JR01-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/merge708-executable-closure.json",
+          "sha256": "63f53ae4cd93cd9185769247aa8d4556afe3d084732345e3d6f045b9cca105b9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary child merge and whole tree identity."
+        },
+        {
+          "id": "JR01-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/engineering-acceptance.json",
+          "sha256": "278d1435df45475a60102797b1eee5453a4721f9a92295824b285130372012bf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "U05 residual quantity and cost engineering only."
+        }
+      ],
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/review-021-receive.json",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/review-022-receive.json"
+      ],
+      "blueprint_checkpoints": [
+        "CP-700-U05-RESIDUAL-LOT-ACCEPTED-20261118"
+      ],
+      "supersedes": null
     }
   ]
 }

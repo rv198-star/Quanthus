@@ -16150,6 +16150,101 @@
           "body_sha256": "20e75ef048efb210c93455631ec1f8d9d4d65e49978621a4c2cd8abd98428b31"
         }
       ]
+    },
+    {
+      "id": "CP-700-U05-RESIDUAL-LOT-ACCEPTED-20261118",
+      "recorded_at": "2026-11-18T07:42:07.997317+00:00",
+      "actor": "Sol after independent 022 and native acceptance",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept bounded U05 residual-lot engineering; keep whole R11 open.",
+      "evidence": [
+        {
+          "id": "JR01-022",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/review-022-receive.json",
+          "sha256": "04773129717f8e07f6a0ca88a6a2ce9e7f80bcaae80f4dc0d81b341e5e5fbe07",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Bounded independent decoder re-review; delivery overrun retained."
+        },
+        {
+          "id": "JR01-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/native-final/check-receipt.json",
+          "sha256": "5149645cf90369290673248d66ac92ce42dc09d563a34f6746823c78b186f753",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact 613 native engineering check."
+        },
+        {
+          "id": "JR01-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/merge708-executable-closure.json",
+          "sha256": "63f53ae4cd93cd9185769247aa8d4556afe3d084732345e3d6f045b9cca105b9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary child merge and whole tree identity."
+        },
+        {
+          "id": "JR01-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/engineering-acceptance.json",
+          "sha256": "278d1435df45475a60102797b1eee5453a4721f9a92295824b285130372012bf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "U05 residual quantity and cost engineering only."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Accept bounded residual-lot implementation: full reduction order, remaining quantity/cost, later full exit and old fee.",
+          "remaining": "Historical/PIT input handoff, exact U06 use comparison, C13 multi-day, U07 full audit and U08 daily use.",
+          "next_action": "Qualify existing P10 #701 handoff for the approved history window; then route the bounded U06 comparison. Keep C13 multi-day in scope.",
+          "evidence": [
+            "JR01-022",
+            "JR01-NATIVE",
+            "JR01-MERGE",
+            "JR01-ACCEPT"
+          ],
+          "supersedes": "CP-700-ORIGINAL-EXPERT-ENTRY-ACCEPTED-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Preserve 020 partial and 021 declaration, JR01 strict replay validation, independent 022, exact native check and merge identity.",
+          "remaining": "Historical/PIT input handoff, exact U06 use comparison, C13 multi-day, U07 full audit and U08 daily use.",
+          "next_action": "Qualify existing P10 #701 handoff for the approved history window; then route the bounded U06 comparison. Keep C13 multi-day in scope.",
+          "evidence": [
+            "JR01-022",
+            "JR01-NATIVE",
+            "JR01-MERGE",
+            "JR01-ACCEPT"
+          ],
+          "supersedes": "CP-700-ORIGINAL-EXPERT-ENTRY-ACCEPTED-20261118"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "Expert and independent whole-use acceptance retain their prior scopes; no quality, value, or admission update.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-18T07:42:09Z",
+          "body_sha256": "84d5d897db9ccc623be72a741facb3c68e63ef5c4a8d0cb103b8d54c4a769056"
+        }
+      ]
     }
   ],
   "history_imports": [

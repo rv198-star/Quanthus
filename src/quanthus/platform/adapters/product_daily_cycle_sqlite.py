@@ -27,6 +27,7 @@ from quanthus.product_daily.application.funding_bridge import (
     LateFeeFact,
     LateFeeResult,
     PendingObligation,
+    ReductionSellProfile,
     SellExecutionReport,
     SellImpact,
     SellProfile,
@@ -173,7 +174,8 @@ class SQLiteCycleBridgeAdapter:
                       account_id TEXT NOT NULL, mode TEXT NOT NULL, lot_id TEXT NOT NULL,
                       security_code TEXT NOT NULL, cycle_id TEXT NOT NULL,
                       quantity INTEGER NOT NULL, remaining_quantity INTEGER NOT NULL,
-                      cost_basis TEXT NOT NULL, source_report_id TEXT NOT NULL,
+                      cost_basis TEXT NOT NULL, remaining_cost TEXT NOT NULL,
+                      source_report_id TEXT NOT NULL,
                       PRIMARY KEY(account_id,mode,lot_id));
                     CREATE TABLE bridge_operations(
                       account_id TEXT NOT NULL, mode TEXT NOT NULL, kind TEXT NOT NULL,
@@ -187,10 +189,10 @@ class SQLiteCycleBridgeAdapter:
                       digest TEXT NOT NULL,
                       PRIMARY KEY(account_id,mode,sequence),
                       UNIQUE(account_id,mode,transition_id));
-                    PRAGMA user_version=4;
+                    PRAGMA user_version=5;
                     """
                 )
-            elif version == 4:
+            elif version == 5:
                 expected = {
                     "bridge_baseline",
                     "bridge_account",
@@ -826,7 +828,7 @@ class SQLiteCycleBridgeAdapter:
                         ),
                     )
                 connection.execute(
-                    "INSERT INTO bridge_lots VALUES(?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO bridge_lots VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (
                         context.account_id,
                         context.mode,
@@ -835,6 +837,7 @@ class SQLiteCycleBridgeAdapter:
                         obligation.cycle_id,
                         report.quantity,
                         report.quantity,
+                        format(report.price * report.quantity, "f"),
                         format(report.price * report.quantity, "f"),
                         report.report_id,
                     ),
@@ -891,6 +894,7 @@ class SQLiteCycleBridgeAdapter:
                             "quantity": report.quantity,
                             "remaining_quantity": report.quantity,
                             "cost_basis": format(report.price * report.quantity, "f"),
+                            "remaining_cost": format(report.price * report.quantity, "f"),
                             "source_report_id": report.report_id,
                             "occurred_at": report.occurred_at.isoformat(),
                             "source_id": report.source_id,
@@ -910,7 +914,7 @@ class SQLiteCycleBridgeAdapter:
         self,
         context: SyntheticContext,
         report: SellExecutionReport,
-        profile: SellProfile,
+        profile: SellProfile | ReductionSellProfile,
     ) -> BuyBridgeResult | None:
         expected = digest({"report": report.to_dict(), "profile": profile.payload_digest})
         return self._replay_buy_operation(
@@ -928,7 +932,7 @@ class SQLiteCycleBridgeAdapter:
         expected_funding_digest: str,
         receipt_id: str,
         report: SellExecutionReport,
-        profile: SellProfile,
+        profile: SellProfile | ReductionSellProfile,
         impact: SellImpact,
     ) -> BuyBridgeResult:
         with self._connect() as connection:
@@ -973,13 +977,15 @@ class SQLiteCycleBridgeAdapter:
                     connection.commit()
                     raise FactError("SOURCE_FACT_DUPLICATE", "sell source already posted")
                 updated_lot = connection.execute(
-                    "UPDATE bridge_lots SET remaining_quantity=0 "
+                    "UPDATE bridge_lots SET remaining_quantity=?,remaining_cost=? "
                     "WHERE account_id=? AND mode=? AND lot_id=? AND remaining_quantity=?",
                     (
+                        impact.lot.remaining_quantity,
+                        format(impact.lot.remaining_cost, "f"),
                         context.account_id,
                         context.mode,
                         impact.lot.lot_id,
-                        report.quantity,
+                        report.quantity + impact.lot.remaining_quantity,
                     ),
                 ).rowcount
                 if updated_lot != 1:
@@ -1011,8 +1017,11 @@ class SQLiteCycleBridgeAdapter:
                                 "kind": "sell",
                                 "report": report.to_dict(),
                                 "profile": profile.payload_digest,
+                                "profile_kind": profile.profile_kind,
                                 "lot_id": impact.lot.lot_id,
                                 "cycle_id": report.cycle_id,
+                                "remaining_quantity": impact.lot.remaining_quantity,
+                                "remaining_cost": format(impact.lot.remaining_cost, "f"),
                             },
                             sort_keys=True,
                         ),
@@ -1047,6 +1056,7 @@ class SQLiteCycleBridgeAdapter:
                     payload={
                         "report": report.to_dict(),
                         "profile": profile.payload_digest,
+                        "profile_kind": profile.profile_kind,
                         "profile_data": {
                             "profile_version": profile.profile_version,
                             "source_id": profile.source_id,
@@ -1063,7 +1073,8 @@ class SQLiteCycleBridgeAdapter:
                             "security_code": impact.lot.security_code,
                             "cycle_id": impact.lot.cycle_id,
                             "quantity": impact.lot.quantity,
-                            "remaining_quantity": report.quantity,
+                            "remaining_quantity": impact.lot.remaining_quantity,
+                            "remaining_cost": format(impact.lot.remaining_cost, "f"),
                             "cost_basis": format(impact.lot.cost_basis, "f"),
                             "source_report_id": impact.lot.source_report_id,
                         },
@@ -1445,6 +1456,7 @@ class SQLiteCycleBridgeAdapter:
                         buy_report.quantity,
                         buy_report.quantity,
                         buy_report.price * buy_report.quantity,
+                        buy_report.price * buy_report.quantity,
                         buy_report.report_id,
                         buy_report.occurred_at,
                         buy_report.source_id,
@@ -1483,7 +1495,18 @@ class SQLiteCycleBridgeAdapter:
                         raw["source_sequence"],
                     )
                     raw_profile = event["profile_data"]
-                    sell_profile = SellProfile(
+                    profile_kind = event.get("profile_kind")
+                    if not isinstance(profile_kind, str) or profile_kind not in (
+                        "full_position",
+                        "residual_lot_reduction",
+                    ):
+                        raise FactError("REBUILD_MISMATCH", "sell profile kind is unsupported")
+                    profile_type = (
+                        ReductionSellProfile
+                        if profile_kind == "residual_lot_reduction"
+                        else SellProfile
+                    )
+                    sell_profile = profile_type(
                         raw_profile["profile_version"],
                         raw_profile["source_id"],
                         raw_profile["order_total_quantity"],
@@ -1497,7 +1520,8 @@ class SQLiteCycleBridgeAdapter:
                         for item in lots.values()
                         if item.security_code == sell_report.security_code
                         and item.cycle_id == sell_report.cycle_id
-                        and item.remaining_quantity == sell_report.quantity
+                        and item.remaining_quantity >= sell_report.quantity
+                        and item.remaining_quantity > 0
                     ]
                     if len(matches) != 1:
                         raise FactError("REBUILD_MISMATCH", "sell lot is not derivable")
@@ -1641,6 +1665,7 @@ class SQLiteCycleBridgeAdapter:
                     item.quantity,
                     item.remaining_quantity,
                     item.cost_basis,
+                    item.remaining_cost,
                     item.source_report_id,
                 )
                 for item in stored_lots
@@ -1652,6 +1677,7 @@ class SQLiteCycleBridgeAdapter:
                     item.quantity,
                     item.remaining_quantity,
                     item.cost_basis,
+                    item.remaining_cost,
                     item.source_report_id,
                 )
                 for item in derived_lots
@@ -1708,6 +1734,7 @@ class SQLiteCycleBridgeAdapter:
                     row["quantity"],
                     row["remaining_quantity"],
                     Decimal(row["cost_basis"]),
+                    Decimal(row["remaining_cost"]),
                     row["source_report_id"],
                     datetime.fromisoformat(occurred),
                     str(raw.get("source_id", "")),

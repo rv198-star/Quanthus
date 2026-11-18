@@ -605,16 +605,58 @@ class BuyLot:
     quantity: int
     remaining_quantity: int
     cost_basis: Decimal
+    remaining_cost: Decimal
     source_report_id: str
     occurred_at: datetime
     source_id: str
     source_sequence: str
 
     def __post_init__(self) -> None:
-        if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
+        if not isinstance(self.lot_id, str) or not self.lot_id.strip():
+            raise FactError("INVALID_REPORT_SHAPE", "lot identity is required")
+        if not isinstance(self.security_code, str) or not self.security_code.strip():
+            raise FactError("INVALID_REPORT_SHAPE", "lot security is required")
+        if not isinstance(self.cycle_id, str) or not self.cycle_id.strip():
+            raise FactError("INVALID_REPORT_SHAPE", "lot cycle is required")
+        if not isinstance(self.source_report_id, str) or not self.source_report_id.strip():
+            raise FactError("INVALID_REPORT_SHAPE", "lot source report is required")
+        if not isinstance(self.occurred_at, datetime) or (
+            self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None
+        ):
             raise FactError("INVALID_REPORT_SHAPE", "lot occurrence must be aware")
-        if not self.source_id or not self.source_sequence:
+        if (
+            not isinstance(self.source_id, str)
+            or not self.source_id.strip()
+            or not isinstance(self.source_sequence, str)
+            or not self.source_sequence.strip()
+        ):
             raise FactError("INVALID_REPORT_SHAPE", "lot source identity is required")
+        if (
+            not isinstance(self.quantity, int)
+            or isinstance(self.quantity, bool)
+            or not isinstance(self.remaining_quantity, int)
+            or isinstance(self.remaining_quantity, bool)
+            or self.quantity <= 0
+            or self.remaining_quantity < 0
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "lot quantities are invalid")
+        if self.remaining_quantity > self.quantity:
+            raise FactError("INVALID_REPORT_SHAPE", "lot remaining quantity exceeds original")
+        if (
+            not isinstance(self.cost_basis, Decimal)
+            or not self.cost_basis.is_finite()
+            or self.cost_basis < 0
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "lot cost is invalid")
+        if (
+            not isinstance(self.remaining_cost, Decimal)
+            or not self.remaining_cost.is_finite()
+            or self.remaining_cost < 0
+            or self.remaining_cost > self.cost_basis
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "lot remaining cost is invalid")
+        if self.remaining_quantity == 0 and self.remaining_cost != 0:
+            raise FactError("INVALID_REPORT_SHAPE", "closed lot must have zero cost")
 
 
 @dataclass(frozen=True)
@@ -647,11 +689,17 @@ class SellExecutionReport:
             or self.quantity <= 0
         ):
             raise FactError("INVALID_REPORT_SHAPE", "sell quantity must be positive")
-        if not isinstance(self.price, Decimal) or self.price <= 0:
+        if not isinstance(self.price, Decimal) or not self.price.is_finite() or self.price <= 0:
             raise FactError("INVALID_REPORT_SHAPE", "sell price must be positive")
-        if not isinstance(self.confirmed_fee, Decimal) or self.confirmed_fee < 0:
+        if (
+            not isinstance(self.confirmed_fee, Decimal)
+            or not self.confirmed_fee.is_finite()
+            or self.confirmed_fee < 0
+        ):
             raise FactError("INVALID_REPORT_SHAPE", "sell fee is invalid")
-        if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
+        if not isinstance(self.occurred_at, datetime) or (
+            self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None
+        ):
             raise FactError("INVALID_REPORT_SHAPE", "sell time must be aware")
 
     @property
@@ -727,6 +775,77 @@ class SellProfile:
                 "terminal": self.terminal,
             }
         )
+
+    @property
+    def profile_kind(self) -> str:
+        return "full_position"
+
+
+@dataclass(frozen=True)
+class ReductionSellProfile:
+    """A complete sell order reducing, but not exhausting, one open lot."""
+
+    profile_version: str
+    source_id: str
+    order_total_quantity: int
+    final_cumulative_fill_quantity: int
+    cancelled_quantity: int
+    confirmed_fee: Decimal
+    terminal: bool
+
+    def __post_init__(self) -> None:
+        if self.profile_version != "complete-order-residual-lot-v1":
+            raise FactError("UNSUPPORTED_SELL_PROFILE", "reduction profile version differs")
+        if not isinstance(self.source_id, str) or not self.source_id.strip():
+            raise FactError("INVALID_REPORT_SHAPE", "reduction source is required")
+        if any(
+            not isinstance(item, int) or isinstance(item, bool)
+            for item in (
+                self.order_total_quantity,
+                self.final_cumulative_fill_quantity,
+                self.cancelled_quantity,
+            )
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "reduction quantities are invalid")
+        if self.order_total_quantity <= 0 or self.final_cumulative_fill_quantity <= 0:
+            raise FactError("INVALID_REPORT_SHAPE", "reduction quantities are invalid")
+        if self.cancelled_quantity < 0:
+            raise FactError("INVALID_REPORT_SHAPE", "reduction cancelled quantity is invalid")
+        if self.cancelled_quantity != 0:
+            raise FactError("FINAL_FILL_GAP", "reduction order must fill completely")
+        if self.order_total_quantity != self.final_cumulative_fill_quantity:
+            raise FactError("FINAL_FILL_GAP", "reduction order quantities differ")
+        if not isinstance(self.terminal, bool):
+            raise FactError("INVALID_REPORT_SHAPE", "reduction terminal flag is invalid")
+        if self.terminal is not True:
+            raise FactError("UNSUPPORTED_TERMINAL_STATE", "reduction order must be terminal")
+        if (
+            not isinstance(self.confirmed_fee, Decimal)
+            or not self.confirmed_fee.is_finite()
+            or self.confirmed_fee < 0
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "reduction fee is invalid")
+
+    @property
+    def payload_digest(self) -> str:
+        return str(
+            digest(
+                {
+                    "profile_kind": self.profile_kind,
+                    "profile_version": self.profile_version,
+                    "source_id": self.source_id,
+                    "order_total_quantity": self.order_total_quantity,
+                    "final_cumulative_fill_quantity": self.final_cumulative_fill_quantity,
+                    "cancelled_quantity": self.cancelled_quantity,
+                    "confirmed_fee": format(self.confirmed_fee, "f"),
+                    "terminal": self.terminal,
+                }
+            )
+        )
+
+    @property
+    def profile_kind(self) -> str:
+        return "residual_lot_reduction"
 
 
 @dataclass(frozen=True)
@@ -853,6 +972,7 @@ class BridgeSnapshot:
                         "quantity": item.quantity,
                         "remaining_quantity": item.remaining_quantity,
                         "cost_basis": format(item.cost_basis, "f"),
+                        "remaining_cost": format(item.remaining_cost, "f"),
                         "source_report_id": item.source_report_id,
                         "occurred_at": (
                             item.occurred_at.isoformat() if item.occurred_at is not None else None
@@ -1001,7 +1121,7 @@ class FundingBridgePort(Protocol):
         self,
         context: SyntheticContext,
         report: SellExecutionReport,
-        profile: SellProfile,
+        profile: SellProfile | ReductionSellProfile,
     ) -> BuyBridgeResult | None: ...
     def replay_settlement(
         self,
@@ -1021,7 +1141,7 @@ class FundingBridgePort(Protocol):
         expected_funding_digest: str,
         receipt_id: str,
         report: SellExecutionReport,
-        profile: SellProfile,
+        profile: SellProfile | ReductionSellProfile,
         impact: SellImpact,
     ) -> BuyBridgeResult: ...
     def settlement_facts(
@@ -1177,21 +1297,39 @@ def calculate_entry_transition(
 def apply_confirmed_sell_transition(
     state: BridgeState,
     report: SellExecutionReport,
-    profile: SellProfile,
+    profile: SellProfile | ReductionSellProfile,
     lot: BuyLot,
 ) -> SellImpact:
-    """The one full-lot sell calculation used by live posting and rebuild."""
+    """The one full-or-reduction sell calculation used by live posting and rebuild."""
 
+    if not isinstance(profile, (SellProfile, ReductionSellProfile)):
+        raise FactError("UNSUPPORTED_SELL_PROFILE", "typed sell profile is required")
     if (
         lot.security_code != report.security_code
         or lot.cycle_id != report.cycle_id
-        or lot.remaining_quantity != report.quantity
         or report.quantity != profile.final_cumulative_fill_quantity
         or report.confirmed_fee != profile.confirmed_fee
         or report.source_id != profile.source_id
         or profile.cancelled_quantity != 0
     ):
         raise FactError("FINAL_FILL_GAP", "sell report, profile and lot differ")
+    if isinstance(profile, SellProfile):
+        if lot.remaining_quantity != report.quantity:
+            raise FactError("FINAL_FILL_GAP", "full-position profile requires entire residual")
+        sold_cost = lot.remaining_cost
+        remaining_quantity = 0
+        remaining_cost = Decimal("0.00")
+    else:
+        if report.quantity >= lot.remaining_quantity:
+            raise FactError(
+                "REDUCTION_PROFILE_NOT_APPLICABLE",
+                "reduction profile requires a non-empty residual lot",
+            )
+        sold_cost = (lot.remaining_cost * report.quantity / lot.remaining_quantity).quantize(
+            Decimal("0.01")
+        )
+        remaining_quantity = lot.remaining_quantity - report.quantity
+        remaining_cost = lot.remaining_cost - sold_cost
     if report.occurred_at < lot.occurred_at:
         raise FactError("TEMPORAL_ORDER_VIOLATION", "sell occurred before the matched buy")
     if report.source_id != lot.source_id or report.source_sequence == lot.source_sequence:
@@ -1202,7 +1340,7 @@ def apply_confirmed_sell_transition(
         quantity=report.quantity,
         price=report.price,
         fee=report.confirmed_fee,
-        cost_basis=lot.cost_basis,
+        cost_basis=sold_cost,
     )
     bucket = state.funding.bucket(_bucket_for_cycle(state.funding, report.cycle_id))
     updated_bucket = BucketState(
@@ -1226,6 +1364,15 @@ def apply_confirmed_sell_transition(
         "profile_digest": profile.payload_digest,
         "source_fact_id": report.source_fact_id,
     }
+    if isinstance(profile, ReductionSellProfile):
+        result_body.update(
+            {
+                "profile_kind": profile.profile_kind,
+                "cost_basis_consumed": format(sold_cost, "f"),
+                "remaining_quantity": remaining_quantity,
+                "remaining_cost": format(remaining_cost, "f"),
+            }
+        )
     command = CommandEnvelope.create(
         f"sell:{report.report_id}:{profile.payload_digest}",
         result_body,
@@ -1249,7 +1396,11 @@ def apply_confirmed_sell_transition(
     )
     if funding.cash_total != core.projection.cash:
         raise FactError("BASELINE_IDENTITY_MISMATCH", "sell closure cash differs")
-    updated_lot = replace(lot, remaining_quantity=0)
+    updated_lot = replace(
+        lot,
+        remaining_quantity=remaining_quantity,
+        remaining_cost=remaining_cost,
+    )
     return SellImpact(
         core.projection,
         funding,
@@ -1469,7 +1620,7 @@ class FundingBridgeService:
         self,
         context: SyntheticContext,
         report: SellExecutionReport,
-        profile: SellProfile,
+        profile: SellProfile | ReductionSellProfile,
     ) -> BuyBridgeResult:
         context = self._context_for(context)
         report.__post_init__()
@@ -1501,7 +1652,8 @@ class FundingBridgeService:
             for item in view.lots
             if item.security_code == report.security_code
             and item.cycle_id == report.cycle_id
-            and item.remaining_quantity == report.quantity
+            and item.remaining_quantity >= report.quantity
+            and item.remaining_quantity > 0
         )
         if len(lots) != 1:
             raise FactError("LOT_IDENTITY_MISMATCH", "sell does not match one open lot")

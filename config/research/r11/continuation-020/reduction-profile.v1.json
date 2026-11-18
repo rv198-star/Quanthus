@@ -1,0 +1,23 @@
+{
+  "schema": "quanthus.r11.u05-reduction-profile.v1",
+  "profile": {
+    "profile_version": "complete-order-residual-lot-v1",
+    "source_id": "fixture:two-cycle:broker",
+    "order_total_quantity": 200,
+    "final_cumulative_fill_quantity": 200,
+    "cancelled_quantity": 0,
+    "confirmed_fee": "5",
+    "terminal": true
+  },
+  "temporal": {
+    "version": "synthetic-r11-reduction-clock-v1",
+    "events": [
+      {"step": "S01", "role": "entry", "decision_at": "2026-11-17T15:30:00+00:00", "occurred_at": "2026-11-17T16:00:00+00:00", "received_at": "2026-11-17T16:00:00+00:00"},
+      {"step": "S02", "role": "buy", "decision_at": "2026-11-18T00:30:00+00:00", "occurred_at": "2026-11-18T01:00:00+00:00", "received_at": "2026-11-18T01:00:00+00:00"},
+      {"step": "S03", "role": "sell", "decision_at": "2026-11-19T00:30:00+00:00", "occurred_at": "2026-11-19T01:00:00+00:00", "received_at": "2026-11-19T01:00:00+00:00"},
+      {"step": "S04", "role": "sell", "decision_at": "2026-11-19T01:30:00+00:00", "occurred_at": "2026-11-19T02:00:00+00:00", "received_at": "2026-11-19T02:00:00+00:00"},
+      {"step": "S05", "role": "settlement", "decision_at": "2026-11-19T03:00:00+00:00", "occurred_at": "2026-11-19T03:00:00+00:00", "received_at": "2026-11-19T03:00:00+00:00"},
+      {"step": "S06", "role": "late_fee", "decision_at": "2026-11-20T00:00:00+00:00", "occurred_at": "2026-11-18T16:00:00+00:00", "received_at": "2026-11-20T00:00:00+00:00"}
+    ]
+  }
+}

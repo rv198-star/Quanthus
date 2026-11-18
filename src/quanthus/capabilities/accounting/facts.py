@@ -41,6 +41,15 @@ class Posting:
 
 
 @dataclass(frozen=True)
+class SellImpactCore:
+    projection: AccountProjection
+    postings: tuple[Posting, ...]
+    cash_delta: Decimal
+    gross_proceeds: Decimal
+    realized_pnl: Decimal
+
+
+@dataclass(frozen=True)
 class AccountProjection:
     revision: int
     event_sequence: int
@@ -103,6 +112,47 @@ def apply_buy_delta(
         ),
         apply_buy_postings(principal, fee),
     )
+
+
+def apply_sell_delta(
+    projection: AccountProjection,
+    *,
+    security_code: str,
+    quantity: int,
+    price: Decimal,
+    fee: Decimal,
+    cost_basis: Decimal,
+) -> SellImpactCore:
+    if quantity <= 0 or price <= 0 or fee < 0 or cost_basis < 0:
+        raise FactError("INVALID_REPORT_SHAPE", "sell inputs are invalid")
+    current = projection.quantity(security_code)
+    if quantity > current:
+        raise FactError("NEGATIVE_POSITION", "sell exceeds matched position")
+    gross = price * quantity
+    cash_delta = gross - fee
+    realized = gross - cost_basis
+    postings = (
+        Posting("ASSET_CASH", cash_delta),
+        Posting("ASSET_POSITION", -cost_basis),
+        Posting("REALIZED_PNL", -realized),
+        Posting("EXPENSE_CONFIRMED_FEE", fee),
+    )
+    if sum((item.amount for item in postings), Decimal("0")) != 0:
+        raise FactError("UNBALANCED_POSTING", "sell postings must sum to zero")
+    positions = tuple(
+        Position(item.security_code, item.quantity - quantity)
+        if item.security_code == security_code
+        else item
+        for item in projection.positions
+    )
+    updated = AccountProjection(
+        projection.revision + 1,
+        projection.event_sequence + 1,
+        (projection.cash + cash_delta).quantize(Decimal("0.01")),
+        tuple(item for item in positions if item.quantity),
+        projection.fact_count + 1,
+    )
+    return SellImpactCore(updated, postings, cash_delta, gross, realized)
 
 
 def apply_correction_delta(

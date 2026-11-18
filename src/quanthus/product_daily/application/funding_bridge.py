@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Protocol
 
-from quanthus.capabilities.accounting import AccountProjection, Posting, apply_buy_delta
+from quanthus.capabilities.accounting import (
+    AccountProjection,
+    Posting,
+    apply_buy_delta,
+    apply_sell_delta,
+)
 from quanthus.capabilities.execution import (
     ExecutionReport as ExecutionReport,
 )
@@ -19,6 +25,7 @@ from quanthus.capabilities.execution import (
     validate_report,
 )
 from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
+from quanthus.product_daily.candidate import CandidateProjection
 from quanthus.product_daily.contracts import (
     CommandEnvelope,
     ProcessedCommand,
@@ -29,16 +36,25 @@ from quanthus.product_daily.funding import (
     BucketPhase,
     BucketState,
     CompletedSettlement,
+    CycleSettlementEvidence,
     EntryReservation,
+    FundingDecision,
     FundingState,
+    SettlementRequest,
+    apply_late_cash_delta,
+    late_cash_invocation_payload,
+    settle_batch,
+    settle_invocation_payload,
 )
 from quanthus.product_daily.risk import (
     BuyFeeRule,
     CandidateEntry,
-    EntryDecision,
     EntryLimits,
+    ExpertEntryAction,
+    ExpertEntryEligibility,
     MarkedExposure,
     PendingBuy,
+    PendingSell,
     QuantityLimits,
     RiskSnapshot,
     decide_entry,
@@ -338,6 +354,153 @@ class CycleEntryIntent:
     fee_rule: BuyFeeRule
 
 
+def entry_intent_to_dict(intent: CycleEntryIntent) -> dict[str, Any]:
+    return {
+        "expected_account_revision": intent.expected_account_revision,
+        "command": {
+            "command_id": intent.command.command_id,
+            "body_digest": intent.command.body_digest,
+            "expected_revision": intent.command.expected_revision,
+        },
+        "candidate": intent.candidate.to_dict(),
+        "snapshot": intent.snapshot.to_dict(),
+        "empty_bucket_ids": list(intent.empty_bucket_ids),
+        "active_or_reserved_security_codes": list(intent.active_or_reserved_security_codes),
+        "active_industry_counts": [list(item) for item in intent.active_industry_counts],
+        "new_buckets_today": intent.new_buckets_today,
+        "limits": {
+            "max_active_or_reserved_per_industry": (
+                intent.limits.max_active_or_reserved_per_industry
+            ),
+            "max_new_buckets_per_day": intent.limits.max_new_buckets_per_day,
+        },
+        "fraction": format(intent.fraction, "f"),
+        "mark_price": format(intent.mark_price, "f"),
+        "price_bound": format(intent.price_bound, "f"),
+        "lot_size": intent.lot_size,
+        "quantity_limits": {
+            "stock": format(intent.quantity_limits.stock or Decimal("0"), "f"),
+            "industry": format(intent.quantity_limits.industry or Decimal("0"), "f"),
+            "total": format(intent.quantity_limits.total or Decimal("0"), "f"),
+        },
+        "fee_rule": {
+            "commission_rate": format(intent.fee_rule.commission_rate or Decimal("0"), "f"),
+            "minimum_commission": format(intent.fee_rule.minimum_commission or Decimal("0"), "f"),
+            "cash_quantum": format(intent.fee_rule.cash_quantum, "f"),
+        },
+    }
+
+
+def restore_entry_intent(raw: dict[str, Any]) -> CycleEntryIntent:
+    candidate_raw = raw["candidate"]
+    expert_raw = candidate_raw.get("expert_entry")
+    expert = None
+    if expert_raw is not None:
+        expert = ExpertEntryEligibility(
+            expert_raw["event_id"],
+            expert_raw["security_code"],
+            ExpertEntryAction(expert_raw["final_action"]),
+            expert_raw["source_digest"],
+            Decimal(expert_raw["target_maximum_position"])
+            if expert_raw["target_maximum_position"] is not None
+            else None,
+        )
+    candidate = CandidateEntry(
+        candidate_raw["opportunity_id"],
+        candidate_raw["security_code"],
+        candidate_raw["level1_industry_id"],
+        CandidateProjection(candidate_raw["projection"]),
+        candidate_raw["input_valid"],
+        candidate_raw["knowledge_cutoff_valid"],
+        candidate_raw["policy_adopted"],
+        expert,
+    )
+    snapshot_raw = raw["snapshot"]
+    positions = tuple(
+        MarkedExposure(
+            item["unit_id"],
+            item["opportunity_id"],
+            item["security_code"],
+            item["level1_industry_id"],
+            item["quantity"],
+            Decimal(item["mark_price"]) if item["mark_price"] is not None else None,
+            Decimal(item["price_bound"]) if item["price_bound"] is not None else None,
+        )
+        for item in snapshot_raw["positions"]
+    )
+    pending = tuple(
+        PendingBuy(
+            item["reservation_id"],
+            item["security_code"],
+            item["level1_industry_id"],
+            item["remaining_quantity"],
+            Decimal(item["mark_price"]) if item["mark_price"] is not None else None,
+            Decimal(item["price_bound"]) if item["price_bound"] is not None else None,
+            Decimal(item["unrecognized_fee_upper_bound"])
+            if item["unrecognized_fee_upper_bound"] is not None
+            else None,
+            item["fee_already_recognized"],
+        )
+        for item in snapshot_raw["pending_buys"]
+    )
+    sells = tuple(
+        PendingSell(
+            item["sell_id"],
+            item["security_code"],
+            item["level1_industry_id"],
+            item["quantity"],
+            Decimal(item["mark_price"]) if item["mark_price"] is not None else None,
+        )
+        for item in snapshot_raw["pending_sells"]
+    )
+    snapshot = RiskSnapshot(
+        snapshot_raw["snapshot_id"],
+        datetime.fromisoformat(snapshot_raw["as_of"]),
+        Decimal(snapshot_raw["equity"]) if snapshot_raw["equity"] is not None else None,
+        Decimal(snapshot_raw["cash_available"])
+        if snapshot_raw["cash_available"] is not None
+        else None,
+        positions,
+        pending,
+        sells,
+        Decimal(snapshot_raw["recognized_payables"]),
+    )
+    limits = raw["limits"]
+    quantity_limits = raw["quantity_limits"]
+    fee = raw["fee_rule"]
+    command = raw["command"]
+    return CycleEntryIntent(
+        raw["expected_account_revision"],
+        CommandEnvelope(
+            command["command_id"], command["body_digest"], command["expected_revision"]
+        ),
+        candidate,
+        snapshot,
+        tuple(raw["empty_bucket_ids"]),
+        tuple(raw["active_or_reserved_security_codes"]),
+        tuple((item[0], item[1]) for item in raw["active_industry_counts"]),
+        raw["new_buckets_today"],
+        EntryLimits(
+            limits["max_active_or_reserved_per_industry"],
+            limits["max_new_buckets_per_day"],
+        ),
+        Decimal(raw["fraction"]),
+        Decimal(raw["mark_price"]),
+        Decimal(raw["price_bound"]),
+        raw["lot_size"],
+        QuantityLimits(
+            Decimal(quantity_limits["stock"]),
+            Decimal(quantity_limits["industry"]),
+            Decimal(quantity_limits["total"]),
+        ),
+        BuyFeeRule(
+            Decimal(fee["commission_rate"]),
+            Decimal(fee["minimum_commission"]),
+            Decimal(fee["cash_quantum"]),
+        ),
+    )
+
+
 @dataclass(frozen=True)
 class CycleFillProfile:
     profile_version: str
@@ -403,6 +566,7 @@ class PendingObligation:
     security_code: str
     level1_industry_id: str
     bucket_id: str
+    cycle_id: str
     quantity: int
     price_bound: Decimal
     fee_upper_bound: Decimal
@@ -434,6 +598,213 @@ class BuyImpact:
 
 
 @dataclass(frozen=True)
+class BuyLot:
+    lot_id: str
+    security_code: str
+    cycle_id: str
+    quantity: int
+    remaining_quantity: int
+    cost_basis: Decimal
+    source_report_id: str
+    occurred_at: datetime
+    source_id: str
+    source_sequence: str
+
+    def __post_init__(self) -> None:
+        if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
+            raise FactError("INVALID_REPORT_SHAPE", "lot occurrence must be aware")
+        if not self.source_id or not self.source_sequence:
+            raise FactError("INVALID_REPORT_SHAPE", "lot source identity is required")
+
+
+@dataclass(frozen=True)
+class SellExecutionReport:
+    report_id: str
+    security_code: str
+    cycle_id: str
+    quantity: int
+    price: Decimal
+    confirmed_fee: Decimal
+    occurred_at: datetime
+    source_id: str
+    source_sequence: str
+
+    def __post_init__(self) -> None:
+        if any(
+            not isinstance(item, str) or not item.strip()
+            for item in (
+                self.report_id,
+                self.security_code,
+                self.cycle_id,
+                self.source_id,
+                self.source_sequence,
+            )
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "sell identity is invalid")
+        if (
+            not isinstance(self.quantity, int)
+            or isinstance(self.quantity, bool)
+            or self.quantity <= 0
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "sell quantity must be positive")
+        if not isinstance(self.price, Decimal) or self.price <= 0:
+            raise FactError("INVALID_REPORT_SHAPE", "sell price must be positive")
+        if not isinstance(self.confirmed_fee, Decimal) or self.confirmed_fee < 0:
+            raise FactError("INVALID_REPORT_SHAPE", "sell fee is invalid")
+        if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
+            raise FactError("INVALID_REPORT_SHAPE", "sell time must be aware")
+
+    @property
+    def payload_digest(self) -> str:
+        return digest(self.to_dict())
+
+    @property
+    def source_fact_id(self) -> str:
+        return digest([self.source_id, self.source_sequence])
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "report_id": self.report_id,
+            "security_code": self.security_code,
+            "cycle_id": self.cycle_id,
+            "quantity": self.quantity,
+            "price": format(self.price, "f"),
+            "confirmed_fee": format(self.confirmed_fee, "f"),
+            "occurred_at": self.occurred_at.isoformat(),
+            "source_id": self.source_id,
+            "source_sequence": self.source_sequence,
+        }
+
+
+@dataclass(frozen=True)
+class SellProfile:
+    profile_version: str
+    source_id: str
+    order_total_quantity: int
+    final_cumulative_fill_quantity: int
+    cancelled_quantity: int
+    confirmed_fee: Decimal
+    terminal: bool
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.profile_version, str)
+            or not self.profile_version
+            or not isinstance(self.source_id, str)
+            or not self.source_id
+            or not isinstance(self.terminal, bool)
+            or not self.terminal
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "sell profile identity is invalid")
+        values = (
+            self.order_total_quantity,
+            self.final_cumulative_fill_quantity,
+            self.cancelled_quantity,
+        )
+        if any(not isinstance(item, int) or isinstance(item, bool) or item < 0 for item in values):
+            raise FactError("INVALID_REPORT_SHAPE", "sell profile quantities are invalid")
+        if self.order_total_quantity != (
+            self.final_cumulative_fill_quantity + self.cancelled_quantity
+        ):
+            raise FactError("FINAL_FILL_GAP", "sell terminal quantities differ")
+        if (
+            not isinstance(self.confirmed_fee, Decimal)
+            or not self.confirmed_fee.is_finite()
+            or self.confirmed_fee < 0
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "sell profile fee is invalid")
+
+    @property
+    def payload_digest(self) -> str:
+        return digest(
+            {
+                "profile_version": self.profile_version,
+                "source_id": self.source_id,
+                "order_total_quantity": self.order_total_quantity,
+                "final_cumulative_fill_quantity": self.final_cumulative_fill_quantity,
+                "cancelled_quantity": self.cancelled_quantity,
+                "confirmed_fee": format(self.confirmed_fee, "f"),
+                "terminal": self.terminal,
+            }
+        )
+
+
+@dataclass(frozen=True)
+class SellImpact:
+    account: AccountProjection
+    funding: FundingState
+    postings: tuple[Posting, ...]
+    cash_delta: Decimal
+    receipt: ProcessedCommand
+    lot: BuyLot
+
+
+@dataclass(frozen=True)
+class SettlementBridgeResult:
+    settlement_id: str
+    funding: FundingState
+    decision: FundingDecision
+    account_revision: int
+    receipt_id: str
+
+
+@dataclass(frozen=True)
+class LateFeeFact:
+    fact_id: str
+    bucket_id: str
+    cycle_id: str
+    cash_delta: Decimal
+    source_id: str
+    source_sequence: str
+    occurred_at: datetime
+
+    def __post_init__(self) -> None:
+        if any(
+            not isinstance(item, str) or not item.strip()
+            for item in (
+                self.fact_id,
+                self.bucket_id,
+                self.cycle_id,
+                self.source_id,
+                self.source_sequence,
+            )
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "late fee identity is invalid")
+        if (
+            not isinstance(self.cash_delta, Decimal)
+            or not self.cash_delta.is_finite()
+            or self.cash_delta == 0
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "late fee delta is invalid")
+        if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
+            raise FactError("INVALID_REPORT_SHAPE", "late fee time must be aware")
+
+    @property
+    def payload_digest(self) -> str:
+        return digest(
+            {
+                "fact_id": self.fact_id,
+                "bucket_id": self.bucket_id,
+                "cycle_id": self.cycle_id,
+                "cash_delta": format(self.cash_delta, "f"),
+                "source_id": self.source_id,
+                "source_sequence": self.source_sequence,
+                "occurred_at": self.occurred_at.isoformat(),
+            }
+        )
+
+
+@dataclass(frozen=True)
+class LateFeeResult:
+    receipt_id: str
+    status: str
+    account: AccountProjection
+    funding: FundingState
+    account_revision: int
+    postings: tuple[Posting, ...]
+
+
+@dataclass(frozen=True)
 class BridgeState:
     account: AccountProjection
     funding: FundingState
@@ -444,6 +815,8 @@ class BridgeState:
 class BridgeSnapshot:
     state: BridgeState
     obligations: tuple[PendingObligation, ...]
+    lots: tuple[BuyLot, ...] = ()
+    latest_received_at: datetime | None = None
 
     @property
     def revision(self) -> int:
@@ -463,6 +836,7 @@ class BridgeSnapshot:
                         "security_code": item.security_code,
                         "level1_industry_id": item.level1_industry_id,
                         "bucket_id": item.bucket_id,
+                        "cycle_id": item.cycle_id,
                         "quantity": item.quantity,
                         "price_bound": format(item.price_bound, "f"),
                         "fee_upper_bound": format(item.fee_upper_bound, "f"),
@@ -471,8 +845,78 @@ class BridgeSnapshot:
                     }
                     for item in self.obligations
                 ],
+                "lots": [
+                    {
+                        "lot_id": item.lot_id,
+                        "security_code": item.security_code,
+                        "cycle_id": item.cycle_id,
+                        "quantity": item.quantity,
+                        "remaining_quantity": item.remaining_quantity,
+                        "cost_basis": format(item.cost_basis, "f"),
+                        "source_report_id": item.source_report_id,
+                        "occurred_at": (
+                            item.occurred_at.isoformat() if item.occurred_at is not None else None
+                        ),
+                        "source_id": item.source_id,
+                        "source_sequence": item.source_sequence,
+                    }
+                    for item in self.lots
+                ],
+                "latest_received_at": (
+                    self.latest_received_at.isoformat()
+                    if self.latest_received_at is not None
+                    else None
+                ),
             }
         )
+
+
+@dataclass(frozen=True)
+class SyntheticTemporalProfile:
+    profile_version: str
+    received_times: tuple[datetime, ...]
+    roles: tuple[str, ...] = ()
+    occurred_times: tuple[datetime, ...] = ()
+    decision_times: tuple[datetime, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.profile_version or not self.received_times:
+            raise FactError("INVALID_REPORT_SHAPE", "temporal profile is empty")
+        if any(item.tzinfo is None or item.utcoffset() is None for item in self.received_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal profile must be aware")
+        if self.roles and len(self.roles) != len(self.received_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal roles must align")
+        if self.occurred_times and len(self.occurred_times) != len(self.received_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal occurrences must align")
+        if self.decision_times and len(self.decision_times) != len(self.received_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal decisions must align")
+        if any(item.tzinfo is None or item.utcoffset() is None for item in self.occurred_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal occurrences must be aware")
+        if any(item.tzinfo is None or item.utcoffset() is None for item in self.decision_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal decisions must be aware")
+
+    def require(
+        self,
+        context: SyntheticContext,
+        role: str,
+        occurred_at: datetime | None = None,
+    ) -> None:
+        try:
+            index = self.received_times.index(context.as_of)
+        except ValueError:
+            raise FactError(
+                "TEMPORAL_PROFILE_REQUIRED", "context is outside synthetic profile"
+            ) from None
+        if self.roles and self.roles[index] != role:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "operation role is outside profile")
+        if self.decision_times and self.decision_times[index] > context.as_of:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "decision window is in the future")
+        if (
+            occurred_at is not None
+            and self.occurred_times
+            and occurred_at != self.occurred_times[index]
+        ):
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "fact occurrence is outside profile")
 
 
 @dataclass(frozen=True)
@@ -486,6 +930,7 @@ class EntryBridgeResult:
     result_digest: str
     command_id: str
     obligation: PendingObligation | None = None
+    intent: CycleEntryIntent | None = None
 
 
 @dataclass(frozen=True)
@@ -500,9 +945,32 @@ class BuyBridgeResult:
 
 class FundingBridgePort(Protocol):
     def establish(self, baseline: CycleBaseline) -> BridgeState: ...
+    def replay_entry(
+        self, context: SyntheticContext, intent: CycleEntryIntent
+    ) -> EntryBridgeResult | None: ...
     def read(self, context: SyntheticContext) -> BridgeState: ...
     def read_snapshot(self, context: SyntheticContext) -> BridgeSnapshot: ...
     def obligations(self, context: SyntheticContext) -> tuple[PendingObligation, ...]: ...
+    def lots(self, context: SyntheticContext) -> tuple[BuyLot, ...]: ...
+    def latest_received_at(self, context: SyntheticContext) -> datetime | None: ...
+    def receive_operation(
+        self,
+        context: SyntheticContext,
+        kind: str,
+        identity: str,
+        payload_digest: str,
+        payload: object,
+    ) -> str: ...
+    def check_source_alias(
+        self,
+        context: SyntheticContext,
+        *,
+        identity: str,
+        source_id: str,
+        source_sequence: str,
+        new_digest: str,
+        payload: object,
+    ) -> None: ...
     def commit_entry(
         self, context: SyntheticContext, expected: str, result: EntryBridgeResult
     ) -> BridgeState: ...
@@ -529,6 +997,52 @@ class FundingBridgePort(Protocol):
         report: ExecutionReport,
         profile: CycleFillProfile,
     ) -> BuyBridgeResult | None: ...
+    def replay_sell(
+        self,
+        context: SyntheticContext,
+        report: SellExecutionReport,
+        profile: SellProfile,
+    ) -> BuyBridgeResult | None: ...
+    def replay_settlement(
+        self,
+        context: SyntheticContext,
+        settlement_id: str,
+        cycle_id: str,
+    ) -> SettlementBridgeResult | None: ...
+    def replay_late_fee(
+        self,
+        context: SyntheticContext,
+        fact: LateFeeFact,
+    ) -> LateFeeResult | None: ...
+    def commit_sell(
+        self,
+        context: SyntheticContext,
+        expected_account_digest: str,
+        expected_funding_digest: str,
+        receipt_id: str,
+        report: SellExecutionReport,
+        profile: SellProfile,
+        impact: SellImpact,
+    ) -> BuyBridgeResult: ...
+    def settlement_facts(
+        self, context: SyntheticContext, cycle_id: str
+    ) -> tuple[bool, bool, bool, bool]: ...
+    def commit_settlement(
+        self,
+        context: SyntheticContext,
+        expected_account_digest: str,
+        expected_funding_digest: str,
+        result: SettlementBridgeResult,
+        request: SettlementRequest,
+    ) -> SettlementBridgeResult: ...
+    def commit_late_fee(
+        self,
+        context: SyntheticContext,
+        expected_account_digest: str,
+        expected_funding_digest: str,
+        fact: LateFeeFact,
+        result: LateFeeResult,
+    ) -> LateFeeResult: ...
     def rebuild(self, context: SyntheticContext) -> BridgeState: ...
 
 
@@ -610,42 +1124,273 @@ def apply_confirmed_buy_transition(
     return BuyImpact(account, funding, postings, cash_delta, receipt)
 
 
+def calculate_entry_transition(
+    state: BridgeState, intent: CycleEntryIntent, source_id: str
+) -> EntryBridgeResult:
+    decision = decide_entry(
+        candidate=intent.candidate,
+        funding=state.funding,
+        snapshot=intent.snapshot,
+        empty_bucket_ids=intent.empty_bucket_ids,
+        active_or_reserved_security_codes=intent.active_or_reserved_security_codes,
+        active_industry_counts=intent.active_industry_counts,
+        new_buckets_today=intent.new_buckets_today,
+        limits=intent.limits,
+        fraction=intent.fraction,
+        mark_price=intent.mark_price,
+        price_bound=intent.price_bound,
+        lot_size=intent.lot_size,
+        quantity_limits=intent.quantity_limits,
+        fee_rule=intent.fee_rule,
+        command=intent.command,
+    )
+    obligation = None
+    if decision.accepted and decision.reservation_id is not None and decision.quantity is not None:
+        bucket_id = decision.selected_bucket_id or ""
+        obligation = PendingObligation(
+            decision.reservation_id,
+            decision.reservation_id,
+            intent.candidate.security_code,
+            intent.candidate.level1_industry_id,
+            bucket_id,
+            decision.funding_state.bucket(bucket_id).cycle_id or "",
+            decision.quantity.quantity,
+            intent.price_bound,
+            decision.quantity.fees or Decimal("0"),
+            source_id,
+        )
+    return EntryBridgeResult(
+        decision.accepted,
+        decision.replayed,
+        decision.quantity.quantity if decision.quantity is not None else 0,
+        decision.reservation_id,
+        decision.funding_state,
+        state.account_revision
+        + (1 if decision.funding_state_changed and not decision.replayed else 0),
+        decision.digest,
+        intent.command.command_id,
+        obligation,
+        intent,
+    )
+
+
+def apply_confirmed_sell_transition(
+    state: BridgeState,
+    report: SellExecutionReport,
+    profile: SellProfile,
+    lot: BuyLot,
+) -> SellImpact:
+    """The one full-lot sell calculation used by live posting and rebuild."""
+
+    if (
+        lot.security_code != report.security_code
+        or lot.cycle_id != report.cycle_id
+        or lot.remaining_quantity != report.quantity
+        or report.quantity != profile.final_cumulative_fill_quantity
+        or report.confirmed_fee != profile.confirmed_fee
+        or report.source_id != profile.source_id
+        or profile.cancelled_quantity != 0
+    ):
+        raise FactError("FINAL_FILL_GAP", "sell report, profile and lot differ")
+    if report.occurred_at < lot.occurred_at:
+        raise FactError("TEMPORAL_ORDER_VIOLATION", "sell occurred before the matched buy")
+    if report.source_id != lot.source_id or report.source_sequence == lot.source_sequence:
+        raise FactError("SOURCE_CONTEXT_MISMATCH", "sell source differs from matched buy")
+    core = apply_sell_delta(
+        state.account,
+        security_code=report.security_code,
+        quantity=report.quantity,
+        price=report.price,
+        fee=report.confirmed_fee,
+        cost_basis=lot.cost_basis,
+    )
+    bucket = state.funding.bucket(_bucket_for_cycle(state.funding, report.cycle_id))
+    updated_bucket = BucketState(
+        bucket.bucket_id,
+        bucket.cash + core.cash_delta,
+        bucket.target_notional,
+        bucket.locked_cycle_budget,
+        bucket.cycle_id,
+        bucket.phase,
+    )
+    buckets = tuple(
+        updated_bucket if item.bucket_id == bucket.bucket_id else item
+        for item in state.funding.buckets
+    )
+    result_body = {
+        "accepted": True,
+        "account_cash": format(core.projection.cash, "f"),
+        "account_digest": core.projection.digest,
+        "cycle_id": report.cycle_id,
+        "lot_id": lot.lot_id,
+        "profile_digest": profile.payload_digest,
+        "source_fact_id": report.source_fact_id,
+    }
+    command = CommandEnvelope.create(
+        f"sell:{report.report_id}:{profile.payload_digest}",
+        result_body,
+        state.funding.revision,
+    )
+    receipt = make_receipt(
+        command=command,
+        operation="post_confirmed_sell",
+        invocation_payload=result_body,
+        result=result_body,
+        revision=state.funding.revision + 1,
+    )
+    funding = FundingState(
+        buckets,
+        state.funding.reserve,
+        state.funding.unallocated_adjustment,
+        state.funding.revision + 1,
+        (*state.funding.processed_commands, receipt),
+        state.funding.completed_settlements,
+        state.funding.entry_reservations,
+    )
+    if funding.cash_total != core.projection.cash:
+        raise FactError("BASELINE_IDENTITY_MISMATCH", "sell closure cash differs")
+    updated_lot = replace(lot, remaining_quantity=0)
+    return SellImpact(
+        core.projection,
+        funding,
+        core.postings,
+        core.cash_delta,
+        receipt,
+        updated_lot,
+    )
+
+
+def _bucket_for_cycle(funding: FundingState, cycle_id: str) -> str:
+    matches = [item.bucket_id for item in funding.buckets if item.cycle_id == cycle_id]
+    if len(matches) != 1:
+        raise FactError("CYCLE_IDENTITY_MISMATCH", "cycle does not identify one bucket")
+    return matches[0]
+
+
+def apply_late_fee_transition(
+    state: BridgeState,
+    fact: LateFeeFact,
+    command: CommandEnvelope,
+) -> LateFeeResult:
+    decision = apply_late_cash_delta(
+        state.funding,
+        command,
+        bucket_id=fact.bucket_id,
+        cycle_id=fact.cycle_id,
+        cash_delta=fact.cash_delta,
+    )
+    if not decision.accepted:
+        raise FactError("LATE_FEE_NOT_APPLIED", "late fee funding decision refused")
+    if decision.replayed:
+        cash = state.account.cash
+        postings: tuple[Posting, ...] = ()
+    else:
+        cash = state.account.cash + fact.cash_delta
+        postings = (
+            Posting("ASSET_CASH", fact.cash_delta),
+            Posting("EXPENSE_CONFIRMED_FEE", -fact.cash_delta),
+        )
+    account = AccountProjection(
+        state.account.revision + (0 if decision.replayed else 1),
+        state.account.event_sequence + (0 if decision.replayed else 1),
+        cash,
+        state.account.positions,
+        state.account.fact_count + (0 if decision.replayed else 1),
+    )
+    if account.cash != decision.state.cash_total:
+        raise FactError("BASELINE_IDENTITY_MISMATCH", "late fee cash closure differs")
+    return LateFeeResult(
+        command.command_id,
+        "DUPLICATE" if decision.replayed else "POSTED",
+        account,
+        decision.state,
+        account.revision,
+        postings,
+    )
+
+
 class FundingBridgeService:
     def __init__(
         self,
         port: FundingBridgePort,
         authorized_context: SyntheticContext,
         authorization: SyntheticRuntimeAuthorization,
+        temporal_profile: SyntheticTemporalProfile | None = None,
     ) -> None:
         authorization.require(authorized_context)
         self._port = port
         self._authorization = authorization
         self._context = validate_context(authorized_context)
+        self._temporal_profile = temporal_profile
 
     def _context_for(self, context: SyntheticContext) -> SyntheticContext:
         value = validate_context(context)
         self._authorization.require(value)
-        if value != self._context:
-            raise FactError("UNAUTHORIZED_CONTEXT", "bridge context differs")
+        if (
+            value.account_id != self._context.account_id
+            or value.mode != self._context.mode
+            or value.source_id != self._context.source_id
+            or value.coverage_id != self._context.coverage_id
+            or value.as_of < self._context.as_of
+        ):
+            raise FactError("UNAUTHORIZED_CONTEXT", "bridge context identity or time differs")
         return value
+
+    def _require_not_before_latest(self, context: SyntheticContext) -> None:
+        latest = self._port.latest_received_at(context)
+        if latest is not None and context.as_of < latest:
+            raise FactError("CONTEXT_TIME_REGRESSION", "caller as_of precedes consumed facts")
+
+    def _require_fact_time(
+        self,
+        context: SyntheticContext,
+        occurred_at: datetime | None,
+        *,
+        role: str,
+        mutation: bool = True,
+    ) -> None:
+        self._require_not_before_latest(context)
+        if occurred_at is not None and occurred_at > context.as_of:
+            raise FactError("FUTURE_FACT", "fact occurred after caller as_of")
+        if mutation and self._temporal_profile is not None:
+            self._temporal_profile.require(context, role, occurred_at)
 
     def establish_baseline(self, baseline: CycleBaseline) -> BridgeState:
         self._context_for(baseline.context)
         return self._port.establish(baseline)
 
     def current(self, context: SyntheticContext) -> BridgeState:
-        return self._port.read(self._context_for(context))
+        value = self._context_for(context)
+        self._require_not_before_latest(value)
+        return self._port.read(value)
 
     def enter(self, context: SyntheticContext, intent: CycleEntryIntent) -> EntryBridgeResult:
         context = self._context_for(context)
+        existing = self._port.replay_entry(context, intent)
+        if existing is not None:
+            return existing
         view = self._port.read_snapshot(context)
         state = view.state
+        if state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle execution lacks profile")
         known_command = any(
             item.command_id == intent.command.command_id
             for item in state.funding.processed_commands
         )
         if not known_command and state.account_revision != intent.expected_account_revision:
             raise ProductDailyError("ACCOUNT_REVISION_CONFLICT", "account revision is stale")
+        if not known_command:
+            if intent.snapshot.as_of != context.as_of:
+                raise FactError(
+                    "RISK_SNAPSHOT_STALE", "risk snapshot as_of differs from caller context"
+                )
+            self._require_fact_time(context, None, role="entry")
+        if (
+            state.funding.completed_settlements
+            and self._temporal_profile is None
+            and not known_command
+        ):
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle admission lacks profile")
         if not known_command:
             pending = tuple(
                 item.pending_buy() for item in view.obligations if item.status == "OPEN"
@@ -672,52 +1417,7 @@ class FundingBridgeService:
                 raise FactError(
                     "RISK_SNAPSHOT_STALE", "risk snapshot differs from current account closure"
                 )
-        decision: EntryDecision = decide_entry(
-            candidate=intent.candidate,
-            funding=state.funding,
-            snapshot=intent.snapshot,
-            empty_bucket_ids=intent.empty_bucket_ids,
-            active_or_reserved_security_codes=intent.active_or_reserved_security_codes,
-            active_industry_counts=intent.active_industry_counts,
-            new_buckets_today=intent.new_buckets_today,
-            limits=intent.limits,
-            fraction=intent.fraction,
-            mark_price=intent.mark_price,
-            price_bound=intent.price_bound,
-            lot_size=intent.lot_size,
-            quantity_limits=intent.quantity_limits,
-            fee_rule=intent.fee_rule,
-            command=intent.command,
-        )
-        obligation = None
-        if (
-            decision.accepted
-            and decision.reservation_id is not None
-            and decision.quantity is not None
-        ):
-            obligation = PendingObligation(
-                decision.reservation_id,
-                decision.reservation_id,
-                intent.candidate.security_code,
-                intent.candidate.level1_industry_id,
-                decision.selected_bucket_id or "",
-                decision.quantity.quantity,
-                intent.price_bound,
-                decision.quantity.fees or Decimal("0"),
-                context.source_id,
-            )
-        result = EntryBridgeResult(
-            decision.accepted,
-            decision.replayed,
-            decision.quantity.quantity if decision.quantity is not None else 0,
-            decision.reservation_id,
-            decision.funding_state,
-            state.account_revision
-            + (1 if decision.funding_state_changed and not decision.replayed else 0),
-            decision.digest,
-            intent.command.command_id,
-            obligation,
-        )
+        result = calculate_entry_transition(state, intent, context.source_id)
         expected = digest(
             {
                 "account": state.account.digest,
@@ -738,7 +1438,10 @@ class FundingBridgeService:
         if existing is not None:
             return existing
         receipt_id = self._port.receive_buy(context, report, profile)
+        self._require_fact_time(context, report.occurred_at, role="buy")
         view = self._port.read_snapshot(context)
+        if view.state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle execution lacks profile")
         state = view.state
         obligations = tuple(
             item
@@ -762,8 +1465,175 @@ class FundingBridgeService:
             impact.postings,
         )
 
+    def submit_sell(
+        self,
+        context: SyntheticContext,
+        report: SellExecutionReport,
+        profile: SellProfile,
+    ) -> BuyBridgeResult:
+        context = self._context_for(context)
+        report.__post_init__()
+        profile.__post_init__()
+        existing = self._port.replay_sell(context, report, profile)
+        if existing is not None:
+            return existing
+        receipt_id = self._port.receive_operation(
+            context,
+            "sell",
+            report.report_id,
+            digest({"report": report.to_dict(), "profile": profile.payload_digest}),
+            {"report": report.to_dict(), "profile_digest": profile.payload_digest},
+        )
+        self._port.check_source_alias(
+            context,
+            identity=report.report_id,
+            source_id=report.source_id,
+            source_sequence=report.source_sequence,
+            new_digest=receipt_id,
+            payload=report.to_dict(),
+        )
+        self._require_fact_time(context, report.occurred_at, role="sell")
+        view = self._port.read_snapshot(context)
+        if view.state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle sell lacks profile")
+        lots = tuple(
+            item
+            for item in view.lots
+            if item.security_code == report.security_code
+            and item.cycle_id == report.cycle_id
+            and item.remaining_quantity == report.quantity
+        )
+        if len(lots) != 1:
+            raise FactError("LOT_IDENTITY_MISMATCH", "sell does not match one open lot")
+        impact = apply_confirmed_sell_transition(view.state, report, profile, lots[0])
+        return self._port.commit_sell(
+            context,
+            view.state.account.digest,
+            view.state.funding.digest,
+            receipt_id,
+            report,
+            profile,
+            impact,
+        )
+
+    def settle_cycle(
+        self, context: SyntheticContext, *, settlement_id: str, cycle_id: str
+    ) -> SettlementBridgeResult:
+        context = self._context_for(context)
+        existing = self._port.replay_settlement(context, settlement_id, cycle_id)
+        if existing is not None:
+            return existing
+        self._require_not_before_latest(context)
+        if self._temporal_profile is not None:
+            self._temporal_profile.require(context, "settlement")
+        view = self._port.read_snapshot(context)
+        if view.state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "later settlement lacks profile")
+        bucket = view.state.funding.bucket(_bucket_for_cycle(view.state.funding, cycle_id))
+        request = SettlementRequest(
+            settlement_id,
+            bucket.bucket_id,
+            cycle_id,
+            CycleSettlementEvidence(
+                not view.state.account.positions,
+                *self._port.settlement_facts(context, cycle_id),
+            ),
+        )
+        payload = settle_invocation_payload((request,))
+        payload_digest = digest(payload)
+        receipt_id = self._port.receive_operation(
+            context, "settlement", settlement_id, payload_digest, payload
+        )
+        if not request.evidence.settlement_ready:
+            raise FactError("SETTLEMENT_NOT_READY", "actual facts do not prove completeness")
+        closed_funding = FundingState(
+            tuple(
+                replace(item, phase=BucketPhase.CLOSED)
+                if item.bucket_id == bucket.bucket_id
+                else item
+                for item in view.state.funding.buckets
+            ),
+            view.state.funding.reserve,
+            view.state.funding.unallocated_adjustment,
+            view.state.funding.revision,
+            view.state.funding.processed_commands,
+            view.state.funding.completed_settlements,
+            view.state.funding.entry_reservations,
+        )
+        command = CommandEnvelope.create(
+            f"settle:{settlement_id}", payload, closed_funding.revision
+        )
+        decision = settle_batch(closed_funding, command, (request,))
+        if not decision.accepted:
+            raise FactError("SETTLEMENT_NOT_READY", "settle_batch refused actual facts")
+        account = replace(view.state.account, revision=view.state.account.revision + 1)
+        result = SettlementBridgeResult(
+            settlement_id, decision.state, decision, account.revision, receipt_id
+        )
+        return self._port.commit_settlement(
+            context,
+            view.state.account.digest,
+            view.state.funding.digest,
+            result,
+            request,
+        )
+
+    def apply_late_fee(self, context: SyntheticContext, fact: LateFeeFact) -> LateFeeResult:
+        context = self._context_for(context)
+        fact.__post_init__()
+        existing = self._port.replay_late_fee(context, fact)
+        if existing is not None:
+            return existing
+        receipt_id = self._port.receive_operation(
+            context,
+            "late_fee",
+            fact.fact_id,
+            fact.payload_digest,
+            {
+                "fact_id": fact.fact_id,
+                "bucket_id": fact.bucket_id,
+                "cycle_id": fact.cycle_id,
+                "cash_delta": format(fact.cash_delta, "f"),
+                "source_id": fact.source_id,
+                "source_sequence": fact.source_sequence,
+                "occurred_at": fact.occurred_at.isoformat(),
+            },
+        )
+        self._port.check_source_alias(
+            context,
+            identity=fact.fact_id,
+            source_id=fact.source_id,
+            source_sequence=fact.source_sequence,
+            new_digest=receipt_id,
+            payload={
+                "fact_id": fact.fact_id,
+                "cash_delta": format(fact.cash_delta, "f"),
+            },
+        )
+        self._require_fact_time(context, fact.occurred_at, role="late_fee")
+        view = self._port.read_snapshot(context)
+        if view.state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "late fee lacks profile")
+        payload = late_cash_invocation_payload(
+            bucket_id=fact.bucket_id,
+            cycle_id=fact.cycle_id,
+            cash_delta=fact.cash_delta,
+        )
+        command = CommandEnvelope.create(fact.fact_id, payload, view.state.funding.revision)
+        result = apply_late_fee_transition(view.state, fact, command)
+        result = replace(result, receipt_id=receipt_id)
+        return self._port.commit_late_fee(
+            context,
+            view.state.account.digest,
+            view.state.funding.digest,
+            fact,
+            result,
+        )
+
     def risk_snapshot(self, context: SyntheticContext, *, mark_price: Decimal) -> RiskSnapshot:
-        view = self._port.read_snapshot(self._context_for(context))
+        value = self._context_for(context)
+        self._require_not_before_latest(value)
+        view = self._port.read_snapshot(value)
         state = view.state
         pending = tuple(item.pending_buy() for item in view.obligations if item.status == "OPEN")
         positions = tuple(
@@ -781,7 +1651,7 @@ class FundingBridgeService:
         marked = sum((Decimal(item.quantity) * mark_price for item in positions), Decimal("0"))
         return RiskSnapshot(
             f"bridge-risk:{view.digest}",
-            self._context.as_of,
+            value.as_of,
             state.account.cash + marked,
             state.account.cash,
             positions,

@@ -16316,6 +16316,101 @@
         "CLOSEOUT"
       ],
       "no_change_reason": "Only design evidence and provenance are accepted. Existing execution, research value, cold rebuild and use eligibility unchanged."
+    },
+    {
+      "id": "CP-700-C13-SYNTHETIC-GATE-ACCEPTED-20261118",
+      "recorded_at": "2026-11-18T10:48:37.889534+00:00",
+      "actor": "Sol after independent 027 and CN02",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept C13 A01–A09 synthetics in the continued branch; remaining original goals open.",
+      "evidence": [
+        {
+          "id": "C13-027-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-c13-review-027/root-receive.json",
+          "sha256": "20c30672464e6e093bf565a419847cca6e8203c4b9b3ebaa1fed118068379651",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed artifact review closes F1–F6."
+        },
+        {
+          "id": "C13-025-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-c13-025-repair/native-final/check-receipt.json",
+          "sha256": "e909f1a8577845c8118b55fabd0a2c8ebcce5a87f8da1c4271fe904a994e6f0a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact fixed-source CN02 full engineering check."
+        },
+        {
+          "id": "C13-709-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-c13-025-repair/merge709-executable-closure.json",
+          "sha256": "7ae59554975bcef232f0df4e6dc7076d08b95f5440bded1ade450e6b7991bb52",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Merge matches native tree byte-for-byte."
+        },
+        {
+          "id": "C13-025-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-c13-025-repair/engineering-acceptance.json",
+          "sha256": "784f2657c76fffd08296ec0512ba5dc35fef2ced17369408c39ed5cfafbbba9f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Pure synthetic C13 A01–A09 and slot identity only."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "C13 pure synthetic later-signal gate with immutable parent, close-time and lifetime checks.",
+          "remaining": "A10–A13 account transactions, qualified producer, explicit adoption, U06/U07/U08.",
+          "next_action": "Use the exact accepted pure gate in one bounded synthetic transaction package; P10 remains a parallel dependency.",
+          "evidence": [
+            "C13-027-REVIEW",
+            "C13-025-NATIVE",
+            "C13-709-MERGE",
+            "C13-025-ACCEPT"
+          ],
+          "supersedes": "CP-700-U05-RESIDUAL-LOT-ACCEPTED-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "025 original evidence/overrun, 026 rejection, fixed 027 and exact native merge retained.",
+          "remaining": "A10–A13 account transactions, qualified producer, explicit adoption, U06/U07/U08.",
+          "next_action": "Use the exact accepted pure gate in one bounded synthetic transaction package; P10 remains a parallel dependency.",
+          "evidence": [
+            "C13-027-REVIEW",
+            "C13-025-NATIVE",
+            "C13-709-MERGE",
+            "C13-025-ACCEPT"
+          ],
+          "supersedes": "CP-700-C13-LATER-SIGNAL-DESIGN-20261118"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "No new expert use, whole-use reproduction, C13 policy, or daily admission.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-18T10:48:39Z",
+          "body_sha256": "36c32b174f94ac55e9260ccaacdcaf0936cb0d97813efd4d00758ed1bb407520"
+        }
+      ]
     }
   ],
   "history_imports": [

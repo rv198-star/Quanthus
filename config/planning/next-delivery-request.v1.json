@@ -34,7 +34,7 @@
     "Onlynamed2productionmodules/newtest/profile/doc; allothersreadonly, ordinaryappendGitHubcommits.",
     "No market/P10repair/reference/training/capital/P6/daily/production or genericOMS."
   ],
-  "memory_sha256": "0b6a1adec16de3c7e908020f90b72db41c35262cf271afaa17dbbdf5a1d7af6f",
+  "memory_sha256": "b7100b6c7003eed229ee3cc09d5cc588f821e0b94649e35f0d23dca2e991d082",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -225,6 +225,11 @@
       "conclusion_id": "CON-R11-C13-LATER-SIGNAL-DESIGN-20261118",
       "relation": "respect",
       "rationale": "The C13 proposal keeps original T+1 separate. New later signals and order attempts await separate input qualification and policy adoption."
+    },
+    {
+      "conclusion_id": "CON-R11-C13-SYNTHETIC-GATE-ACCEPTED-20261118",
+      "relation": "respect",
+      "rationale": "Reuse accepted synthetic A01-A09. Account transactions and C13 market qualification remain separate."
     }
   ],
   "cumulative_cost_review": "AllR6-R10 and diagnostic/closeout costs,UNKNOWN and both timing deviations retained. New60minute/1800CPU protection envelope planned by audit within Owner continuation; not itemized Owner numeric approval.",

@@ -3448,6 +3448,83 @@
           "claim_ceiling": "Six synthetic pairs exercise only the accepted classifier."
         }
       ]
+    },
+    {
+      "id": "CON-R11-C13-SYNTHETIC-GATE-ACCEPTED-20261118",
+      "recorded_at": "2026-11-18T10:48:37.889534+00:00",
+      "actor": "Sol with independent 027",
+      "question_id": "R11-U04-C13-SYNTHETIC-GATE-025",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-USE-002",
+      "modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "question": "Can a separate later-signal planning decision enforce exact clock, window and parent constraints?",
+      "consumer": "C13 synthetic transaction engineering",
+      "scope": "One pure gate; no production or market activation.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Engineering accepted for synthetic use only.",
+      "decision_effect": "Reuse in the A10–A13 synthetic transaction proof; keep original data and policy gates.",
+      "reopen_conditions": [
+        "Changed C13 contracts need independent public regression evidence."
+      ],
+      "retained_assets": [
+        "Original 025 and 026 and transport attempts",
+        "Exact 027 and final merge/native receipts."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "CN02 完整验证 913.7 秒、脚本 CPU 893.5 秒。原 025 超时至少 1819 秒、026 的六项拒绝和 027 修复回执全部保留。既有未测成本继续标为未知。",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-c13-review-026/root-receive.json",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-c13-review-027/root-receive.json"
+      ],
+      "blueprint_checkpoints": [
+        "CP-700-C13-SYNTHETIC-GATE-ACCEPTED-20261118"
+      ],
+      "supersedes": null,
+      "evidence": [
+        {
+          "id": "C13-027-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-c13-review-027/root-receive.json",
+          "sha256": "20c30672464e6e093bf565a419847cca6e8203c4b9b3ebaa1fed118068379651",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed artifact review closes F1–F6."
+        },
+        {
+          "id": "C13-025-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-c13-025-repair/native-final/check-receipt.json",
+          "sha256": "e909f1a8577845c8118b55fabd0a2c8ebcce5a87f8da1c4271fe904a994e6f0a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact fixed-source CN02 full engineering check."
+        },
+        {
+          "id": "C13-709-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-c13-025-repair/merge709-executable-closure.json",
+          "sha256": "7ae59554975bcef232f0df4e6dc7076d08b95f5440bded1ade450e6b7991bb52",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Merge matches native tree byte-for-byte."
+        },
+        {
+          "id": "C13-025-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-c13-025-repair/engineering-acceptance.json",
+          "sha256": "784f2657c76fffd08296ec0512ba5dc35fef2ced17369408c39ed5cfafbbba9f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Pure synthetic C13 A01–A09 and slot identity only."
+        }
+      ]
     }
   ]
 }

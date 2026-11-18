@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -19,7 +20,9 @@ from quanthus.product_daily.c13_later_signal import (
     SignalObservation,
     SyntheticCalendar,
     evaluate_later_signal,
+    parent_opportunity_identity,
 )
+from quanthus.shared.fact_contracts import FactError
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = json.loads(
@@ -52,12 +55,14 @@ def calendar() -> SyntheticCalendar:
         raw["timezone_name"],
         tuple(date.fromisoformat(item) for item in raw["sessions"]),
         tuple(datetime.fromisoformat(item) for item in raw["opens"]),
+        tuple(datetime.fromisoformat(item) for item in raw["closes"]),
+        raw["execution_window_id"],
     )
 
 
 def opportunity(**changes: object) -> OriginalOpportunity:
     value = OriginalOpportunity(
-        "opportunity:parent",
+        parent_opportunity_identity("event:parent", "snapshot:parent", "sha256:" + "1" * 64),
         "event:parent",
         "snapshot:parent",
         "sha256:" + "1" * 64,
@@ -72,7 +77,7 @@ def opportunity(**changes: object) -> OriginalOpportunity:
 
 def prior(**changes: object) -> SignalObservation:
     value = SignalObservation(
-        "opportunity:parent",
+        opportunity().identity,
         "security-cn-000001",
         policy().predicate_version,
         policy().producer_version,
@@ -90,7 +95,7 @@ def prior(**changes: object) -> SignalObservation:
 
 def current(**changes: object) -> SignalObservation:
     value = SignalObservation(
-        "opportunity:parent",
+        opportunity().identity,
         "security-cn-000001",
         policy().predicate_version,
         policy().producer_version,
@@ -239,6 +244,7 @@ def test_attempt_slot_identity_is_stable_across_policy_versions() -> None:
     assert first.candidate is not None and second.candidate is not None
     assert first.candidate.later_signal_id == second.candidate.later_signal_id
     assert first.candidate.policy_version != second.candidate.policy_version
+    assert first.candidate.identity != second.candidate.identity
 
 
 def test_calendar_order_and_opening_identity_are_strict() -> None:
@@ -251,4 +257,88 @@ def test_calendar_order_and_opening_identity_are_strict() -> None:
                 datetime.fromisoformat("2026-11-18T09:30:00+08:00"),
                 datetime.fromisoformat("2026-11-17T09:30:00+08:00"),
             ),
+            (
+                datetime.fromisoformat("2026-11-18T15:00:00+08:00"),
+                datetime.fromisoformat("2026-11-17T15:00:00+08:00"),
+            ),
+            "next-adopted-open-v1",
         )
+
+
+def test_intraday_evidence_cannot_establish_a_close_signal() -> None:
+    found = decide(
+        current=current(
+            evidence_at=datetime.fromisoformat("2026-11-18T10:00:00+08:00"),
+            available_at=datetime.fromisoformat("2026-11-18T10:01:00+08:00"),
+            decision_cutoff=datetime.fromisoformat("2026-11-18T10:02:00+08:00"),
+        )
+    )
+    assert found.status is LaterSignalStatus.BLOCK_LATER_ATTEMPT
+    assert found.candidate is None
+
+
+def test_prior_cutoff_cannot_be_after_current_decision() -> None:
+    found = decide(prior=prior(decision_cutoff=datetime.fromisoformat("2026-11-19T15:10:00+08:00")))
+    assert found.status is LaterSignalStatus.BLOCK_LATER_ATTEMPT
+    assert found.candidate is None
+
+
+@pytest.mark.parametrize("value", [True, 1.0, Decimal("1")])
+def test_attempt_limit_requires_an_exact_integer(value: object) -> None:
+    with pytest.raises(FactError, match="attempt_limit must be an integer"):
+        replace(policy(), attempt_limit=value)
+
+
+def test_observation_lifetime_caps_a_later_absolute_expiry() -> None:
+    second_day = current(
+        feature_session=date(2026, 11, 19),
+        signal_session=date(2026, 11, 19),
+        evidence_at=datetime.fromisoformat("2026-11-19T15:00:00+08:00"),
+        available_at=datetime.fromisoformat("2026-11-19T15:05:00+08:00"),
+        decision_cutoff=datetime.fromisoformat("2026-11-19T15:10:00+08:00"),
+    )
+    preceding = current(eligibility=Eligibility.EXPLICIT_FALSE, evidence_id="second-day-prior")
+    long_expiry = replace(policy(), expiry=datetime.fromisoformat("2026-11-20T10:00:00+08:00"))
+    assert (
+        decide(prior=preceding, current=second_day, policy=long_expiry).status
+        is LaterSignalStatus.TERMINAL_NO_REARM
+    )
+    two_sessions = replace(long_expiry, observation_lifetime_sessions=2)
+    assert (
+        decide(prior=preceding, current=second_day, policy=two_sessions).status
+        is LaterSignalStatus.ELIGIBLE_FOR_ONE_ATTEMPT
+    )
+
+
+def test_policy_window_must_bind_calendar_window() -> None:
+    found = decide(calendar=replace(calendar(), execution_window_id="different-window"))
+    assert found.status is LaterSignalStatus.BLOCK_LATER_ATTEMPT and found.candidate is None
+    assert found.reason == "CALENDAR_BINDING_MISMATCH"
+
+
+def test_unknown_execution_window_is_rejected_even_when_input_ids_match() -> None:
+    unregistered = "UNREGISTERED-WINDOW-V9"
+    found = decide(
+        policy=replace(policy(), execution_window_id=unregistered),
+        calendar=replace(calendar(), execution_window_id=unregistered),
+    )
+    assert found.status is LaterSignalStatus.BLOCK_LATER_ATTEMPT and found.candidate is None
+    assert found.reason == "UNREGISTERED_EXECUTION_WINDOW"
+
+
+@pytest.mark.parametrize(
+    "changes", [{"opportunity_id": "alias"}, {"source_snapshot_id": "snapshot:other"}]
+)
+def test_parent_key_cannot_be_aliased_or_rebound(changes: dict[str, str]) -> None:
+    with pytest.raises(FactError, match="opportunity identity does not match"):
+        opportunity(**changes)
+
+
+def test_signal_identity_binds_evidence_and_decision_clocks() -> None:
+    baseline = decide()
+    changed = decide(
+        current=current(decision_cutoff=datetime.fromisoformat("2026-11-18T15:20:00+08:00"))
+    )
+    assert baseline.slot == changed.slot
+    assert baseline.candidate is not None and changed.candidate is not None
+    assert baseline.candidate.later_signal_id != changed.candidate.later_signal_id

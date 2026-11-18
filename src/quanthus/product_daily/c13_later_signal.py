@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from enum import Enum
 from zoneinfo import ZoneInfo
 
 from quanthus.shared.fact_contracts import FactError, digest
+
+NEXT_SYNTHETIC_OPEN_WINDOW = "next-adopted-open-v1"
 
 
 class LaterSignalStatus(str, Enum):
@@ -67,6 +69,22 @@ def _require_exact_int(value: object, name: str, *, minimum: int = 0) -> int:
     return value
 
 
+def parent_opportunity_identity(
+    event_id: str, source_snapshot_id: str, candidate_rule_digest: str
+) -> str:
+    return str(
+        digest(
+            {
+                "event_id": _require_text(event_id, "event_id"),
+                "source_snapshot_id": _require_text(source_snapshot_id, "source_snapshot_id"),
+                "candidate_rule_digest": _require_text(
+                    candidate_rule_digest, "candidate_rule_digest"
+                ),
+            }
+        )
+    )
+
+
 @dataclass(frozen=True)
 class OriginalOpportunity:
     opportunity_id: str
@@ -94,17 +112,13 @@ class OriginalOpportunity:
             raise FactError("INVALID_C13_INPUT", "original_window_closed must be boolean")
         if not isinstance(self.original_attempt_state, OriginalAttemptState):
             raise FactError("INVALID_C13_INPUT", "original_attempt_state must be typed")
+        if self.opportunity_id != self.identity:
+            raise FactError("INVALID_C13_INPUT", "original opportunity identity does not match")
 
     @property
     def identity(self) -> str:
-        return str(
-            digest(
-                {
-                    "event_id": self.event_id,
-                    "source_snapshot_id": self.source_snapshot_id,
-                    "candidate_rule_digest": self.candidate_rule_digest,
-                }
-            )
+        return parent_opportunity_identity(
+            self.event_id, self.source_snapshot_id, self.candidate_rule_digest
         )
 
 
@@ -175,7 +189,7 @@ class LaterSignalPolicy:
         _require_exact_int(
             self.observation_lifetime_sessions, "observation_lifetime_sessions", minimum=1
         )
-        if self.attempt_limit != 1:
+        if _require_exact_int(self.attempt_limit, "attempt_limit", minimum=1) != 1:
             raise FactError("INVALID_C13_POLICY", "later-attempt limit must be one")
         _require_aware(self.expiry, "expiry")
 
@@ -205,20 +219,30 @@ class SyntheticCalendar:
     timezone_name: str
     sessions: tuple[date, ...]
     opens: tuple[datetime, ...]
+    closes: tuple[datetime, ...]
+    execution_window_id: str
 
     def __post_init__(self) -> None:
         _require_text(self.version, "calendar version")
+        _require_text(self.execution_window_id, "calendar execution window")
         zone = ZoneInfo(_require_text(self.timezone_name, "calendar timezone"))
-        if not self.sessions or len(self.sessions) != len(self.opens):
+        if not self.sessions or not len(self.sessions) == len(self.opens) == len(self.closes):
             raise FactError("INVALID_C13_CALENDAR", "calendar rows must align")
+        if any(type(session) is not date for session in self.sessions):
+            raise FactError("INVALID_C13_CALENDAR", "calendar sessions must be dates")
         if tuple(sorted(self.sessions)) != self.sessions or len(set(self.sessions)) != len(
             self.sessions
         ):
             raise FactError("INVALID_C13_CALENDAR", "calendar sessions must be unique and ordered")
-        for session, opening in zip(self.sessions, self.opens, strict=True):
+        for session, opening, closing in zip(self.sessions, self.opens, self.closes, strict=True):
             _require_aware(opening, "calendar opening")
-            if opening.astimezone(zone).date() != session:
-                raise FactError("INVALID_C13_CALENDAR", "opening date differs from session")
+            _require_aware(closing, "calendar closing")
+            if (
+                opening.astimezone(zone).date() != session
+                or closing.astimezone(zone).date() != session
+                or opening >= closing
+            ):
+                raise FactError("INVALID_C13_CALENDAR", "session clock or open/close order invalid")
 
     def preceding_session(self, session: date) -> date | None:
         try:
@@ -227,8 +251,18 @@ class SyntheticCalendar:
             return None
         return self.sessions[index - 1] if index > 0 else None
 
-    def next_open_after(self, cutoff: datetime) -> datetime | None:
-        return next((opening for opening in self.opens if opening > cutoff), None)
+    def following_open(self, session: date) -> datetime | None:
+        index = self.sessions.index(session) + 1
+        return self.opens[index] if index < len(self.opens) else None
+
+    def closing_time(self, session: date) -> datetime:
+        return self.closes[self.sessions.index(session)]
+
+    def session_distance(self, start: date, end: date) -> int | None:
+        try:
+            return self.sessions.index(end) - self.sessions.index(start)
+        except ValueError:
+            return None
 
 
 @dataclass(frozen=True)
@@ -253,6 +287,20 @@ class PlanningAttempt:
     execution_window_id: str
     execution_at: datetime
 
+    @property
+    def identity(self) -> str:
+        return str(
+            digest(
+                [
+                    self.slot.identity,
+                    self.later_signal_id,
+                    self.policy_version,
+                    self.execution_window_id,
+                    self.execution_at.astimezone(timezone.utc).isoformat(),
+                ]
+            )
+        )
+
 
 @dataclass(frozen=True)
 class LaterSignalDecision:
@@ -267,8 +315,16 @@ def _observation_key(signal: SignalObservation) -> dict[str, object]:
         "parent_opportunity_id": signal.parent_opportunity_id,
         "security_id": signal.security_id,
         "rule_version": signal.rule_version,
-        "prior_evidence_id": None,
-        "current_evidence_id": signal.evidence_id,
+        "producer_version": signal.producer_version,
+        "source_version": signal.source_version,
+        "evidence_id": signal.evidence_id,
+        "signal_session": signal.signal_session.isoformat(),
+        "feature_session": signal.feature_session.isoformat(),
+        "evidence_at": signal.evidence_at.astimezone(timezone.utc).isoformat(),
+        "available_at": signal.available_at.astimezone(timezone.utc).isoformat(),
+        "decision_cutoff": signal.decision_cutoff.astimezone(timezone.utc).isoformat(),
+        "eligibility": signal.eligibility.value,
+        "cause": signal.cause.value,
     }
 
 
@@ -300,9 +356,14 @@ def evaluate_later_signal(
         return LaterSignalDecision(LaterSignalStatus.OBSERVATION_ONLY, "POLICY_NOT_ADOPTED")
     if not isinstance(policy, LaterSignalPolicy):
         raise FactError("INVALID_C13_INPUT", "policy must be typed or null")
+    if policy.execution_window_id != NEXT_SYNTHETIC_OPEN_WINDOW:
+        return LaterSignalDecision(
+            LaterSignalStatus.BLOCK_LATER_ATTEMPT, "UNREGISTERED_EXECUTION_WINDOW"
+        )
     if (
         policy.calendar_version != calendar.version
         or policy.timezone_name != calendar.timezone_name
+        or policy.execution_window_id != calendar.execution_window_id
     ):
         return LaterSignalDecision(
             LaterSignalStatus.BLOCK_LATER_ATTEMPT, "CALENDAR_BINDING_MISMATCH"
@@ -311,6 +372,19 @@ def evaluate_later_signal(
         return LaterSignalDecision(
             LaterSignalStatus.BLOCK_LATER_ATTEMPT, "ORIGINAL_ATTEMPT_NOT_TERMINAL_ZERO"
         )
+    zone = ZoneInfo(policy.timezone_name)
+    observation_age = calendar.session_distance(
+        opportunity.original_window_end.astimezone(zone).date(), current.signal_session
+    )
+    if observation_age is None:
+        return LaterSignalDecision(
+            LaterSignalStatus.BLOCK_LATER_ATTEMPT, "LIFETIME_CALENDAR_UNBOUND"
+        )
+    if (
+        observation_age > policy.observation_lifetime_sessions
+        or current.decision_cutoff > policy.expiry
+    ):
+        return LaterSignalDecision(LaterSignalStatus.TERMINAL_NO_REARM, "EXPIRY_PASSED")
     if prior is None:
         return LaterSignalDecision(LaterSignalStatus.OBSERVATION_ONLY, "PRIOR_EVIDENCE_MISSING")
     if (
@@ -338,12 +412,14 @@ def evaluate_later_signal(
         return LaterSignalDecision(
             LaterSignalStatus.BLOCK_LATER_ATTEMPT, "FEATURE_SESSION_MISMATCH"
         )
-    zone = ZoneInfo(policy.timezone_name)
     if (
         prior.evidence_at.astimezone(zone).date() != prior.signal_session
         or prior.available_at.astimezone(zone).date() != prior.signal_session
+        or prior.decision_cutoff.astimezone(zone).date() != prior.signal_session
         or current.evidence_at.astimezone(zone).date() != current.signal_session
         or current.available_at.astimezone(zone).date() != current.signal_session
+        or current.decision_cutoff.astimezone(zone).date() != current.signal_session
+        or prior.decision_cutoff >= current.decision_cutoff
     ):
         return LaterSignalDecision(
             LaterSignalStatus.BLOCK_LATER_ATTEMPT, "EVIDENCE_SESSION_MISMATCH"
@@ -351,8 +427,14 @@ def evaluate_later_signal(
     if prior.evidence_id == current.evidence_id:
         return LaterSignalDecision(LaterSignalStatus.OBSERVATION_ONLY, "DUPLICATE_EVIDENCE")
     if (
-        not prior.evidence_at <= prior.available_at <= prior.decision_cutoff
-        or not current.evidence_at <= current.available_at <= current.decision_cutoff
+        not calendar.closing_time(prior.signal_session)
+        <= prior.evidence_at
+        <= prior.available_at
+        <= prior.decision_cutoff
+        or not calendar.closing_time(current.signal_session)
+        <= current.evidence_at
+        <= current.available_at
+        <= current.decision_cutoff
     ):
         return LaterSignalDecision(LaterSignalStatus.BLOCK_LATER_ATTEMPT, "EVIDENCE_NOT_AVAILABLE")
     if current.cause is not SignalCause.QUALIFYING_RULE_TRANSITION:
@@ -366,24 +448,13 @@ def evaluate_later_signal(
         return LaterSignalDecision(
             LaterSignalStatus.OBSERVATION_ONLY, "NO_FALSE_TO_TRUE_TRANSITION"
         )
-    if current.decision_cutoff > policy.expiry:
-        return LaterSignalDecision(LaterSignalStatus.TERMINAL_NO_REARM, "EXPIRY_PASSED")
-    execution_at = calendar.next_open_after(current.decision_cutoff)
-    if execution_at is None or execution_at > policy.expiry:
+    execution_at = calendar.following_open(current.signal_session)
+    if execution_at is None or not current.decision_cutoff < execution_at <= policy.expiry:
         return LaterSignalDecision(LaterSignalStatus.TERMINAL_NO_REARM, "NO_OPEN_IN_WINDOW")
 
-    slot = AttemptSlot(opportunity.account_id, opportunity.opportunity_id)
+    slot = AttemptSlot(opportunity.account_id, opportunity.identity)
     signal_id = str(
-        digest(
-            {
-                **_observation_key(current),
-                "prior_evidence_id": prior.evidence_id,
-                "prior_eligibility": prior.eligibility.value,
-                "current_eligibility": current.eligibility.value,
-                "prior_session": prior.signal_session.isoformat(),
-                "current_session": current.signal_session.isoformat(),
-            }
-        )
+        digest({"prior": _observation_key(prior), "current": _observation_key(current)})
     )
     candidate = PlanningAttempt(
         slot,

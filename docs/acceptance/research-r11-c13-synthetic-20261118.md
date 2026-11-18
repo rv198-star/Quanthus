@@ -21,3 +21,17 @@ The A01-A09 witnesses are in `tests/unit/test_product_daily_c13_later_signal.py`
 sticky-expiry test and the existing pure Trend classifier tests are retained unchanged. A10-A13
 transaction, receipt, slot-consumption, reconciliation and concurrency behavior remains outside
 this package.
+
+## Independent review 026 and grouped repair
+
+Review 026 rejected the initial `5b8fc8b` despite passing focused tests. Public witnesses
+showed acceptance of intraday evidence and reversed cutoffs, implicit coercion of the attempt
+limit, an unused observation lifetime, an unregistered opening window, and aliases of the parent
+opportunity. The repair requires session close evidence and ordered same-session cutoffs, counts
+synthetic sessions from the original window end, resolves the single registered next-session
+opening, strictly checks the integer attempt limit, and binds the parent tuple, evidence clocks
+and tentative attempt identity. The slot is still the account plus canonical parent, independent
+of policy version. The original T+1 path and the unadopted C13 policy remain unchanged.
+
+The original exact artifact and all cost and failed review evidence are retained. The repaired
+candidate awaits independent re-review and final native acceptance.

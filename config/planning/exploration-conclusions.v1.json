@@ -3602,6 +3602,84 @@
           "claim_ceiling": "Scoped synthetic A12 engineering acceptance."
         }
       ]
+    },
+    {
+      "id": "CON-R11-T1-A11-ENGINEERING-20261119",
+      "recorded_at": "2026-11-19T09:47:53.053046+00:00",
+      "actor": "Sol with DS2 and CN02",
+      "question_id": "R11-T1-A11-035-036",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-USE-002",
+      "modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "question": "Can the fixed R11 T+1 composition and C13 later terminal transition support the scoped synthetic replay?",
+      "consumer": "R11 T+1 research and C13 engineering",
+      "scope": "Synthetic engineering on the original execution profile.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Scoped engineering acceptance.",
+      "decision_effect": "Reuse exact engineering. Hold original historical launch until qualified source and budget.",
+      "reopen_conditions": [
+        "A change in source clock, policy, or execution semantics needs exact independent evidence."
+      ],
+      "retained_assets": [
+        "Author A11 return and overrun",
+        "T+1 and A11 focused witnesses",
+        "Combined CN02 evidence and C13 disposition"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "CN02 墙钟 945.6 秒、脚本 CPU 921.1 秒。A11 作者回合共 2,040.827 秒，超过原 1,500 秒。保留首次返回及复核时实际发现并修复的槽位不一致。",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/t1-review/REVIEW.md",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/a11-author/RESULT.md"
+      ],
+      "blueprint_checkpoints": [
+        "CP-700-R11-T1-A11-ENGINEERING-20261119"
+      ],
+      "supersedes": null,
+      "evidence": [
+        {
+          "id": "R11-035-T1-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/t1-review/REVIEW.md",
+          "sha256": "b2e8506a47fecbb9a5b6a42d5135e8b70d1e8e22ccfbc8170bf2634d52f28c6c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent scoped T+1 engineering review."
+        },
+        {
+          "id": "R11-035-036-ENGINEERING",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/engineering-acceptance.json",
+          "sha256": "15dec2d4eefced969eea34fdd0c25433483d9fe69de3113c650125f6274eeac2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Accepted combined synthetic engineering."
+        },
+        {
+          "id": "R11-035-036-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/native/check-receipt.json",
+          "sha256": "26ba7d76d9c93d3f3f45914584eb8f311b5e6c40757944d84f6c23e6ba8660c5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CN02 full validation of the merged exact tree."
+        },
+        {
+          "id": "R11-037-C13-USE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/C13-USE-DISPOSITION.md",
+          "sha256": "85b07e409e1fb452b7fd776a3c3748d0d13166538d2edfed74b0a16d9175cba5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "C13 remains observation only pending actual PIT and policy."
+        }
+      ]
     }
   ]
 }

@@ -16506,6 +16506,101 @@
           "work_item": "P11-R11-USE-002"
         }
       ]
+    },
+    {
+      "id": "CP-700-R11-T1-A11-ENGINEERING-20261119",
+      "recorded_at": "2026-11-19T09:47:53.053046+00:00",
+      "actor": "Sol with DS2 and CN02",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept the scoped T+1 synthetic replay binding and A11 terminal orders.",
+      "evidence": [
+        {
+          "id": "R11-035-T1-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/t1-review/REVIEW.md",
+          "sha256": "b2e8506a47fecbb9a5b6a42d5135e8b70d1e8e22ccfbc8170bf2634d52f28c6c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent scoped T+1 engineering review."
+        },
+        {
+          "id": "R11-035-036-ENGINEERING",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/engineering-acceptance.json",
+          "sha256": "15dec2d4eefced969eea34fdd0c25433483d9fe69de3113c650125f6274eeac2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Accepted combined synthetic engineering."
+        },
+        {
+          "id": "R11-035-036-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/native/check-receipt.json",
+          "sha256": "26ba7d76d9c93d3f3f45914584eb8f311b5e6c40757944d84f6c23e6ba8660c5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CN02 full validation of the merged exact tree."
+        },
+        {
+          "id": "R11-037-C13-USE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/C13-USE-DISPOSITION.md",
+          "sha256": "85b07e409e1fb452b7fd776a3c3748d0d13166538d2edfed74b0a16d9175cba5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "C13 remains observation only pending actual PIT and policy."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Original replay binding and dynamic funding/sizing, C13 A11 later terminal and restart.",
+          "remaining": "P10 #701, exact source use and finite U06 budget, C13 producer and adopted rules, U06 result, U07 and U08.",
+          "next_action": "Bind qualified original input and time, exclusion crosswalk, and cold/running budgets before U06.",
+          "evidence": [
+            "R11-035-T1-REVIEW",
+            "R11-035-036-ENGINEERING",
+            "R11-035-036-NATIVE",
+            "R11-037-C13-USE"
+          ],
+          "supersedes": "CP-700-C13-A12-ORDER-FACTS-ACCEPTED-20261119"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Exact independent and combined native validation plus scoped C13 use disposition.",
+          "remaining": "P10 #701, exact source use and finite U06 budget, C13 producer and adopted rules, U06 result, U07 and U08.",
+          "next_action": "Bind qualified original input and time, exclusion crosswalk, and cold/running budgets before U06.",
+          "evidence": [
+            "R11-035-T1-REVIEW",
+            "R11-035-036-ENGINEERING",
+            "R11-035-036-NATIVE",
+            "R11-037-C13-USE"
+          ],
+          "supersedes": "CP-700-C13-A12-ORDER-FACTS-ACCEPTED-20261119"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "Research and daily adoption require their own qualified evidence.",
+      "issue_observations": [
+        {
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-19T09:47:51Z",
+          "work_item": "P11-R11-USE-002",
+          "body_sha256": "6214e1e9f90cd0d391b7718585c24cbe863f070b0fc3fc8349082c29671c198a"
+        }
+      ]
     }
   ],
   "history_imports": [

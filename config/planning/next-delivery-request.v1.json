@@ -34,7 +34,7 @@
     "Onlynamed2productionmodules/newtest/profile/doc; allothersreadonly, ordinaryappendGitHubcommits.",
     "No market/P10repair/reference/training/capital/P6/daily/production or genericOMS."
   ],
-  "memory_sha256": "a1d1a44d2969e015eef1d608d39630afcc7180ab54362140457c310c42f0e8b9",
+  "memory_sha256": "befba6f5d3f8ad02abf7058373c5eca4b35b95cb8f60442fac0937bc91dd8532",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -235,6 +235,11 @@
       "conclusion_id": "CON-R11-C13-A12-ORDER-FACTS-ACCEPTED-20261119",
       "relation": "respect",
       "rationale": "Reuse scoped A12 synthetic order facts and keep the multi-day signal, policy and historical source gates."
+    },
+    {
+      "conclusion_id": "CON-R11-T1-A11-ENGINEERING-20261119",
+      "relation": "respect",
+      "rationale": "Reuse the scoped T+1 candidate and A11 engineering while retaining the historical data, actual signal, and use gates."
     }
   ],
   "cumulative_cost_review": "AllR6-R10 and diagnostic/closeout costs,UNKNOWN and both timing deviations retained. New60minute/1800CPU protection envelope planned by audit within Owner continuation; not itemized Owner numeric approval.",

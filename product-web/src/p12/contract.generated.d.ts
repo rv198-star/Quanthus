@@ -73,6 +73,7 @@ export interface Bucket {
   cash: MaybeMoney
   cycle_id: string | null
   locked_cycle_budget: MaybeMoney | null
+  next_available: MaybeMoney | null
   phase: string
   target_notional: Money
   trial_notional_cap: MaybeMoney | null

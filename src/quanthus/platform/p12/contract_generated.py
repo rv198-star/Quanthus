@@ -7,7 +7,7 @@ from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
 SCHEMA_VERSION = 'p12.desktop.v1'
-SCHEMA_DIGEST = 'sha256:c6e181cd2543ca28f6173b5aa0b887cad3e75acbf2520fbd5612d323eb032728'
+SCHEMA_DIGEST = 'sha256:52d88ed7b5090e20ca8abbd78a3ad8f663fa45d6c8d1fd6347788b4cb88959cd'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -341,6 +341,8 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                                                   {'type': 'null'}]},
                            'locked_cycle_budget': {'anyOf': [{'$ref': '#/components/schemas/MaybeMoney'},
                                                              {'type': 'null'}]},
+                           'next_available': {'anyOf': [{'$ref': '#/components/schemas/MaybeMoney'},
+                                                        {'type': 'null'}]},
                            'phase': {'minLength': 1, 'type': 'string'},
                            'target_notional': {'$ref': '#/components/schemas/Money'},
                            'trial_notional_cap': {'anyOf': [{'$ref': '#/components/schemas/MaybeMoney'},
@@ -351,6 +353,7 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                          'cash',
                          'cycle_id',
                          'locked_cycle_budget',
+                         'next_available',
                          'phase',
                          'target_notional',
                          'trial_notional_cap',

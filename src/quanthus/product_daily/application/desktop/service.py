@@ -32,6 +32,7 @@ from quanthus.capabilities.execution import (
 )
 from quanthus.capabilities.funding import (
     BUCKET_ASSIGNMENT_CONFLICT,
+    FUNDING_LEDGER_MISMATCH,
     FundingView,
     describe_funding,
     describe_unbound_funding,
@@ -393,6 +394,19 @@ class P12DesktopApplication:
                 binding = None
         if binding is not None:
             persisted, bound_revision = binding
+            # The page reconciles the persisted partition with the account
+            # ledger: a partition whose total no longer equals recorded cash
+            # (an older local store admitted before ledger-consistent
+            # settlement) is shown as needing reconciliation, not as money the
+            # account does not hold.
+            account_cash = history.baseline_cash + sum(
+                (item.cash_delta for item in history.events),
+                Decimal("0.00"),
+            )
+            if persisted.cash_total != account_cash:
+                return describe_unbound_funding(
+                    self._policy.funding, FUNDING_LEDGER_MISMATCH
+                )
             return describe_funding(
                 self._policy.funding,
                 persisted,
@@ -405,15 +419,6 @@ class P12DesktopApplication:
             if exc.reason_code != BUCKET_ASSIGNMENT_CONFLICT:
                 raise
             return describe_unbound_funding(self._policy.funding, BUCKET_ASSIGNMENT_CONFLICT)
-        # A normal start whose baseline already equals the configured buckets plus
-        # reserve binds that fresh partition so settle/prepare see FUNDING bound
-        # instead of an unexplained gap.
-        bind = getattr(self._facts, "bind_funding_state", None)
-        if bind is not None and not history.baseline_quantity:
-            try:
-                bind(self._context, state)
-            except FactError:
-                pass
         return describe_funding(
             self._policy.funding,
             state,
@@ -846,8 +851,27 @@ class P12DesktopApplication:
     def prepare_funding_cycle(
         self, scope: AccountScope, *, bucket_id: str, cycle_id: str
     ) -> FundingDecision:
-        """Lock the next cycle budget for a settled or empty bucket."""
+        """Lock the next cycle budget for a settled or empty bucket.
+
+        A cold account whose baseline already equals the configured partition
+        binds that partition on this first command instead of forcing a page
+        read first, so a headless reservation works without warm-up.
+        """
         self._require(scope)
+        try:
+            return self._facts.prepare_funding_cycle(
+                self._context, bucket_id=bucket_id, cycle_id=cycle_id
+            )
+        except FactError as exc:
+            if exc.reason_code != "FUNDING_NOT_BOUND":
+                raise
+        history = self._facts.history(self._context)
+        if history.baseline_quantity:
+            raise FactError(
+                "FUNDING_NOT_BOUND", "baseline holdings keep funding unbound"
+            )
+        state = initial_funding_state(self._policy.funding, history.baseline_cash)
+        self._facts.bind_funding_state(self._context, state)
         return self._facts.prepare_funding_cycle(
             self._context, bucket_id=bucket_id, cycle_id=cycle_id
         )

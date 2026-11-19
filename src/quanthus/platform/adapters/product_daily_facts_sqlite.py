@@ -58,7 +58,14 @@ from quanthus.product_daily.application.models import (
     SyntheticRuntimeAuthorization,
 )
 from quanthus.product_daily.application.service import SyntheticFactService
-from quanthus.product_daily.contracts import CommandEnvelope
+from quanthus.product_daily.contracts import (
+    CommandDisposition,
+    CommandEnvelope,
+    ProductDailyError,
+    ReasonCode,
+    require_bool,
+    resolve_command,
+)
 from quanthus.product_daily.funding import (
     BucketPhase,
     CycleSettlementEvidence,
@@ -71,6 +78,17 @@ from quanthus.product_daily.funding import (
     settle_invocation_payload,
 )
 from quanthus.shared.fact_contracts import FactError, digest
+
+# Evidence is re-derived inside the write transaction; the recorded settlement
+# identity deliberately excludes it so an order arriving after settlement does
+# not turn a retry into an idempotency conflict.
+_EMPTY_EVIDENCE = CycleSettlementEvidence(
+    position_flat=True,
+    orders_terminal=True,
+    fills_complete=True,
+    fees_known=True,
+    conflicts_clear=True,
+)
 
 
 class SQLiteSyntheticFactsAdapter:
@@ -2187,6 +2205,90 @@ class SQLiteSyntheticFactsAdapter:
             return None
         return restore_funding_envelope(json.loads(row["state_json"]))
 
+    def _bound_event_sequence(
+        self, connection: sqlite3.Connection, context: SyntheticContext, bound_rev: int
+    ) -> int:
+        """Event sequence at the account revision the partition was bound to."""
+        row = connection.execute(
+            "SELECT MAX(event_sequence) FROM events "
+            "WHERE account_id=? AND mode=? AND revision<=?",
+            (context.account_id, context.mode, bound_rev),
+        ).fetchone()
+        return 0 if row is None or row[0] is None else int(row[0])
+
+    def _projection_at(
+        self, connection: sqlite3.Connection, context: SyntheticContext, revision: int
+    ) -> AccountProjection:
+        """Account positions/cash as of a revision, replayed from the baseline
+        plus the cash/quantity deltas each event posted up to that revision."""
+        row = connection.execute(
+            "SELECT cash, quantity, security_code FROM baselines "
+            "WHERE account_id=? AND mode=?",
+            (context.account_id, context.mode),
+        ).fetchone()
+        positions: dict[str, int] = {}
+        if row is not None and row["quantity"]:
+            positions[row["security_code"]] = int(row["quantity"])
+        for event_row in connection.execute(
+            "SELECT event_json FROM events WHERE account_id=? AND mode=? "
+            "AND revision<=? ORDER BY event_sequence",
+            (context.account_id, context.mode, revision),
+        ).fetchall():
+            event = json.loads(event_row["event_json"])
+            if event.get("kind") != "fill":
+                continue
+            sec = event["security_code"]
+            qty = int(event["quantity"])
+            positions[sec] = positions.get(sec, 0) + (qty if event["side"] == "buy" else -qty)
+            if not positions[sec]:
+                positions.pop(sec)
+        return AccountProjection(
+            revision,
+            revision,
+            Decimal("0"),
+            tuple(Position(sec, qty) for sec, qty in positions.items()),
+            0,
+        )
+
+    def _cycle_event_floors(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        bound_rev: int,
+    ) -> tuple[dict[str, int], int]:
+        """bucket_id -> event floor of the bucket's current cycle.
+
+        Each accepted funding write stores ``cycle_bound_account_revision`` per
+        bucket in bindings_json; converted to an event sequence it marks when
+        that bucket's cycle began.  Missing entries fall back to the account
+        revision at initial binding.
+        """
+        row = connection.execute(
+            "SELECT bindings_json, bound_account_revision FROM funding_states "
+            "WHERE account_id=? AND mode=?",
+            (context.account_id, context.mode),
+        ).fetchone()
+        floors: dict[str, int] = {}
+        if row is not None:
+            raw = json.loads(row["bindings_json"] or "{}")
+            for bucket_id, revision in (
+                raw.get("cycle_bound_account_revision") or {}
+            ).items():
+                floors[bucket_id] = self._bound_event_sequence(
+                    connection, context, int(revision)
+                )
+            # No per-bucket cycle boundary yet means the bucket still rides its
+            # first cycle since binding, so the floor is the binding revision.
+            if not floors:
+                default = self._bound_event_sequence(connection, context, bound_rev)
+            else:
+                default = self._bound_event_sequence(
+                    connection, context, int(row["bound_account_revision"])
+                )
+        else:
+            default = self._bound_event_sequence(connection, context, bound_rev)
+        return floors, default
+
     def _write_funding_state(
         self,
         connection: sqlite3.Connection,
@@ -2207,7 +2309,8 @@ class SQLiteSyntheticFactsAdapter:
             "VALUES(?,?,?,?,?) "
             "ON CONFLICT(account_id,mode) DO UPDATE SET "
             "bound_account_revision=excluded.bound_account_revision,"
-            "state_json=excluded.state_json",
+            "state_json=excluded.state_json,"
+            "bindings_json=excluded.bindings_json",
             (
                 context.account_id,
                 context.mode,
@@ -2363,6 +2466,26 @@ class SQLiteSyntheticFactsAdapter:
             rows = [row for row in rows if row["security_code"] in wanted]
         return rows
 
+    def _order_securities(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> dict[str, str]:
+        """order_id -> security_code from admitted order rows and fill facts."""
+        mapping: dict[str, str] = {}
+        for row in connection.execute(
+            "SELECT order_id, security_code FROM order_states "
+            "WHERE account_id=? AND mode=? AND order_id IS NOT NULL",
+            (context.account_id, context.mode),
+        ).fetchall():
+            if row["security_code"]:
+                mapping.setdefault(row["order_id"], row["security_code"])
+        for row in connection.execute(
+            "SELECT DISTINCT order_id, security_code FROM facts "
+            "WHERE account_id=? AND mode=? AND order_id IS NOT NULL",
+            (context.account_id, context.mode),
+        ).fetchall():
+            mapping.setdefault(row["order_id"], row["security_code"])
+        return mapping
+
     def _evidence_from(
         self,
         connection: sqlite3.Connection,
@@ -2456,25 +2579,33 @@ class SQLiteSyntheticFactsAdapter:
         connection: sqlite3.Connection,
         context: SyntheticContext,
         since_sequence: int,
+        until_sequence: int | None = None,
     ) -> dict[str, Decimal]:
-        """Per-security net ASSET_CASH moved by events after an event sequence.
+        """Per-security net ASSET_CASH moved by events in one sequence window.
 
-        Sell fills return positive proceeds, buys spend them; a partition bound
-        before these events sees the delta, while one bound to an already
-        realized balance does not charge it again.
+        Fill, correction and confirmed whole-order-fee events move cash; plain
+        observations only describe orders.  A partition bound before the window
+        sees its net delta, while later events keep waiting for the bucket's
+        next settlement cycle.
         """
-        rows = connection.execute(
+        sql = (
             "SELECT e.event_id, e.event_json FROM events e "
-            "WHERE e.account_id=? AND e.mode=? AND e.event_sequence>? "
-            "ORDER BY e.event_sequence",
-            (context.account_id, context.mode, since_sequence),
-        ).fetchall()
+            "WHERE e.account_id=? AND e.mode=? AND e.event_sequence>?"
+        )
+        params: list[object] = [context.account_id, context.mode, since_sequence]
+        if until_sequence is not None:
+            sql += " AND e.event_sequence<=?"
+            params.append(until_sequence)
+        sql += " ORDER BY e.event_sequence"
+        rows = connection.execute(sql, params).fetchall()
+        order_securities = self._order_securities(connection, context)
         moved: dict[str, Decimal] = {}
         for row in rows:
             event = json.loads(row["event_json"])
-            if event.get("kind") not in ("fill", "correction"):
+            kind = event.get("kind")
+            if kind not in ("fill", "correction", "fee"):
                 continue
-            sec = event.get("security_code")
+            sec = event.get("security_code") or order_securities.get(event.get("order_id"))
             if sec is None:
                 continue
             cash = connection.execute(
@@ -2484,6 +2615,33 @@ class SQLiteSyntheticFactsAdapter:
             ).fetchone()[0]
             moved[sec] = moved.get(sec, Decimal("0.00")) + Decimal(str(cash))
         return moved
+
+    def _event_sequence_by_fact(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        order_ids: tuple[str, ...],
+    ) -> int | None:
+        """Newest event sequence touching the orders, or None when none posted."""
+        if not order_ids:
+            return None
+        latest: int | None = None
+        rows = connection.execute(
+            "SELECT event_sequence, event_json FROM events "
+            "WHERE account_id=? AND mode=? ORDER BY event_sequence",
+            (context.account_id, context.mode),
+        ).fetchall()
+        wanted = set(order_ids)
+        for row in rows:
+            event = json.loads(row["event_json"])
+            if event.get("kind") not in ("fill", "correction", "fee"):
+                continue
+            fact_id = event.get("fact_id") or event.get("correction_id")
+            order_id = event.get("order_id") or fact_id
+            if order_id in wanted or fact_id in wanted:
+                seq = int(row["event_sequence"])
+                latest = seq if latest is None else max(latest, seq)
+        return latest
 
     def settle_funding(
         self,
@@ -2495,13 +2653,14 @@ class SQLiteSyntheticFactsAdapter:
     ) -> FundingDecision:
         """Settle closed buckets in confirmed bucket order against one reserve.
 
-        The submission is re-verified against the bucket's own admitted facts
-        inside the write transaction: each request's cycle must still be that
-        bucket's current closed cycle, its orders terminal/fill-complete/fee-
-        confirmed and conflict-free, and the bucket cash must reconcile to the
-        security's realized net proceeds plus its locked budget draw.  A late
-        replay of an older settlement returns the recorded receipt without
-        closing a newer reserved cycle.
+        An already-processed ``settle:<id>`` command replays its recorded
+        receipt before anything is re-derived, so a retry never moves cash or
+        touches a newer reserved cycle.  A first-time submission is re-verified
+        inside the write transaction against each bucket's own admitted orders
+        — terminal, fill-complete, fee-confirmed and conflict-free — then the
+        ledger's net cash moved by that bucket's orders during the cycle is
+        folded into the bucket before the shared reserve is split.  A bucket
+        still reserved keeps its reservation while its cash tracks the ledger.
         """
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -2512,10 +2671,45 @@ class SQLiteSyntheticFactsAdapter:
             securities = self._funding_securities(connection, context, state)
 
             targets = set(close_bucket_ids or (item.bucket_id for item in requests))
-            projection = self._projection(connection, context)
+            # One security's proceeds belong to exactly one bucket.  When the
+            # same security is attributed to more than one targeted bucket —
+            # possible only through the single-security fallback, since
+            # explicit bindings are checked for uniqueness — the attribution
+            # is ambiguous and settlement stays out rather than double-count.
+            targeted_secs = [
+                securities[bid]
+                for bid in targets
+                if bid in securities
+            ]
+            if len(targeted_secs) != len(set(targeted_secs)):
+                connection.rollback()
+                raise FactError(
+                    "FUNDING_ATTRIBUTION_UNKNOWN",
+                    "one security's proceeds cannot settle two buckets; "
+                    "bind an explicit bucket-security mapping first",
+                )
             binding_row = self._read_funding_binding(connection, context)
             bound_rev = binding_row[1] if binding_row is not None else 0
-            moved = self._cash_events_after(connection, context, bound_rev)
+            if not securities and targets:
+                connection.rollback()
+                raise FactError(
+                    "FUNDING_ATTRIBUTION_UNKNOWN",
+                    "bucket-security attribution is required to settle proceeds",
+                )
+            binding_row0 = self._read_funding_binding(connection, context)
+            explicit_map = (
+                dict((binding_row0[2] or {}).get("bucket_securities") or {})
+                if binding_row0 is not None
+                else {}
+            )
+            if len(set(explicit_map.values())) != len(explicit_map.values()):
+                connection.rollback()
+                raise FactError(
+                    "FUNDING_ATTRIBUTION_UNKNOWN",
+                    "explicit bindings assign one security to two buckets",
+                )
+            projection = self._projection(connection, context)
+            order_securities = self._order_securities(connection, context)
             # Re-verify every requested bucket against its own admitted facts and
             # rebuild the submission with current evidence.  A bucket whose cycle
             # changed (a newer reservation) is left untouched, and a cycle whose
@@ -2542,8 +2736,144 @@ class SQLiteSyntheticFactsAdapter:
                     )
                 )
 
-            reconciled = []
+            # Replay check on the stable submission identity (settlement ids,
+            # bucket ids, cycles — not the caller's read-time evidence): an
+            # already-settled command returns its recorded receipt even when
+            # newer orders arrived meanwhile, and a reused id carrying a
+            # different stable identity is an idempotency conflict.
+            stable_probe_requests = tuple(
+                replace(request, evidence=_EMPTY_EVIDENCE)
+                for request in current_requests
+            )
+            probe_payload = settle_invocation_payload(stable_probe_requests)
+            probe_command = CommandEnvelope.create(
+                "settle:" + settlement_id, probe_payload, state.revision
+            )
+            try:
+                probe = resolve_command(
+                    revision=state.revision,
+                    processed=state.processed_commands,
+                    command=probe_command,
+                    operation="settle_batch",
+                    invocation_payload=probe_payload,
+                )
+            except ProductDailyError as conflict:
+                if conflict.reason_code == "idempotency_conflict":
+                    connection.rollback()
+                    raise FactError(
+                        "IDEMPOTENCY_CONFLICT",
+                        "settlement id was already used with a different "
+                        "settlement identity",
+                    ) from conflict
+                raise
+            if probe.disposition is CommandDisposition.DUPLICATE:
+                if probe.receipt is None:
+                    connection.rollback()
+                    raise FactError("INVALID_RECEIPT", "duplicate lacks receipt")
+                stored = probe.receipt.result
+                reasons = tuple(
+                    ReasonCode(item) for item in stored.get("reason_codes", ())
+                )
+                connection.commit()
+                return FundingDecision(
+                    operation="settle_batch",
+                    accepted=require_bool(stored.get("accepted"), "accepted"),
+                    replayed=True,
+                    state=state,
+                    reason_codes=reasons,
+                    ledger_entries=(),
+                    details_json=stored.get("details_json", "{}"),
+                    result_digest=probe.receipt.result_digest,
+                )
+            if probe.disposition is CommandDisposition.CAS_CONFLICT:
+                connection.commit()
+                return FundingDecision(
+                    operation="settle_batch",
+                    accepted=False,
+                    replayed=False,
+                    state=state,
+                    reason_codes=(ReasonCode.CAS_CONFLICT,),
+                    ledger_entries=(),
+                    details_json='{"expected_state_unchanged": true}',
+                    result_digest=digest(
+                        {
+                            "operation": "settle_batch",
+                            "accepted": False,
+                            "reason_codes": [ReasonCode.CAS_CONFLICT.value],
+                        }
+                    ),
+                )
+
+            cycle_floors, default_floor = self._cycle_event_floors(
+                connection, context, bound_rev
+            )
+            # Fold each targeted bucket's own ledger-moved cash into its cycle:
+            # fills, corrections and whole-order fees posted since the bucket's
+            # current cycle began, up to that security's newest cash event.
+            # Cash arriving after the newest attributed event keeps waiting for
+            # the bucket's next settlement cycle, and a bucket that was never
+            # prepared for this cycle does not silently absorb unattributed
+            # activity.  Buckets still reserved stay reserved.
+            ready_by_bucket = {
+                request.bucket_id: request.evidence.settlement_ready
+                for request in current_requests
+            }
+            folded = []
             for item in state.buckets:
+                completed = any(
+                    done.bucket_id == item.bucket_id and done.cycle_id == item.cycle_id
+                    for done in state.completed_settlements
+                )
+                tracked = item.phase in (BucketPhase.RESERVED, BucketPhase.HELD) or (
+                    item.bucket_id in targets
+                    and ready_by_bucket.get(item.bucket_id, False)
+                )
+                if (
+                    item.phase is BucketPhase.EMPTY
+                    or completed
+                    or not tracked
+                ):
+                    folded.append(item)
+                    continue
+                sec = securities.get(item.bucket_id)
+                if sec is None:
+                    connection.rollback()
+                    raise FactError(
+                        "FUNDING_ATTRIBUTION_UNKNOWN",
+                        f"bucket {item.bucket_id} has no attributed security",
+                    )
+                order_ids = tuple(
+                    oid for oid, osec in order_securities.items() if osec == sec
+                )
+                until = self._event_sequence_by_fact(connection, context, order_ids)
+                cycle_start: int
+                recorded_floor = cycle_floors.get(item.bucket_id)
+                if recorded_floor is not None:
+                    cycle_start = recorded_floor
+                elif item.phase is not BucketPhase.CLOSED:
+                    # A freshly reserved or held cycle starts at binding.
+                    cycle_start = default_floor
+                else:
+                    # A closed leftover cycle only folds proceeds the binding
+                    # already implied: events after binding belong to it only
+                    # when the account held that security at binding (an
+                    # inherited position), not for a brand-new order flow.
+                    held_at_binding = any(
+                        p.security_code == sec and p.quantity
+                        for p in self._projection_at(
+                            connection, context, bound_rev
+                        ).positions
+                    )
+                    cycle_start = default_floor if held_at_binding else (until or 0)
+                moved = self._cash_events_after(connection, context, cycle_start, until)
+                delta = moved.get(sec, Decimal("0.00"))
+                folded.append(
+                    replace(item, cash=(item.cash + delta).quantize(Decimal("0.01")))
+                    if delta
+                    else item
+                )
+            reconciled = []
+            for item in folded:
                 live_request = next(
                     (r for r in current_requests if r.bucket_id == item.bucket_id),
                     None,
@@ -2552,30 +2882,22 @@ class SQLiteSyntheticFactsAdapter:
                     item.bucket_id not in targets
                     or live_request is None
                     or not live_request.evidence.settlement_ready
-                    or item.phase is BucketPhase.RESERVED
                 ):
                     reconciled.append(item)
                     continue
-                # The bucket's settled cash is its recorded cash plus the net
-                # proceeds its security's fills already returned to the shared
-                # account since the partition was bound.
-                cash = item.cash
-                sec = securities.get(item.bucket_id)
-                if sec:
-                    realized = moved.get(sec, Decimal("0.00"))
-                    cash = (cash + realized).quantize(Decimal("0.01"))
-                reconciled.append(
-                    replace(item, cash=cash, phase=BucketPhase.CLOSED)
-                )
+                reconciled.append(replace(item, phase=BucketPhase.CLOSED))
             closed = replace(state, buckets=tuple(reconciled))
-            payload = settle_invocation_payload(current_requests)
+            stable_requests = tuple(
+                replace(request, evidence=_EMPTY_EVIDENCE)
+                for request in current_requests
+            )
+            payload = settle_invocation_payload(stable_requests)
             command = CommandEnvelope.create(
                 "settle:" + settlement_id, payload, state.revision
             )
-            # resolve_command inside settle_batch returns the recorded receipt
-            # for an identical retry (leaving a newer reserved cycle untouched)
-            # and rejects a conflicting reuse of the same settlement id.
-            decision = settle_batch(closed, command, current_requests)
+            decision = settle_batch(
+                closed, command, current_requests, invocation_payload=payload
+            )
             if decision.accepted:
                 bound_rev = self._bound_account_revision(connection, context)
                 self._write_funding_state(

@@ -907,6 +907,7 @@
      "cash",
      "cycle_id",
      "locked_cycle_budget",
+     "next_available",
      "phase",
      "target_notional",
      "trial_notional_cap",
@@ -959,6 +960,16 @@
       ]
      },
      "trial_notional_cap": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MaybeMoney"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "next_available": {
       "anyOf": [
        {
         "$ref": "#/components/schemas/MaybeMoney"

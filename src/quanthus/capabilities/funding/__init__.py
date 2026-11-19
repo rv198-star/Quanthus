@@ -27,6 +27,7 @@ from quanthus.shared.values import CNY_QUANTUM, MaybeDecimal, VersionRef
 FIXED_BUCKET = "fixed_bucket"
 FUNDING_CYCLE_NOT_BOUND = "FUNDING_CYCLE_NOT_BOUND"
 BUCKET_ASSIGNMENT_CONFLICT = "BUCKET_ASSIGNMENT_CONFLICT"
+FUNDING_LEDGER_MISMATCH = "FUNDING_LEDGER_MISMATCH"
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,7 @@ class BucketView:
     locked_cycle_budget: MaybeDecimal | None = None
     underfunded: MaybeDecimal | None = None
     trial_notional_cap: MaybeDecimal | None = None
+    next_available: MaybeDecimal | None = None
 
 
 @dataclass(frozen=True)
@@ -134,6 +136,11 @@ def describe_funding(
     def amount(value: Decimal) -> MaybeDecimal:
         return MaybeDecimal.unknown(FUNDING_CYCLE_NOT_BOUND) if stale else MaybeDecimal.known(value)
 
+    def next_budget(item) -> Decimal:
+        # What the bucket can actually deploy on its next activation: cash it
+        # already holds, topped up by whatever the shared reserve could add.
+        return min(item.target_notional, item.cash + state.reserve)
+
     return FundingView(
         policy_ref=policy.policy_ref,
         mode=policy.mode,
@@ -152,6 +159,7 @@ def describe_funding(
                     if item.locked_cycle_budget
                     else Decimal("0.00")
                 ),
+                amount(next_budget(item)),
             )
             for item in sorted(state.buckets, key=lambda x: x.bucket_id)
         ),
@@ -166,6 +174,7 @@ __all__ = [
     "BUCKET_ASSIGNMENT_CONFLICT",
     "FIXED_BUCKET",
     "FUNDING_CYCLE_NOT_BOUND",
+    "FUNDING_LEDGER_MISMATCH",
     "BucketView",
     "FixedBucketPolicy",
     "FundingState",

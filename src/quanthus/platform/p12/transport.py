@@ -426,6 +426,7 @@ def funding_rules_dto(value: FundingRulesView) -> dict[str, Any]:
                         "locked_cycle_budget": _maybe(item.locked_cycle_budget),
                         "underfunded": _maybe(item.underfunded),
                         "trial_notional_cap": _maybe(item.trial_notional_cap),
+                        "next_available": _maybe(item.next_available),
                     }
                     for item in funding.buckets
                 ],

@@ -778,11 +778,18 @@ def settle_batch(
     requests: Sequence[SettlementRequest],
     *,
     cash_quantum: Decimal = Decimal("0.01"),
+    invocation_payload: dict[str, Any] | None = None,
 ) -> FundingDecision:
-    """Settle eligible buckets in confirmed bucket-id order with one shared reserve."""
+    """Settle eligible buckets in confirmed bucket-id order with one shared reserve.
+
+    ``invocation_payload`` overrides the derived identity when the caller
+    computes a stable submission digest separately from the re-verified
+    request contents (for example when evidence is intentionally excluded).
+    """
 
     require_decimal(cash_quantum, "cash_quantum", minimum=Decimal("0.0000000001"))
-    invocation_payload = settle_invocation_payload(requests, cash_quantum)
+    if invocation_payload is None:
+        invocation_payload = settle_invocation_payload(requests, cash_quantum)
     resolution = resolve_command(
         revision=state.revision,
         processed=state.processed_commands,

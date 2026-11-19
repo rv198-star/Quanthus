@@ -32,6 +32,7 @@ from quanthus.capabilities.execution import (
 )
 from quanthus.capabilities.funding import (
     BUCKET_ASSIGNMENT_CONFLICT,
+    FUNDING_CYCLE_NOT_BOUND,
     FUNDING_LEDGER_MISMATCH,
     FundingView,
     describe_funding,
@@ -424,12 +425,21 @@ class P12DesktopApplication:
                 if callable(pending_read)
                 else None
             )
+            held_read = getattr(
+                self._facts, "funding_held_by_bucket", None
+            )
+            held = (
+                held_read(self._context)
+                if callable(held_read)
+                else None
+            )
             return describe_funding(
                 self._policy.funding,
                 persisted,
                 state_account_revision=bound_revision,
                 current_account_revision=revision,
                 pending_by_bucket=pending,
+                held_by_bucket=held,
             )
         try:
             state = initial_funding_state(self._policy.funding, history.baseline_cash)
@@ -437,6 +447,18 @@ class P12DesktopApplication:
             if exc.reason_code != BUCKET_ASSIGNMENT_CONFLICT:
                 raise
             return describe_unbound_funding(self._policy.funding, BUCKET_ASSIGNMENT_CONFLICT)
+        # The synthetic partition is only the opening snapshot.  Once the
+        # ledger has moved without a bound partition the snapshot no longer
+        # describes the account, so the page marks the amounts for review
+        # instead of presenting stale balances as current.
+        account_cash = history.baseline_cash + sum(
+            (item.cash_delta for item in history.events),
+            Decimal("0.00"),
+        )
+        if state.cash_total != account_cash:
+            return describe_unbound_funding(
+                self._policy.funding, FUNDING_CYCLE_NOT_BOUND
+            )
         return describe_funding(
             self._policy.funding,
             state,

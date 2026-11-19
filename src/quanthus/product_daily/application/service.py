@@ -151,6 +151,12 @@ class SyntheticFactService:
         """Per-bucket proceeds already attributable but not yet settled."""
         return self._port.funding_pending_by_bucket(self._authorize(context))
 
+    def funding_held_by_bucket(
+        self, context: SyntheticContext
+    ) -> dict[str, bool] | None:
+        """Whether each bucket's attributed security is still held."""
+        return self._port.funding_held_by_bucket(self._authorize(context))
+
     def bind_funding_state(
         self,
         context: SyntheticContext,

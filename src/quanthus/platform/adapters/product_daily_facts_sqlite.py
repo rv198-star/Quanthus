@@ -2437,19 +2437,18 @@ class SQLiteSyntheticFactsAdapter:
             bindings = self._read_bindings(connection, context)
         persisted = dict(bindings.get("bucket_securities") or {})
         if persisted:
-            cycles = dict(bindings.get("bucket_security_cycles") or {})
-            if not cycles:
-                return persisted
             if state is None:
                 return persisted
-            active = {
+            cycles = dict(bindings.get("bucket_security_cycles") or {})
+            current = {
                 item.bucket_id: item.cycle_id
                 for item in state.buckets
             }
             return {
                 bucket_id: sec
                 for bucket_id, sec in persisted.items()
-                if cycles.get(bucket_id) in (active.get(bucket_id), "pending")
+                if cycles.get(bucket_id, current.get(bucket_id))
+                in (current.get(bucket_id), "pending")
             }
         if state is None:
             return persisted
@@ -2510,6 +2509,38 @@ class SQLiteSyntheticFactsAdapter:
             )
             connection.commit()
             return total
+
+    def funding_held_by_bucket(
+        self, context: SyntheticContext
+    ) -> dict[str, bool] | None:
+        """bucket_id -> whether its attributed security is still held.
+
+        A bucket holding an open position has committed the cash it spent;
+        that outlay is not yet a shortfall needing reserve.  Returns None
+        when no partition is bound.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            binding = self._read_funding_binding(connection, context)
+            if binding is None:
+                connection.commit()
+                return None
+            state, _rev, bindings = binding
+            securities = self._funding_securities(
+                connection, context, state, bindings
+            )
+            try:
+                projection = self._projection(connection, context)
+                held = {item.security_code for item in projection.positions
+                        if item.quantity}
+            except FactError:
+                held = set()
+            result = {
+                item.bucket_id: (securities.get(item.bucket_id) in held)
+                for item in state.buckets
+            }
+            connection.commit()
+            return result
 
     def funding_pending_by_bucket(
         self, context: SyntheticContext
@@ -2602,6 +2633,29 @@ class SQLiteSyntheticFactsAdapter:
             return state
 
     @staticmethod
+    def _attribution_occupies(
+        state: FundingState, bucket_id: str, cycle: str | None
+    ) -> bool:
+        """Whether a bucket's recorded attribution still claims its security.
+
+        The security stays claimed while the bucket is inside the cycle the
+        attribution was recorded for — a live reserved or held cycle, or the
+        just-closed cycle whose settlement still reads it.  A binding with no
+        recorded cycle (an older store) occupies its bucket's current cycle.
+        """
+        item = next(
+            (entry for entry in state.buckets if entry.bucket_id == bucket_id),
+            None,
+        )
+        if item is None or item.phase not in (
+            BucketPhase.RESERVED,
+            BucketPhase.HELD,
+        ):
+            return False
+        served = item.cycle_id if cycle in (None, "pending") else cycle
+        return served == item.cycle_id
+
+    @staticmethod
     def _attribution_targets(
         state: FundingState, requested: dict[str, str]
     ) -> dict[str, str]:
@@ -2662,8 +2716,8 @@ class SQLiteSyntheticFactsAdapter:
                     bid
                     for bid, sec in securities.items()
                     if sec == security_code
-                    and cycles.get(bid) == target
                     and bid != bucket_id
+                    and self._attribution_occupies(state, bid, cycles.get(bid))
                 ),
                 None,
             )
@@ -2922,25 +2976,21 @@ class SQLiteSyntheticFactsAdapter:
             )
 
             targets = set(close_bucket_ids or (item.bucket_id for item in requests))
-            # One security's proceeds belong to exactly one bucket.  When the
-            # same security is attributed to more than one targeted bucket —
-            # possible only through the single-security fallback, since
-            # explicit bindings are checked for uniqueness — the attribution
-            # is ambiguous and settlement stays out rather than double-count.
-            all_secs = list(securities.values())
-            if len(all_secs) != len(set(all_secs)):
-                connection.rollback()
-                raise FactError(
-                    "FUNDING_ATTRIBUTION_UNKNOWN",
-                    "one security's proceeds cannot settle two buckets; "
-                    "bind an explicit bucket-security mapping first",
-                )
-            targeted_secs = [
-                securities[bid]
-                for bid in targets
-                if bid in securities
+            # One security's proceeds belong to exactly one live bucket.  The
+            # check covers every bucket whose attribution still claims a
+            # security — a targeted bucket plus any bucket inside a live
+            # reserved or held cycle — while a closed leftover binding no
+            # longer counts as an owner.  Ambiguous attribution stays out
+            # rather than double-count proceeds.
+            live = {
+                item.bucket_id
+                for item in state.buckets
+                if item.phase in (BucketPhase.RESERVED, BucketPhase.HELD)
+            } | targets
+            live_secs = [
+                sec for bid, sec in securities.items() if bid in live
             ]
-            if len(targeted_secs) != len(set(targeted_secs)):
+            if len(live_secs) != len(set(live_secs)):
                 connection.rollback()
                 raise FactError(
                     "FUNDING_ATTRIBUTION_UNKNOWN",
@@ -2952,13 +3002,6 @@ class SQLiteSyntheticFactsAdapter:
                 raise FactError(
                     "FUNDING_ATTRIBUTION_UNKNOWN",
                     "bucket-security attribution is required to settle proceeds",
-                )
-            explicit_map = dict(bound_bindings.get("bucket_securities") or {})
-            if len(set(explicit_map.values())) != len(explicit_map.values()):
-                connection.rollback()
-                raise FactError(
-                    "FUNDING_ATTRIBUTION_UNKNOWN",
-                    "explicit bindings assign one security to two buckets",
                 )
             projection = self._projection(connection, context)
             order_securities = self._order_securities(connection, context)

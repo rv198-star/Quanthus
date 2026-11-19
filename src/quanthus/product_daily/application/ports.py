@@ -83,6 +83,10 @@ class SyntheticFactsPort(Protocol):
         self, context: SyntheticContext
     ) -> dict[str, Decimal] | None: ...
 
+    def funding_held_by_bucket(
+        self, context: SyntheticContext
+    ) -> dict[str, bool] | None: ...
+
     def bind_funding_state(
         self,
         context: SyntheticContext,

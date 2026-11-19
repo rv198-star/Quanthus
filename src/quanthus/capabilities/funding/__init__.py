@@ -128,17 +128,20 @@ def describe_funding(
     state_account_revision: int,
     current_account_revision: int,
     pending_by_bucket: dict[str, Decimal] | None = None,
+    held_by_bucket: dict[str, bool] | None = None,
 ) -> FundingView:
     """Read view of the partition plus cash each open cycle can already explain.
 
     ``pending_by_bucket`` carries the ledger cash moved inside each bucket's
-    open cycle by its attributed security.  Adding it to the settled bucket
-    cash gives the amount the user can currently account for; a partition
-    whose open cycles cannot explain the account's cash is refused upstream
-    as a ledger mismatch before this view is described.
+    open cycle by its attributed security, and ``held_by_bucket`` marks a
+    bucket whose security is still held.  Adding the pending delta to the
+    settled bucket cash gives the amount the user can currently account for;
+    a partition whose open cycles cannot explain the account's cash is
+    refused upstream as a ledger mismatch before this view is described.
     """
 
     pending_by_bucket = pending_by_bucket or {}
+    held_by_bucket = held_by_bucket or {}
 
     def known(value: Decimal) -> MaybeDecimal:
         return MaybeDecimal.known(value)
@@ -158,26 +161,54 @@ def describe_funding(
             return item.locked_cycle_budget
         return next_budget(item)
 
+    def settlement_dependent(item: BucketState) -> MaybeDecimal:
+        """Underfund and next-cycle amounts only settle once the cycle ends.
+
+        Cash already spent on an open position is committed inside the
+        bucket, not a shortfall; the true top-up a closed cycle needs is
+        only known after the sale, fees and reserve split.  While a cycle
+        is live those two fields wait for settlement evidence.
+        """
+        return MaybeDecimal.unknown(FUNDING_CYCLE_NOT_BOUND)
+
+    def bucket_view(item: BucketState) -> BucketView:
+        # A bucket still holding its security has committed the spent cash
+        # inside the position; whether it is underfunded and what the next
+        # cycle can deploy are only known once the cycle settles.  A bucket
+        # with no open position can already name both.
+        holding = bool(held_by_bucket.get(item.bucket_id))
+        underfund = (
+            settlement_dependent(item)
+            if holding
+            else known(max(Decimal("0.00"), item.target_notional - live_cash(item)))
+        )
+        next_available = (
+            settlement_dependent(item)
+            if holding
+            else known(next_budget(item))
+        )
+        return BucketView(
+            item.bucket_id,
+            item.phase.value,
+            item.target_notional,
+            known(live_cash(item)),
+            item.cycle_id,
+            known(display_locked(item)),
+            underfund,
+            known(
+                (policy.trial_fraction * display_locked(item)).quantize(CNY_QUANTUM)
+                if display_locked(item)
+                else Decimal("0.00")
+            ),
+            next_available,
+        )
+
     return FundingView(
         policy_ref=policy.policy_ref,
         mode=policy.mode,
         funding_revision=state.revision,
         buckets=tuple(
-            BucketView(
-                item.bucket_id,
-                item.phase.value,
-                item.target_notional,
-                known(live_cash(item)),
-                item.cycle_id,
-                known(display_locked(item)),
-                known(max(Decimal("0.00"), item.target_notional - live_cash(item))),
-                known(
-                    (policy.trial_fraction * display_locked(item)).quantize(CNY_QUANTUM)
-                    if display_locked(item)
-                    else Decimal("0.00")
-                ),
-                known(next_budget(item)),
-            )
+            bucket_view(item)
             for item in sorted(state.buckets, key=lambda x: x.bucket_id)
         ),
         reserve=known(state.reserve),

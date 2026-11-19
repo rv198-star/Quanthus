@@ -2429,7 +2429,13 @@ class SQLiteSyntheticFactsAdapter:
         }
         if len(securities) == 1:
             only = next(iter(securities))
-            return {item.bucket_id: only for item in state.buckets}
+            # An empty bucket holds no proceeds; attributing the security to it
+            # would make an open bucket look ambiguous without cause.
+            return {
+                item.bucket_id: only
+                for item in state.buckets
+                if item.phase is not BucketPhase.EMPTY
+            }
         return {}
 
     def funding_state(
@@ -2443,6 +2449,30 @@ class SQLiteSyntheticFactsAdapter:
             if binding is None:
                 return None
             return binding[0], binding[1]
+
+    def funding_accountable_cash(
+        self, context: SyntheticContext
+    ) -> Decimal | None:
+        """Partition cash plus proceeds still waiting to be attributed.
+
+        Returns None when no partition is bound.  The total matches the
+        recorded account cash whenever movements so far are explainable by
+        the bound buckets' securities; a gap is a real mismatch needing
+        manual reconciliation.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            binding = self._read_funding_binding(connection, context)
+            if binding is None:
+                connection.commit()
+                return None
+            state, bound_rev, bindings = binding
+            anchor_rev = self._binding_anchor(bound_rev, bindings)
+            total = self._attributed_cash_total(
+                connection, context, state, bindings, anchor_rev
+            )
+            connection.commit()
+            return total
 
     def bind_funding_state(
         self,
@@ -2459,8 +2489,21 @@ class SQLiteSyntheticFactsAdapter:
         """
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            existing = self._read_funding_state(connection, context)
-            if existing is not None:
+            binding_row = self._read_funding_binding(connection, context)
+            if binding_row is not None:
+                existing, existing_rev, existing_bindings = binding_row
+                if bucket_securities:
+                    merged = self._merge_bucket_securities(
+                        existing_bindings, bucket_securities
+                    )
+                    if merged is not existing_bindings:
+                        self._write_funding_state(
+                            connection,
+                            context,
+                            existing,
+                            existing_rev,
+                            merged,
+                        )
                 connection.commit()
                 return existing
             bindings = {"bucket_securities": dict(bucket_securities or {})}
@@ -2492,6 +2535,43 @@ class SQLiteSyntheticFactsAdapter:
             )
             connection.commit()
             return state
+
+    def _merge_bucket_securities(
+        self,
+        bindings: dict[str, Any],
+        requested: dict[str, str],
+    ) -> dict[str, Any]:
+        """Fold a later attribution into persisted bindings.
+
+        Persisted mappings win over a repeated request; new bucket-security
+        pairs join them.  A request that would attach one security to a second
+        bucket is refused outright — proceeds could then settle two cycles —
+        and a request matching what is already stored is a no-op.
+        """
+        merged = dict(bindings)
+        securities = dict(merged.get("bucket_securities") or {})
+        incoming = dict(requested)
+        for bucket_id, security_code in incoming.items():
+            existing = securities.get(bucket_id)
+            if existing is not None and existing != security_code:
+                raise FactError(
+                    "FUNDING_ATTRIBUTION_UNKNOWN",
+                    f"bucket {bucket_id} is already attributed to {existing}",
+                )
+            owner = next(
+                (bid for bid, sec in securities.items() if sec == security_code),
+                None,
+            )
+            if owner is not None and owner != bucket_id:
+                raise FactError(
+                    "FUNDING_ATTRIBUTION_UNKNOWN",
+                    "one security's proceeds cannot settle two buckets",
+                )
+            securities[bucket_id] = security_code
+        merged["bucket_securities"] = securities
+        if securities == dict(bindings.get("bucket_securities") or {}):
+            return bindings
+        return merged
 
     def _bound_account_revision(
         self, connection: sqlite3.Connection, context: SyntheticContext

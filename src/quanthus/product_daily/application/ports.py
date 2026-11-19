@@ -75,6 +75,10 @@ class SyntheticFactsPort(Protocol):
         self, context: SyntheticContext
     ) -> tuple[FundingState, int] | None: ...
 
+    def funding_accountable_cash(
+        self, context: SyntheticContext
+    ) -> Decimal | None: ...
+
     def bind_funding_state(
         self,
         context: SyntheticContext,

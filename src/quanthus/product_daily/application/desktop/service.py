@@ -395,15 +395,24 @@ class P12DesktopApplication:
         if binding is not None:
             persisted, bound_revision = binding
             # The page reconciles the persisted partition with the account
-            # ledger: a partition whose total no longer equals recorded cash
-            # (an older local store admitted before ledger-consistent
-            # settlement) is shown as needing reconciliation, not as money the
-            # account does not hold.
+            # ledger the same way the write path does: bucket cash plus
+            # proceeds still awaiting attribution must equal recorded cash.
+            # Movements already explainable by a bound bucket's security are
+            # pending settlement, not a mismatch; only an unexplained gap
+            # marks the account for manual review.
             account_cash = history.baseline_cash + sum(
                 (item.cash_delta for item in history.events),
                 Decimal("0.00"),
             )
-            if persisted.cash_total != account_cash:
+            accountable = getattr(
+                self._facts, "funding_accountable_cash", None
+            )
+            accountable_total = (
+                accountable(self._context)
+                if callable(accountable)
+                else persisted.cash_total
+            )
+            if accountable_total != account_cash:
                 return describe_unbound_funding(
                     self._policy.funding, FUNDING_LEDGER_MISMATCH
                 )

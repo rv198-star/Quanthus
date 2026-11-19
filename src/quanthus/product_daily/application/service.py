@@ -139,6 +139,12 @@ class SyntheticFactService:
         """Persisted fixed-bucket partition, or None when not yet bound."""
         return self._port.funding_state(self._authorize(context))
 
+    def funding_accountable_cash(
+        self, context: SyntheticContext
+    ) -> Decimal | None:
+        """Partition cash plus proceeds awaiting attribution, or None unbound."""
+        return self._port.funding_accountable_cash(self._authorize(context))
+
     def bind_funding_state(
         self,
         context: SyntheticContext,

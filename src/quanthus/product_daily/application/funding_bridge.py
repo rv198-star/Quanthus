@@ -24,12 +24,16 @@ from quanthus.capabilities.execution import (
     validate_context,
     validate_report,
 )
+from quanthus.capabilities.execution.order_evidence import (
+    OrderWindow,
+    SyntheticOrderSource,
+    require_admission,
+)
 from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
 from quanthus.product_daily.c13_later_signal import (
     LaterSignalDecision,
     LaterSignalPolicy,
     LaterSignalStatus,
-    OriginalAttemptState,
     OriginalOpportunity,
     SignalObservation,
     SyntheticCalendar,
@@ -941,6 +945,16 @@ class BridgeState:
 
 
 @dataclass(frozen=True)
+class OrderAccountReplay:
+    """Account and audit views built from the baseline, pinned input and journal."""
+
+    state: BridgeState
+    obligations: tuple[PendingObligation, ...]
+    reports: dict[str, dict[str, Any]]
+    windows: dict[str, dict[str, Any]]
+
+
+@dataclass(frozen=True)
 class BridgeSnapshot:
     state: BridgeState
     obligations: tuple[PendingObligation, ...]
@@ -1113,12 +1127,20 @@ class BuyBridgeResult:
 
 
 class FundingBridgePort(Protocol):
+    def observe_original(
+        self, context: SyntheticContext, window: OrderWindow, request_id: str
+    ) -> dict[str, Any]: ...
+    def order_report(self, context: SyntheticContext, report_id: str) -> dict[str, Any] | None: ...
+    def resolve_order_buy(
+        self, context: SyntheticContext, report: ExecutionReport, profile: CycleFillProfile
+    ) -> str: ...
     def establish(self, baseline: CycleBaseline) -> BridgeState: ...
     def replay_entry(
         self,
         context: SyntheticContext,
         intent: CycleEntryIntent,
         later_binding: LaterAttemptBinding | None = None,
+        original_claim: dict[str, str] | None = None,
     ) -> EntryBridgeResult | None: ...
     def read(self, context: SyntheticContext) -> BridgeState: ...
     def read_snapshot(self, context: SyntheticContext) -> BridgeSnapshot: ...
@@ -1149,6 +1171,7 @@ class FundingBridgePort(Protocol):
         expected: str,
         result: EntryBridgeResult,
         later_binding: LaterAttemptBinding | None = None,
+        original_evidence: dict[str, Any] | None = None,
     ) -> BridgeState: ...
     def receive_buy(
         self, context: SyntheticContext, report: ExecutionReport, profile: CycleFillProfile
@@ -1220,6 +1243,7 @@ class FundingBridgePort(Protocol):
         result: LateFeeResult,
     ) -> LateFeeResult: ...
     def rebuild(self, context: SyntheticContext) -> BridgeState: ...
+    def reconstruct_order_account(self, context: SyntheticContext) -> OrderAccountReplay: ...
 
 
 def apply_confirmed_buy_transition(
@@ -1523,12 +1547,14 @@ class FundingBridgeService:
         authorized_context: SyntheticContext,
         authorization: SyntheticRuntimeAuthorization,
         temporal_profile: SyntheticTemporalProfile | None = None,
+        order_source: SyntheticOrderSource | None = None,
     ) -> None:
         authorization.require(authorized_context)
         self._port = port
         self._authorization = authorization
         self._context = validate_context(authorized_context)
         self._temporal_profile = temporal_profile
+        self._order_source = order_source
 
     def _context_for(self, context: SyntheticContext) -> SyntheticContext:
         value = validate_context(context)
@@ -1656,14 +1682,6 @@ class FundingBridgeService:
             return LaterEntryResult(decision, None, None)
         if decision.candidate is None or decision.slot is None:
             raise FactError("INVALID_C13_DECISION", "eligible decision lacks planning identity")
-        if (
-            request.opportunity.original_attempt_state
-            is OriginalAttemptState.TERMINAL_ZERO_FILL_RECONCILED
-        ):
-            raise FactError(
-                "C13_ORIGINAL_ORDER_FACT_REQUIRED",
-                "the account bridge cannot attest original terminal zero fill",
-            )
         if decision.slot.account_id != context.account_id:
             raise FactError("C13_ACCOUNT_MISMATCH", "attempt slot belongs to another account")
         if (
@@ -1689,7 +1707,19 @@ class FundingBridgeService:
             decision.candidate.identity,
             decision.candidate.execution_at,
         )
-        existing = self._port.replay_entry(context, request.intent, binding)
+        original = request.opportunity
+        existing = self._port.replay_entry(
+            context,
+            request.intent,
+            binding,
+            {
+                "parent_id": original.opportunity_id,
+                "security_id": original.security_id,
+                "end": original.original_window_end.isoformat(),
+                "decision_at": request.current.decision_cutoff.isoformat(),
+                "claimed_state": original.original_attempt_state.value,
+            },
+        )
         if existing is not None:
             return LaterEntryResult(decision, existing, binding if existing.accepted else None)
         if not request.current.decision_cutoff <= context.as_of < binding.execution_at:
@@ -1697,11 +1727,41 @@ class FundingBridgeService:
                 "C13_RESERVATION_OUTSIDE_DECISION_WINDOW",
                 "later reservation must be after its decision and before its planned open",
             )
+        if self._order_source is None:
+            raise FactError(
+                "C13_ORIGINAL_ORDER_FACT_REQUIRED", "a trusted account source is required"
+            )
+        opportunity = request.opportunity
+        window = self._order_source.scope_window(
+            opportunity.opportunity_id, opportunity.security_id, opportunity.original_window_end
+        )
+        evidence = require_admission(
+            self._order_source,
+            window,
+            request.current.decision_cutoff,
+            context.as_of,
+            opportunity.original_attempt_state.value,
+        )
         result, expected = self._prepare_entry(context, request.intent)
-        self._port.commit_entry(context, expected, result, binding)
+        self._port.commit_entry(context, expected, result, binding, evidence)
         if not result.accepted:
             return LaterEntryResult(decision, result, None)
         return LaterEntryResult(decision, result, binding)
+
+    def observe_original(
+        self, context: SyntheticContext, window: OrderWindow, *, request_id: str
+    ) -> dict[str, Any]:
+        """Persist the account-source verdict, reconciling a proven terminal original hold."""
+        validated = self._context_for(context)
+        if self._order_source is None:
+            raise FactError("C13_ORIGINAL_ORDER_FACT_REQUIRED", "no trusted provider is bound")
+        if not isinstance(request_id, str) or not request_id.strip():
+            raise FactError("INVALID_REPORT_SHAPE", "stable request ID is required")
+        return self._port.observe_original(validated, window, request_id)
+
+    def order_report(self, context: SyntheticContext, report_id: str) -> dict[str, Any] | None:
+        """Read the durable source-order lineage and disposition of a received buy."""
+        return self._port.order_report(self._context_for(context), report_id)
 
     def submit_buy(
         self, context: SyntheticContext, report: ExecutionReport, profile: CycleFillProfile
@@ -1714,6 +1774,11 @@ class FundingBridgeService:
             return existing
         receipt_id = self._port.receive_buy(context, report, profile)
         self._require_fact_time(context, report.occurred_at, role="buy")
+        reservation_id = (
+            self._port.resolve_order_buy(context, report, profile)
+            if self._order_source is not None
+            else None
+        )
         view = self._port.read_snapshot(context)
         if view.state.funding.completed_settlements and self._temporal_profile is None:
             raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle execution lacks profile")
@@ -1721,7 +1786,9 @@ class FundingBridgeService:
         obligations = tuple(
             item
             for item in view.obligations
-            if item.status == "OPEN" and item.security_code == report.security_code
+            if item.status == "OPEN"
+            and item.security_code == report.security_code
+            and (reservation_id is None or item.reservation_id == reservation_id)
         )
         if len(obligations) != 1:
             raise FactError("ORDER_ALREADY_FILLED", "no open application obligation")
@@ -1933,6 +2000,10 @@ class FundingBridgeService:
             positions,
             pending_buys=pending,
         )
+
+    def reconstruct_order_account(self, context: SyntheticContext) -> OrderAccountReplay:
+        """Read the original order account from its baseline, source and append-only events."""
+        return self._port.reconstruct_order_account(self._context_for(context))
 
     def rebuild(self, context: SyntheticContext) -> BridgeState:
         return self._port.rebuild(self._context_for(context))

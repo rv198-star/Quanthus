@@ -6,7 +6,7 @@ import json
 import sqlite3
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -27,6 +27,7 @@ from quanthus.product_daily.application.funding_bridge import (
     LateFeeFact,
     LateFeeResult,
     LaterAttemptBinding,
+    OrderAccountReplay,
     PendingObligation,
     ReductionSellProfile,
     SellExecutionReport,
@@ -45,6 +46,17 @@ from quanthus.product_daily.application.funding_bridge import (
     restore_funding_envelope,
 )
 from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
+from quanthus.product_daily.application.order_facts import (
+    OrderWindow,
+    SyntheticOrderSource,
+    check_buy_route,
+    check_original_reservation,
+    identify_buy,
+    reconcile_window,
+    require_admission,
+    restore_window,
+    window_body,
+)
 from quanthus.product_daily.c13_later_signal import AttemptSlot, PlanningAttempt
 from quanthus.product_daily.contracts import CommandEnvelope, ProcessedCommand, ReasonCode
 from quanthus.product_daily.funding import (
@@ -60,6 +72,34 @@ from quanthus.product_daily.funding import (
     settle_invocation_payload,
 )
 from quanthus.shared.fact_contracts import FactError, digest
+
+
+def _report_view(
+    report_id: str, lineage: dict[str, Any] | None, reason: str | None
+) -> dict[str, Any]:
+    return {
+        "report_id": report_id,
+        "status": "POSTED" if reason is None else "NEEDS_RECONCILIATION",
+        "lineage": lineage,
+        "reason": reason,
+        "receipt_id": f"bridge-receipt-{report_id}",
+    }
+
+
+def _profile_body(profile: CycleFillProfile) -> dict[str, Any]:
+    return {**asdict(profile), "confirmed_fee": format(profile.confirmed_fee, "f")}
+
+
+def _restore_buy(raw: dict[str, Any]) -> ExecutionReport:
+    return ExecutionReport(
+        **{
+            **raw,
+            "price": Decimal(raw["price"]),
+            "confirmed_fee": Decimal(raw["confirmed_fee"]),
+            "intended_price_cap": Decimal(raw["intended_price_cap"]),
+            "occurred_at": datetime.fromisoformat(raw["occurred_at"]),
+        }
+    )
 
 
 def _alias_matches(original: object, candidate: object) -> bool:
@@ -91,6 +131,7 @@ class SQLiteCycleBridgeAdapter:
         self._path = str(path)
         self._fault_hook = fault_hook
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._order_source: SyntheticOrderSource | None = None
         self._initialize()
 
     @contextmanager
@@ -203,7 +244,7 @@ class SQLiteCycleBridgeAdapter:
                     PRAGMA user_version=7;
                     """
                 )
-            elif version == 7:
+            elif version in (7, 8):
                 expected = {
                     "bridge_baseline",
                     "bridge_account",
@@ -222,10 +263,315 @@ class SQLiteCycleBridgeAdapter:
                     "bridge_journal",
                     "bridge_later_attempts",
                 }
+                if version == 8:
+                    expected.add("bridge_order_source")
                 if not expected.issubset({row[0] for row in tables}):
                     raise FactError("STORE_SCHEMA_MISMATCH", "cycle bridge schema is incomplete")
             else:
                 raise FactError("STORE_SCHEMA_MISMATCH", "unsupported cycle bridge schema")
+
+    def bind_order_source(
+        self, context: SyntheticContext, source: SyntheticOrderSource | None
+    ) -> None:
+        if source is not None and (
+            source.account_id != context.account_id or context.mode != "synthetic"
+        ):
+            raise FactError("UNAUTHORIZED_CONTEXT", "order provider belongs to another account")
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            version = db.execute("PRAGMA user_version").fetchone()[0]
+            if source is None:
+                if version == 8:
+                    raise FactError(
+                        "ORDER_SOURCE_MISMATCH", "source-backed store requires its provider"
+                    )
+                return
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS bridge_order_source("
+                "account_id TEXT, mode TEXT, source_id TEXT, digest TEXT, manifest TEXT,"
+                "PRIMARY KEY(account_id,mode))"
+            )
+            row = db.execute(
+                "SELECT * FROM bridge_order_source WHERE account_id=? AND mode=?",
+                (context.account_id, context.mode),
+            ).fetchone()
+            if row is not None:
+                if source is None or (row["digest"], row["manifest"]) != (
+                    source.identity,
+                    source.encoded(),
+                ):
+                    raise FactError("ORDER_SOURCE_MISMATCH", "reopen requires the pinned provider")
+            else:
+                if version == 8:
+                    raise FactError(
+                        "ORDER_SOURCE_MISMATCH", "provider manifest missing or wrong account"
+                    )
+                existing = db.execute(
+                    "SELECT 1 FROM bridge_baseline WHERE account_id=? AND mode=?",
+                    (context.account_id, context.mode),
+                ).fetchone()
+                if existing:
+                    raise FactError(
+                        "ORDER_SOURCE_MISMATCH",
+                        "existing account requires a separate reviewed migration",
+                    )
+                db.execute(
+                    "INSERT INTO bridge_order_source VALUES(?,?,?,?,?)",
+                    (
+                        context.account_id,
+                        context.mode,
+                        source.source_id,
+                        source.identity,
+                        source.encoded(),
+                    ),
+                )
+                db.execute("PRAGMA user_version=8")
+            db.commit()
+        self._order_source = source
+
+    def _require_config(self, db: sqlite3.Connection, context: SyntheticContext) -> None:
+        if self._order_source is not None:
+            self._source(db, context)
+        elif db.execute("PRAGMA user_version").fetchone()[0] == 8:
+            raise FactError("ORDER_SOURCE_MISMATCH", "this store requires its pinned order source")
+
+    def _source(self, db: sqlite3.Connection, context: SyntheticContext) -> SyntheticOrderSource:
+        source = self._order_source
+        if source is None or source.account_id != context.account_id:
+            raise FactError("C13_ORIGINAL_ORDER_FACT_REQUIRED", "trusted provider missing")
+        row = db.execute(
+            "SELECT digest,manifest FROM bridge_order_source WHERE account_id=? AND mode=?",
+            (context.account_id, context.mode),
+        ).fetchone()
+        if row is None or (row["digest"], row["manifest"]) != (source.identity, source.encoded()):
+            raise FactError("ORDER_SOURCE_MISMATCH", "stored source changed")
+        return source
+
+    def _evidence_event(
+        self, db: sqlite3.Connection, context: SyntheticContext, event_id: str
+    ) -> dict[str, Any] | None:
+        row = db.execute(
+            "SELECT payload_json,digest FROM bridge_journal WHERE account_id=? "
+            "AND mode=? AND transition_id=?",
+            (context.account_id, context.mode, event_id),
+        ).fetchone()
+        if row is None:
+            return None
+        event: dict[str, Any] = json.loads(row["payload_json"])
+        if digest(event) != row["digest"]:
+            raise FactError("REBUILD_MISMATCH", "order journal digest differs")
+        return event
+
+    def observe_original(
+        self, context: SyntheticContext, window: OrderWindow, request_id: str
+    ) -> dict[str, Any]:
+        body = window_body(window)
+        self.receive_operation(context, "order_window", request_id, digest(body), body)
+        event_id = f"order_window:{request_id}"
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            source = self._source(db, context)
+            existing = self._evidence_event(db, context, event_id)
+            if existing is not None:
+                if existing["window"] != body or existing["source_digest"] != source.identity:
+                    raise FactError("IDEMPOTENCY_CONFLICT", "window request binding differs")
+                expected_request = db.execute(
+                    "SELECT result_json FROM bridge_operations WHERE account_id=? AND mode=? "
+                    "AND kind='order_window' AND identity=?",
+                    (context.account_id, context.mode, request_id),
+                ).fetchone()
+                if (
+                    expected_request is None
+                    or json.loads(expected_request["result_json"]) != existing["receipt"]
+                ):
+                    raise FactError("STORE_PROJECTION_MISMATCH", "window receipt differs")
+                return dict(existing["receipt"])
+            state = self._read(db, context)
+            raw = db.execute(
+                "SELECT received_at FROM bridge_operations WHERE account_id=? AND mode=? "
+                "AND kind='order_window' AND identity=?",
+                (context.account_id, context.mode, request_id),
+            ).fetchone()
+            as_received = replace(context, as_of=datetime.fromisoformat(raw["received_at"]))
+            pending = self._unresolved_order_facts(db, context)
+            observation = reconcile_window(
+                source,
+                as_received,
+                window,
+                state,
+                self._obligation_rows(db, context),
+                unresolved=pending,
+            )
+            if observation.closed_obligation and source.window_result(
+                window, as_received.as_of
+            ) != source.window_result(window, context.as_of):
+                raise FactError(
+                    "ORDER_WINDOW_CHANGED", "reconcile current evidence with a new request"
+                )
+            receipt = observation.receipt
+            if observation.closed_obligation:
+                oid = observation.closed_obligation.obligation_id
+                changed = db.execute(
+                    "UPDATE bridge_obligations SET status='CANCELLED' WHERE account_id=? "
+                    "AND mode=? AND obligation_id=? AND status='OPEN'",
+                    (context.account_id, context.mode, oid),
+                )
+                if changed.rowcount != 1:
+                    raise FactError("ACCOUNT_REVISION_CONFLICT", "original obligation changed")
+                self._write_funding(db, context, observation.state.funding)
+                if self._fault_hook:
+                    self._fault_hook("after_zero_funding_before_account")
+                self._write_account(db, context, observation.state.account)
+            payload = {
+                "source_digest": source.identity,
+                "source_id": source.source_id,
+                "window": body,
+                "unresolved_at_observation": pending,
+                "received_at": as_received.as_of.isoformat(),
+                "receipt": receipt,
+                "request_id": request_id,
+            }
+            self._append_journal(
+                db, context, transition_id=event_id, kind="order_window", payload=payload
+            )
+            db.execute(
+                "UPDATE bridge_operations SET status='POSTED',result_json=? WHERE account_id=? "
+                "AND mode=? AND kind='order_window' AND identity=?",
+                (json.dumps(receipt, sort_keys=True), context.account_id, context.mode, request_id),
+            )
+            self._outbox(db, context, event_id, receipt)
+            db.commit()
+            return receipt
+
+    def _buy_evidence(
+        self,
+        db: sqlite3.Connection,
+        context: SyntheticContext,
+        report: ExecutionReport,
+        profile: CycleFillProfile,
+        state: BridgeState,
+        *,
+        received_at: datetime,
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        source = self._source(db, context)
+        lineage = None
+        try:
+            order, bound = identify_buy(
+                source, report, context.as_of, state, received_at=received_at
+            )
+            lineage = asdict(bound)
+            later = db.execute(
+                "SELECT * FROM bridge_later_attempts WHERE account_id=? AND mode=? "
+                "AND parent_opportunity_id=?",
+                (context.account_id, context.mode, order.parent_id),
+            ).fetchone()
+            slot = None
+            if later is not None:
+                entry = self._evidence_event(db, context, f"entry:{later['command_id']}")
+                if not entry:
+                    raise FactError("STORE_PROJECTION_MISMATCH", "later attempt lacks an entry")
+                slot = {**dict(later), "execution_at": entry["later_attempt"]["execution_at"]}
+            obligation = next(
+                (
+                    ob
+                    for ob in self._obligation_rows(db, context)
+                    if ob.reservation_id == bound.reservation_id
+                ),
+                None,
+            )
+            owner = (
+                db.execute(
+                    "SELECT parent_opportunity_id,attempt_identity FROM bridge_later_attempts "
+                    "WHERE account_id=? AND mode=? AND obligation_id=?",
+                    (context.account_id, context.mode, bound.reservation_id),
+                ).fetchone()
+                if bound.reservation_id
+                else None
+            )
+            reservation = (
+                self._evidence_event(db, context, f"entry:{order.command_id}")
+                if obligation
+                else None
+            )
+            reserved_at = (
+                datetime.fromisoformat(reservation["account_recorded_at"]) if reservation else None
+            )
+            check_buy_route(
+                order,
+                bound,
+                report,
+                profile,
+                obligation,
+                slot,
+                dict(owner) if owner else None,
+                reserved_at,
+            )
+        except FactError as exc:
+            return lineage, exc.reason_code
+        return lineage, None
+
+    def resolve_order_buy(
+        self, context: SyntheticContext, report: ExecutionReport, profile: CycleFillProfile
+    ) -> str:
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            state = self._read(db, context)
+            self._validate_later_slots(db, context)
+            row = db.execute(
+                "SELECT received_at FROM bridge_inbox WHERE account_id=? AND "
+                "mode=? AND report_id=?",
+                (context.account_id, context.mode, report.report_id),
+            ).fetchone()
+            received = replace(context, as_of=datetime.fromisoformat(row["received_at"]))
+            event_id = f"order_conflict:{report.report_id}"
+            existing = self._evidence_event(db, context, event_id)
+            if existing:
+                raise FactError(existing["reason"], "existing order reconciliation receipt")
+            lineage, reason = self._buy_evidence(
+                db, context, report, profile, state, received_at=received.as_of
+            )
+            if reason:
+                payload = {
+                    "report": report.to_dict(),
+                    "received_at": received.as_of.isoformat(),
+                    "order_lineage": lineage,
+                    "source_digest": self._source(db, context).identity,
+                    "profile_data": _profile_body(profile),
+                    "reason": reason,
+                }
+                self._append_journal(
+                    db, context, transition_id=event_id, kind="order_conflict", payload=payload
+                )
+                self._record_conflict(
+                    db,
+                    context,
+                    "order_fact",
+                    report.report_id,
+                    report.payload_digest,
+                    self._source(db, context).identity,
+                    json.dumps(payload, sort_keys=True),
+                )
+                alert_id = (
+                    f"c13-unattributed-buy:{report.report_id}"
+                    if reason == "C13_ORDER_ATTRIBUTION_REQUIRED"
+                    else event_id
+                )
+                self._outbox(db, context, alert_id, payload)
+                db.commit()
+                raise FactError(reason, "source report retained for reconciliation")
+            assert lineage is not None and lineage["reservation_id"] is not None
+            return str(lineage["reservation_id"])
+
+    def order_report(self, context: SyntheticContext, report_id: str) -> dict[str, Any] | None:
+        with self._connect() as db:
+            db.execute("BEGIN")
+            self._source(db, context)
+            self._require_context_not_before_store(db, context)
+            for prefix in ("buy", "order_conflict"):
+                event = self._evidence_event(db, context, f"{prefix}:{report_id}")
+                if event is not None:
+                    return _report_view(report_id, event.get("order_lineage"), event.get("reason"))
+            return None
 
     def _timestamp(self) -> str:
         value = self._clock()
@@ -238,6 +584,7 @@ class SQLiteCycleBridgeAdapter:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
+                self._require_config(connection, c)
                 old = connection.execute(
                     "SELECT * FROM bridge_baseline WHERE account_id=? AND mode=?",
                     (c.account_id, c.mode),
@@ -298,6 +645,7 @@ class SQLiteCycleBridgeAdapter:
         context: SyntheticContext,
         intent: CycleEntryIntent,
         later_binding: LaterAttemptBinding | None = None,
+        original_claim: dict[str, str] | None = None,
     ) -> EntryBridgeResult | None:
         with self._connect() as connection:
             connection.execute("BEGIN")
@@ -339,6 +687,25 @@ class SQLiteCycleBridgeAdapter:
             expected_binding = later_binding.to_dict() if later_binding is not None else None
             if stored_binding != expected_binding:
                 raise FactError("IDEMPOTENCY_CONFLICT", "entry attempt binding differs")
+            if original_claim is not None and event.get("original_evidence") is not None:
+                proof = event["original_evidence"]
+                saved_claim = {
+                    "parent_id": proof["window"]["parent_id"],
+                    "security_id": proof["window"]["security_id"],
+                    "end": proof["window"]["end"],
+                    "decision_at": proof["decision_at"],
+                    "claimed_state": proof["claimed_state"],
+                }
+                # ISO offsets may differ while representing the same instant.
+                if any(
+                    (datetime.fromisoformat(saved_claim[k]) != datetime.fromisoformat(v))
+                    if k in {"decision_at", "end"}
+                    else saved_claim[k] != v
+                    for k, v in original_claim.items()
+                ):
+                    raise FactError(
+                        "IDEMPOTENCY_CONFLICT", "original window or claimed status changed"
+                    )
             if later_binding is not None:
                 self._validate_later_slots(connection, context)
                 result_keys = (
@@ -551,6 +918,7 @@ class SQLiteCycleBridgeAdapter:
         expected: str,
         result: EntryBridgeResult,
         later_binding: LaterAttemptBinding | None = None,
+        original_evidence: dict[str, Any] | None = None,
     ) -> BridgeState:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -568,14 +936,31 @@ class SQLiteCycleBridgeAdapter:
                     raise FactError("ACCOUNT_REVISION_CONFLICT", "entry CAS conflict")
                 if later_binding is not None:
                     self._validate_later_slots(connection, context)
-                    if any(
-                        reservation.opportunity_id == later_binding.parent_opportunity_id
-                        for reservation in state.funding.entry_reservations
+                    source = self._source(connection, context)
+                    if original_evidence is None:
+                        raise FactError("C13_ORIGINAL_ORDER_FACT_REQUIRED", "no window receipt")
+                    window = restore_window(original_evidence["window"])
+                    proof = require_admission(
+                        source,
+                        window,
+                        datetime.fromisoformat(original_evidence["decision_at"]),
+                        context.as_of,
+                        original_evidence["claimed_state"],
+                    )
+                    if (
+                        proof != original_evidence
+                        or window.parent_id != later_binding.parent_opportunity_id
                     ):
                         raise FactError(
-                            "C13_ORIGINAL_ORDER_FACT_REQUIRED",
-                            "an original reservation contradicts the no-submission claim",
+                            "C13_ORIGINAL_ORDER_FACT_REQUIRED", "changed admission evidence"
                         )
+                    check_original_reservation(
+                        source.window_result(window, context.as_of),
+                        source,
+                        window,
+                        state,
+                        self._obligation_rows(connection, context),
+                    )
                     if (
                         connection.execute(
                             "SELECT 1 FROM bridge_entry_receipts "
@@ -603,7 +988,7 @@ class SQLiteCycleBridgeAdapter:
                             raise FactError(
                                 "INVALID_C13_DECISION", "later reservation lacks a fresh obligation"
                             )
-                        if self._has_unreconciled_unposted(connection, context):
+                        if self._unresolved_order_facts(connection, context):
                             raise FactError(
                                 "C13_ORIGINAL_FACT_UNRESOLVED",
                                 "unreconciled raw original fact precedes later admission",
@@ -677,6 +1062,11 @@ class SQLiteCycleBridgeAdapter:
                                     if result.intent is not None
                                     else None
                                 ),
+                                **(
+                                    {"original_evidence": original_evidence}
+                                    if later_binding
+                                    else {}
+                                ),
                                 "later_attempt": (
                                     later_binding.to_dict() if later_binding is not None else None
                                 ),
@@ -687,6 +1077,7 @@ class SQLiteCycleBridgeAdapter:
                 if later_binding is not None and not result.accepted:
                     if result.intent is None:
                         raise FactError("INVALID_C13_DECISION", "later refusal lacks an intent")
+                    entry_receipt["original_evidence"] = original_evidence
                     entry_receipt["intent"] = entry_intent_to_dict(result.intent)
                     entry_receipt["later_attempt"] = later_binding.to_dict()
                     entry_receipt["receipt_digest"] = digest(
@@ -900,7 +1291,26 @@ class SQLiteCycleBridgeAdapter:
                     "WHERE account_id=? AND mode=? AND obligation_id=?",
                     (context.account_id, context.mode, obligation.obligation_id),
                 ).fetchone()
-                if later is not None:
+                lineage = None
+                if self._order_source is not None:
+                    row = connection.execute(
+                        "SELECT received_at FROM bridge_inbox WHERE account_id=? "
+                        "AND mode=? AND report_id=?",
+                        (context.account_id, context.mode, report.report_id),
+                    ).fetchone()
+                    received = replace(context, as_of=datetime.fromisoformat(row["received_at"]))
+                    lineage, reason = self._buy_evidence(
+                        connection, context, report, profile, state, received_at=received.as_of
+                    )
+                    if (
+                        reason
+                        or not lineage
+                        or lineage["reservation_id"] != obligation.reservation_id
+                    ):
+                        raise FactError(
+                            reason or "ORDER_SOURCE_CONFLICT", "order changed before posting"
+                        )
+                elif later is not None:
                     # The generic buy report has no order identity to distinguish two attempts.
                     evidence = {
                         "report": report.to_dict(),
@@ -1044,6 +1454,7 @@ class SQLiteCycleBridgeAdapter:
                     transition_id=f"buy:{report.report_id}",
                     kind="buy",
                     payload={
+                        **({"order_lineage": lineage} if lineage else {}),
                         "report": report.to_dict(),
                         "profile": profile.payload_digest,
                         "profile_data": {
@@ -1528,9 +1939,21 @@ class SQLiteCycleBridgeAdapter:
                 raise
 
     def rebuild(self, context: SyntheticContext) -> BridgeState:
+        return self._replay_account(context, compare_projections=True).state
+
+    def reconstruct_order_account(self, context: SyntheticContext) -> OrderAccountReplay:
+        if self._order_source is None:
+            raise FactError(
+                "C13_ORIGINAL_ORDER_FACT_REQUIRED", "source-backed replay requires a provider"
+            )
+        return self._replay_account(context, compare_projections=False)
+
+    def _replay_account(
+        self, context: SyntheticContext, *, compare_projections: bool
+    ) -> OrderAccountReplay:
         with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            state = self._read(connection, context)
+            connection.execute("BEGIN IMMEDIATE" if compare_projections else "BEGIN")
+            self._require_config(connection, context)
             baseline = connection.execute(
                 "SELECT * FROM bridge_baseline WHERE account_id=? AND mode=?",
                 (context.account_id, context.mode),
@@ -1541,6 +1964,12 @@ class SQLiteCycleBridgeAdapter:
             funding = restore_funding_envelope(json.loads(baseline["funding_json"]))
             obligations: dict[str, PendingObligation] = {}
             lots: dict[str, BuyLot] = {}
+            later_orders: dict[str, dict[str, Any]] = {}
+            reservation_times: dict[str, datetime] = {}
+            later_owners: dict[str, dict[str, Any]] = {}
+            reports: dict[str, dict[str, Any]] = {}
+            windows: dict[str, dict[str, Any]] = {}
+            last_recorded_at: datetime | None = None
             for row in connection.execute(
                 "SELECT kind,payload_json,digest FROM bridge_journal "
                 "WHERE account_id=? AND mode=? "
@@ -1551,6 +1980,15 @@ class SQLiteCycleBridgeAdapter:
                 if row["digest"] != digest(event):
                     raise FactError("REBUILD_MISMATCH", "journal digest differs")
                 kind = str(row["kind"])
+                if self._order_source is not None:
+                    recorded = datetime.fromisoformat(event["account_recorded_at"])
+                    if recorded > context.as_of or (
+                        last_recorded_at is not None and recorded < last_recorded_at
+                    ):
+                        raise FactError(
+                            "CONTEXT_TIME_REGRESSION", "journal is outside the requested clock"
+                        )
+                    last_recorded_at = recorded
                 if kind == "entry":
                     if event.get("intent") is None:
                         raise FactError("REBUILD_MISMATCH", "entry journal lacks typed intent")
@@ -1574,7 +2012,47 @@ class SQLiteCycleBridgeAdapter:
                     }:
                         raise FactError("REBUILD_MISMATCH", "entry result identity differs")
                     if entry_result.obligation is not None:
+                        reservation_times[entry_result.obligation.reservation_id] = (
+                            intent.snapshot.as_of
+                        )
                         obligations[entry_result.obligation.obligation_id] = entry_result.obligation
+                    later_binding = event.get("later_attempt")
+                    if later_binding is not None and entry_result.obligation is not None:
+                        original_proof = event.get("original_evidence")
+                        if original_proof is None and self._order_source is not None:
+                            raise FactError("REBUILD_MISMATCH", "missing original window proof")
+                        if original_proof is not None:
+                            source = self._source(connection, context)
+                            window = restore_window(original_proof["window"])
+                            expected_proof = require_admission(
+                                source,
+                                window,
+                                datetime.fromisoformat(original_proof["decision_at"]),
+                                intent.snapshot.as_of,
+                                original_proof["claimed_state"],
+                            )
+                            check_original_reservation(
+                                source.window_result(window, intent.snapshot.as_of),
+                                source,
+                                window,
+                                BridgeState(account, funding, account.revision),
+                                tuple(obligations.values()),
+                            )
+                            if (
+                                expected_proof != original_proof
+                                or window.parent_id != later_binding["parent_opportunity_id"]
+                            ):
+                                raise FactError(
+                                    "REBUILD_MISMATCH", "original window admission differs"
+                                )
+                        later_orders[later_binding["parent_opportunity_id"]] = {
+                            **later_binding,
+                            "obligation_id": entry_result.obligation.obligation_id,
+                            "created_at": intent.snapshot.as_of.isoformat(),
+                        }
+                        later_owners[entry_result.obligation.obligation_id] = later_orders[
+                            later_binding["parent_opportunity_id"]
+                        ]
                     funding = entry_result.funding
                     if funding_state_envelope(funding) != event["funding"]:
                         raise FactError("REBUILD_MISMATCH", "entry transition output differs")
@@ -1584,6 +2062,70 @@ class SQLiteCycleBridgeAdapter:
                         account.cash,
                         account.positions,
                         account.fact_count,
+                    )
+                elif kind == "order_window":
+                    source = self._source(connection, context)
+                    observation = reconcile_window(
+                        source,
+                        replace(context, as_of=datetime.fromisoformat(event["received_at"])),
+                        restore_window(event["window"]),
+                        BridgeState(account, funding, account.revision),
+                        tuple(obligations.values()),
+                        unresolved=event["unresolved_at_observation"],
+                    )
+                    if (
+                        event["source_digest"] != source.identity
+                        or observation.receipt != event["receipt"]
+                    ):
+                        raise FactError("REBUILD_MISMATCH", "source window receipt differs")
+                    account, funding = observation.state.account, observation.state.funding
+                    windows[event["request_id"]] = observation.receipt
+                    if observation.closed_obligation:
+                        obligations[observation.closed_obligation.obligation_id] = (
+                            observation.closed_obligation
+                        )
+                elif kind == "order_conflict":
+                    source = self._source(connection, context)
+                    conflict_report = _restore_buy(event["report"])
+                    conflict_profile = CycleFillProfile(
+                        **{
+                            **event["profile_data"],
+                            "confirmed_fee": Decimal(event["profile_data"]["confirmed_fee"]),
+                        }
+                    )
+                    conflict_lineage = None
+                    try:
+                        order, bound = identify_buy(
+                            source,
+                            conflict_report,
+                            datetime.fromisoformat(event["account_recorded_at"]),
+                            BridgeState(account, funding, account.revision),
+                            received_at=datetime.fromisoformat(event["received_at"]),
+                        )
+                        conflict_lineage = asdict(bound)
+                        check_buy_route(
+                            order,
+                            bound,
+                            conflict_report,
+                            conflict_profile,
+                            obligations.get(bound.reservation_id or ""),
+                            later_orders.get(order.parent_id),
+                            later_owners.get(bound.reservation_id or ""),
+                            reservation_times.get(bound.reservation_id or ""),
+                        )
+                    except FactError as exc:
+                        if (
+                            exc.reason_code != event["reason"]
+                            or conflict_lineage != event["order_lineage"]
+                            or source.identity != event["source_digest"]
+                        ):
+                            raise FactError(
+                                "REBUILD_MISMATCH", "unreconciled order provenance differs"
+                            ) from exc
+                    else:
+                        raise FactError("REBUILD_MISMATCH", "order conflict has no source basis")
+                    reports[conflict_report.report_id] = _report_view(
+                        conflict_report.report_id, conflict_lineage, event["reason"]
                     )
                 elif kind == "buy":
                     raw = event["report"]
@@ -1614,6 +2156,32 @@ class SQLiteCycleBridgeAdapter:
                     obligation = obligations.get(obligation_id)
                     if obligation is None or obligation.status != "OPEN":
                         raise FactError("REBUILD_MISMATCH", "buy obligation is not derivable")
+                    raw_lineage = event.get("order_lineage")
+                    if raw_lineage is None and self._order_source is not None:
+                        raise FactError("REBUILD_MISMATCH", "missing buy order lineage")
+                    if raw_lineage is not None:
+                        order, bound = identify_buy(
+                            self._source(connection, context),
+                            buy_report,
+                            datetime.fromisoformat(event["account_recorded_at"]),
+                            BridgeState(account, funding, account.revision),
+                            received_at=datetime.fromisoformat(raw_lineage["received_at"]),
+                        )
+                        check_buy_route(
+                            order,
+                            bound,
+                            buy_report,
+                            buy_profile,
+                            obligation,
+                            later_orders.get(order.parent_id),
+                            later_owners.get(bound.reservation_id or ""),
+                            reservation_times.get(bound.reservation_id or ""),
+                        )
+                        if raw_lineage != asdict(bound):
+                            raise FactError("REBUILD_MISMATCH", "buy lineage differs from provider")
+                        reports[buy_report.report_id] = _report_view(
+                            buy_report.report_id, raw_lineage, None
+                        )
                     buy_impact = apply_confirmed_buy_transition(
                         BridgeState(account, funding, account.revision),
                         buy_report,
@@ -1813,6 +2381,15 @@ class SQLiteCycleBridgeAdapter:
                 expected_revision = event.get("account_revision")
                 if expected_revision is not None and account.revision != int(expected_revision):
                     raise FactError("REBUILD_MISMATCH", "journal account revision differs")
+            replay = OrderAccountReplay(
+                BridgeState(account, funding, account.revision),
+                tuple(obligations[key] for key in sorted(obligations)),
+                reports,
+                windows,
+            )
+            if not compare_projections:
+                return replay
+            state = self._read(connection, context)
             if account != state.account:
                 raise FactError(
                     "REBUILD_MISMATCH",
@@ -1822,15 +2399,15 @@ class SQLiteCycleBridgeAdapter:
             if funding_state_envelope(funding) != funding_state_envelope(state.funding):
                 raise FactError("REBUILD_MISMATCH", "funding projection differs")
             stored_obligations = self._obligation_rows(connection, context)
-            if stored_obligations and stored_obligations != tuple(
-                obligations[key] for key in sorted(obligations)
-            ):
+            if (
+                self._order_source is not None or stored_obligations
+            ) and stored_obligations != tuple(obligations[key] for key in sorted(obligations)):
                 raise FactError(
                     "STORE_PROJECTION_MISMATCH", "obligation projection differs from journal"
                 )
             stored_lots = self._lot_rows(connection, context)
             derived_lots = tuple(lots[key] for key in sorted(lots))
-            if stored_lots and tuple(
+            if (self._order_source is not None or stored_lots) and tuple(
                 (
                     item.lot_id,
                     item.security_code,
@@ -1858,7 +2435,7 @@ class SQLiteCycleBridgeAdapter:
                 raise FactError("STORE_PROJECTION_MISMATCH", "lot projection differs from journal")
             self._validate_later_slots(connection, context, restore_empty=True)
             connection.commit()
-            return BridgeState(account, funding, state.account_revision)
+            return replay
 
     def _validate_later_slots(
         self,
@@ -2081,6 +2658,20 @@ class SQLiteCycleBridgeAdapter:
                 return True
         return False
 
+    def _unresolved_order_facts(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> bool:
+        if self._has_unreconciled_unposted(connection, context):
+            return True
+        return (
+            connection.execute(
+                "SELECT 1 FROM bridge_conflict_register WHERE account_id=? AND mode=? "
+                "AND state='UNRESOLVED' LIMIT 1",
+                (context.account_id, context.mode),
+            ).fetchone()
+            is not None
+        )
+
     def _latest_received_at(
         self, connection: sqlite3.Connection, context: SyntheticContext
     ) -> datetime | None:
@@ -2093,12 +2684,21 @@ class SQLiteCycleBridgeAdapter:
                 (context.account_id, context.mode, context.account_id, context.mode),
             )
         ]
+        if self._order_source is not None:
+            row = connection.execute(
+                "SELECT payload_json FROM bridge_journal WHERE account_id=? AND mode=? "
+                "ORDER BY sequence DESC LIMIT 1",
+                (context.account_id, context.mode),
+            ).fetchone()
+            if row is not None:
+                values.append(json.loads(row["payload_json"])["account_recorded_at"])
         parsed = [datetime.fromisoformat(value) for value in values]
         return max(parsed) if parsed else None
 
     def _require_context_not_before_store(
         self, connection: sqlite3.Connection, context: SyntheticContext
     ) -> None:
+        self._require_config(connection, context)
         latest = self._latest_received_at(connection, context)
         if latest is not None and context.as_of < latest:
             raise FactError("CONTEXT_TIME_REGRESSION", "caller as_of precedes consumed facts")
@@ -2282,6 +2882,10 @@ class SQLiteCycleBridgeAdapter:
         kind: str,
         payload: object,
     ) -> None:
+        if self._order_source is not None:
+            if not isinstance(payload, dict):
+                raise FactError("INVALID_REPORT_SHAPE", "journal payload must be an object")
+            payload = {**payload, "account_recorded_at": context.as_of.isoformat()}
         sequence = connection.execute(
             "SELECT coalesce(max(sequence),0)+1 FROM bridge_journal WHERE account_id=? AND mode=?",
             (context.account_id, context.mode),
@@ -2561,11 +3165,15 @@ def build_funding_bridge_service(
     fault_hook: Callable[[str], None] | None = None,
     clock: Callable[[], datetime] | None = None,
     temporal_profile: SyntheticTemporalProfile | None = None,
+    order_source: SyntheticOrderSource | None = None,
 ) -> FundingBridgeService:
     authorization.require(context)
+    adapter = SQLiteCycleBridgeAdapter(path, fault_hook=fault_hook, clock=clock)
+    adapter.bind_order_source(context, order_source)
     return FundingBridgeService(
-        SQLiteCycleBridgeAdapter(path, fault_hook=fault_hook, clock=clock),
+        adapter,
         context,
         authorization,
         temporal_profile,
+        order_source,
     )

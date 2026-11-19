@@ -12,6 +12,11 @@ from threading import Barrier
 
 import pytest
 
+from quanthus.capabilities.execution.order_evidence import (
+    OrderWindow,
+    SyntheticOrderSource,
+    WindowStatement,
+)
 from quanthus.platform.adapters.product_daily_cycle_sqlite import build_funding_bridge_service
 from quanthus.product_daily.application.funding_bridge import LaterEntryRequest
 from quanthus.product_daily.c13_later_signal import (
@@ -82,8 +87,27 @@ def later_request(
 
 
 def service(path: Path, *, fault_hook=None):
+    # The account composition now supplies the original-window evidence these fixtures assume.
+    windows = tuple(
+        OrderWindow(
+            opportunity().identity,
+            sec,
+            opportunity().original_window_end - timedelta(hours=5),
+            opportunity().original_window_end,
+        )
+        for sec in ("SYN001", "security-cn-000001")
+    )
+    source = SyntheticOrderSource(
+        context().account_id,
+        "fixture:two-cycle:broker",
+        "test-coverage-v1",
+        windows,
+        tuple(WindowStatement(w.security_id, w, w.end, w.end, True, ()) for w in windows),
+        (),
+        (),
+    )
     bridge = build_funding_bridge_service(
-        path, context=context(), authorization=AUTH, fault_hook=fault_hook
+        path, context=context(), authorization=AUTH, fault_hook=fault_hook, order_source=source
     )
     bridge.establish_baseline(baseline())
     return bridge
@@ -238,7 +262,12 @@ def test_a12_later_reservation_retains_hold_on_unmatched_old_fact(tmp_path: Path
             bridge.submit_buy(context(NOW), old_report, profile)
     assert bridge.current(context(NOW)) == before
     with sqlite3.connect(path) as db:
-        assert db.execute("SELECT count(*) FROM bridge_journal").fetchone()[0] == before_journals
+        assert (
+            db.execute(
+                "SELECT count(*) FROM bridge_journal WHERE kind != 'order_conflict'"
+            ).fetchone()[0]
+            == before_journals
+        )
         assert db.execute("SELECT count(*) FROM bridge_later_attempts").fetchone()[0] == 1
         assert db.execute("SELECT count(*) FROM bridge_obligations").fetchone()[0] == 1
         assert db.execute("SELECT status FROM bridge_obligations").fetchone()[0] == "OPEN"

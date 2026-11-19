@@ -52,6 +52,7 @@ from quanthus.product_daily.application.order_facts import (
     check_buy_route,
     check_original_reservation,
     identify_buy,
+    reconcile_later,
     reconcile_window,
     require_admission,
     restore_window,
@@ -447,6 +448,114 @@ class SQLiteCycleBridgeAdapter:
             db.execute(
                 "UPDATE bridge_operations SET status='POSTED',result_json=? WHERE account_id=? "
                 "AND mode=? AND kind='order_window' AND identity=?",
+                (json.dumps(receipt, sort_keys=True), context.account_id, context.mode, request_id),
+            )
+            self._outbox(db, context, event_id, receipt)
+            db.commit()
+            return receipt
+
+    def observe_later(
+        self, context: SyntheticContext, attempt_identity: str, request_id: str
+    ) -> dict[str, Any]:
+        body = {"attempt_id": attempt_identity}
+        self.receive_operation(context, "order_terminal", request_id, digest(body), body)
+        event_id = f"order_terminal:{request_id}"
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            source = self._source(db, context)
+            existing = self._evidence_event(db, context, event_id)
+            if existing is not None:
+                if (
+                    existing["attempt_id"] != attempt_identity
+                    or existing["source_digest"] != source.identity
+                ):
+                    raise FactError("IDEMPOTENCY_CONFLICT", "terminal request binding differs")
+                expected_request = db.execute(
+                    "SELECT result_json FROM bridge_operations WHERE account_id=? AND mode=? "
+                    "AND kind='order_terminal' AND identity=?",
+                    (context.account_id, context.mode, request_id),
+                ).fetchone()
+                if (
+                    expected_request is None
+                    or json.loads(expected_request["result_json"]) != existing["receipt"]
+                ):
+                    raise FactError("STORE_PROJECTION_MISMATCH", "terminal receipt differs")
+                return dict(existing["receipt"])
+            state = self._read(db, context)
+            self._validate_later_slots(db, context)
+            raw = db.execute(
+                "SELECT received_at FROM bridge_operations WHERE account_id=? AND mode=? "
+                "AND kind='order_terminal' AND identity=?",
+                (context.account_id, context.mode, request_id),
+            ).fetchone()
+            as_received = replace(context, as_of=datetime.fromisoformat(raw["received_at"]))
+            later_row = db.execute(
+                "SELECT * FROM bridge_later_attempts WHERE account_id=? AND mode=? "
+                "AND attempt_identity=?",
+                (context.account_id, context.mode, attempt_identity),
+            ).fetchone()
+            if (
+                later_row is not None
+                and db.execute(
+                    "SELECT 1 FROM bridge_later_attempts WHERE account_id=? AND mode=? "
+                    "AND parent_opportunity_id=? AND attempt_identity!=?",
+                    (
+                        context.account_id,
+                        context.mode,
+                        later_row["parent_opportunity_id"],
+                        attempt_identity,
+                    ),
+                ).fetchone()
+            ):
+                raise FactError(
+                    "C13_ATTEMPT_BINDING_MISMATCH", "multiple later attempts share the parent"
+                )
+            later = dict(later_row) if later_row is not None else None
+            pending = self._unresolved_order_facts(db, context)
+            observation = reconcile_later(
+                source,
+                as_received,
+                attempt_identity,
+                later,
+                state,
+                self._obligation_rows(db, context),
+                unresolved=pending,
+            )
+            if observation.closed_obligation and source.terminal_order(
+                attempt_identity, as_received.as_of
+            ) != source.terminal_order(attempt_identity, context.as_of):
+                raise FactError(
+                    "ORDER_WINDOW_CHANGED", "reconcile current evidence with a new request"
+                )
+            receipt = observation.receipt
+            if observation.closed_obligation:
+                oid = observation.closed_obligation.obligation_id
+                changed = db.execute(
+                    "UPDATE bridge_obligations SET status='CANCELLED' WHERE account_id=? "
+                    "AND mode=? AND obligation_id=? AND status='OPEN'",
+                    (context.account_id, context.mode, oid),
+                )
+                if changed.rowcount != 1:
+                    raise FactError("ACCOUNT_REVISION_CONFLICT", "later obligation changed")
+                self._write_funding(db, context, observation.state.funding)
+                if self._fault_hook:
+                    self._fault_hook("after_zero_funding_before_account")
+                self._write_account(db, context, observation.state.account)
+            payload = {
+                "source_digest": source.identity,
+                "source_id": source.source_id,
+                "attempt_id": attempt_identity,
+                "unresolved_at_observation": pending,
+                "received_at": as_received.as_of.isoformat(),
+                "receipt": receipt,
+                "request_id": request_id,
+            }
+            self._append_journal(
+                db, context, transition_id=event_id, kind="order_terminal", payload=payload
+            )
+            db.execute(
+                "UPDATE bridge_operations SET status='POSTED',result_json=? WHERE account_id=? "
+                "AND mode=? AND kind='order_terminal' AND identity=?",
                 (json.dumps(receipt, sort_keys=True), context.account_id, context.mode, request_id),
             )
             self._outbox(db, context, event_id, receipt)
@@ -1987,6 +2096,7 @@ class SQLiteCycleBridgeAdapter:
             later_owners: dict[str, dict[str, Any]] = {}
             reports: dict[str, dict[str, Any]] = {}
             windows: dict[str, dict[str, Any]] = {}
+            terminals: dict[str, dict[str, Any]] = {}
             last_recorded_at: datetime | None = None
             for row in connection.execute(
                 "SELECT kind,payload_json,digest FROM bridge_journal "
@@ -2065,6 +2175,7 @@ class SQLiteCycleBridgeAdapter:
                                 )
                         later_orders[later_binding["parent_opportunity_id"]] = {
                             **later_binding,
+                            "command_id": entry_result.command_id,
                             "obligation_id": entry_result.obligation.obligation_id,
                             "created_at": intent.snapshot.as_of.isoformat(),
                         }
@@ -2099,6 +2210,45 @@ class SQLiteCycleBridgeAdapter:
                         raise FactError("REBUILD_MISMATCH", "source window receipt differs")
                     account, funding = observation.state.account, observation.state.funding
                     windows[event["request_id"]] = observation.receipt
+                    if observation.closed_obligation:
+                        obligations[observation.closed_obligation.obligation_id] = (
+                            observation.closed_obligation
+                        )
+                elif kind == "order_terminal":
+                    source = self._source(connection, context)
+                    attempt = event["attempt_id"]
+                    stored_later = connection.execute(
+                        "SELECT * FROM bridge_later_attempts WHERE account_id=? AND mode=? "
+                        "AND attempt_identity=?",
+                        (context.account_id, context.mode, attempt),
+                    ).fetchone()
+                    if stored_later is None:
+                        later = next(
+                            (
+                                lo
+                                for lo in later_orders.values()
+                                if lo["attempt_identity"] == attempt
+                            ),
+                            None,
+                        )
+                    else:
+                        later = dict(stored_later)
+                    observation = reconcile_later(
+                        source,
+                        replace(context, as_of=datetime.fromisoformat(event["received_at"])),
+                        attempt,
+                        later,
+                        BridgeState(account, funding, account.revision),
+                        tuple(obligations.values()),
+                        unresolved=event["unresolved_at_observation"],
+                    )
+                    if (
+                        event["source_digest"] != source.identity
+                        or observation.receipt != event["receipt"]
+                    ):
+                        raise FactError("REBUILD_MISMATCH", "source terminal receipt differs")
+                    account, funding = observation.state.account, observation.state.funding
+                    terminals[event["request_id"]] = observation.receipt
                     if observation.closed_obligation:
                         obligations[observation.closed_obligation.obligation_id] = (
                             observation.closed_obligation
@@ -2405,6 +2555,7 @@ class SQLiteCycleBridgeAdapter:
                 tuple(obligations[key] for key in sorted(obligations)),
                 reports,
                 windows,
+                terminals,
             )
             if not compare_projections:
                 return replay

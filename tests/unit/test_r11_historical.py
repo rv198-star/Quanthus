@@ -12,6 +12,7 @@ import pytest
 
 from quanthus.aggregator import GovernedAction
 from quanthus.backtest.contracts import MarketSession, OpenExecutionState
+from quanthus.backtest.data_provider import load_replay_data_provider_config
 from quanthus.backtest.engine import BacktestEngine
 from quanthus.backtest.policy import load_execution_policy
 from quanthus.backtest.strategy_replay import StrategyReplayFrame
@@ -21,6 +22,7 @@ from quanthus.expert_evaluation.serialization import ExpertEvaluationError
 from quanthus.expert_strategy import ExpertStrategyRegistry, FormalStrategyRunner
 from quanthus.expert_strategy import formal_p2_replay as replay
 from quanthus.expert_strategy.r11_historical import HistoricalBuyBound, R11HistoricalReplayRuntime
+from quanthus.expert_strategy.r11_provider_admission import expected_r11_reader_manifest
 from quanthus.policy import load_policy
 from tests.unit.test_entry_allocation_audit import at
 from tests.unit.test_formal_expert_strategy import _context, _evidence
@@ -239,17 +241,10 @@ def test_wrong_admitted_manifest_rejected_before_any_read(monkeypatch):
 
 
 def test_admitted_manifest_matches_pinned_canonical_lineage():
-    from quanthus.backtest.data_provider import (
-        ReplayDataProvider,
-        load_replay_data_provider_config,
+    config = load_replay_data_provider_config(
+        ROOT / "config/replay-data-provider.development.v2.json"
     )
-
-    provider = ReplayDataProvider(
-        load_replay_data_provider_config(
-            ROOT / "config/replay-data-provider.development.v2.json"
-        )
-    )
-    assert provider.admitted_manifest() == (
+    assert expected_r11_reader_manifest(config) == (
         "sha256:2821b5923bd1525642d9b4479ed2bd35281203c1f117acf6ba0819c606e4b300"
     )
 
@@ -321,14 +316,12 @@ def test_r11_verifies_shared_manifest_before_loading_events(
 
 
 def test_r11_rejects_wrong_direct_dwd_authority_before_loading_events(tmp_path, monkeypatch):
-    from quanthus.backtest.data_provider import ReplayDataProvider, load_replay_data_provider_config
-
     path = ROOT / "config/replay-data-provider.development.v2.json"
     payload = json.loads(path.read_bytes())
     (tmp_path / "manifest.json").write_text("{}")
     monkeypatch.setenv(payload["dwd_authority"]["root_env"], str(tmp_path))
     monkeypatch.setenv(payload["dwd_correction"]["root_env"], str(tmp_path))
-    provider = ReplayDataProvider(load_replay_data_provider_config(path))
+    config = load_replay_data_provider_config(path)
 
     def event_load_reached(self, root):
         pytest.fail("event data must not be read before the DWD authority is verified")
@@ -340,7 +333,7 @@ def test_r11_rejects_wrong_direct_dwd_authority_before_loading_events(tmp_path, 
             provider_config=str(path),
             parent_event_run_digest=HASH,
             buy_bounds={},
-            admitted_data_manifest_sha256=provider.admitted_manifest(),
+            admitted_data_manifest_sha256=expected_r11_reader_manifest(config),
             consumer_receipt_id="receipt",
             excluded_security_ids=frozenset({SEC}),
         )

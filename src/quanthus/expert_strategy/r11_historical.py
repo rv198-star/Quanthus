@@ -30,6 +30,7 @@ from quanthus.expert_strategy.formal_p2_replay import (
     _SellSchedule,
     _UnitRuntime,
 )
+from quanthus.expert_strategy.r11_provider_admission import verify_r11_reader_admission
 from quanthus.industry_mapping import StaticIndustryMapping
 from quanthus.product_daily.contracts import CommandEnvelope
 from quanthus.product_daily.funding import (
@@ -106,7 +107,8 @@ class R11HistoricalReplayRuntime(FormalP2ReplayRuntime):
         self._admitted_provider = ReplayDataProvider(
             load_replay_data_provider_config(repository_root.resolve() / provider_config)
         )
-        self._admitted_provider.verify_admission(
+        verify_r11_reader_admission(
+            self._admitted_provider.config,
             admitted_data_manifest_sha256,
             scope_start=DECISION_START,
             scope_end=DECISION_END,
@@ -124,10 +126,15 @@ class R11HistoricalReplayRuntime(FormalP2ReplayRuntime):
             raise ValueError("R11 replay starts before the admitted decision window")
 
     def _open_data_session(self) -> ReplayDataSession:
+        verify_r11_reader_admission(
+            self._admitted_provider.config,
+            self._admitted_data_manifest_sha256,
+            scope_start=self._provider_scope_start(),
+            scope_end=self.decision_end,
+        )
         session = self._admitted_provider.open(
             scope_start=self._provider_scope_start(),
             scope_end=self.decision_end,
-            admitted_reader_manifest_sha256=self._admitted_data_manifest_sha256,
         )
         if session.reader.data_manifest_sha256 != self._admitted_data_manifest_sha256:
             session.__exit__(None, None, None)

@@ -127,19 +127,29 @@ def describe_funding(
     *,
     state_account_revision: int,
     current_account_revision: int,
+    pending_by_bucket: dict[str, Decimal] | None = None,
 ) -> FundingView:
-    """Read view; a partition that predates later account facts is shown as not bound."""
+    """Read view of the partition plus cash each open cycle can already explain.
 
-    stale = state_account_revision != current_account_revision
-    reason = FUNDING_CYCLE_NOT_BOUND if stale else None
+    ``pending_by_bucket`` carries the ledger cash moved inside each bucket's
+    open cycle by its attributed security.  Adding it to the settled bucket
+    cash gives the amount the user can currently account for; a partition
+    whose open cycles cannot explain the account's cash is refused upstream
+    as a ledger mismatch before this view is described.
+    """
 
-    def amount(value: Decimal) -> MaybeDecimal:
-        return MaybeDecimal.unknown(FUNDING_CYCLE_NOT_BOUND) if stale else MaybeDecimal.known(value)
+    pending_by_bucket = pending_by_bucket or {}
+
+    def known(value: Decimal) -> MaybeDecimal:
+        return MaybeDecimal.known(value)
+
+    def live_cash(item: BucketState) -> Decimal:
+        return item.cash + pending_by_bucket.get(item.bucket_id, Decimal("0.00"))
 
     def next_budget(item: BucketState) -> Decimal:
         # What the bucket can actually deploy on its next activation: cash it
         # already holds, topped up by whatever the shared reserve could add.
-        return min(item.target_notional, item.cash + state.reserve)
+        return min(item.target_notional, live_cash(item) + state.reserve)
 
     def display_locked(item: BucketState) -> Decimal:
         # Only an active cycle owns a locked budget; a closed or idle row shows
@@ -157,23 +167,23 @@ def describe_funding(
                 item.bucket_id,
                 item.phase.value,
                 item.target_notional,
-                amount(item.cash),
+                known(live_cash(item)),
                 item.cycle_id,
-                amount(display_locked(item)),
-                amount(max(Decimal("0.00"), item.target_notional - item.cash)),
-                amount(
+                known(display_locked(item)),
+                known(max(Decimal("0.00"), item.target_notional - live_cash(item))),
+                known(
                     (policy.trial_fraction * display_locked(item)).quantize(CNY_QUANTUM)
                     if display_locked(item)
                     else Decimal("0.00")
                 ),
-                amount(next_budget(item)),
+                known(next_budget(item)),
             )
             for item in sorted(state.buckets, key=lambda x: x.bucket_id)
         ),
-        reserve=amount(state.reserve),
-        unallocated_adjustment=amount(state.unallocated_adjustment),
+        reserve=known(state.reserve),
+        unallocated_adjustment=known(state.unallocated_adjustment),
         bound_account_revision=state_account_revision,
-        status_reason=reason,
+        status_reason=None,
     )
 
 

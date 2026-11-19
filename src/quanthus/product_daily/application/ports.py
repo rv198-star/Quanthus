@@ -79,6 +79,10 @@ class SyntheticFactsPort(Protocol):
         self, context: SyntheticContext
     ) -> Decimal | None: ...
 
+    def funding_pending_by_bucket(
+        self, context: SyntheticContext
+    ) -> dict[str, Decimal] | None: ...
+
     def bind_funding_state(
         self,
         context: SyntheticContext,

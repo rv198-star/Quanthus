@@ -2344,6 +2344,25 @@ class SQLiteSyntheticFactsAdapter:
         cycle's security, so they count toward the partition's accountable
         total until a settlement folds them in and advances the floor.
         """
+        pending_by_bucket = self._pending_cash_by_bucket(
+            connection, context, state, bindings, bound_rev
+        )
+        return state.cash_total + sum(pending_by_bucket.values(), Decimal("0.00"))
+
+    def _pending_cash_by_bucket(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        state: FundingState,
+        bindings: dict[str, Any],
+        bound_rev: int,
+    ) -> dict[str, Decimal]:
+        """bucket_id -> ledger cash moved inside its open cycle, by security.
+
+        The folded value stays inside the bucket's recorded cash until a
+        settlement commits it; the pending amount is what the page can
+        already explain.
+        """
         securities = self._funding_securities(
             connection, context, state, bindings
         )
@@ -2357,7 +2376,7 @@ class SQLiteSyntheticFactsAdapter:
             for item in state.buckets
             if item.phase is not BucketPhase.EMPTY
         } - completed
-        pending = Decimal("0.00")
+        pending: dict[str, Decimal] = {}
         for bucket_id, _cycle_id in open_cycles:
             sec = securities.get(bucket_id)
             floor = int(raw_floors.get(bucket_id, default))
@@ -2366,8 +2385,10 @@ class SQLiteSyntheticFactsAdapter:
                 # event-sequence tracking; its cash is already partitioned.
                 continue
             moved = self._cash_events_after(connection, context, floor)
-            pending += moved.get(sec, Decimal("0.00"))
-        return state.cash_total + pending
+            delta = moved.get(sec, Decimal("0.00"))
+            if delta:
+                pending[bucket_id] = delta
+        return pending
 
     def _read_funding_binding(
         self, connection: sqlite3.Connection, context: SyntheticContext
@@ -2403,17 +2424,33 @@ class SQLiteSyntheticFactsAdapter:
     ) -> dict[str, str]:
         """bucket_id -> security_code assignment.
 
-        Persisted bindings win.  Otherwise, when the account trades a single
-        security it is attributed to the bucket being settled (the fixed-bucket
-        product holds one security per bucket); a genuinely multi-security
-        account without an explicit binding is left unattributed rather than
-        guessed.
+        A persisted binding applies to the cycle it was recorded for: the
+        bucket's active cycle while it is reserved or held, or the cycle that
+        just closed while it is being settled.  An attribution recorded for an
+        earlier cycle is left in place for audit but no longer describes the
+        bucket's new opportunity, so it is not returned.  Otherwise, when the
+        account trades a single security it is attributed to the bucket being
+        settled; a genuinely multi-security account without an explicit
+        binding is left unattributed rather than guessed.
         """
         if bindings is None:
             bindings = self._read_bindings(connection, context)
         persisted = dict(bindings.get("bucket_securities") or {})
         if persisted:
-            return persisted
+            cycles = dict(bindings.get("bucket_security_cycles") or {})
+            if not cycles:
+                return persisted
+            if state is None:
+                return persisted
+            active = {
+                item.bucket_id: item.cycle_id
+                for item in state.buckets
+            }
+            return {
+                bucket_id: sec
+                for bucket_id, sec in persisted.items()
+                if cycles.get(bucket_id) in (active.get(bucket_id), "pending")
+            }
         if state is None:
             return persisted
         securities = {
@@ -2474,6 +2511,29 @@ class SQLiteSyntheticFactsAdapter:
             connection.commit()
             return total
 
+    def funding_pending_by_bucket(
+        self, context: SyntheticContext
+    ) -> dict[str, Decimal] | None:
+        """Per-bucket ledger cash already attributable but not yet settled.
+
+        Returns None when no partition is bound.  The desktop adds each
+        bucket's pending delta to its settled cash so an explainable
+        in-cycle movement reads as a concrete amount instead of unknown.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            binding = self._read_funding_binding(connection, context)
+            if binding is None:
+                connection.commit()
+                return None
+            state, bound_rev, bindings = binding
+            anchor_rev = self._binding_anchor(bound_rev, bindings)
+            pending = self._pending_cash_by_bucket(
+                connection, context, state, bindings, anchor_rev
+            )
+            connection.commit()
+            return pending
+
     def bind_funding_state(
         self,
         context: SyntheticContext,
@@ -2494,7 +2554,7 @@ class SQLiteSyntheticFactsAdapter:
                 existing, existing_rev, existing_bindings = binding_row
                 if bucket_securities:
                     merged = self._merge_bucket_securities(
-                        existing_bindings, bucket_securities
+                        existing, existing_bindings, bucket_securities
                     )
                     if merged is not existing_bindings:
                         self._write_funding_state(
@@ -2506,7 +2566,12 @@ class SQLiteSyntheticFactsAdapter:
                         )
                 connection.commit()
                 return existing
-            bindings = {"bucket_securities": dict(bucket_securities or {})}
+            bindings = {
+                "bucket_securities": dict(bucket_securities or {}),
+                "bucket_security_cycles": self._attribution_targets(
+                    state, bucket_securities or {}
+                ),
+            }
             try:
                 projection = self._projection(connection, context)
                 account_cash = projection.cash
@@ -2536,40 +2601,85 @@ class SQLiteSyntheticFactsAdapter:
             connection.commit()
             return state
 
+    @staticmethod
+    def _attribution_targets(
+        state: FundingState, requested: dict[str, str]
+    ) -> dict[str, str]:
+        """The cycle each requested attribution will serve.
+
+        A reserved or held bucket's attribution serves its active cycle; an
+        empty or closed bucket's waits for the next reservation, recorded as
+        ``pending`` until a prepare pins it to the new cycle id.
+        """
+        phases = {item.bucket_id: item for item in state.buckets}
+        targets: dict[str, str] = {}
+        for bucket_id in requested:
+            item = phases.get(bucket_id)
+            if item is not None and item.phase in (
+                BucketPhase.RESERVED,
+                BucketPhase.HELD,
+            ):
+                targets[bucket_id] = str(item.cycle_id)
+            else:
+                targets[bucket_id] = "pending"
+        return targets
+
     def _merge_bucket_securities(
         self,
+        state: FundingState,
         bindings: dict[str, Any],
         requested: dict[str, str],
     ) -> dict[str, Any]:
         """Fold a later attribution into persisted bindings.
 
-        Persisted mappings win over a repeated request; new bucket-security
-        pairs join them.  A request that would attach one security to a second
-        bucket is refused outright — proceeds could then settle two cycles —
-        and a request matching what is already stored is a no-op.
+        An attribution serves the bucket's current opportunity: while the
+        bucket is reserved or held it is pinned to that cycle; while it is
+        empty or closed it waits for the next activation.  A request that
+        would retarget the bucket inside the same cycle is refused outright,
+        as is one that attaches a security already serving another bucket's
+        live cycle.  A new cycle may name a new security; a request matching
+        what is already stored is a no-op.
         """
         merged = dict(bindings)
         securities = dict(merged.get("bucket_securities") or {})
-        incoming = dict(requested)
-        for bucket_id, security_code in incoming.items():
+        cycles = dict(merged.get("bucket_security_cycles") or {})
+        targets = self._attribution_targets(state, requested)
+        for bucket_id, security_code in requested.items():
+            target = targets[bucket_id]
             existing = securities.get(bucket_id)
-            if existing is not None and existing != security_code:
+            if (
+                existing is not None
+                and existing != security_code
+                and cycles.get(bucket_id) == target
+            ):
                 raise FactError(
                     "FUNDING_ATTRIBUTION_UNKNOWN",
-                    f"bucket {bucket_id} is already attributed to {existing}",
+                    f"bucket {bucket_id} is already attributed to {existing}"
+                    f" for cycle {target}",
                 )
             owner = next(
-                (bid for bid, sec in securities.items() if sec == security_code),
+                (
+                    bid
+                    for bid, sec in securities.items()
+                    if sec == security_code
+                    and cycles.get(bid) == target
+                    and bid != bucket_id
+                ),
                 None,
             )
-            if owner is not None and owner != bucket_id:
+            if owner is not None:
                 raise FactError(
                     "FUNDING_ATTRIBUTION_UNKNOWN",
                     "one security's proceeds cannot settle two buckets",
                 )
             securities[bucket_id] = security_code
+            cycles[bucket_id] = target
         merged["bucket_securities"] = securities
-        if securities == dict(bindings.get("bucket_securities") or {}):
+        merged["bucket_security_cycles"] = cycles
+        if (
+            securities == dict(bindings.get("bucket_securities") or {})
+            and cycles == dict(bindings.get("bucket_security_cycles") or {})
+        ):
             return bindings
         return merged
 
@@ -3097,7 +3207,9 @@ class SQLiteSyntheticFactsAdapter:
                     context,
                     decision.state,
                     write_rev,
-                    self._bindings_mark_cycle(bucket_id, cycle_seq, bound_bindings),
+                    self._bindings_prepare_cycle(
+                        bucket_id, cycle_id, cycle_seq, bound_bindings
+                    ),
                 )
             connection.commit()
             return decision
@@ -3153,6 +3265,27 @@ class SQLiteSyntheticFactsAdapter:
         floors = dict(bindings.get("cycle_bound_account_revision") or {})
         floors[bucket_id] = event_sequence
         bindings["cycle_bound_account_revision"] = floors
+        return bindings
+
+    def _bindings_prepare_cycle(
+        self,
+        bucket_id: str,
+        cycle_id: str,
+        event_sequence: int,
+        bindings: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Mark a bucket's new cycle and pin any pending attribution to it.
+
+        A bucket-security binding recorded while the bucket was empty or
+        closed targets the next activation; starting that cycle converts the
+        pending marker into this cycle id so the attribution is live exactly
+        for this opportunity.
+        """
+        bindings = self._bindings_mark_cycle(bucket_id, event_sequence, bindings)
+        cycles = dict(bindings.get("bucket_security_cycles") or {})
+        if cycles.get(bucket_id) == "pending":
+            cycles[bucket_id] = cycle_id
+            bindings["bucket_security_cycles"] = cycles
         return bindings
 
     def _bindings_with_settled(

@@ -416,11 +416,20 @@ class P12DesktopApplication:
                 return describe_unbound_funding(
                     self._policy.funding, FUNDING_LEDGER_MISMATCH
                 )
+            pending_read = getattr(
+                self._facts, "funding_pending_by_bucket", None
+            )
+            pending = (
+                pending_read(self._context)
+                if callable(pending_read)
+                else None
+            )
             return describe_funding(
                 self._policy.funding,
                 persisted,
                 state_account_revision=bound_revision,
                 current_account_revision=revision,
+                pending_by_bucket=pending,
             )
         try:
             state = initial_funding_state(self._policy.funding, history.baseline_cash)

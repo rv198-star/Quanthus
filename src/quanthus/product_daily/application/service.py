@@ -145,6 +145,12 @@ class SyntheticFactService:
         """Partition cash plus proceeds awaiting attribution, or None unbound."""
         return self._port.funding_accountable_cash(self._authorize(context))
 
+    def funding_pending_by_bucket(
+        self, context: SyntheticContext
+    ) -> dict[str, Decimal] | None:
+        """Per-bucket proceeds already attributable but not yet settled."""
+        return self._port.funding_pending_by_bucket(self._authorize(context))
+
     def bind_funding_state(
         self,
         context: SyntheticContext,

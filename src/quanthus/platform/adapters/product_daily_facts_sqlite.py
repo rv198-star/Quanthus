@@ -2701,10 +2701,18 @@ class SQLiteSyntheticFactsAdapter:
         for bucket_id, security_code in requested.items():
             target = targets[bucket_id]
             existing = securities.get(bucket_id)
+            # A stored binding with no recorded cycle belongs to the bucket's
+            # current cycle (the pre-cycle semantics), so a live bucket
+            # retargeting inside that same cycle is still refused.  An empty
+            # or closed bucket carries only a pending target and may be
+            # reassigned for its next opportunity.
+            existing_cycle = cycles.get(bucket_id)
+            if existing_cycle is None and target != "pending":
+                existing_cycle = target
             if (
                 existing is not None
                 and existing != security_code
-                and cycles.get(bucket_id) == target
+                and existing_cycle == target
             ):
                 raise FactError(
                     "FUNDING_ATTRIBUTION_UNKNOWN",

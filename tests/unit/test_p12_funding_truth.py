@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from quanthus.platform.adapters.p12_synthetic_fixture import load_synthetic_fixture
-from quanthus.platform.p12.assembly import synthetic_applications
+from quanthus.platform.p12.assembly import STORE_NAME, synthetic_applications
 from quanthus.product_daily.application.desktop import SubmitOrderEvent
 from quanthus.product_daily.funding import SettlementRequest
 from quanthus.shared.fact_contracts import FactError
@@ -184,3 +184,61 @@ def test_open_position_shows_cash_but_waits_on_settlement(tmp_path: Path) -> Non
     assert by_id[B2].cash.value == Decimal("5000.00")
     assert by_id[B2].underfunded.value == Decimal("0.00")
     assert by_id[B2].next_available.value == Decimal("5000.00")
+
+
+# ---- legacy store without cycle markers (created by an older release) -------
+
+
+def _strip_cycle_markers(state: Path) -> None:
+    """Drop the cycle-tracking fields an older release never wrote."""
+    import json
+    import sqlite3
+
+    with sqlite3.connect(state / STORE_NAME) as db:
+        raw = db.execute(
+            "SELECT bindings_json FROM funding_states WHERE account_id=?",
+            (ACCOUNT,),
+        ).fetchone()[0]
+        bindings = json.loads(raw)
+        bindings.pop("bucket_security_cycles", None)
+        db.execute(
+            "UPDATE funding_states SET bindings_json=? WHERE account_id=?",
+            (json.dumps(bindings), ACCOUNT),
+        )
+
+
+def test_legacy_holding_retarget_is_refused(tmp_path: Path) -> None:
+    """A store written before cycle tracking still occupies its security.
+
+    A live bucket holding its position cannot be retargeted to a different
+    security after the upgrade; refusing leaves the original attribution,
+    balances and holdings untouched instead of a later ledger mismatch.
+    """
+    import sqlite3
+
+    app = _app(tmp_path)
+    _reserve(app, B1, "already-live")
+    _assign(app, B1, SEC_A)
+    _trade(app, "prior-buy", SEC_A, "buy", 100, "10.00", 19)
+    _strip_cycle_markers(tmp_path)
+
+    # Reopen through the current adapter, then attempt the retarget.
+    app = _app(tmp_path)
+    with pytest.raises(FactError) as error:
+        _assign(app, B1, SEC_B)
+    assert error.value.reason_code == "FUNDING_ATTRIBUTION_UNKNOWN"
+
+    reopened = _app(tmp_path)
+    page = _page(reopened)
+    assert page.status_reason != "FUNDING_LEDGER_MISMATCH"
+    by_id = _by_id(page)
+    assert by_id[B1].cycle_id == "already-live"
+    assert by_id[B1].cash.value == Decimal("4000.00")
+    account = reopened.workbench(reopened.scope).account
+    assert account.cash_total == Decimal("9000.00")
+    with sqlite3.connect(tmp_path / STORE_NAME) as db:
+        bindings = db.execute(
+            "SELECT bindings_json FROM funding_states WHERE account_id=?",
+            (ACCOUNT,),
+        ).fetchone()[0]
+    assert '"600000"' in bindings and '"000001"' not in bindings

@@ -24,7 +24,6 @@ from quanthus.platform.p12.assembly import build_synthetic_runtime
 from quanthus.platform.persistence import InMemoryPlatformStore
 from quanthus.policy import find_project_root
 
-PRODUCT_PREFIXES = ("/p12", "/candidates/", "/p12/")
 PRODUCT_ROUTES = ("/", "/research", "/candidates", "/attribution", "/p12")
 API_PREFIXES = ("/api/", "/health", "/ready", "/metrics", "/openapi.json")
 

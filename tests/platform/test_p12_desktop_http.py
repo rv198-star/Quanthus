@@ -135,6 +135,14 @@ def test_trusted_binding_rejects_cross_account_mode_and_role(p12_kernel) -> None
     assert status == 403 and error["error"]["reason_code"] == "ACCOUNT_NOT_ADMITTED"
     status, _, error = wsgi_request(p12_kernel, "GET", f"{A}/workbench?mode=real", headers=owner)
     assert status == 403 and error["error"]["reason_code"] == "UNAUTHORIZED_CONTEXT"
+    status, _, error = wsgi_request(
+        p12_kernel,
+        "POST",
+        f"{A}/execution-reports?mode=real",
+        payload={**FILL, "plan_id": PLAN},
+        headers=owner,
+    )
+    assert status == 403 and error["error"]["reason_code"] == "UNAUTHORIZED_CONTEXT"
     status, _, _ = wsgi_request(p12_kernel, "GET", f"{A}/workbench")
     assert status == 401
     watcher = _auth(p12_kernel, "watcher")

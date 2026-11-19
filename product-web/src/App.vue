@@ -32,7 +32,7 @@
           </a-dropdown>
         </div>
       </header>
-      <main><router-view :catalog="catalog" :catalog-loading="loading" :user="user" @catalog-changed="refreshCatalog" /></main>
+      <main><router-view :catalog="catalog" :catalog-loading="loading" :user="user" @catalog-changed="refreshCatalog" @session-expired="logout" /></main>
     </div>
     <button v-if="mobileOpen" class="drawer-mask" aria-label="关闭导航" @click="mobileOpen = false"></button>
   </div>

@@ -28,6 +28,7 @@ test('desktop routes and navigation separate my account from strategy research',
   for (const route of ["'/p12'", "'/p12/records'", "'/p12/funding'"]) assert.ok(router.includes(route))
   for (const text of ['我的账户', '工作台', '记录', '资金与规则', '策略研究', '候选验证']) assert.ok(app.includes(text), text)
   assert.match(server, /pathname\.startsWith\("\/p12\/"\)/)
+  assert.match(app, /@session-expired="logout"/)
 })
 
 test('client derives every call from contract operations', () => {

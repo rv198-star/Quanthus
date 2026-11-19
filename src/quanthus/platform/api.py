@@ -719,6 +719,7 @@ class PlatformHttpApp:
             params["account_id"],
             observed_request.json_object(),
             observed_request.request_id,
+            observed_request.query_string,
         )
         return _json_response(payload, status)
 
@@ -731,6 +732,7 @@ class PlatformHttpApp:
             params["account_id"],
             observed_request.json_object(),
             observed_request.request_id,
+            observed_request.query_string,
         )
         return _json_response(payload, status)
 

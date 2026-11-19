@@ -172,9 +172,11 @@ class P12Endpoints:
         account_id: str,
         body: dict[str, Any],
         request_id: str,
+        query_string: str = "",
     ) -> Result:
         def call(runtime: P12Runtime) -> dict[str, Any]:
             binding = runtime.binding_for(principal, account_id)
+            self._scope_query(binding, query_string)
             command = _transport().parse_submit_fill(body)
             app = binding.application
             payload: dict[str, Any] = _transport().outcome_dto(app.submit_fill(app.scope, command))
@@ -188,9 +190,11 @@ class P12Endpoints:
         account_id: str,
         body: dict[str, Any],
         request_id: str,
+        query_string: str = "",
     ) -> Result:
         def call(runtime: P12Runtime) -> dict[str, Any]:
             binding = runtime.binding_for(principal, account_id)
+            self._scope_query(binding, query_string)
             command = _transport().parse_correct_fill(body)
             app = binding.application
             payload: dict[str, Any] = _transport().outcome_dto(app.correct_fill(app.scope, command))

@@ -2227,25 +2227,33 @@ class SQLiteSyntheticFactsAdapter:
             (context.account_id, context.mode),
         ).fetchone()
         positions: dict[str, int] = {}
+        cash = Decimal(row["cash"]) if row is not None else Decimal("0")
         if row is not None and row["quantity"]:
             positions[row["security_code"]] = int(row["quantity"])
         for event_row in connection.execute(
-            "SELECT event_json FROM events WHERE account_id=? AND mode=? "
+            "SELECT event_id, event_json FROM events WHERE account_id=? AND mode=? "
             "AND revision<=? ORDER BY event_sequence",
             (context.account_id, context.mode, revision),
         ).fetchall():
             event = json.loads(event_row["event_json"])
-            if event.get("kind") != "fill":
-                continue
-            sec = event["security_code"]
-            qty = int(event["quantity"])
-            positions[sec] = positions.get(sec, 0) + (qty if event["side"] == "buy" else -qty)
-            if not positions[sec]:
-                positions.pop(sec)
+            if event.get("kind") == "fill":
+                sec = event["security_code"]
+                qty = int(event["quantity"])
+                positions[sec] = positions.get(sec, 0) + (
+                    qty if event["side"] == "buy" else -qty
+                )
+                if not positions[sec]:
+                    positions.pop(sec)
+            moved = connection.execute(
+                "SELECT COALESCE(SUM(amount),0) FROM postings "
+                "WHERE event_id=? AND account='ASSET_CASH'",
+                (event_row["event_id"],),
+            ).fetchone()[0]
+            cash += Decimal(str(moved))
         return AccountProjection(
             revision,
             revision,
-            Decimal("0"),
+            cash.quantize(Decimal("0.01")),
             tuple(Position(sec, qty) for sec, qty in positions.items()),
             0,
         )
@@ -2258,35 +2266,23 @@ class SQLiteSyntheticFactsAdapter:
     ) -> tuple[dict[str, int], int]:
         """bucket_id -> event floor of the bucket's current cycle.
 
-        Each accepted funding write stores ``cycle_bound_account_revision`` per
-        bucket in bindings_json; converted to an event sequence it marks when
-        that bucket's cycle began.  Missing entries fall back to the account
-        revision at initial binding.
+        Each accepted funding write stores the event sequence at which that
+        bucket's cycle began in bindings_json.  Buckets without a recorded
+        boundary still ride the cycle open at binding, whose default floor is
+        the binding revision's event sequence.
         """
         row = connection.execute(
-            "SELECT bindings_json, bound_account_revision FROM funding_states "
-            "WHERE account_id=? AND mode=?",
+            "SELECT bindings_json FROM funding_states WHERE account_id=? AND mode=?",
             (context.account_id, context.mode),
         ).fetchone()
-        floors: dict[str, int] = {}
-        if row is not None:
-            raw = json.loads(row["bindings_json"] or "{}")
+        default = self._bound_event_sequence(connection, context, bound_rev)
+        raw = json.loads(row["bindings_json"] or "{}") if row is not None else {}
+        floors = {
+            bucket_id: int(revision)
             for bucket_id, revision in (
                 raw.get("cycle_bound_account_revision") or {}
-            ).items():
-                floors[bucket_id] = self._bound_event_sequence(
-                    connection, context, int(revision)
-                )
-            # No per-bucket cycle boundary yet means the bucket still rides its
-            # first cycle since binding, so the floor is the binding revision.
-            if not floors:
-                default = self._bound_event_sequence(connection, context, bound_rev)
-            else:
-                default = self._bound_event_sequence(
-                    connection, context, int(row["bound_account_revision"])
-                )
-        else:
-            default = self._bound_event_sequence(connection, context, bound_rev)
+            ).items()
+        }
         return floors, default
 
     def _write_funding_state(
@@ -2297,12 +2293,25 @@ class SQLiteSyntheticFactsAdapter:
         bound_account_revision: int,
         bindings: dict[str, Any] | None = None,
     ) -> None:
+        row = connection.execute(
+            "SELECT bindings_json, bound_account_revision FROM funding_states "
+            "WHERE account_id=? AND mode=?",
+            (context.account_id, context.mode),
+        ).fetchone()
         if bindings is None:
-            row = connection.execute(
-                "SELECT bindings_json FROM funding_states WHERE account_id=? AND mode=?",
-                (context.account_id, context.mode),
-            ).fetchone()
-            bindings = json.loads(row["bindings_json"]) if row is not None else {}
+            bindings = (
+                json.loads(row["bindings_json"]) if row is not None else {}
+            )
+        # First write pins the reconciliation anchor inside bindings_json;
+        # later writes keep it untouched while the column revision tracks the
+        # newest accepted write for stale-view purposes.
+        if row is None or "initial_bound_account_revision" not in bindings:
+            bindings = dict(bindings)
+            bindings["initial_bound_account_revision"] = (
+                int(row["bound_account_revision"])
+                if row is not None
+                else bound_account_revision
+            )
         connection.execute(
             "INSERT INTO funding_states "
             "(account_id,mode,bound_account_revision,state_json,bindings_json) "
@@ -2320,6 +2329,46 @@ class SQLiteSyntheticFactsAdapter:
             ),
         )
 
+    def _attributed_cash_total(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        state: FundingState,
+        bindings: dict[str, Any],
+        bound_rev: int,
+    ) -> Decimal:
+        """Partition cash plus account cash still waiting to be attributed.
+
+        Order-level cash events (fills, corrections, confirmed fees) posted
+        after an open cycle's recorded floor remain attributable to that
+        cycle's security, so they count toward the partition's accountable
+        total until a settlement folds them in and advances the floor.
+        """
+        securities = self._funding_securities(
+            connection, context, state, bindings
+        )
+        raw_floors = bindings.get("cycle_bound_account_revision") or {}
+        default = self._bound_event_sequence(connection, context, bound_rev)
+        completed = {
+            (item.bucket_id, item.cycle_id) for item in state.completed_settlements
+        }
+        open_cycles = {
+            (item.bucket_id, item.cycle_id)
+            for item in state.buckets
+            if item.phase is not BucketPhase.EMPTY
+        } - completed
+        pending = Decimal("0.00")
+        for bucket_id, _cycle_id in open_cycles:
+            sec = securities.get(bucket_id)
+            floor = int(raw_floors.get(bucket_id, default))
+            if sec is None or floor < 0:
+                # A negative floor marks a cycle whose boundary predates
+                # event-sequence tracking; its cash is already partitioned.
+                continue
+            moved = self._cash_events_after(connection, context, floor)
+            pending += moved.get(sec, Decimal("0.00"))
+        return state.cash_total + pending
+
     def _read_funding_binding(
         self, connection: sqlite3.Connection, context: SyntheticContext
     ) -> tuple[FundingState, int, dict[str, Any]] | None:
@@ -2336,11 +2385,21 @@ class SQLiteSyntheticFactsAdapter:
             json.loads(row["bindings_json"] or "{}"),
         )
 
+    def _binding_anchor(self, bound_rev: int, bindings: dict[str, Any]) -> int:
+        """Account revision the partition reconciles against.
+
+        Rows written since anchoring record it in bindings_json; rows bound
+        before then reconcile against the revision their last write stored,
+        which is what older releases tracked as the bound revision.
+        """
+        return int(bindings.get("initial_bound_account_revision", bound_rev))
+
     def _funding_securities(
         self,
         connection: sqlite3.Connection,
         context: SyntheticContext,
         state: FundingState | None = None,
+        bindings: dict[str, Any] | None = None,
     ) -> dict[str, str]:
         """bucket_id -> security_code assignment.
 
@@ -2350,14 +2409,9 @@ class SQLiteSyntheticFactsAdapter:
         account without an explicit binding is left unattributed rather than
         guessed.
         """
-        row = connection.execute(
-            "SELECT bindings_json FROM funding_states WHERE account_id=? AND mode=?",
-            (context.account_id, context.mode),
-        ).fetchone()
-        persisted = {}
-        if row is not None:
-            raw = json.loads(row["bindings_json"] or "{}")
-            persisted = dict(raw.get("bucket_securities") or {})
+        if bindings is None:
+            bindings = self._read_bindings(connection, context)
+        persisted = dict(bindings.get("bucket_securities") or {})
         if persisted:
             return persisted
         if state is None:
@@ -2664,11 +2718,18 @@ class SQLiteSyntheticFactsAdapter:
         """
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            state = self._read_funding_state(connection, context)
-            if state is None:
+            binding_row = self._read_funding_binding(connection, context)
+            if binding_row is None:
                 connection.rollback()
                 raise FactError("FUNDING_NOT_BOUND", "no funding partition is bound")
-            securities = self._funding_securities(connection, context, state)
+            state, bound_rev, bound_bindings = binding_row
+            anchor_rev = self._binding_anchor(bound_rev, bound_bindings)
+            self._require_reconciled_partition(
+                connection, context, state, anchor_rev, bound_bindings
+            )
+            securities = self._funding_securities(
+                connection, context, state, bound_bindings
+            )
 
             targets = set(close_bucket_ids or (item.bucket_id for item in requests))
             # One security's proceeds belong to exactly one bucket.  When the
@@ -2676,6 +2737,14 @@ class SQLiteSyntheticFactsAdapter:
             # possible only through the single-security fallback, since
             # explicit bindings are checked for uniqueness — the attribution
             # is ambiguous and settlement stays out rather than double-count.
+            all_secs = list(securities.values())
+            if len(all_secs) != len(set(all_secs)):
+                connection.rollback()
+                raise FactError(
+                    "FUNDING_ATTRIBUTION_UNKNOWN",
+                    "one security's proceeds cannot settle two buckets; "
+                    "bind an explicit bucket-security mapping first",
+                )
             targeted_secs = [
                 securities[bid]
                 for bid in targets
@@ -2688,20 +2757,13 @@ class SQLiteSyntheticFactsAdapter:
                     "one security's proceeds cannot settle two buckets; "
                     "bind an explicit bucket-security mapping first",
                 )
-            binding_row = self._read_funding_binding(connection, context)
-            bound_rev = binding_row[1] if binding_row is not None else 0
             if not securities and targets:
                 connection.rollback()
                 raise FactError(
                     "FUNDING_ATTRIBUTION_UNKNOWN",
                     "bucket-security attribution is required to settle proceeds",
                 )
-            binding_row0 = self._read_funding_binding(connection, context)
-            explicit_map = (
-                dict((binding_row0[2] or {}).get("bucket_securities") or {})
-                if binding_row0 is not None
-                else {}
-            )
+            explicit_map = dict(bound_bindings.get("bucket_securities") or {})
             if len(set(explicit_map.values())) != len(explicit_map.values()):
                 connection.rollback()
                 raise FactError(
@@ -2805,7 +2867,7 @@ class SQLiteSyntheticFactsAdapter:
                 )
 
             cycle_floors, default_floor = self._cycle_event_floors(
-                connection, context, bound_rev
+                connection, context, anchor_rev
             )
             # Fold each targeted bucket's own ledger-moved cash into its cycle:
             # fills, corrections and whole-order fees posted since the bucket's
@@ -2819,6 +2881,7 @@ class SQLiteSyntheticFactsAdapter:
                 for request in current_requests
             }
             folded = []
+            advanced: dict[str, int] = {}
             for item in state.buckets:
                 completed = any(
                     done.bucket_id == item.bucket_id and done.cycle_id == item.cycle_id
@@ -2848,7 +2911,10 @@ class SQLiteSyntheticFactsAdapter:
                 until = self._event_sequence_by_fact(connection, context, order_ids)
                 cycle_start: int
                 recorded_floor = cycle_floors.get(item.bucket_id)
-                if recorded_floor is not None:
+                if (
+                    recorded_floor is not None
+                    and item.phase is not BucketPhase.CLOSED
+                ):
                     cycle_start = recorded_floor
                 elif item.phase is not BucketPhase.CLOSED:
                     # A freshly reserved or held cycle starts at binding.
@@ -2861,12 +2927,17 @@ class SQLiteSyntheticFactsAdapter:
                     held_at_binding = any(
                         p.security_code == sec and p.quantity
                         for p in self._projection_at(
-                            connection, context, bound_rev
+                            connection, context, anchor_rev
                         ).positions
                     )
                     cycle_start = default_floor if held_at_binding else (until or 0)
                 moved = self._cash_events_after(connection, context, cycle_start, until)
                 delta = moved.get(sec, Decimal("0.00"))
+                if until is not None and until > cycle_start:
+                    # The fold consumed this bucket's attributed cash events;
+                    # advance its cycle floor so a later settlement cannot
+                    # count them again.
+                    advanced[item.bucket_id] = until
                 folded.append(
                     replace(item, cash=(item.cash + delta).quantize(Decimal("0.01")))
                     if delta
@@ -2899,9 +2970,15 @@ class SQLiteSyntheticFactsAdapter:
                 closed, command, current_requests, invocation_payload=payload
             )
             if decision.accepted:
-                bound_rev = self._bound_account_revision(connection, context)
+                write_rev = self._bound_account_revision(connection, context)
                 self._write_funding_state(
-                    connection, context, decision.state, bound_rev
+                    connection,
+                    context,
+                    decision.state,
+                    write_rev,
+                    self._bindings_with_settled(
+                        decision.state, bound_bindings, advanced
+                    ),
                 )
             connection.commit()
             return decision
@@ -2916,10 +2993,15 @@ class SQLiteSyntheticFactsAdapter:
         """Top up a bucket's next cycle from the shared reserve and lock its budget."""
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            state = self._read_funding_state(connection, context)
-            if state is None:
+            binding_row = self._read_funding_binding(connection, context)
+            if binding_row is None:
                 connection.rollback()
                 raise FactError("FUNDING_NOT_BOUND", "no funding partition is bound")
+            state, bound_rev, bound_bindings = binding_row
+            anchor_rev = self._binding_anchor(bound_rev, bound_bindings)
+            self._require_reconciled_partition(
+                connection, context, state, anchor_rev, bound_bindings
+            )
             payload = prepare_cycle_invocation_payload(
                 bucket_id=bucket_id, cycle_id=cycle_id
             )
@@ -2928,12 +3010,95 @@ class SQLiteSyntheticFactsAdapter:
             )
             decision = prepare_cycle(state, command, bucket_id=bucket_id, cycle_id=cycle_id)
             if decision.accepted and decision.state is not state:
-                bound_rev = self._bound_account_revision(connection, context)
+                write_rev = self._bound_account_revision(connection, context)
+                cycle_seq = self._bound_event_sequence(connection, context, write_rev)
                 self._write_funding_state(
-                    connection, context, decision.state, bound_rev
+                    connection,
+                    context,
+                    decision.state,
+                    write_rev,
+                    self._bindings_mark_cycle(bucket_id, cycle_seq, bound_bindings),
                 )
             connection.commit()
             return decision
+
+    def _require_reconciled_partition(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        state: FundingState,
+        bound_rev: int,
+        bindings: dict[str, Any],
+    ) -> None:
+        """Refuse a new write while the partition trails the ledger.
+
+        Partition cash plus order cash still waiting to fold into an open
+        cycle must equal the recorded account cash.  Rows bound before
+        cycle tracking carry no floors, so their open cycles account for
+        every post-binding fill; a stored gap on either row shape is an
+        unresolved review item, not budget.
+        """
+        accountable = self._attributed_cash_total(
+            connection, context, state, bindings, bound_rev
+        )
+        try:
+            account_cash = self._projection(connection, context).cash
+        except FactError:
+            account_cash = None
+        if account_cash is not None and accountable != account_cash:
+            connection.rollback()
+            raise FactError(
+                "FUNDING_LEDGER_MISMATCH",
+                "funding partition plus pending proceeds differs from the "
+                "recorded account cash",
+            )
+
+    def _read_bindings(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> dict[str, Any]:
+        row = connection.execute(
+            "SELECT bindings_json FROM funding_states WHERE account_id=? AND mode=?",
+            (context.account_id, context.mode),
+        ).fetchone()
+        return json.loads(row["bindings_json"] or "{}") if row is not None else {}
+
+    def _bindings_mark_cycle(
+        self,
+        bucket_id: str,
+        event_sequence: int,
+        bindings: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Persist the event sequence marking the start of one bucket cycle."""
+        bindings = dict(bindings)
+        floors = dict(bindings.get("cycle_bound_account_revision") or {})
+        floors[bucket_id] = event_sequence
+        bindings["cycle_bound_account_revision"] = floors
+        return bindings
+
+    def _bindings_with_settled(
+        self,
+        state: FundingState,
+        bindings: dict[str, Any],
+        advanced: dict[str, int] | None = None,
+    ) -> dict[str, Any]:
+        """Bindings after settlement: settled buckets close their cycle floor.
+
+        A bucket that stays RESERVED/HELD keeps the floor it already had so
+        later cash arriving in its cycle still attributes to it, advanced past
+        the events this settlement just folded; a bucket whose cycle just
+        closed drops the floor so its next cycle starts fresh from the next
+        reservation.
+        """
+        bindings = dict(bindings)
+        floors = dict(bindings.get("cycle_bound_account_revision") or {})
+        for bucket_id, event_sequence in (advanced or {}).items():
+            floors[bucket_id] = event_sequence
+        settled = {item.bucket_id for item in state.completed_settlements}
+        for bucket in state.buckets:
+            if bucket.phase is BucketPhase.CLOSED and bucket.bucket_id in settled:
+                floors.pop(bucket.bucket_id, None)
+        bindings["cycle_bound_account_revision"] = floors
+        return bindings
 
     def _current_chain(
         self, connection: sqlite3.Connection, context: SyntheticContext, fact: sqlite3.Row

@@ -7,7 +7,7 @@ from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
 SCHEMA_VERSION = 'p12.desktop.v1'
-SCHEMA_DIGEST = 'sha256:52d88ed7b5090e20ca8abbd78a3ad8f663fa45d6c8d1fd6347788b4cb88959cd'
+SCHEMA_DIGEST = 'sha256:1003f9dc2b0342f7a182550c03cdb5ea21c161b4f26c80120e20523653378d13'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -70,6 +70,7 @@ REASON_TEXTS: dict[str, str] = {'ACCOUNT_NOT_ADMITTED': '该账户未对当前�
  'FINAL_FILL_GAP': '委托结束后仍有成交未登记',
  'FIXED_CYCLE_SETTLED': '固定桶周期已结算',
  'FUNDING_CYCLE_NOT_BOUND': '资金桶尚未按实际成交更新',
+ 'FUNDING_LEDGER_MISMATCH': '资金分区与账户现金不一致，需要核对',
  'HOLD_AND_ALERT': '继续持有并提醒',
  'IDEMPOTENCY_CONFLICT': '同一编号的内容与上次不同',
  'IDEMPOTENT_REPLAY': '重复提交，返回原结果',
@@ -888,6 +889,7 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                          'FINAL_FILL_GAP',
                          'FIXED_CYCLE_SETTLED',
                          'FUNDING_CYCLE_NOT_BOUND',
+                         'FUNDING_LEDGER_MISMATCH',
                          'HOLD_AND_ALERT',
                          'IDEMPOTENCY_CONFLICT',
                          'IDEMPOTENT_REPLAY',

@@ -136,10 +136,17 @@ def describe_funding(
     def amount(value: Decimal) -> MaybeDecimal:
         return MaybeDecimal.unknown(FUNDING_CYCLE_NOT_BOUND) if stale else MaybeDecimal.known(value)
 
-    def next_budget(item) -> Decimal:
+    def next_budget(item: BucketState) -> Decimal:
         # What the bucket can actually deploy on its next activation: cash it
         # already holds, topped up by whatever the shared reserve could add.
         return min(item.target_notional, item.cash + state.reserve)
+
+    def display_locked(item: BucketState) -> Decimal:
+        # Only an active cycle owns a locked budget; a closed or idle row shows
+        # the next cycle's expected budget instead of the finished cycle's.
+        if item.phase in (BucketPhase.RESERVED, BucketPhase.HELD):
+            return item.locked_cycle_budget
+        return next_budget(item)
 
     return FundingView(
         policy_ref=policy.policy_ref,
@@ -152,11 +159,11 @@ def describe_funding(
                 item.target_notional,
                 amount(item.cash),
                 item.cycle_id,
-                amount(item.locked_cycle_budget),
+                amount(display_locked(item)),
                 amount(max(Decimal("0.00"), item.target_notional - item.cash)),
                 amount(
-                    (policy.trial_fraction * item.locked_cycle_budget).quantize(CNY_QUANTUM)
-                    if item.locked_cycle_budget
+                    (policy.trial_fraction * display_locked(item)).quantize(CNY_QUANTUM)
+                    if display_locked(item)
                     else Decimal("0.00")
                 ),
                 amount(next_budget(item)),
@@ -204,6 +211,7 @@ def describe_unbound_funding(policy: FixedBucketPolicy, reason_code: str) -> Fun
                 policy.bucket_budget,
                 unknown,
                 None,
+                unknown,
                 unknown,
                 unknown,
                 unknown,

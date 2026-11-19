@@ -375,14 +375,40 @@ class ReplayDataProvider:
     def __init__(self, config: ReplayDataProviderConfig) -> None:
         self.config = config
 
+    def admitted_manifest(self) -> str:
+        """Resolve the reader manifest the admitted digest must match, without
+        opening any data tables. Raises for modes that cannot prove one.
+        """
+        if self.config.mode == "direct-dwd-job-local":
+            from quanthus.backtest.direct_dwd_provider import (
+                canonical_direct_dwd_manifest_sha256,
+            )
+
+            return canonical_direct_dwd_manifest_sha256(self.config)
+        if self.config.mode == "shared-replay-projection":
+            manifest = self.config.replay_identity.get("manifest_sha256")
+            if not isinstance(manifest, str) or not manifest.startswith("sha256:"):
+                raise ConfigurationError("shared replay manifest identity is invalid")
+            return manifest
+        raise ConfigurationError(
+            "this replay provider mode exposes no admissible reader manifest"
+        )
+
     def open(
         self,
         *,
         scope_start: date,
         scope_end: date,
         progress: Callable[[str, Mapping[str, Any]], None] | None = None,
+        admitted_reader_manifest_sha256: str | None = None,
     ) -> ReplayDataSession:
         self.config.scope.authorize(scope_start, scope_end)
+        if admitted_reader_manifest_sha256 is not None and (
+            self.admitted_manifest() != admitted_reader_manifest_sha256
+        ):
+            raise ConfigurationError(
+                "replay provider manifest does not match the admitted data"
+            )
         if self.config.mode == "direct-dwd-job-local":
             from quanthus.backtest.direct_dwd_provider import open_direct_dwd_session
 

@@ -1156,15 +1156,12 @@ def _direct_dwd_authority(
     return actual_dwd, actual_correction, correction_manifest
 
 
-def _bind_canonical_projection_identity(
+def _load_canonical_projection_receipt(
     config: Any,
     *,
-    physical_bundle: HistoricalReplayBundle,
-    files: Mapping[str, str],
-    counts: Mapping[str, int],
     actual_dwd: Mapping[str, Any],
     actual_correction: Mapping[str, Any],
-) -> tuple[HistoricalReplayBundle, str, str]:
+) -> tuple[Path, dict[str, Any]]:
     receipt_path = find_project_root() / _CANONICAL_PROJECTION_RECEIPT
     receipt = _object(receipt_path, "direct DWD canonical projection receipt")
     expected_fields = {
@@ -1197,6 +1194,55 @@ def _bind_canonical_projection_identity(
     }
     if any(receipt.get(name) != value for name, value in bindings.items()):
         raise ConfigurationError("direct DWD canonical projection receipt binding differs")
+    return receipt_path, receipt
+
+
+def canonical_direct_dwd_manifest_sha256(config: Any) -> str:
+    """Resolve the canonical reader manifest without opening any data tables.
+
+    The digest reproduces the lineage recorded by the pinned projection receipt,
+    not a config self-report: it binds the receipt's verified canonical bundle
+    digest and then re-checks the full lineage equality.
+    """
+    assert config.correction_identity is not None
+    _, receipt = _load_canonical_projection_receipt(
+        config,
+        actual_dwd=config.dwd_identity,
+        actual_correction=config.correction_identity,
+    )
+    canonical_bundle_digest = receipt.get("canonical_bundle_digest")
+    if not isinstance(canonical_bundle_digest, str) or not _SHA256.fullmatch(
+        canonical_bundle_digest
+    ):
+        raise ConfigurationError("direct DWD canonical projection identity differs")
+    lineage_digest = _digest(
+        {
+            "materializer_version": MATERIALIZER_VERSION,
+            "history_start": config.history_start.isoformat(),
+            "dwd": dict(config.dwd_identity),
+            "correction": dict(config.correction_identity),
+            "benchmark_sha256": config.benchmark_sha256,
+            "industry_sha256": config.industry_sha256,
+            "materialized_content_digest": canonical_bundle_digest,
+        }
+    )
+    if lineage_digest != receipt.get("provider_lineage_digest"):
+        raise ConfigurationError("direct DWD canonical provider lineage differs")
+    return lineage_digest
+
+
+def _bind_canonical_projection_identity(
+    config: Any,
+    *,
+    physical_bundle: HistoricalReplayBundle,
+    files: Mapping[str, str],
+    counts: Mapping[str, int],
+    actual_dwd: Mapping[str, Any],
+    actual_correction: Mapping[str, Any],
+) -> tuple[HistoricalReplayBundle, str, str]:
+    receipt_path, receipt = _load_canonical_projection_receipt(
+        config, actual_dwd=actual_dwd, actual_correction=actual_correction
+    )
     raw_datasets = receipt.get("datasets")
     if not isinstance(raw_datasets, Mapping) or set(raw_datasets) != set(DATASETS):
         raise ConfigurationError("direct DWD canonical projection receipt datasets differ")

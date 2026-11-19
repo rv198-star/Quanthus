@@ -208,3 +208,46 @@ def test_realized_fill_outside_bound_invalidates_candidate(monkeypatch, tmp_path
     )
     with pytest.raises(ExpertEvaluationError, match="decision-time bound"):
         runtime.run_candidate(tmp_path)
+
+
+def test_wrong_admitted_manifest_rejected_before_any_read(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        replay.FormalP2ReplayRuntime,
+        "_load_event_population",
+        lambda self, root: calls.append("events")
+        or (_ for _ in ()).throw(RuntimeError("EVENT_LOAD")),
+    )
+    monkeypatch.setattr(
+        replay.FormalP2ReplayRuntime,
+        "_open_data_session",
+        lambda self: calls.append("open")
+        or (_ for _ in ()).throw(RuntimeError("PROVIDER_OPEN")),
+    )
+    with pytest.raises(ValueError, match="admitted data"):
+        R11HistoricalReplayRuntime(
+            ROOT,
+            provider_config="config/replay-data-provider.development.v2.json",
+            parent_event_run_digest="sha256:" + "0" * 64,
+            buy_bounds={},
+            admitted_data_manifest_sha256="sha256:" + "f" * 64,
+            consumer_receipt_id="receipt",
+            excluded_security_ids=frozenset({SEC}),
+        )
+    assert calls == []
+
+
+def test_admitted_manifest_matches_pinned_canonical_lineage():
+    from quanthus.backtest.data_provider import (
+        ReplayDataProvider,
+        load_replay_data_provider_config,
+    )
+
+    provider = ReplayDataProvider(
+        load_replay_data_provider_config(
+            ROOT / "config/replay-data-provider.development.v2.json"
+        )
+    )
+    assert provider.admitted_manifest() == (
+        "sha256:2821b5923bd1525642d9b4479ed2bd35281203c1f117acf6ba0819c606e4b300"
+    )

@@ -294,3 +294,63 @@ def test_legacy_holding_settle_then_retarget(tmp_path: Path) -> None:
     assert _close(app, B1, "next-cycle", SEC_B, "close-next-cycle").accepted
     reopened = _cash(_app(tmp_path))
     assert reopened["account"] == reopened["partition"] == Decimal("10000.00")
+
+
+def test_legacy_second_cycle_same_security_held(tmp_path: Path) -> None:
+    """A legacy binding re-trading its security inside the open cycle still
+    occupies it.
+
+    When the bucket settled cycle-1 and re-bound the same security in
+    cycle-2, the missing marker is inferred to the open cycle: the
+    in-cycle retarget is refused and a later settlement counts those
+    proceeds instead of reporting a ledger mismatch.
+    """
+    app = _app(tmp_path)
+    _reserve(app, B1, "cycle-1")
+    _assign(app, B1, SEC_A)
+    _trade(app, "c1-buy", SEC_A, "buy", 100, "10.00", 19)
+    _trade(app, "c1-sell", SEC_A, "sell", 100, "11.00", 20)
+    assert _close(app, B1, "cycle-1", SEC_A, "close-cycle-1").accepted
+    _reserve(app, B1, "cycle-2")
+    _assign(app, B1, SEC_A)
+    _trade(app, "c2-buy", SEC_A, "buy", 100, "10.00", 23)
+    _strip_cycle_markers(tmp_path)
+
+    app = _app(tmp_path)
+    page = _page(app)
+    assert page.status_reason != "FUNDING_LEDGER_MISMATCH"
+    assert _by_id(page)[B1].cash.value == Decimal("4000.00")
+    with pytest.raises(FactError) as error:
+        _assign(app, B1, SEC_B)
+    assert error.value.reason_code == "FUNDING_ATTRIBUTION_UNKNOWN"
+
+    _trade(app, "c2-sell", SEC_A, "sell", 100, "9.00", 24)
+    assert _close(app, B1, "cycle-2", SEC_A, "close-cycle-2").accepted
+    reopened = _cash(_app(tmp_path))
+    assert reopened["account"] == reopened["partition"] == Decimal("10000.00")
+
+
+def test_legacy_second_cycle_same_security_unsettled(tmp_path: Path) -> None:
+    """The same legacy holder with fills already settled is accepted.
+
+    The bought-and-sold cycle-2 under the markerless binding closes
+    cleanly and leaves the partition equal to the ledger.
+    """
+    app = _app(tmp_path)
+    _reserve(app, B1, "cycle-1")
+    _assign(app, B1, SEC_A)
+    _trade(app, "c1-buy", SEC_A, "buy", 100, "10.00", 19)
+    _trade(app, "c1-sell", SEC_A, "sell", 100, "11.00", 20)
+    assert _close(app, B1, "cycle-1", SEC_A, "close-cycle-1").accepted
+    _reserve(app, B1, "cycle-2")
+    _assign(app, B1, SEC_A)
+    _trade(app, "c2-buy", SEC_A, "buy", 100, "10.00", 23)
+    _trade(app, "c2-sell", SEC_A, "sell", 100, "9.00", 24)
+    _strip_cycle_markers(tmp_path)
+
+    app = _app(tmp_path)
+    page = _page(app)
+    assert page.status_reason != "FUNDING_LEDGER_MISMATCH"
+    assert _close(app, B1, "cycle-2", SEC_A, "close-cycle-2").accepted
+    reopened = _cash(_app(tmp_path))
+    assert reopened["account"] == reopened["partition"] == Decimal("10000.00")

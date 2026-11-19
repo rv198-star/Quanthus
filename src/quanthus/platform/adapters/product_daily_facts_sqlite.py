@@ -2449,8 +2449,9 @@ class SQLiteSyntheticFactsAdapter:
                 for bucket_id, sec in persisted.items()
                 if cycles.get(
                     bucket_id,
-                    SQLiteSyntheticFactsAdapter._legacy_binding_cycle(
-                        state, bucket_id
+                    self._legacy_binding_cycle(
+                        connection, context, state, bindings, bucket_id,
+                        persisted[bucket_id],
                     ),
                 )
                 in (current.get(bucket_id), "pending")
@@ -2590,7 +2591,8 @@ class SQLiteSyntheticFactsAdapter:
                 existing, existing_rev, existing_bindings = binding_row
                 if bucket_securities:
                     merged = self._merge_bucket_securities(
-                        existing, existing_bindings, bucket_securities
+                        connection, context,
+                        existing, existing_bindings, bucket_securities,
                     )
                     if merged is not existing_bindings:
                         self._write_funding_state(
@@ -2637,31 +2639,60 @@ class SQLiteSyntheticFactsAdapter:
             connection.commit()
             return state
 
-    @staticmethod
-    def _legacy_binding_cycle(state: FundingState, bucket_id: str) -> str | None:
+    def _legacy_binding_cycle(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        state: FundingState,
+        bindings: dict[str, Any],
+        bucket_id: str,
+        security_code: str,
+    ) -> str | None:
         """The cycle a markerless binding actually served.
 
-        A binding written before cycle tracking belongs to the bucket last
-        settled cycle when that cycle is already closed out, and to the
-        bucket still-open cycle otherwise.  Returns None when neither can
-        be inferred, which leaves occupancy to the live-phase check.
+        A binding written before cycle tracking belongs to the bucket's
+        current open cycle when the security already has admitted fills
+        recorded after that cycle's reservation (the bucket is genuinely
+        re-trading it); when the bucket only reserved the cycle it stays
+        attributed to the last settled cycle, freeing the new one; and to
+        the open cycle when neither is provable.
         """
-        settled = [
-            item.cycle_id
-            for item in state.completed_settlements
-            if item.bucket_id == bucket_id
-        ]
-        if settled:
-            return settled[-1]
         item = next(
             (entry for entry in state.buckets if entry.bucket_id == bucket_id),
             None,
         )
+        settled = [
+            record.cycle_id
+            for record in state.completed_settlements
+            if record.bucket_id == bucket_id
+        ]
+        if item is not None and item.phase in (
+            BucketPhase.RESERVED,
+            BucketPhase.HELD,
+        ):
+            floors = bindings.get("cycle_bound_account_revision") or {}
+            floor = floors.get(bucket_id)
+            if floor is not None and security_code is not None:
+                moved = self._cash_events_after(
+                    connection, context, int(floor)
+                )
+                if moved.get(security_code) is not None:
+                    # Admitted fills after the reservation prove the binding
+                    # is live in this cycle.
+                    return item.cycle_id
+        if settled:
+            return settled[-1]
         return None if item is None else item.cycle_id
 
-    @staticmethod
     def _attribution_occupies(
-        state: FundingState, bucket_id: str, cycle: str | None
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        state: FundingState,
+        bindings: dict[str, Any],
+        bucket_id: str,
+        cycle: str | None,
+        security_code: str,
     ) -> bool:
         """Whether a bucket's recorded attribution still claims its security.
 
@@ -2682,8 +2713,8 @@ class SQLiteSyntheticFactsAdapter:
         ):
             return False
         if cycle is None:
-            cycle = SQLiteSyntheticFactsAdapter._legacy_binding_cycle(
-                state, bucket_id
+            cycle = self._legacy_binding_cycle(
+                connection, context, state, bindings, bucket_id, security_code
             )
         served = item.cycle_id if cycle in (None, "pending") else cycle
         return served == item.cycle_id
@@ -2713,6 +2744,8 @@ class SQLiteSyntheticFactsAdapter:
 
     def _merge_bucket_securities(
         self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
         state: FundingState,
         bindings: dict[str, Any],
         requested: dict[str, str],
@@ -2745,8 +2778,8 @@ class SQLiteSyntheticFactsAdapter:
                 # last settled cycle when it has one, else the still-open cycle.
                 # Inferring the settled one frees the bucket to bind a
                 # different security for its next opportunity.
-                existing_cycle = SQLiteSyntheticFactsAdapter._legacy_binding_cycle(
-                    state, bucket_id
+                existing_cycle = self._legacy_binding_cycle(
+                    connection, context, state, bindings, bucket_id, existing
                 )
             if (
                 existing is not None
@@ -2764,7 +2797,10 @@ class SQLiteSyntheticFactsAdapter:
                     for bid, sec in securities.items()
                     if sec == security_code
                     and bid != bucket_id
-                    and self._attribution_occupies(state, bid, cycles.get(bid))
+                    and self._attribution_occupies(
+                        connection, context, state, bindings, bid,
+                        cycles.get(bid), securities[bid],
+                    )
                 ),
                 None,
             )

@@ -14,8 +14,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from quanthus.platform.adapters.p12_synthetic_fixture import DEFAULT_FIXTURE, load_synthetic_fixture
 from quanthus.platform.p12 import transport
@@ -34,9 +35,10 @@ def run(
     account_id: str,
     request: dict[str, Any] | None = None,
     fixture_path: Path | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> tuple[int, dict[str, Any]]:
     fixture = load_synthetic_fixture(fixture_path or find_project_root() / DEFAULT_FIXTURE)
-    applications = synthetic_applications(state_dir=state_dir, fixture=fixture)
+    applications = synthetic_applications(state_dir=state_dir, fixture=fixture, clock=clock)
     try:
         app = applications.get(account_id)
         if app is None:
@@ -67,6 +69,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="P12 desktop use cases over the CLI")
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--fixture", type=Path)
+    parser.add_argument(
+        "--clock",
+        default=None,
+        metavar="ISO8601",
+        help="pin the synthetic clock to one aware instant for repeatable reads",
+    )
     parser.add_argument("--account", default="SYN-P12-A")
     parser.add_argument("command", choices=COMMANDS)
     parser.add_argument("--request", type=Path)
@@ -78,6 +86,11 @@ def main(argv: list[str] | None = None) -> int:
         account_id=args.account,
         request=request,
         fixture_path=args.fixture,
+        clock=(
+            (lambda: datetime.fromisoformat(args.clock))
+            if args.clock is not None
+            else None
+        ),
     )
     json.dump(payload, sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
     sys.stdout.write("\n")

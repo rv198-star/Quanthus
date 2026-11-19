@@ -124,8 +124,18 @@ def test_http_journey_matches_the_brief_amounts(p12_kernel) -> None:
     assert board["account"]["cash_total"] == "6245.00"
     assert board["opportunities"][0]["status_code"] == "NEEDS_REASSESSMENT"
     _, _, rules = wsgi_request(p12_kernel, "GET", f"{A}/funding-rules", headers=headers)
-    assert rules["funding"]["status_reason"] == "FUNDING_CYCLE_NOT_BOUND"
-    assert rules["funding"]["reserve"] == {"value": None, "reason_code": "FUNDING_CYCLE_NOT_BOUND"}
+    funding = rules["funding"]
+    # The fill lands inside an auto-reserved cycle: bucket-01 is pinned to the
+    # security and its settlement-dependent fields stay unset until the sell
+    # side reports terminal, while the whole-page status stays bound.
+    assert funding["status_reason"] is None
+    assert funding["reserve"] == {"value": "0.00", "reason_code": None}
+    reserved = funding["buckets"][0]
+    assert (reserved["bucket_id"], reserved["phase"]) == ("bucket-01", "reserved")
+    assert reserved["cash"] == {"value": "1245.00", "reason_code": None}
+    assert reserved["underfunded"]["reason_code"] == "FUNDING_CYCLE_NOT_BOUND"
+    assert reserved["next_available"]["reason_code"] == "FUNDING_CYCLE_NOT_BOUND"
+    assert funding["buckets"][1]["phase"] == "empty"
     assert rules["retained_bucket_mode_available"] is False
 
 

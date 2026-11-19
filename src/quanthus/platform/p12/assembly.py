@@ -43,7 +43,7 @@ def synthetic_applications(
         f"local-synthetic:{fixture.fixture_ref.digest}",
         frozenset(item.account_id for item in fixture.accounts),
     )
-    source = FixtureDecisionSource(fixture)
+    source = FixtureDecisionSource(fixture, clock=effective_clock)
     applications: dict[str, P12DesktopApplication] = {}
     for spec in fixture.accounts:
         context = SyntheticContext(

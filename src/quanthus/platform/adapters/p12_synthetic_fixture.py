@@ -9,6 +9,7 @@ other mode with POLICY_NOT_ADOPTED instead of returning an empty package.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -68,7 +69,7 @@ class SyntheticDesktopFixture:
     clock: datetime
     accounts: tuple[SyntheticAccountSpec, ...]
     policy: DesktopPolicyBundle
-    decisions: MarketDecisionSet
+    decisions: tuple[MarketDecisionSet, ...]
 
     def account(self, account_id: str) -> SyntheticAccountSpec:
         for item in self.accounts:
@@ -78,16 +79,34 @@ class SyntheticDesktopFixture:
 
 
 class FixtureDecisionSource:
-    """DecisionPackageSource for sealed synthetic accounts."""
+    """DecisionPackageSource for sealed synthetic accounts.
 
-    def __init__(self, fixture: SyntheticDesktopFixture) -> None:
+    The fixture may carry several dated packages; the source returns the
+    latest one whose ``published_at`` has already passed on the shared
+    clock, so a packaged T+1 release only becomes visible once it is due.
+    """
+
+    def __init__(
+        self,
+        fixture: SyntheticDesktopFixture,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         self._fixture = fixture
         self._accounts = {item.account_id for item in fixture.accounts}
+        self._clock = clock or (lambda: fixture.clock)
 
     def current(self, scope: AccountScope) -> MarketDecisionSet:
         if scope.mode != "synthetic" or scope.account_id not in self._accounts:
             raise FactError("POLICY_NOT_ADOPTED", "no adopted decision source for this account")
-        return self._fixture.decisions
+        now = self._clock()
+        published = [
+            item for item in self._fixture.decisions if now >= item.published_at
+        ]
+        if not published:
+            # Before the first package is due, surface the earliest one so the
+            # account binds and shows it as not yet published.
+            return min(self._fixture.decisions, key=lambda item: item.published_at)
+        return max(published, key=lambda item: item.published_at)
 
     def history(self, scope: AccountScope) -> tuple[MarketDecisionSet, ...]:
         return (self.current(scope),)
@@ -237,8 +256,9 @@ def load_synthetic_fixture(path: Path) -> SyntheticDesktopFixture:
         execution_profile=str(policy_raw["execution_profile"]),
         adoption=adoption,
     )
-    decision_raw = raw["decision_set"]
-    decisions = validate_decision_set(
+    decision_raws = raw.get("decision_sets") or [raw["decision_set"]]
+    def _one_set(decision_raw):
+        return validate_decision_set(
         MarketDecisionSet(
             source_ref=VersionRef(
                 str(decision_raw["source_id"]), str(decision_raw["version"]), digest(decision_raw)
@@ -252,6 +272,11 @@ def load_synthetic_fixture(path: Path) -> SyntheticDesktopFixture:
             decisions=tuple(_decision(item) for item in decision_raw["decisions"]),
         )
     )
+
+    decisions = tuple(sorted(
+        (_one_set(item) for item in decision_raws),
+        key=lambda item: item.published_at,
+    ))
     return SyntheticDesktopFixture(
         fixture_ref=fixture_ref,
         clock=_aware(raw["synthetic_clock"], "synthetic_clock"),

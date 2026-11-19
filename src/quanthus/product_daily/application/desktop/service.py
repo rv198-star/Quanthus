@@ -68,6 +68,7 @@ from quanthus.product_daily.funding import (
     FundingDecision,
     FundingState,
     SettlementRequest,
+    BucketPhase,
 )
 from quanthus.shared.fact_contracts import FactError, digest
 from quanthus.shared.values import (
@@ -195,10 +196,17 @@ class P12DesktopApplication:
         """
 
         decisions = self._current_decisions()
+        # The binding identifies the source, not whichever dated package is
+        # currently visible: a store bound on the T package must still open
+        # once the T+1 release becomes current.
+        source_ref = decisions.source_ref
         binding: dict[str, object] = {
             "mode": self._scope.mode,
             "composition": self._policy.composition_ref.to_dict(),
-            "decision_source": decisions.source_ref.to_dict(),
+            "decision_source": {
+                "ref_id": source_ref.ref_id,
+                "version": source_ref.version,
+            },
             "execution_profile": self._policy.execution_profile,
         }
         binding_digest = digest(binding)
@@ -978,10 +986,12 @@ class P12DesktopApplication:
             intended_price_cap=plan.price_cap,
             suggestion_id=plan.plan_id,
         )
+        self._auto_reserve(plan.security_code)
         result = self._facts.submit_report(self._context, report)
         deviations = tuple(
             dict.fromkeys((*result.deviations, *self._window_deviation(plan, command.occurred_at)))
         )
+        self._auto_settle(plan.security_code)
         return self._outcome(
             "fill",
             result.receipt_id,
@@ -1035,6 +1045,7 @@ class P12DesktopApplication:
                     "INVALID_REPORT_SHAPE",
                     "first observation must declare accepted_total_qty",
                 )
+            self._auto_reserve(command.security_code)
             result = self._facts.submit_order_observation(
                 self._context,
                 observation,
@@ -1058,6 +1069,7 @@ class P12DesktopApplication:
                     else Decimal("0.00")
                 ),
             )
+            self._auto_settle(command.security_code)
             return self._outcome(
                 "observation",
                 result.receipt_id,
@@ -1082,7 +1094,9 @@ class P12DesktopApplication:
                 source_sequence=command.report_id,
                 occurred_at=command.occurred_at,
             )
+            self._auto_reserve(command.security_code)
             result = self._facts.submit_fee_assessment(self._context, fee)
+            self._auto_settle(command.security_code)
             return self._outcome(
                 "fee",
                 result.receipt_id,
@@ -1117,6 +1131,7 @@ class P12DesktopApplication:
                 source_sequence=f"{command.report_id}:open",
                 order_revision=command.order_revision,
             )
+            self._auto_reserve(command.security_code)
             self._facts.submit_order_observation(
                 self._context,
                 opening,
@@ -1149,6 +1164,7 @@ class P12DesktopApplication:
             ),
             order_id=command.order_id,
         )
+        self._auto_reserve(command.security_code)
         result = self._facts.submit_report(self._context, report)
         return self._outcome(
             "fill",
@@ -1188,6 +1204,116 @@ class P12DesktopApplication:
             result.quantity_delta,
             command.fact_id,
         )
+
+    def _auto_reserve(self, security_code: str | None) -> None:
+        """Bind the partition, reserve a free bucket and pin the security.
+
+        Called before the user's fill is posted: a live entry plan locks its
+        budget into one empty bucket and attributes that bucket to the
+        security, so the fill lands inside an already-reserved cycle.  Every
+        step is retried-safe and returns its recorded result on a repeat.
+        """
+        if security_code is None:
+            return
+        try:
+            snapshot = self._facts.snapshot(self._context)
+            decisions = self._current_decisions()
+            package = self._publish(decisions, snapshot.history)
+            entry = next(
+                (
+                    plan
+                    for plan in package.plans
+                    if plan.security_code == security_code and plan.delta_qty > 0
+                ),
+                None,
+            )
+            if entry is None:
+                return
+            state = self._facts.funding_state(self._context)
+            if state is None:
+                if snapshot.history.baseline_quantity:
+                    return
+                self._facts.bind_funding_state(
+                    self._context,
+                    initial_funding_state(
+                        self._policy.funding, snapshot.history.baseline_cash
+                    ),
+                )
+                state = self._facts.funding_state(self._context)
+                if state is None:
+                    return
+            funding, _ = state
+            if any(
+                item.phase in (BucketPhase.RESERVED, BucketPhase.HELD)
+                for item in funding.buckets
+            ):
+                return
+            empty = next(
+                (item for item in funding.buckets if item.phase is BucketPhase.EMPTY),
+                None,
+            )
+            if empty is None:
+                return
+            cycle_id = f"{entry.opportunity_id}:{entry.plan_id}"
+            self._facts.prepare_funding_cycle(
+                self._context, bucket_id=empty.bucket_id, cycle_id=cycle_id
+            )
+            self._facts.bind_funding_state(
+                self._context,
+                self._facts.funding_state(self._context)[0],
+                bucket_securities={empty.bucket_id: security_code},
+            )
+        except FactError:
+            # A failed reserve never blocks the user's fill; the page shows
+            # the unbound reason on the next read instead.
+            return
+
+    def _auto_settle(self, security_code: str | None) -> None:
+        """Settle an open bucket cycle once the security is flat.
+
+        Called after the user's fact is posted: when the order closes the
+        position, the owning bucket's cycle settles inside the same store,
+        idempotent by its settlement id.
+        """
+        if security_code is None:
+            return
+        try:
+            state = self._facts.funding_state(self._context)
+            if state is None:
+                return
+            funding, _ = state
+            snapshot = self._facts.snapshot(self._context)
+            if any(
+                item.security_code == security_code and item.quantity
+                for item in snapshot.projection.positions
+            ):
+                return
+            for item in funding.buckets:
+                if item.phase not in (BucketPhase.RESERVED, BucketPhase.HELD):
+                    continue
+                evidence = self._facts.funding_settlement_evidence(
+                    self._context, security_codes={security_code},
+                )
+                if not evidence.settlement_ready:
+                    continue
+                try:
+                    self._facts.settle_funding(
+                        self._context,
+                        settlement_id=f"auto:{item.bucket_id}:{item.cycle_id}",
+                        requests=(
+                            SettlementRequest(
+                                f"auto-{item.bucket_id}-{item.cycle_id}",
+                                item.bucket_id,
+                                item.cycle_id,
+                                evidence,
+                            ),
+                        ),
+                        close_bucket_ids=(item.bucket_id,),
+                    )
+                except FactError:
+                    continue
+        except FactError:
+            return
 
     def _outcome(
         self,

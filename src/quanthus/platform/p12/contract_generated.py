@@ -7,7 +7,7 @@ from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
 SCHEMA_VERSION = 'p12.desktop.v1'
-SCHEMA_DIGEST = 'sha256:1003f9dc2b0342f7a182550c03cdb5ea21c161b4f26c80120e20523653378d13'
+SCHEMA_DIGEST = 'sha256:7dd4bac2af5b153643a1fdc0423477adf3f15a450ad2c04c1df79b1b3d2760fd'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -63,6 +63,7 @@ REASON_TEXTS: dict[str, str] = {'ACCOUNT_NOT_ADMITTED': '该账户未对当前�
  'EVENT_SEPARATION': '与上次事件间隔不足',
  'EXECUTION_WINDOW_INVALID': '执行窗口不在下一交易日的交易时段内，暂不提示操作',
  'EXISTING_SECURITY_CYCLE': '这只股票已有进行中的周期',
+ 'EXIT_SIGNAL': '达到退出条件，按计划卖出',
  'EXPERT_ENTRY_BLOCKED': '风险检查不允许买入',
  'EXTERNAL_TRADE': '计划外的持仓或交易',
  'FACT_NOT_FOUND': '找不到这条成交记录',
@@ -882,6 +883,7 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                          'EVENT_SEPARATION',
                          'EXECUTION_WINDOW_INVALID',
                          'EXISTING_SECURITY_CYCLE',
+                         'EXIT_SIGNAL',
                          'EXPERT_ENTRY_BLOCKED',
                          'EXTERNAL_TRADE',
                          'FACT_NOT_FOUND',

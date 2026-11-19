@@ -196,9 +196,17 @@ def test_next_session_window_drives_applicability(tmp_path, clock, status, actio
 )
 def test_windows_outside_the_next_session_publish_no_plan(tmp_path, window) -> None:
     def move(raw: dict) -> None:
-        raw["decision_set"]["decisions"][0]["entry"].update(
-            eligible_at=window[0], expires_at=window[1]
-        )
+        # The T package appears under both decision_set and decision_sets[0];
+        # the loader prefers decision_sets, so move the window in both places.
+        for key in ("decision_set",):
+            raw[key]["decisions"][0]["entry"].update(
+                eligible_at=window[0], expires_at=window[1]
+            )
+        for item in raw.get("decision_sets", []):
+            if item["market_date"] == "2026-11-18":
+                item["decisions"][0]["entry"].update(
+                    eligible_at=window[0], expires_at=window[1]
+                )
 
     path = _variant(tmp_path, "window", move)
     app = _app(tmp_path / "state", path, clock=lambda: _at("2026-11-18T19:00:00+08:00"))

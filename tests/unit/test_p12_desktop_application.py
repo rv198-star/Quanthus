@@ -216,7 +216,8 @@ def test_decision_source_refuses_non_synthetic_scopes(tmp_path: Path) -> None:
 
 
 def test_pit_breaches_fail_closed() -> None:
-    decisions = load_synthetic_fixture(FIXTURE).decisions
+    # The fixture carries dated packages; the breach cases exercise the first one.
+    decisions = load_synthetic_fixture(FIXTURE).decisions[0]
     entry = decisions.decisions[0]
     early = replace(entry, entry=replace(entry.entry, eligible_at=decisions.knowledge_cutoff))
     with pytest.raises(FactError, match="KNOWLEDGE_CUTOFF_BREACH"):

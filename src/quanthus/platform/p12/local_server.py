@@ -14,6 +14,7 @@ import argparse
 import json
 import mimetypes
 import secrets
+from datetime import datetime
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
@@ -38,14 +39,21 @@ class LocalMfaDisabledCipher:
         raise RuntimeError("mfa_disabled_in_local_synthetic_runtime")
 
 
-def build_local_kernel(*, state_dir: Path, users: dict[str, tuple[str, str]]) -> PlatformKernel:
+def build_local_kernel(
+    *,
+    state_dir: Path,
+    users: dict[str, tuple[str, str]],
+    clock: Callable[[], datetime] | None = None,
+) -> PlatformKernel:
     """users maps username -> (role, password); SYN-P12-A goes to every user but p12-other."""
 
     account_users = {
         "SYN-P12-A": frozenset(name for name in users if name != "p12-other"),
         "SYN-P12-B": frozenset(name for name in users if name == "p12-other"),
     }
-    runtime = build_synthetic_runtime(state_dir=state_dir, account_users=account_users)
+    runtime = build_synthetic_runtime(
+        state_dir=state_dir, account_users=account_users, clock=clock
+    )
     kernel = create_platform_kernel(
         store=InMemoryPlatformStore(),
         cipher=LocalMfaDisabledCipher(),
@@ -99,6 +107,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--web-dist", type=Path, default=None)
+    parser.add_argument(
+        "--clock",
+        default=None,
+        metavar="ISO8601",
+        help=(
+            "pin the synthetic clock to one aware instant (for example "
+            "2026-11-20T09:30:00+08:00); restart with a later value to advance "
+            "the demo to the next market day"
+        ),
+    )
     args = parser.parse_args(argv)
     if args.host not in {"127.0.0.1", "localhost", "::1"}:
         raise SystemExit("the synthetic local server binds to loopback only")
@@ -108,7 +126,10 @@ def main(argv: list[str] | None = None) -> int:
         "p12-viewer": ("viewer", secrets.token_urlsafe(12)),
         "p12-other": ("operator", secrets.token_urlsafe(12)),
     }
-    kernel = build_local_kernel(state_dir=args.state_dir, users=users)
+    fixed_clock = (
+        (lambda: datetime.fromisoformat(args.clock)) if args.clock is not None else None
+    )
+    kernel = build_local_kernel(state_dir=args.state_dir, users=users, clock=fixed_clock)
     credentials = args.state_dir / "local-users.json"
     credentials.write_text(
         json.dumps(
@@ -124,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
                 "credentials_file": str(credentials),
                 "web_dist": str(web_dist) if web_dist.exists() else None,
                 "state_dir": str(args.state_dir),
+                "clock": args.clock,
             },
             ensure_ascii=False,
         ),

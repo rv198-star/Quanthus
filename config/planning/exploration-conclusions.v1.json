@@ -3525,6 +3525,83 @@
           "claim_ceiling": "Pure synthetic C13 A01–A09 and slot identity only."
         }
       ]
+    },
+    {
+      "id": "CON-R11-C13-A12-ORDER-FACTS-ACCEPTED-20261119",
+      "recorded_at": "2026-11-19T04:26:07.946349+00:00",
+      "actor": "Sol with independent 034",
+      "question_id": "R11-U04-C13-A12-033",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-USE-002",
+      "modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "question": "Can synthetic original and later orders keep independent economic lineage through live intake and cold rebuild?",
+      "consumer": "R11 C13 multi-day engineering",
+      "scope": "Single synthetic account and fixed order source.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Scoped synthetic engineering.",
+      "decision_effect": "Reuse A12 facts and reconciliation in C13. Keep later policy uses and original T+1 comparison gates.",
+      "reopen_conditions": [
+        "Changed source, partial-fill behavior or clock contract requires new scoped evidence."
+      ],
+      "retained_assets": [
+        "033 author package and baseline failures",
+        "034 defect reproduction, correction and independent witnesses"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "CN02 全量检查墙钟 987.8 秒，脚本 CPU 969.6 秒。直连 Git 在测试前遇到 TLS 中断，随后通过 GitHub 固定对象恢复。033 原始作者检查、825 项基线问题、Sol 公共反例和独立复核均有保留。其他未测成本记为未知。",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/native-034-console.log",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/received/review.json"
+      ],
+      "blueprint_checkpoints": [
+        "CP-700-C13-A12-ORDER-FACTS-ACCEPTED-20261119"
+      ],
+      "supersedes": null,
+      "evidence": [
+        {
+          "id": "C13-A12-034-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/received/review.json",
+          "sha256": "182a3848b3db9c05fe494170f7f6e827b4a4467f1762bbac29f42b735abb862f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent exact synthetic A12 engineering review."
+        },
+        {
+          "id": "C13-A12-034-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/native/check-receipt.json",
+          "sha256": "5f7b7ec15ca7859233f5e23d4bb849762b808c46ded5a401180e032e2e9a46a7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CN02 full check of the reviewed exact tree."
+        },
+        {
+          "id": "C13-A12-710-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/merge710-executable-closure.json",
+          "sha256": "208cc3e9916d4a927ac0fcce320331d943922c4a944979632aef131fe26a39a1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary merge with identical tree."
+        },
+        {
+          "id": "C13-A12-034-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/engineering-acceptance.json",
+          "sha256": "1d2b0faa8f69acc1fc68cfeb275688dbb1a8f81a58d65fa8811c17db9a8d72f4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Scoped synthetic A12 engineering acceptance."
+        }
+      ]
     }
   ]
 }

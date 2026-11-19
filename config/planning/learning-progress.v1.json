@@ -16411,6 +16411,101 @@
           "body_sha256": "36c32b174f94ac55e9260ccaacdcaf0936cb0d97813efd4d00758ed1bb407520"
         }
       ]
+    },
+    {
+      "id": "CP-700-C13-A12-ORDER-FACTS-ACCEPTED-20261119",
+      "recorded_at": "2026-11-19T04:26:07.946349+00:00",
+      "actor": "Sol after independent 034 and CN02",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept the fixed source-backed synthetic C13 A12 slice in the R11 continuation.",
+      "evidence": [
+        {
+          "id": "C13-A12-034-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/received/review.json",
+          "sha256": "182a3848b3db9c05fe494170f7f6e827b4a4467f1762bbac29f42b735abb862f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent exact synthetic A12 engineering review."
+        },
+        {
+          "id": "C13-A12-034-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/native/check-receipt.json",
+          "sha256": "5f7b7ec15ca7859233f5e23d4bb849762b808c46ded5a401180e032e2e9a46a7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CN02 full check of the reviewed exact tree."
+        },
+        {
+          "id": "C13-A12-710-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/merge710-executable-closure.json",
+          "sha256": "208cc3e9916d4a927ac0fcce320331d943922c4a944979632aef131fe26a39a1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary merge with identical tree."
+        },
+        {
+          "id": "C13-A12-034-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/engineering-acceptance.json",
+          "sha256": "1d2b0faa8f69acc1fc68cfeb275688dbb1a8f81a58d65fa8811c17db9a8d72f4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Scoped synthetic A12 engineering acceptance."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Source-backed synthetic A12 order identity, terminal zero and later reservation.",
+          "remaining": "A11 later-terminal proof, signal source/PIT, explicit multi-day adoption, historical candidate runner and P10 #701, U06/U07/U08.",
+          "next_action": "Prepare the original T+1 historical candidate runner while the scoped C13 multi-day use work continues.",
+          "evidence": [
+            "C13-A12-034-REVIEW",
+            "C13-A12-034-NATIVE",
+            "C13-A12-710-MERGE",
+            "C13-A12-034-ACCEPT"
+          ],
+          "supersedes": "CP-700-C13-SYNTHETIC-GATE-ACCEPTED-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Independent review and exact native reconciliation/rebuild trace.",
+          "remaining": "A11 later-terminal proof, signal source/PIT, explicit multi-day adoption, historical candidate runner and P10 #701, U06/U07/U08.",
+          "next_action": "Prepare the original T+1 historical candidate runner while the scoped C13 multi-day use work continues.",
+          "evidence": [
+            "C13-A12-034-REVIEW",
+            "C13-A12-034-NATIVE",
+            "C13-A12-710-MERGE",
+            "C13-A12-034-ACCEPT"
+          ],
+          "supersedes": "CP-700-C13-SYNTHETIC-GATE-ACCEPTED-20261118"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "Research value, expert use and whole-use audit remain separately open.",
+      "issue_observations": [
+        {
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-19T04:26:07Z",
+          "body_sha256": "02b4f369ff428ec215d5ff76c7fc1c76232535c6371303c0a82dd2ec6bc87f5e",
+          "work_item": "P11-R11-USE-002"
+        }
+      ]
     }
   ],
   "history_imports": [

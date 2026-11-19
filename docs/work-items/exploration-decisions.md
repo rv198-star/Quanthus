@@ -47,5 +47,6 @@
 | CON-R11-U05-RESIDUAL-LOT-ACCEPTED-20261118 | supported：Confirmed fully filled reduction and later exit, settlement, late fee, and cold rebuild. | Reuse the scoped action adapter for U06 after the underlying data and purpose gates. | A changed journal contract requires cold rebuild and failure-mode evidence. |
 | CON-R11-C13-LATER-SIGNAL-DESIGN-20261118 | not_met：Fixed-source review, exact signal and attempt identity proposal, and synthetic classifier witness. | Define one producer contract and retain observation-only until qualification and explicit policy adoption. | Bind a source and clock for a truly new later signal before result-bearing comparison. |
 | CON-R11-C13-SYNTHETIC-GATE-ACCEPTED-20261118 | supported：One pure gate; no production or market activation. | Reuse in the A10–A13 synthetic transaction proof; keep original data and policy gates. | Changed C13 contracts need independent public regression evidence. |
+| CON-R11-C13-A12-ORDER-FACTS-ACCEPTED-20261119 | supported：Single synthetic account and fixed order source. | Reuse A12 facts and reconciliation in C13. Keep later policy uses and original T+1 comparison gates. | Changed source, partial-fill behavior or clock contract requires new scoped evidence. |
 
 未知历史投入不记作零；新方向预算不抹掉旧尝试。

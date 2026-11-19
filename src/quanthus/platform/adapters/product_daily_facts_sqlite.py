@@ -674,6 +674,22 @@ class SQLiteSyntheticFactsAdapter:
                         ),
                     )
                 else:
+                    # A terminal order is a proven final state.  A later non-terminal
+                    # observation is a stale, out-of-order report: keep it in the inbox
+                    # and ledger as history but do not reopen the order or release the
+                    # held unreported fills it already confirmed.
+                    order_is_terminal = order["status"] == "terminal"
+                    observation_reopens = observation.status != "terminal"
+                    if order_is_terminal and observation_reopens:
+                        self._store_submission(connection, inbox, SubmissionResult(
+                            receipt.receipt_id, "POSTED",
+                            self._projection(connection, context),
+                        ))
+                        connection.commit()
+                        return SubmissionResult(
+                            receipt.receipt_id, "POSTED",
+                            self._projection(connection, context),
+                        )
                     connection.execute(
                         "UPDATE order_states SET last_observation_id=? "
                         "WHERE account_id=? AND mode=? AND order_id=?",
@@ -706,6 +722,11 @@ class SQLiteSyntheticFactsAdapter:
                         "status": observation.status,
                         "final_cumulative_fill_qty": observation.final_cumulative_fill_qty,
                         "cancelled_qty": observation.cancelled_qty,
+                        "side": side,
+                        "security_code": security_code,
+                        "accepted_total_qty": accepted_total_qty,
+                        "price_bound": format(price_bound, "f"),
+                        "estimated_fee_upper": format(estimated_fee_upper, "f"),
                         "observed_at": observation.observed_at.isoformat(),
                         "received_at": inbox["received_at"],
                         "recorded_at": self._timestamp(),
@@ -815,6 +836,27 @@ class SQLiteSyntheticFactsAdapter:
                 order = self._order_state_row(connection, context, fee.order_id)
                 if order is None:
                     raise FactError("UNKNOWN_ORDER_EXPOSURE", "fee references an unknown order")
+                # One whole-order fee total is a single business fact; the same
+                # confirmed amount for the same order re-posted under a new form
+                # number returns the original receipt instead of charging again.
+                existing_fee = connection.execute(
+                    "SELECT fee_id FROM order_fees WHERE account_id=? AND mode=? "
+                    "AND order_id=? AND amount=? ORDER BY rowid LIMIT 1",
+                    (context.account_id, context.mode, fee.order_id, format(fee.amount, "f")),
+                ).fetchone()
+                if existing_fee is not None and existing_fee["fee_id"] != fee.fee_id:
+                    # Same whole-order total under a new form id is the same
+                    # business fact; record it POSTED against the unchanged
+                    # projection rather than charging the order a second time.
+                    self._store_submission(connection, inbox, SubmissionResult(
+                        receipt.receipt_id, "POSTED",
+                        self._projection(connection, context),
+                    ))
+                    connection.commit()
+                    return SubmissionResult(
+                        receipt.receipt_id, "POSTED",
+                        self._projection(connection, context),
+                    )
                 current = self._projection(connection, context)
                 cash = (current.cash - fee.amount).quantize(Decimal("0.01"))
                 if cash < 0:
@@ -1288,6 +1330,7 @@ class SQLiteSyntheticFactsAdapter:
         )
 
     def _history(self, connection: sqlite3.Connection, context: SyntheticContext) -> FactHistory:
+        self._restore_order_states(connection, context)
         baseline = connection.execute(
             "SELECT * FROM baselines WHERE account_id=? AND mode=?",
             (context.account_id, context.mode),
@@ -1468,7 +1511,10 @@ class SQLiteSyntheticFactsAdapter:
                     reason_codes=reasons,
                     fee_confirmed_total=fee_total.quantize(Decimal("0.01")),
                     settlement_ready=(
-                        status == "terminal" and not needs and int(row["known_fill_qty"]) > 0
+                        status == "terminal"
+                        and not needs
+                        and int(row["known_fill_qty"]) > 0
+                        and fee_total > 0
                     ),
                 )
             )
@@ -1739,6 +1785,122 @@ class SQLiteSyntheticFactsAdapter:
             (known, context.account_id, context.mode, report.order_id),
         )
         self._refresh_order_state(connection, context, report.order_id)
+
+
+    def _restore_order_states(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> None:
+        """Rebuild cached order projections from the immutable baseline and events.
+
+        order_states / order_fees are derived read models, not source truth:
+        when a cached row is missing (a restored or trimmed store) the committed
+        events carry every boundary needed to rebuild it.  Replaying
+        observations in order applies the same stale-observation guard as the
+        live path, so a rebuilt ledger keeps the proven terminal state.
+        """
+
+        order_events: dict[str, list[dict]] = {}
+        for row in connection.execute(
+            "SELECT event_json FROM events WHERE account_id=? AND mode=? ORDER BY event_sequence",
+            (context.account_id, context.mode),
+        ):
+            event = json.loads(row["event_json"])
+            order_id = event.get("order_id")
+            if order_id and event.get("kind") in ("fill", "order_observation", "fee"):
+                order_events.setdefault(order_id, []).append(event)
+
+        for order_id, events in order_events.items():
+            # Only rebuild orders whose cached projection is missing entirely;
+            # live rows already carry the latest fills and must not be replayed.
+            if self._order_state_row(connection, context, order_id) is not None:
+                continue
+            exists = False
+            last_obs: OrderObservation | None = None
+            for event in events:
+                if event["kind"] == "order_observation":
+                    if not exists:
+                        if event.get("accepted_total_qty") is None:
+                            continue
+                        connection.execute(
+                            "INSERT INTO order_states "
+                            "(account_id,mode,order_id,security_code,side,accepted_total_qty,"
+                            "price_bound,estimated_fee_upper,known_fill_qty,status,"
+                            "order_state_revision,last_observation_id) "
+                            "VALUES(?,?,?,?,?,?,?,?,0,'open',0,NULL)",
+                            (
+                                context.account_id,
+                                context.mode,
+                                order_id,
+                                event["security_code"],
+                                event["side"],
+                                int(event["accepted_total_qty"]),
+                                event["price_bound"],
+                                event["estimated_fee_upper"],
+                            ),
+                        )
+                        exists = True
+                    row = self._order_state_row(connection, context, order_id)
+                    # Mirror the live guard: a proven terminal state is not
+                    # reopened by a stale non-terminal replayed observation.
+                    if row["status"] == "terminal" and event["status"] != "terminal":
+                        continue
+                    obs_row = connection.execute(
+                        "SELECT payload_json FROM inbox WHERE account_id=? AND mode=? "
+                        "AND report_id=?",
+                        (context.account_id, context.mode, event["fact_id"]),
+                    ).fetchone()
+                    if obs_row is not None:
+                        raw = json.loads(obs_row["payload_json"])
+                        last_obs = OrderObservation(
+                            raw["observation_id"], raw["order_id"], raw["status"],
+                            datetime.fromisoformat(raw["observed_at"]), raw["source_id"],
+                            raw["source_sequence"], raw["final_cumulative_fill_qty"],
+                            raw["cancelled_qty"], raw["order_revision"],
+                            raw["expected_order_state_revision"],
+                        )
+                        connection.execute(
+                            "UPDATE order_states SET last_observation_id=? "
+                            "WHERE account_id=? AND mode=? AND order_id=?",
+                            (
+                                event["fact_id"],
+                                context.account_id,
+                                context.mode,
+                                order_id,
+                            ),
+                        )
+                elif event["kind"] == "fill":
+                    if not exists:
+                        continue
+                    current = self._order_state_row(connection, context, order_id)
+                    connection.execute(
+                        "UPDATE order_states SET known_fill_qty=? "
+                        "WHERE account_id=? AND mode=? AND order_id=?",
+                        (
+                            int(current["known_fill_qty"]) + int(event["quantity"]),
+                            context.account_id,
+                            context.mode,
+                            order_id,
+                        ),
+                    )
+                elif event["kind"] == "fee":
+                    present = connection.execute(
+                        "SELECT 1 FROM order_fees WHERE account_id=? AND mode=? AND fee_id=?",
+                        (context.account_id, context.mode, event["fact_id"]),
+                    ).fetchone()
+                    if present is None:
+                        connection.execute(
+                            "INSERT INTO order_fees VALUES(?,?,?,?,?,?)",
+                            (
+                                context.account_id,
+                                context.mode,
+                                event["fact_id"],
+                                order_id,
+                                event["amount"],
+                                event["occurred_at"],
+                            ),
+                        )
+            if exists:
+                self._refresh_order_state(connection, context, order_id, last_obs)
 
     def _current_chain(
         self, connection: sqlite3.Connection, context: SyntheticContext, fact: sqlite3.Row

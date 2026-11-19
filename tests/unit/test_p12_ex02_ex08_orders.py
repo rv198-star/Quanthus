@@ -280,3 +280,134 @@ def test_ex08_missing_final_cumulative_keeps_last_provable_hold(tmp_path: Path) 
     assert account.reconciliation_status == "NEEDS_RECONCILIATION"
     order = next(o for o in app.records(app.scope).orders if o.order_id == "ORD-EX08")
     assert order.needs_reconciliation is True
+
+
+# ---- repair-01 regressions ------------------------------------------------------
+
+
+def test_ex02_settlement_waits_for_fee_and_dedupes_same_total(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    _ex02_setup(app)
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "s1", "ORD-EX02", "fill", T1,
+            side="sell", security_code="600000", quantity=600, price=Decimal("10.07"),
+            confirmed_fee=Decimal("0.00"), accepted_total_qty=600,
+            price_bound=Decimal("10.10"),
+        ),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "st", "ORD-EX02", "observation", T2,
+            order_status="terminal", final_cumulative_fill_qty=600, cancelled_qty=0,
+        ),
+    )
+    # Terminal alone does not settle: the confirmed whole-order fee is still due.
+    order = next(o for o in app.records(app.scope).orders if o.order_id == "ORD-EX02")
+    assert order.settlement_ready is False
+
+    fee = app.submit_order_event(
+        app.scope,
+        _event("sf", "ORD-EX02", "fee", T3, confirmed_fee=Decimal("6.00")),
+    )
+    assert fee.status == "POSTED"
+    order = next(o for o in app.records(app.scope).orders if o.order_id == "ORD-EX02")
+    assert order.settlement_ready is True
+    cash_after_fee = app.workbench(app.scope).account.cash_total
+
+    # The same whole-order total under a new form number does not charge again.
+    dup = app.submit_order_event(
+        app.scope,
+        _event("sf2", "ORD-EX02", "fee", T3, confirmed_fee=Decimal("6.00")),
+    )
+    assert dup.status == "POSTED"
+    assert app.workbench(app.scope).account.cash_total == cash_after_fee
+    assert len([e for e in app.records(app.scope).events if e.kind == "fee"]) == 1
+
+
+def test_ex08_late_stale_observation_keeps_terminal_hold(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    _ex08_setup(app)
+    open_event = dict(
+        order_status="in_progress", side="buy", security_code="600000",
+        accepted_total_qty=400, price_bound=Decimal("12.00"),
+        fee_upper_bound=Decimal("5.00"),
+    )
+    app.submit_order_event(
+        app.scope, _event("bo", "ORD-EX08", "observation", T0, **open_event)
+    )
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "b1", "ORD-EX08", "fill", T1,
+            side="buy", security_code="600000", quantity=100, price=Decimal("12.00"),
+            confirmed_fee=Decimal("0.00"),
+        ),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "bt", "ORD-EX08", "observation", T3,
+            order_status="terminal", final_cumulative_fill_qty=150, cancelled_qty=250,
+        ),
+    )
+    account = app.workbench(app.scope).account
+    assert account.cash_occupied == Decimal("605.00")
+
+    # A stale in_progress observation arriving after the terminal stays history.
+    late = app.submit_order_event(
+        app.scope, _event("bl", "ORD-EX08", "observation", T0, **open_event)
+    )
+    assert late.status == "POSTED"
+    account = app.workbench(app.scope).account
+    assert account.cash_occupied == Decimal("605.00")
+    assert account.cash_available_for_new.value == Decimal("18195.00")
+    order = next(o for o in app.records(app.scope).orders if o.order_id == "ORD-EX08")
+    assert order.status == "terminal"
+    assert order.unreported_fill_qty == 50
+
+
+def test_ex08_rebuild_restores_order_hold_from_events(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    _ex08_setup(app)
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "bo", "ORD-EX08", "observation", T0,
+            order_status="in_progress", side="buy", security_code="600000",
+            accepted_total_qty=400, price_bound=Decimal("12.00"),
+            fee_upper_bound=Decimal("5.00"),
+        ),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "b1", "ORD-EX08", "fill", T1,
+            side="buy", security_code="600000", quantity=100, price=Decimal("12.00"),
+            confirmed_fee=Decimal("0.00"),
+        ),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "bt", "ORD-EX08", "observation", T3,
+            order_status="terminal", final_cumulative_fill_qty=150, cancelled_qty=250,
+        ),
+    )
+    # Drop only the derived order projection; baseline, inbox and ledger are intact.
+    store = tmp_path / STORE_NAME
+    with __import__("sqlite3").connect(store) as conn:
+        conn.execute("DELETE FROM order_states WHERE order_id=?", ("ORD-EX08",))
+        conn.commit()
+
+    again = _reopen(tmp_path)
+    assert again.rebuild_matches(again.scope)
+    account = again.workbench(again.scope).account
+    assert account.cash_occupied == Decimal("605.00")
+    assert account.cash_available_for_new.value == Decimal("18195.00")
+    order = next(o for o in again.records(again.scope).orders if o.order_id == "ORD-EX08")
+    assert order.status == "terminal"
+    assert order.unreported_fill_qty == 50
+    assert order.hold_amount == Decimal("605.00")

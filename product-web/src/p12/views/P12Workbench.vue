@@ -158,6 +158,8 @@
             <label>本笔数量<input v-model.trim="orderForm.quantity" inputmode="numeric" data-testid="p12-order-quantity" /></label>
             <label>本笔价格<input v-model.trim="orderForm.price" inputmode="decimal" data-testid="p12-order-price" /></label>
             <label>本笔费用<input v-model.trim="orderForm.fee" inputmode="decimal" placeholder="0.00" data-testid="p12-order-fill-fee" /></label>
+            <label>委托总量<input v-model.trim="orderForm.accepted_total_qty" inputmode="numeric" placeholder="首次登记必填" data-testid="p12-order-fill-accepted" /></label>
+            <label>价格上界<input v-model.trim="orderForm.price_bound" inputmode="decimal" placeholder="首次登记必填" data-testid="p12-order-fill-bound" /></label>
           </div>
           <div v-if="orderForm.kind === 'observation'" class="p12-form-row">
             <label>状态
@@ -169,6 +171,7 @@
             </label>
             <label v-if="orderForm.order_status === 'terminal'">终结累计成交<input v-model.trim="orderForm.final_cumulative_fill_qty" inputmode="numeric" placeholder="未知留空" data-testid="p12-order-final" /></label>
             <label v-if="orderForm.order_status === 'terminal'">取消数量<input v-model.trim="orderForm.cancelled_qty" inputmode="numeric" placeholder="未知留空" data-testid="p12-order-cancelled" /></label>
+            <label v-if="orderForm.order_status === 'in_progress'">证券代码<input v-model.trim="orderForm.security_code" placeholder="600000" data-testid="p12-order-obs-security" /></label>
             <label v-if="orderForm.order_status === 'in_progress'">委托总量<input v-model.trim="orderForm.accepted_total_qty" inputmode="numeric" data-testid="p12-order-accepted" /></label>
             <label v-if="orderForm.order_status === 'in_progress'">价格上界<input v-model.trim="orderForm.price_bound" inputmode="decimal" data-testid="p12-order-bound" /></label>
             <label v-if="orderForm.order_status === 'in_progress'">费用预留<input v-model.trim="orderForm.fee_upper_bound" inputmode="decimal" placeholder="0.00" data-testid="p12-order-fee-bound" /></label>
@@ -271,7 +274,22 @@ export default {
         report_id: f.report_id,
         kind: f.kind,
         order_id: f.order_id,
-        occurred_at: `${f.time}:00${timezoneSuffix(this.workbench?.clock)}`
+        occurred_at: `${f.time}:00${timezoneSuffix(this.workbench?.clock)}`,
+        // The transport contract is a closed object: every field must be
+        // present, unused ones as null.  Missing keys are rejected with a 422
+        // before any semantic check can run, so the form sends the full shape.
+        side: f.side || 'buy',
+        security_code: f.security_code || '',
+        quantity: null,
+        price: null,
+        confirmed_fee: null,
+        accepted_total_qty: null,
+        order_status: null,
+        final_cumulative_fill_qty: null,
+        cancelled_qty: null,
+        price_bound: null,
+        fee_upper_bound: null,
+        order_revision: 1
       }
       if (!f.order_id) { this.orderError = '请填写订单编号'; return }
       if (!f.time) { this.orderError = '请填写发生时间'; return }

@@ -279,6 +279,7 @@ export interface Package {
   published_at: Timestamp
   schema_version: string
   source_ref: VersionRef
+  superseded: boolean
   synthetic: boolean
 }
 
@@ -351,6 +352,7 @@ export interface Records {
   outbox_pending: number
   package: Package | null
   plans: Array<PlanStatus>
+  prior_packages: Array<Package>
   publication: PublicationStatus
   reports: Array<ReportRecord>
   schema_version: SchemaVersion

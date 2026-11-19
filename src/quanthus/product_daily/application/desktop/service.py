@@ -8,6 +8,8 @@ read models.  Fact registration is never blocked by an expired or unadopted sugg
 
 from __future__ import annotations
 
+import dataclasses
+import json
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
@@ -108,6 +110,15 @@ def plan_ids(decisions: MarketDecisionSet) -> tuple[str, ...]:
     )
 
 
+def _package_content(decisions: MarketDecisionSet) -> dict[str, object]:
+    """JSON-stable dump of one package's full validated content for binding."""
+    import dataclasses
+
+    return json.loads(
+        json.dumps(dataclasses.asdict(decisions), default=str, sort_keys=True)
+    )
+
+
 def _marks(decisions: MarketDecisionSet) -> dict[str, Decimal]:
     marks: dict[str, Decimal] = {}
     for item in decisions.decisions:
@@ -173,9 +184,26 @@ class P12DesktopApplication:
         quantity: int = 0,
         security_code: str | None = None,
     ) -> AccountProjection:
-        """Create the trusted baseline; a held position joins with unknown cost."""
+        """Create the trusted baseline; a held position joins with unknown cost.
 
-        decisions = self._current_decisions()
+        The baseline input is stable across restarts: it names the account's
+        opening cash and the plan ids published for the *earliest* dated
+        package, not whichever package happens to be current today.  Reopening
+        the same store after a newer package is released therefore replays the
+        same payload instead of failing the idempotency check.
+        """
+
+        try:
+            existing = self._facts.snapshot(self._context)
+        except FactError:
+            existing = None
+        if existing is not None:
+            return existing.projection
+        # The earliest dated package owns the baseline: its entry plans are the
+        # dependent plans the store opened with, and they never change on a
+        # later publication.
+        published = self._decisions.history(self._scope)
+        decisions = published[0] if published else self._current_decisions()
         first = (
             security_code
             or (decisions.decisions[0].security_code if decisions.decisions else "CASH")
@@ -196,16 +224,26 @@ class P12DesktopApplication:
         """
 
         decisions = self._current_decisions()
-        # The binding identifies the source, not whichever dated package is
-        # currently visible: a store bound on the T package must still open
-        # once the T+1 release becomes current.
+        # The binding covers the full content of every package the source has
+        # released, not only the source ref: re-opening with the same version
+        # whose package content was edited is refused, while a brand-new dated
+        # release (a new package, not an edited one) still opens the store.
         source_ref = decisions.source_ref
+        published = self._decisions.history(self._scope)
+        # Each bound package is fingerprinted over its full validated
+        # content (entry bounds, charts, reasons), so editing any field under
+        # the same version changes the digest and is refused on reopen.
+        package_digests = {
+            item.market_date.isoformat(): digest(_package_content(item))
+            for item in published
+        }
         binding: dict[str, object] = {
             "mode": self._scope.mode,
             "composition": self._policy.composition_ref.to_dict(),
             "decision_source": {
                 "ref_id": source_ref.ref_id,
                 "version": source_ref.version,
+                "package_digests": package_digests,
             },
             "execution_profile": self._policy.execution_profile,
         }
@@ -232,6 +270,11 @@ class P12DesktopApplication:
             existing = self._facts.bind_configuration(self._context, binding_digest, binding)
         if existing.binding_digest != binding_digest:
             stored = existing.binding
+            if self._binding_is_append_only(stored, binding):
+                # A new dated release extends the bound package set while every
+                # already-bound package keeps its content, so the recorded
+                # binding still holds; no re-bind is needed.
+                return existing
             composition = stored.get("composition", {})
             source = stored.get("decision_source", {})
             raise FactError(
@@ -243,6 +286,28 @@ class P12DesktopApplication:
                 "configuration or start a new account store for the new policy",
             )
         return existing
+
+    @staticmethod
+    def _binding_is_append_only(stored: dict, new: dict) -> bool:
+        """True when ``new`` keeps every bound package digest and only adds releases."""
+        if stored.get("mode") != new.get("mode"):
+            return False
+        if stored.get("composition") != new.get("composition"):
+            return False
+        if stored.get("execution_profile") != new.get("execution_profile"):
+            return False
+        old_src = stored.get("decision_source", {})
+        new_src = new.get("decision_source", {})
+        if (old_src.get("ref_id"), old_src.get("version")) != (
+            new_src.get("ref_id"),
+            new_src.get("version"),
+        ):
+            return False
+        old_digests = old_src.get("package_digests", {})
+        new_digests = new_src.get("package_digests", {})
+        # Every previously bound package digest must still be present and equal;
+        # only additional market dates may be added.
+        return all(new_digests.get(day) == dg for day, dg in old_digests.items())
 
     @staticmethod
     def _visible(decisions: MarketDecisionSet, now: datetime) -> bool:
@@ -601,7 +666,21 @@ class P12DesktopApplication:
         statuses = {item.plan_id: item.status for item in history.plans}
         current = projection.quantity(plan.security_code)
         reasons: list[str] = []
-        if plan.plan_id not in statuses:
+        linked = [r for r in history.reports if r.suggestion_id == plan.plan_id]
+        has_deviation = any(r.deviations for r in linked) or any(
+            self._window_deviation(plan, datetime.fromisoformat(r.occurred_at))
+            for r in linked
+        )
+        # A plan reported in full and without deviation reads as executed, not
+        # as pending review: a clean buy is held, a clean exit is complete.  The
+        # stored NEEDS_REASSESSMENT mark is left for audit but does not reopen
+        # the user-facing status when the position already matches the plan.
+        buy_done = plan.side == "buy" and current >= plan.target_qty and bool(linked)
+        sell_done = plan.side == "sell" and current == 0 and bool(linked)
+        clean_done = (buy_done or sell_done) and not has_deviation
+        if clean_done:
+            status, step = "ACTIONABLE" if buy_done else "EXPIRED", "NONE"
+        elif plan.plan_id not in statuses:
             status, step = "NOT_BOUND", "RECONCILE_FACTS"
             reasons.append("BASELINE_COVERAGE_UNKNOWN")
         elif blockers:
@@ -701,6 +780,18 @@ class P12DesktopApplication:
                 action = "PAUSED"
             else:
                 action = "NONE"
+            # A cleanly executed plan reads as held/completed, never as pending
+            # review: a filled buy is held, a fully sold exit is done.
+            current_qty = projection.quantity(item.security_code)
+            linked = [r for r in history.reports if r.suggestion_id == plan.plan_id]
+            clean = not any(r.deviations for r in linked) and not any(
+                self._window_deviation(plan, datetime.fromisoformat(r.occurred_at))
+                for r in linked
+            )
+            if clean and plan.side == "buy" and current_qty >= plan.target_qty:
+                status, action = "READY", "HOLD"
+            elif clean and plan.side == "sell" and current_qty == 0 and linked:
+                status, action = "ENDED", "NONE"
             reasons.extend(applicability.reason_codes)
             if status != "READY" and applicability.reason_codes:
                 # The account-side reason now explains the state better than the sizing limit.
@@ -711,6 +802,17 @@ class P12DesktopApplication:
             action, status = "HOLD", "READY"
         elif stage is OpportunityStage.EXIT_PLAN:
             action, status = "SELL", "READY"
+            # Once the position is flat the exit is complete: it no longer
+            # prompts a sell.  An exit plan is sized for the whole held
+            # quantity, so quantity 0 after its report marks it done.
+            if projection.quantity(item.security_code) == 0:
+                # The exit reported the whole position sold; no sell remains.
+                sold = any(
+                    r.security_code == item.security_code and r.side == "sell"
+                    for r in history.reports
+                )
+                if sold:
+                    action, status = "NONE", "ENDED"
         elif stage is OpportunityStage.INPUT_BLOCKED:
             action, status = "PAUSED", "MISSING_INPUT"
             primary = next(iter(item.reason_codes), None)
@@ -766,8 +868,32 @@ class P12DesktopApplication:
         return decisions, history, projection, package, funding, now
 
     # ---- queries --------------------------------------------------------------------
+    def _maintain(self) -> None:
+        """Idempotent write-through on the pages a user opens.
+
+        A published executable entry plan reserves an empty bucket and a flat
+        security settles its open cycle, so the page reflects the automatic
+        funding lifecycle without the user touching a control.  These stay on
+        the user-facing reads, never inside the snapshot pair, so a concurrent
+        reader still observes one consistent old state.
+        """
+        try:
+            decisions = self._current_decisions()
+            now = self._now()
+            if not self._visible(decisions, now):
+                return
+            snapshot = self._facts.snapshot(self._context)
+            package = self._publish(decisions, snapshot.history)
+            for plan in package.plans:
+                if plan.delta_qty > 0:
+                    self._auto_reserve(plan.security_code)
+            self._auto_settle(None)
+        except FactError:
+            return
+
     def workbench(self, scope: AccountScope) -> WorkbenchView:
         self._require(scope)
+        self._maintain()
         decisions, history, projection, package, funding, now = self._state()
         account = self._account(projection, history, decisions, funding, now)
         blockers = self._policy.missing_for_action(scope.mode)
@@ -844,9 +970,17 @@ class P12DesktopApplication:
                 history.baseline_security_code if history.baseline_quantity else CASH_ONLY
             ),
         )
+        # Keep earlier published packages readable, each still sized against the
+        # baseline and marked superseded by the current release.
+        prior = tuple(
+            self._publish(item, history)
+            for item in self._decisions.history(self._scope)
+            if item is not decisions and self._visible(item, now)
+        )
         return RecordsView(
             scope=scope,
             package=package if visible else None,
+            prior_packages=prior,
             publication=self._publication(decisions, now),
             account=self._account(projection, history, decisions, funding, now),
             history=exposed,
@@ -859,6 +993,7 @@ class P12DesktopApplication:
 
     def funding_rules(self, scope: AccountScope) -> FundingRulesView:
         self._require(scope)
+        self._maintain()
         _, history, projection, _, funding, _ = self._state()
         return FundingRulesView(
             scope=scope,
@@ -1283,16 +1418,29 @@ class P12DesktopApplication:
                 return
             funding, _ = state
             snapshot = self._facts.snapshot(self._context)
-            if any(
+            if security_code is not None and any(
                 item.security_code == security_code and item.quantity
                 for item in snapshot.projection.positions
             ):
                 return
+            # bucket_id -> its attributed security is still held (open position).
+            held = self._facts.funding_held_by_bucket(self._context) or {}
             for item in funding.buckets:
                 if item.phase not in (BucketPhase.RESERVED, BucketPhase.HELD):
                     continue
+                # A specific security settles only its owning bucket once it is
+                # flat; a None sweep (read-path) settles every open bucket whose
+                # attributed security is no longer held.
+                if security_code is None:
+                    if held.get(item.bucket_id, True):
+                        continue
+                    codes = None
+                else:
+                    if held.get(item.bucket_id, True):
+                        continue
+                    codes = {security_code}
                 evidence = self._facts.funding_settlement_evidence(
-                    self._context, security_codes={security_code},
+                    self._context, security_codes=codes,
                 )
                 if not evidence.settlement_ready:
                     continue

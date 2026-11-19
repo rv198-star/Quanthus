@@ -277,3 +277,74 @@ def test_step6_off_plan_price_still_posts(tmp_path: Path) -> None:
     board = app.workbench(app.scope)
     assert board.account.cash_total == Decimal("4995.00")
     assert app.funding_rules(app.scope) is not None
+
+
+def test_restart_across_days_keeps_one_baseline(tmp_path: Path) -> None:
+    """The documented --clock restart opens the same store on every day.
+
+    The baseline is bound to the earliest dated package's entry plans, so a
+    newer package becoming current never rewrites the baseline input.
+    """
+    fixture = load_synthetic_fixture(FIXTURE)
+
+    def open_app(now: str):
+        clock = _Clock(datetime.fromisoformat(now))
+        apps = synthetic_applications(state_dir=tmp_path, fixture=fixture, clock=clock)
+        return apps["SYN-P12-A"]
+
+    # T day: create the store and bind.
+    open_app("2026-11-18T19:00:00+08:00")
+    # T+1 restart reads the same baseline and current T package.
+    app1 = open_app("2026-11-19T10:05:00+08:00")
+    assert app1._current_decisions().market_date.isoformat() == "2026-11-18"
+    app1.submit_fill(
+        app1.scope,
+        SubmitFill(
+            report_id="buy-1",
+            plan_id=BUY_PLAN,
+            quantity=400,
+            price=Decimal("12.38"),
+            confirmed_fee=Decimal("5.00"),
+            occurred_at=datetime.fromisoformat("2026-11-19T10:05:00+08:00"),
+        ),
+    )
+    # T+1 evening and T+2 restarts open instead of IDEMPOTENCY_CONFLICT.
+    app2 = open_app("2026-11-19T19:00:00+08:00")
+    assert app2._current_decisions().market_date.isoformat() == "2026-11-19"
+    app3 = open_app("2026-11-20T10:00:00+08:00")
+    assert _cash(app3) == Decimal("5043.00") and _qty(app3, "600000") == 400
+
+
+def test_same_version_changed_content_is_refused(tmp_path: Path) -> None:
+    """Re-opening a store with an edited package under one version is refused."""
+    import json
+
+    fixture = load_synthetic_fixture(FIXTURE)
+    clock = _Clock(datetime.fromisoformat("2026-11-19T10:05:00+08:00"))
+    apps = synthetic_applications(state_dir=tmp_path, fixture=fixture, clock=clock)
+    app = apps["SYN-P12-A"]
+    app.submit_fill(
+        app.scope,
+        SubmitFill(
+            report_id="buy-1",
+            plan_id=BUY_PLAN,
+            quantity=400,
+            price=Decimal("12.38"),
+            confirmed_fee=Decimal("5.00"),
+            occurred_at=clock.now,
+        ),
+    )
+    raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    sets = raw.get("decision_sets") or [raw["decision_set"]]
+    for item in [raw["decision_set"], *sets]:
+        for d in item["decisions"]:
+            if d.get("entry"):
+                d["entry"]["price_bound"] = "12.10"
+    changed = tmp_path / "changed.json"
+    changed.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(FactError, match="CONFIGURATION_BINDING_MISMATCH"):
+        synthetic_applications(
+            state_dir=tmp_path,
+            fixture=load_synthetic_fixture(changed),
+            clock=clock,
+        )

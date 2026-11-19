@@ -28,6 +28,7 @@ FIXED_BUCKET = "fixed_bucket"
 FUNDING_CYCLE_NOT_BOUND = "FUNDING_CYCLE_NOT_BOUND"
 BUCKET_ASSIGNMENT_CONFLICT = "BUCKET_ASSIGNMENT_CONFLICT"
 FUNDING_LEDGER_MISMATCH = "FUNDING_LEDGER_MISMATCH"
+INSUFFICIENT_CASH = "INSUFFICIENT_CASH"
 
 
 @dataclass(frozen=True)
@@ -177,10 +178,20 @@ def describe_funding(
         # cycle can deploy are only known once the cycle settles.  A bucket
         # with no open position can already name both.
         holding = bool(held_by_bucket.get(item.bucket_id))
+        # A fill that overspends the bucket (for example an off-plan price)
+        # never shows a negative bucket balance: cash reads unknown with the
+        # shortfall named, and underfunded carries the real gap instead.
+        overspent = live_cash(item) < Decimal("0.00")
+        # The shortfall is the overspent amount below zero (the cash the
+        # bucket owes), never the full target minus a negative balance.
         underfund = (
             settlement_dependent(item)
-            if holding
-            else known(max(Decimal("0.00"), item.target_notional - live_cash(item)))
+            if holding and not overspent
+            else known(
+                max(Decimal("0.00"), -live_cash(item))
+                if overspent
+                else max(Decimal("0.00"), item.target_notional - live_cash(item))
+            )
         )
         next_available = (
             settlement_dependent(item)
@@ -191,7 +202,11 @@ def describe_funding(
             item.bucket_id,
             item.phase.value,
             item.target_notional,
-            known(live_cash(item)),
+            (
+                MaybeDecimal.unknown(INSUFFICIENT_CASH)
+                if overspent
+                else known(live_cash(item))
+            ),
             item.cycle_id,
             known(display_locked(item)),
             underfund,

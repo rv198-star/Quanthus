@@ -95,21 +95,28 @@ class FixtureDecisionSource:
         self._accounts = {item.account_id for item in fixture.accounts}
         self._clock = clock or (lambda: fixture.clock)
 
+    def _published(self) -> list[MarketDecisionSet]:
+        now = self._clock()
+        return [item for item in self._fixture.decisions if now >= item.published_at]
+
     def current(self, scope: AccountScope) -> MarketDecisionSet:
         if scope.mode != "synthetic" or scope.account_id not in self._accounts:
             raise FactError("POLICY_NOT_ADOPTED", "no adopted decision source for this account")
-        now = self._clock()
-        published = [
-            item for item in self._fixture.decisions if now >= item.published_at
-        ]
+        published = self._published()
         if not published:
             # Before the first package is due, surface the earliest one so the
             # account binds and shows it as not yet published.
             return min(self._fixture.decisions, key=lambda item: item.published_at)
         return max(published, key=lambda item: item.published_at)
 
+    def published(self, scope: AccountScope) -> tuple[MarketDecisionSet, ...]:
+        """Every dated package already released, oldest first, for binding and records."""
+        if scope.mode != "synthetic" or scope.account_id not in self._accounts:
+            raise FactError("POLICY_NOT_ADOPTED", "no adopted decision source for this account")
+        return tuple(sorted(self._published(), key=lambda item: item.published_at))
+
     def history(self, scope: AccountScope) -> tuple[MarketDecisionSet, ...]:
-        return (self.current(scope),)
+        return self.published(scope)
 
 
 def _decision(raw: dict[str, Any]) -> MarketDecision:

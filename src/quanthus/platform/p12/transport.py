@@ -172,6 +172,7 @@ def _package(value: PublishedPackage) -> dict[str, Any]:
         "source_ref": _ref(value.source_ref),
         "plans": [_plan(item) for item in value.plans],
         "digest": value.digest,
+        "superseded": False,
     }
 
 
@@ -270,6 +271,10 @@ def records_dto(value: RecordsView) -> dict[str, Any]:
             "schema_version": SCHEMA_VERSION,
             "scope": _scope(value.scope),
             "package": None if value.package is None else _package(value.package),
+            "prior_packages": [
+                {**_package(item), "superseded": True}
+                for item in value.prior_packages
+            ],
             "publication": _publication(value.publication),
             "account": _account(value.account),
             "baseline": {

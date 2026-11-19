@@ -164,6 +164,9 @@ class FactRecord:
 class RecordsView:
     scope: AccountScope
     package: PublishedPackage | None
+    # Earlier dated packages already superseded by the current release; the
+    # records page keeps them readable with their original plans.
+    prior_packages: tuple[PublishedPackage, ...]
     publication: PublicationStatus
     account: AccountSummary
     history: FactHistory

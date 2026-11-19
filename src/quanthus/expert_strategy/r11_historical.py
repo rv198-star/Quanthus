@@ -13,6 +13,7 @@ from typing import Any
 from quanthus.backtest.contracts import EngineEvent, EventType
 from quanthus.backtest.data_provider import (
     ReplayDataProvider,
+    ReplayDataSession,
     load_replay_data_provider_config,
 )
 from quanthus.backtest.strategy_replay import StrategyReplayFrame
@@ -102,17 +103,14 @@ class R11HistoricalReplayRuntime(FormalP2ReplayRuntime):
         self._buy_bounds = dict(buy_bounds)
         self._consumer_receipt_id = consumer_receipt_id
         self._admitted_data_manifest_sha256 = admitted_data_manifest_sha256
-        # Fail closed before any event or market-row read when the provider mode
-        # cannot prove its reader manifest from pinned metadata alone.
-        provable = ReplayDataProvider(
-            load_replay_data_provider_config(
-                repository_root.resolve() / provider_config
-            )
-        ).admitted_manifest()
-        if provable != admitted_data_manifest_sha256:
-            raise ValueError(
-                "R11 provider manifest does not match the admitted data"
-            )
+        self._admitted_provider = ReplayDataProvider(
+            load_replay_data_provider_config(repository_root.resolve() / provider_config)
+        )
+        self._admitted_provider.verify_admission(
+            admitted_data_manifest_sha256,
+            scope_start=DECISION_START,
+            scope_end=DECISION_END,
+        )
         super().__init__(
             repository_root,
             provider_config=provider_config,
@@ -125,13 +123,8 @@ class R11HistoricalReplayRuntime(FormalP2ReplayRuntime):
             self.close()
             raise ValueError("R11 replay starts before the admitted decision window")
 
-    def _open_data_session(self) -> Any:
-        provider_config = load_replay_data_provider_config(
-            self.repository_root / self.provider_config,
-            allowed_partitions=self.allowed_provider_partitions,
-        )
-        provider = ReplayDataProvider(provider_config)
-        session = provider.open(
+    def _open_data_session(self) -> ReplayDataSession:
+        session = self._admitted_provider.open(
             scope_start=self._provider_scope_start(),
             scope_end=self.decision_end,
             admitted_reader_manifest_sha256=self._admitted_data_manifest_sha256,

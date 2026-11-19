@@ -394,6 +394,22 @@ class ReplayDataProvider:
             "this replay provider mode exposes no admissible reader manifest"
         )
 
+    def verify_admission(
+        self, admitted_sha256: str, *, scope_start: date, scope_end: date
+    ) -> None:
+        """Validate the pinned identity and its physical source metadata before event reads."""
+        self.config.scope.authorize(scope_start, scope_end)
+        if self.admitted_manifest() != admitted_sha256:
+            raise ConfigurationError(
+                "replay provider manifest does not match the admitted data"
+            )
+        if self.config.mode == "direct-dwd-job-local":
+            from quanthus.backtest.direct_dwd_provider import _direct_dwd_authority
+
+            _direct_dwd_authority(self.config, None)
+        else:
+            self._shared_replay_authority()
+
     def open(
         self,
         *,
@@ -450,6 +466,28 @@ class ReplayDataProvider:
                 "shared_session": True,
             }
             return ReplayDataSession(self.config, reader, identity)
+        actual_replay, actual_dwd = self._shared_replay_authority()
+        reader = load_strategy_replay_ads_reader(
+            self.config.replay_root,
+            ads_policy=load_strategy_replay_ads_policy(self.config.replay_policy),
+            reader_role=self.config.scope.reader_role,
+            corporate_action_policy=load_corporate_action_normalization_policy(),
+        )
+        identity = {
+            "provider_id": self.config.provider_id,
+            "provider_version": self.config.provider_version,
+            "provider_config_digest": self.config.digest,
+            "scope": self.config.scope.to_dict(),
+            "replay_source": actual_replay,
+            "dwd_authority": actual_dwd,
+            "point_in_time": True,
+            "decision_at_close_execution_at_next_open": True,
+            "dedicated_ads_required": False,
+            "shared_session": True,
+        }
+        return ReplayDataSession(self.config, reader, identity)
+
+    def _shared_replay_authority(self) -> tuple[dict[str, Any], dict[str, Any]]:
         replay_manifest = _load_object(
             self.config.replay_root / "manifest.json", "shared replay manifest"
         )
@@ -478,22 +516,4 @@ class ReplayDataProvider:
         }
         if actual_dwd != dict(self.config.dwd_identity):
             raise ConfigurationError("DWD authority identity differs from provider configuration")
-        reader = load_strategy_replay_ads_reader(
-            self.config.replay_root,
-            ads_policy=load_strategy_replay_ads_policy(self.config.replay_policy),
-            reader_role=self.config.scope.reader_role,
-            corporate_action_policy=load_corporate_action_normalization_policy(),
-        )
-        identity = {
-            "provider_id": self.config.provider_id,
-            "provider_version": self.config.provider_version,
-            "provider_config_digest": self.config.digest,
-            "scope": self.config.scope.to_dict(),
-            "replay_source": actual_replay,
-            "dwd_authority": actual_dwd,
-            "point_in_time": True,
-            "decision_at_close_execution_at_next_open": True,
-            "dedicated_ads_required": False,
-            "shared_session": True,
-        }
-        return ReplayDataSession(self.config, reader, identity)
+        return actual_replay, actual_dwd

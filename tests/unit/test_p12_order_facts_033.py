@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -670,3 +670,181 @@ def test_parent_label_cannot_consume_another_parent_slot(tmp_path):
     final = snapshot(bridge, LATE)
     assert final["pending"] == [reserved.reservation_id] and final["quantity"] == 0
     verify_rebuild(path, feed, LATE, final)
+
+
+def _later_source(order_status="cancelled", *, fee=Decimal("2.50"), extra=()):
+    original_zero = replace(
+        external_order(status="cancelled"), fee=Decimal("1.00"), corrections_clear=True
+    )
+    cancelled = replace(
+        external_order(later=True, published=LATE),
+        status=order_status,
+        filled=0,
+        cancelled=500,
+        fee=fee,
+    )
+    listed = (original_zero.order_id, cancelled.order_id)
+    statement_orders = listed if extra else (original_zero.order_id,)
+    source = ledger(orders=[original_zero, cancelled, *extra], listed=listed)
+    source = replace(
+        source,
+        statements=(
+            replace(
+                source.statements[0],
+                order_ids=(original_zero.order_id,),
+            ),
+        ),
+    )
+    return source, cancelled
+
+
+def _admit_later(bridge):
+    original = reserve_original(bridge)
+    evidence = bridge.observe_original(context(CLOSE), WINDOW, request_id="terminal")
+    assert evidence["released"] and evidence["reservation_id"] == original.reservation_id
+    request = later_request(bridge, security_id=SEC)
+    request = replace(
+        request,
+        opportunity=replace(
+            request.opportunity,
+            original_attempt_state=OriginalAttemptState.TERMINAL_ZERO_FILL_RECONCILED,
+        ),
+    )
+    entry = bridge.enter_later(context(NOW), request)
+    assert entry.entry is not None and entry.entry.accepted
+    return entry
+
+
+def test_a11_later_terminal_zero_releases_only_its_attempt_and_slot_stays_consumed(tmp_path):
+    source, order = _later_source()
+    path = tmp_path / "a11.sqlite"
+    bridge = bridge_at(path, source)
+    entry = _admit_later(bridge)
+    hold = entry.entry.reservation_id
+    before = snapshot(bridge, LATE)
+    assert before["pending"] == [hold] and before["held_cash"] == "5005.00"
+    # A new eligible candidate under a newer policy cannot take the consumed slot.
+    v2 = replace(
+        policy(),
+        policy_version="c13-synthetic-qualified-v2",
+        expiry=datetime.fromisoformat("2026-11-20T10:00:00+08:00"),
+    )
+    second = later_request(bridge, selected_policy=v2, security_id=SEC)
+    second = replace(
+        second,
+        opportunity=replace(
+            second.opportunity,
+            original_attempt_state=OriginalAttemptState.TERMINAL_ZERO_FILL_RECONCILED,
+        ),
+    )
+    with pytest.raises(FactError, match="LATER_ATTEMPT_ALREADY_CONSUMED"):
+        bridge.enter_later(context(NOW), second)
+    assert snapshot(bridge, NOW)["pending"] == [hold]
+    receipt = bridge.observe_later(context(LATE), attempt(), request_id="later-terminal")
+    assert (
+        receipt["status"],
+        receipt["reservation_id"],
+        receipt["released"],
+        receipt["fee_posted"],
+        receipt["order_id"],
+    ) == ("TERMINAL_ZERO_FILL_RECONCILED", hold, True, "2.50", order.order_id)
+    assert bridge.observe_later(context(LATE), attempt(), request_id="later-terminal") == receipt
+    after = snapshot(bridge, LATE)
+    assert after["cash"] == "20996.50" and after["quantity"] == 0 and not after["pending"]
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT count(*) FROM bridge_later_attempts").fetchone()[0] == 1
+        assert db.execute(
+            "SELECT status FROM bridge_obligations WHERE obligation_id=?",
+            (receipt["reservation_id"],),
+        ).fetchone()[0] == "CANCELLED"
+    with sqlite3.connect(path) as db:
+        occupied = db.execute(
+            "SELECT slot_identity,attempt_identity FROM bridge_later_attempts"
+        ).fetchall()
+    assert len(occupied) == 1 and occupied[0][1] == attempt()
+    # Journal rebuild restores the occupied slot after the store table is wiped.
+    with sqlite3.connect(path) as db:
+        stored_slots = db.execute("SELECT * FROM bridge_later_attempts").fetchall()
+        db.execute("DELETE FROM bridge_later_attempts")
+    reopened = verify_rebuild(path, source, LATE, after)
+    assert reopened.observe_later(context(LATE), attempt(), request_id="later-terminal") == receipt
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT * FROM bridge_later_attempts").fetchall() == stored_slots
+    cold_path = path.with_name("cold-" + path.name)
+    cold = build_funding_bridge_service(
+        cold_path, context=context(BASE), authorization=AUTH, order_source=source
+    )
+    restored = cold.reconstruct_order_account(context(LATE))
+    assert restored.terminals["later-terminal"] == receipt
+    witness("a11-later-terminal", {"receipt": receipt, "state": after, "rebuild": "equal"})
+
+
+@pytest.mark.parametrize(
+    "mutation,reason",
+    [
+        ("wrong-attempt", "C13_LATER_ORDER_AMBIGUOUS"),
+        ("ambiguous", "C13_LATER_ORDER_AMBIGUOUS"),
+        ("open", "LATER_ORDER_UNRECONCILED"),
+        ("filled", "LATER_FILL_RECORDED"),
+        ("wrong-command", "C13_ATTEMPT_BINDING_MISMATCH"),
+    ],
+)
+def test_a11_wrong_malformed_or_ambiguous_terminal_has_no_effects(tmp_path, mutation, reason):
+    original_zero = replace(
+        external_order(status="cancelled"), fee=Decimal("1.00"), corrections_clear=True
+    )
+    if mutation == "ambiguous":
+        base = replace(
+            external_order(later=True, published=LATE),
+            status="cancelled",
+            filled=0,
+            cancelled=500,
+            fee=Decimal("2.50"),
+        )
+        other = replace(
+            base, observation_id="obs-other", order_id="O-LATER-2", command_id="other-command"
+        )
+        source = ledger(
+            orders=[original_zero, base, other],
+            listed=(original_zero.order_id,),
+        )
+    elif mutation == "open":
+        source, _ = _later_source("open", fee=None)
+    elif mutation == "filled":
+        filled = external_order(later=True, published=LATE)
+        source = ledger(
+            orders=[original_zero, filled],
+            listed=(original_zero.order_id,),
+            fills=[execution(filled, "E-L")],
+        )
+    elif mutation == "wrong-command":
+        order = replace(
+            external_order(later=True, published=LATE),
+            status="cancelled",
+            filled=0,
+            cancelled=500,
+            fee=Decimal("2.50"),
+            command_id="another-command",
+        )
+        source = ledger(
+            orders=[original_zero, order], listed=(original_zero.order_id,)
+        )
+    else:
+        source, _ = _later_source()
+    path = tmp_path / f"a11-{mutation}.sqlite"
+    bridge = bridge_at(path, source)
+    entry = _admit_later(bridge)
+    before = snapshot(bridge, LATE)
+    target = "unknown-attempt" if mutation == "wrong-attempt" else attempt()
+    receipt = bridge.observe_later(context(LATE), target, request_id=f"later-{mutation}")
+    expected_status = "ANY_FILL" if mutation == "filled" else "NEEDS_RECONCILIATION"
+    assert (receipt["status"], receipt["reason"], receipt["released"], receipt["fee_posted"]) == (
+        expected_status,
+        reason,
+        False,
+        "0.00",
+    )
+    assert snapshot(bridge, LATE) == before and before["pending"] == [entry.entry.reservation_id]
+    assert bridge.observe_later(context(LATE), target, request_id=f"later-{mutation}") == receipt
+    verify_rebuild(path, source, LATE, before)
+    witness(f"a11-{mutation}", {"receipt": receipt, "state": before, "rebuild": "equal"})

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Protocol
@@ -952,6 +952,7 @@ class OrderAccountReplay:
     obligations: tuple[PendingObligation, ...]
     reports: dict[str, dict[str, Any]]
     windows: dict[str, dict[str, Any]]
+    terminals: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -1129,6 +1130,9 @@ class BuyBridgeResult:
 class FundingBridgePort(Protocol):
     def observe_original(
         self, context: SyntheticContext, window: OrderWindow, request_id: str
+    ) -> dict[str, Any]: ...
+    def observe_later(
+        self, context: SyntheticContext, attempt_identity: str, request_id: str
     ) -> dict[str, Any]: ...
     def order_report(self, context: SyntheticContext, report_id: str) -> dict[str, Any] | None: ...
     def resolve_order_buy(
@@ -1758,6 +1762,19 @@ class FundingBridgeService:
         if not isinstance(request_id, str) or not request_id.strip():
             raise FactError("INVALID_REPORT_SHAPE", "stable request ID is required")
         return self._port.observe_original(validated, window, request_id)
+
+    def observe_later(
+        self, context: SyntheticContext, attempt_identity: str, *, request_id: str
+    ) -> dict[str, Any]:
+        """Persist the source verdict, releasing only the bound later attempt's hold."""
+        validated = self._context_for(context)
+        if self._order_source is None:
+            raise FactError("C13_ORDER_ATTRIBUTION_REQUIRED", "no trusted provider is bound")
+        if not isinstance(request_id, str) or not request_id.strip():
+            raise FactError("INVALID_REPORT_SHAPE", "stable request ID is required")
+        if not isinstance(attempt_identity, str) or not attempt_identity.strip():
+            raise FactError("INVALID_REPORT_SHAPE", "typed attempt identity is required")
+        return self._port.observe_later(validated, attempt_identity, request_id)
 
     def order_report(self, context: SyntheticContext, report_id: str) -> dict[str, Any] | None:
         """Read the durable source-order lineage and disposition of a received buy."""

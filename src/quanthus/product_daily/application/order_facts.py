@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
@@ -206,6 +207,7 @@ def reconcile_window(
     window: OrderWindow,
     state: BridgeState,
     obligations: tuple[PendingObligation, ...],
+    reservation_times: Mapping[str, datetime],
     *,
     unresolved: bool = False,
 ) -> WindowTransition:
@@ -258,6 +260,10 @@ def reconcile_window(
     if not obligation:
         return WindowTransition(state, None, receipt)
     receipt["reservation_id"] = obligation.reservation_id
+    reserved_at = reservation_times.get(obligation.reservation_id)
+    if reserved_at is None or order.submitted_at < reserved_at:
+        receipt.update(status=WindowStatus.UNKNOWN.value, reason="ORDER_RESERVATION_TIME_MISMATCH")
+        return WindowTransition(state, None, receipt)
     settlement_id = order.zero_identity(source.source_id)
     if obligation.status == "CANCELLED" and any(
         s.settlement_id == settlement_id for s in state.funding.completed_settlements

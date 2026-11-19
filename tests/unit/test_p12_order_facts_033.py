@@ -350,6 +350,36 @@ def test_05_terminal_zero_reconciles_original_before_later(tmp_path):
     )
 
 
+def test_terminal_zero_cannot_close_a_reservation_created_after_submission(tmp_path):
+    order = replace(external_order(status="cancelled"), fee=Decimal("1.25"))
+    source = ledger(orders=(order,), listed=(order.order_id,))
+    path = tmp_path / "zero-before-reservation.sqlite"
+    bridge = bridge_at(path, source)
+    reserved_at = START + timedelta(seconds=1)
+    reservation = bridge.enter(
+        context(reserved_at),
+        entry_intent(
+            bridge,
+            candidate_entry=candidate(PARENT, SEC),
+            command_id="original-entry",
+            expected_revision=0,
+            at=reserved_at,
+        ),
+    )
+    assert reservation.accepted and order.submitted_at < reserved_at
+    before = snapshot(bridge, CLOSE)
+    assert before["cash"] == "21000.00" and before["pending"] == [reservation.reservation_id]
+    receipt = bridge.observe_original(context(CLOSE), WINDOW, request_id="late-reservation")
+    assert (receipt["status"], receipt["reason"], receipt["released"], receipt["fee_posted"]) == (
+        "NEEDS_RECONCILIATION",
+        "ORDER_RESERVATION_TIME_MISMATCH",
+        False,
+        "0.00",
+    )
+    assert snapshot(bridge, CLOSE) == before
+    verify_rebuild(path, source, CLOSE, before)
+
+
 @pytest.mark.parametrize(
     "problem",
     ["partial-coverage", "short-watermark", "bad-total", "open-fee", "correction", "wrong-window"],

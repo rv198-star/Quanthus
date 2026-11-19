@@ -394,12 +394,22 @@ class SQLiteCycleBridgeAdapter:
             ).fetchone()
             as_received = replace(context, as_of=datetime.fromisoformat(raw["received_at"]))
             pending = self._unresolved_order_facts(db, context)
+            reservation_times = {}
+            for reservation in state.funding.entry_reservations:
+                if reservation.opportunity_id != window.parent_id:
+                    continue
+                entry = self._evidence_event(db, context, f"entry:{reservation.command_id}")
+                if entry and entry["reservation_id"] == reservation.reservation_id:
+                    reservation_times[reservation.reservation_id] = datetime.fromisoformat(
+                        entry["account_recorded_at"]
+                    )
             observation = reconcile_window(
                 source,
                 as_received,
                 window,
                 state,
                 self._obligation_rows(db, context),
+                reservation_times,
                 unresolved=pending,
             )
             if observation.closed_obligation and source.window_result(
@@ -2079,6 +2089,7 @@ class SQLiteCycleBridgeAdapter:
                         restore_window(event["window"]),
                         BridgeState(account, funding, account.revision),
                         tuple(obligations.values()),
+                        reservation_times,
                         unresolved=event["unresolved_at_observation"],
                     )
                     if (

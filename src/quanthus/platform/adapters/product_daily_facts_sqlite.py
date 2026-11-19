@@ -121,7 +121,7 @@ class SQLiteSyntheticFactsAdapter:
             tables = connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
-            if version not in (0, 1, 2) or (version == 0 and tables):
+            if version not in (0, 1, 2, 3) or (version == 0 and tables):
                 raise FactError(
                     "STORE_SCHEMA_MISMATCH",
                     "unversioned candidate store is retained; use a fresh synthetic store",
@@ -180,7 +180,7 @@ class SQLiteSyntheticFactsAdapter:
                 CREATE TABLE IF NOT EXISTS order_fees(
                   account_id TEXT NOT NULL, mode TEXT NOT NULL, fee_id TEXT NOT NULL,
                   order_id TEXT NOT NULL, amount TEXT NOT NULL,
-                  occurred_at TEXT NOT NULL,
+                  occurred_at TEXT NOT NULL, supersedes TEXT,
                   PRIMARY KEY(account_id, mode, fee_id));
                 CREATE TABLE IF NOT EXISTS source_facts(
                   account_id TEXT NOT NULL, mode TEXT NOT NULL, source_fact_id TEXT NOT NULL,
@@ -203,7 +203,7 @@ class SQLiteSyntheticFactsAdapter:
                   account_id TEXT NOT NULL, mode TEXT NOT NULL, binding_digest TEXT NOT NULL,
                   binding_json TEXT NOT NULL, recorded_at TEXT NOT NULL,
                   PRIMARY KEY(account_id, mode));
-                PRAGMA user_version=2;
+                PRAGMA user_version=3;
                 CREATE TABLE IF NOT EXISTS outbox(
                   outbox_id INTEGER PRIMARY KEY AUTOINCREMENT, account_id TEXT NOT NULL,
                   mode TEXT NOT NULL, event_id TEXT NOT NULL, payload_json TEXT NOT NULL,
@@ -227,6 +227,12 @@ class SQLiteSyntheticFactsAdapter:
                 )
             if "order_id" not in fact_cols:
                 connection.execute("ALTER TABLE facts ADD COLUMN order_id TEXT")
+            fee_cols = {
+                r[1] for r in connection.execute("PRAGMA table_info(order_fees)").fetchall()
+            }
+            if "supersedes" not in fee_cols:
+                connection.execute("ALTER TABLE order_fees ADD COLUMN supersedes TEXT")
+            connection.execute("PRAGMA user_version=3")
 
     def establish_baseline(self, baseline: Baseline) -> AccountProjection:
         context = baseline.context
@@ -674,13 +680,36 @@ class SQLiteSyntheticFactsAdapter:
                         ),
                     )
                 else:
-                    # A terminal order is a proven final state.  A later non-terminal
-                    # observation is a stale, out-of-order report: keep it in the inbox
-                    # and ledger as history but do not reopen the order or release the
-                    # held unreported fills it already confirmed.
+                    # A terminal order is a proven final state at a confirmed
+                    # observed_at.  A later observation that is stale relative to
+                    # that proof — either non-terminal, or an earlier terminal
+                    # reading — is kept in the inbox and ledger as history but
+                    # does not reopen the order, release its held unreported
+                    # fills, or overwrite the confirmed terminal counts.
                     order_is_terminal = order["status"] == "terminal"
+                    current_observed_at = None
+                    if order_is_terminal and order["last_observation_id"] is not None:
+                        last_row = connection.execute(
+                            "SELECT payload_json FROM inbox WHERE account_id=? "
+                            "AND mode=? AND report_id=?",
+                            (
+                                context.account_id,
+                                context.mode,
+                                order["last_observation_id"],
+                            ),
+                        ).fetchone()
+                        if last_row is not None:
+                            current_observed_at = datetime.fromisoformat(
+                                json.loads(last_row["payload_json"])["observed_at"]
+                            )
+                    stale_terminal = (
+                        order_is_terminal
+                        and observation.status == "terminal"
+                        and current_observed_at is not None
+                        and observation.observed_at <= current_observed_at
+                    )
                     observation_reopens = observation.status != "terminal"
-                    if order_is_terminal and observation_reopens:
+                    if order_is_terminal and (observation_reopens or stale_terminal):
                         self._store_submission(connection, inbox, SubmissionResult(
                             receipt.receipt_id, "POSTED",
                             self._projection(connection, context),
@@ -836,18 +865,19 @@ class SQLiteSyntheticFactsAdapter:
                 order = self._order_state_row(connection, context, fee.order_id)
                 if order is None:
                     raise FactError("UNKNOWN_ORDER_EXPOSURE", "fee references an unknown order")
-                # One whole-order fee total is a single business fact; the same
-                # confirmed amount for the same order re-posted under a new form
-                # number returns the original receipt instead of charging again.
-                existing_fee = connection.execute(
-                    "SELECT fee_id FROM order_fees WHERE account_id=? AND mode=? "
-                    "AND order_id=? AND amount=? ORDER BY rowid LIMIT 1",
-                    (context.account_id, context.mode, fee.order_id, format(fee.amount, "f")),
-                ).fetchone()
-                if existing_fee is not None and existing_fee["fee_id"] != fee.fee_id:
-                    # Same whole-order total under a new form id is the same
-                    # business fact; record it POSTED against the unchanged
-                    # projection rather than charging the order a second time.
+                # One whole-order fee total is a single business fact carried by a
+                # correction chain of assessments.  A new confirmation restates the
+                # total, so the ledger applies only the delta against the prior
+                # confirmed total: an identical amount is the same fact and posts
+                # nothing, a revised amount corrects by the difference.
+                prior_total = connection.execute(
+                    "SELECT COALESCE(SUM(amount),0) FROM order_fees "
+                    "WHERE account_id=? AND mode=? AND order_id=? AND supersedes IS NULL",
+                    (context.account_id, context.mode, fee.order_id),
+                ).fetchone()[0]
+                prior_total = Decimal(str(prior_total)) if prior_total is not None else Decimal("0")
+                delta = (fee.amount - prior_total).quantize(Decimal("0.01"))
+                if delta == Decimal("0.00") and prior_total != Decimal("0"):
                     self._store_submission(connection, inbox, SubmissionResult(
                         receipt.receipt_id, "POSTED",
                         self._projection(connection, context),
@@ -858,7 +888,7 @@ class SQLiteSyntheticFactsAdapter:
                         self._projection(connection, context),
                     )
                 current = self._projection(connection, context)
-                cash = (current.cash - fee.amount).quantize(Decimal("0.01"))
+                cash = (current.cash - delta).quantize(Decimal("0.01"))
                 if cash < 0:
                     raise FactError("INSUFFICIENT_CASH", "confirmed fee exceeds cash")
                 updated = AccountProjection(
@@ -876,6 +906,7 @@ class SQLiteSyntheticFactsAdapter:
                         "receipt_id": receipt.receipt_id,
                         "order_id": fee.order_id,
                         "amount": format(fee.amount, "f"),
+                        "delta": format(delta, "f"),
                         "occurred_at": fee.occurred_at.isoformat(),
                         "received_at": inbox["received_at"],
                         "recorded_at": self._timestamp(),
@@ -898,13 +929,18 @@ class SQLiteSyntheticFactsAdapter:
                     connection,
                     event_id,
                     (
-                        Posting("ASSET_CASH", -fee.amount),
-                        Posting("EXPENSE_CONFIRMED_FEE", fee.amount),
+                        Posting("ASSET_CASH", -delta),
+                        Posting("EXPENSE_CONFIRMED_FEE", delta),
                     ),
                 )
                 self._write_projection(connection, context, updated)
                 connection.execute(
-                    "INSERT INTO order_fees VALUES(?,?,?,?,?,?)",
+                    "UPDATE order_fees SET supersedes=? "
+                    "WHERE account_id=? AND mode=? AND order_id=? AND supersedes IS NULL",
+                    (fee.fee_id, context.account_id, context.mode, fee.order_id),
+                )
+                connection.execute(
+                    "INSERT INTO order_fees VALUES(?,?,?,?,?,?,NULL)",
                     (
                         context.account_id,
                         context.mode,
@@ -1514,7 +1550,7 @@ class SQLiteSyntheticFactsAdapter:
                         status == "terminal"
                         and not needs
                         and int(row["known_fill_qty"]) > 0
-                        and fee_total > 0
+                        and len(fees) > 0
                     ),
                 )
             )
@@ -1698,7 +1734,7 @@ class SQLiteSyntheticFactsAdapter:
             )
             for r in connection.execute(
                 "SELECT * FROM order_fees WHERE account_id=? AND mode=? AND order_id=? "
-                "ORDER BY rowid",
+                "AND supersedes IS NULL ORDER BY rowid",
                 (context.account_id, context.mode, order_id),
             )
         )
@@ -1812,13 +1848,14 @@ class SQLiteSyntheticFactsAdapter:
         for order_id, events in order_events.items():
             # Only rebuild orders whose cached projection is missing entirely;
             # live rows already carry the latest fills and must not be replayed.
-            if self._order_state_row(connection, context, order_id) is not None:
-                continue
-            exists = False
+            order_missing = self._order_state_row(connection, context, order_id) is None
+            exists = not order_missing
             last_obs: OrderObservation | None = None
             for event in events:
                 if event["kind"] == "order_observation":
-                    if not exists:
+                    if not order_missing:
+                        continue
+                    if order_missing and not exists:
                         if event.get("accepted_total_qty") is None:
                             continue
                         connection.execute(
@@ -1841,9 +1878,28 @@ class SQLiteSyntheticFactsAdapter:
                         exists = True
                     row = self._order_state_row(connection, context, order_id)
                     # Mirror the live guard: a proven terminal state is not
-                    # reopened by a stale non-terminal replayed observation.
-                    if row["status"] == "terminal" and event["status"] != "terminal":
-                        continue
+                    # reopened by a stale replayed observation — non-terminal,
+                    # or an earlier terminal reading of the same order.
+                    if row["status"] == "terminal":
+                        if event["status"] != "terminal":
+                            continue
+                        current_ts = connection.execute(
+                            "SELECT payload_json FROM inbox WHERE account_id=? "
+                            "AND mode=? AND report_id=?",
+                            (
+                                context.account_id,
+                                context.mode,
+                                row["last_observation_id"],
+                            ),
+                        ).fetchone()
+                        if (
+                            current_ts is not None
+                            and datetime.fromisoformat(event["observed_at"])
+                            <= datetime.fromisoformat(
+                                json.loads(current_ts["payload_json"])["observed_at"]
+                            )
+                        ):
+                            continue
                     obs_row = connection.execute(
                         "SELECT payload_json FROM inbox WHERE account_id=? AND mode=? "
                         "AND report_id=?",
@@ -1869,7 +1925,7 @@ class SQLiteSyntheticFactsAdapter:
                             ),
                         )
                 elif event["kind"] == "fill":
-                    if not exists:
+                    if not exists or not order_missing:
                         continue
                     current = self._order_state_row(connection, context, order_id)
                     connection.execute(
@@ -1889,7 +1945,9 @@ class SQLiteSyntheticFactsAdapter:
                     ).fetchone()
                     if present is None:
                         connection.execute(
-                            "INSERT INTO order_fees VALUES(?,?,?,?,?,?)",
+                            "INSERT INTO order_fees "
+                            "(account_id,mode,fee_id,order_id,amount,occurred_at,supersedes) "
+                            "VALUES(?,?,?,?,?,?,NULL)",
                             (
                                 context.account_id,
                                 context.mode,

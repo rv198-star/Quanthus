@@ -1,6 +1,6 @@
 {
   "schema_version": "quanthus.platform.domain-imports.v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "activation_authority": false,
   "purpose": "P12 engineering-contract v1.1 infrastructure implements application ports using typed public execution facts; no runtime execution capability admission",
   "exceptions": [
@@ -15,6 +15,15 @@
       ],
       "consumer": "P12 U05 synthetic SQLite facts adapter",
       "source_contract": "P12 D1 engineering-contract v1.1 sections1A/1B; docs/acceptance/research-r11-u05-synthetic-facts-20261118.md"
+    },
+    {
+      "path": "p12/assembly.py",
+      "module": "quanthus.capabilities.execution",
+      "names": [
+        "SyntheticContext"
+      ],
+      "consumer": "P12 trusted local synthetic desktop assembly",
+      "source_contract": "P12 D1 engineering-contract v1.1 section 1B (composition root wires the trusted synthetic context)"
     }
   ]
 }

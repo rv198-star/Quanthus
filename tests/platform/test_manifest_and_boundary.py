@@ -45,6 +45,9 @@ def test_manifest_admits_only_minimal_runtime_and_operator_web_surfaces() -> Non
         "/attribution",
         "/operator",
         "/catalog",
+        "/p12",
+        "/p12/records",
+        "/p12/funding",
     )
     validate_manifest_against_capability_gate(manifest)
     assert len(manifest.admitted_capabilities) == 11

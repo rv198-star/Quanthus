@@ -15,6 +15,7 @@ import Tooltip from 'ant-design-vue/es/tooltip'
 import App from './App.vue'
 import router from './router'
 import './styles.css'
+import './p12/p12.css'
 import { installAntdRequireShim } from './shims/antd-require'
 
 installAntdRequireShim()

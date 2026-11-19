@@ -11,6 +11,7 @@ from quanthus.capabilities.execution import (
     validate_correction,
     validate_report,
 )
+from quanthus.product_daily.application.history import FactHistory
 from quanthus.product_daily.application.models import (
     Baseline,
     CorrectionResult,
@@ -66,3 +67,7 @@ class SyntheticFactService:
 
     def rebuild(self, context: SyntheticContext) -> AccountProjection:
         return self._port.rebuild(self._authorize(context))
+
+    def history(self, context: SyntheticContext) -> FactHistory:
+        """Original reports, current facts, corrections and ledger events for one account."""
+        return self._port.history(self._authorize(context))

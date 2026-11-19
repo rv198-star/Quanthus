@@ -1,0 +1,78 @@
+{
+  "schema_version": "quanthus.p12.module-boundaries.v1",
+  "version": "1.0.0",
+  "activation_authority": false,
+  "source_contract": "P12 D1 engineering-contract v1.1 sections 1A-1C; engineering-work-packages AR02",
+  "layers": [
+    {
+      "id": "shared",
+      "package": "quanthus.shared",
+      "path": "src/quanthus/shared",
+      "may_import": [
+        "quanthus.shared"
+      ]
+    },
+    {
+      "id": "capabilities",
+      "package": "quanthus.capabilities",
+      "path": "src/quanthus/capabilities",
+      "may_import": [
+        "quanthus.shared",
+        "quanthus.capabilities",
+        "quanthus.product_daily.funding",
+        "quanthus.product_daily.risk",
+        "quanthus.product_daily.contracts",
+        "quanthus.product_daily.candidate"
+      ],
+      "note": "Capabilities reuse the authoritative R11 funding/risk cores; they never import application, platform or transport code."
+    },
+    {
+      "id": "application",
+      "package": "quanthus.product_daily.application",
+      "path": "src/quanthus/product_daily/application",
+      "may_import": [
+        "quanthus.shared",
+        "quanthus.capabilities",
+        "quanthus.product_daily",
+        "quanthus.expert_strategy"
+      ],
+      "note": "Use cases depend on capability public entries and their own ports. quanthus.expert_strategy is admitted only for the pre-existing R11 expert_entry bridge; moving that read behind capabilities.decision_access is recorded debt."
+    },
+    {
+      "id": "p12_entry_adapters",
+      "package": "quanthus.platform.p12",
+      "path": "src/quanthus/platform/p12",
+      "may_import": [
+        "quanthus.platform",
+        "quanthus.product_daily.application",
+        "quanthus.shared",
+        "quanthus.policy",
+        "quanthus.capabilities.execution"
+      ],
+      "note": "HTTP/CLI/assembly translate the contract; capabilities.execution is admitted only for the trusted assembly context (see platform-domain-imports exception)."
+    }
+  ],
+  "forbidden_in_core": [
+    "sqlite3",
+    "wsgiref",
+    "http",
+    "urllib",
+    "socket",
+    "psycopg",
+    "quanthus.platform",
+    "quanthus.web"
+  ],
+  "core_layers": [
+    "shared",
+    "capabilities",
+    "application"
+  ],
+  "capability_edges": {
+    "accounting": [],
+    "decision_access": [],
+    "execution": [],
+    "funding": [],
+    "risk": []
+  },
+  "public_entry_rule": "Imports of quanthus.capabilities.<name> from outside that capability use the package root and only names in its __all__."
+}

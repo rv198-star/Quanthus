@@ -31,6 +31,7 @@ from quanthus.platform.manifest import (
     validate_manifest_against_capability_gate,
 )
 from quanthus.platform.observability import Metrics
+from quanthus.platform.p12.http import P12Runtime
 from quanthus.platform.persistence import PlatformStore, PostgresPlatformStore
 from quanthus.platform.ports import AttributionVerificationPort, GateQueryPort
 from quanthus.platform.product_query import ProductCandidateEvidence, ProductResearchCatalog
@@ -87,6 +88,7 @@ def create_platform_kernel(
     expert_run_root: Path | None = None,
     data_catalog_sources_path: Path | None = None,
     data_catalog_snapshot_path: Path | None = None,
+    p12_runtime: P12Runtime | None = None,
 ) -> PlatformKernel:
     root = find_project_root()
     manifest = load_feature_manifest(manifest_path)
@@ -172,6 +174,7 @@ def create_platform_kernel(
         data_catalog=data_catalog,
         candidate_approvals=candidate_approvals,
         metrics=metrics,
+        p12_runtime=p12_runtime,
     )
     return PlatformKernel(
         manifest=manifest,

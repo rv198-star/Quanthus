@@ -91,7 +91,11 @@ async function staticResponse(url, method) {
 }
 
 function isProductRoute(pathname) {
-  return ["/", "/research", "/candidates", "/attribution"].includes(pathname) || pathname.startsWith("/candidates/");
+  return (
+    ["/", "/research", "/candidates", "/attribution", "/p12"].includes(pathname) ||
+    pathname.startsWith("/candidates/") ||
+    pathname.startsWith("/p12/")
+  );
 }
 
 async function proxyRequest(request, url) {

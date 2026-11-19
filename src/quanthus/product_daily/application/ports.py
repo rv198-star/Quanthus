@@ -6,6 +6,7 @@ from typing import Protocol
 
 from quanthus.capabilities.accounting import AccountProjection
 from quanthus.capabilities.execution import Correction, ExecutionReport, SyntheticContext
+from quanthus.product_daily.application.history import FactHistory
 from quanthus.product_daily.application.models import (
     Baseline,
     CorrectionResult,
@@ -30,3 +31,5 @@ class SyntheticFactsPort(Protocol):
     def projection(self, context: SyntheticContext) -> AccountProjection: ...
 
     def rebuild(self, context: SyntheticContext) -> AccountProjection: ...
+
+    def history(self, context: SyntheticContext) -> FactHistory: ...

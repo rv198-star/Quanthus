@@ -7,9 +7,12 @@
         <div><strong>Quanthus</strong><span>Research Platform</span></div>
       </div>
       <nav aria-label="产品导航">
-        <router-link v-for="item in navigation" :key="item.path" :to="item.path" @click.native="mobileOpen = false">
-          <a-icon :type="item.icon" /><span>{{ item.label }}</span>
-        </router-link>
+        <template v-for="group in navigation">
+          <span :key="group.label" class="nav-group">{{ group.label }}</span>
+          <router-link v-for="item in group.items" :key="item.path" :to="item.path" :exact="item.exact" @click.native="mobileOpen = false">
+            <a-icon :type="item.icon" /><span>{{ item.label }}</span>
+          </router-link>
+        </template>
       </nav>
       <div class="sidebar-foot">
         <a href="/operator"><a-icon type="setting" /><span>系统管理</span></a>
@@ -19,9 +22,10 @@
     <div class="main-shell">
       <header class="topbar">
         <button class="mobile-menu" aria-label="打开导航" @click="mobileOpen = !mobileOpen"><a-icon type="menu" /></button>
-        <div class="page-identity"><span>A 股量化研究</span><b>{{ $route.meta.title }}</b></div>
+        <div class="page-identity"><span>{{ isAccountArea ? '我的账户' : 'A 股量化研究' }}</span><b>{{ $route.meta.title }}</b></div>
         <div class="top-actions">
-          <span class="boundary"><i></i>研究环境</span>
+          <span v-if="isAccountArea" class="boundary account"><i></i>账户事实由你确认，系统不代为下单</span>
+          <span v-else class="boundary"><i></i>研究环境</span>
           <a-dropdown placement="bottomRight">
             <button class="user-button"><span>{{ initials }}</span><b>{{ user.username }}</b><a-icon type="down" /></button>
             <a-menu slot="overlay"><a-menu-item @click="logout"><a-icon type="logout" />退出登录</a-menu-item></a-menu>
@@ -48,13 +52,27 @@ export default {
     loading: false,
     mobileOpen: false,
     navigation: [
-      { path: '/research', label: 'A 股研究', icon: 'fund' },
-      { path: '/candidates', label: '候选验证', icon: 'experiment' },
-      { path: '/attribution', label: '归因分析', icon: 'deployment-unit' }
+      {
+        label: '我的账户',
+        items: [
+          { path: '/p12', label: '工作台', icon: 'dashboard', exact: true },
+          { path: '/p12/records', label: '记录', icon: 'file-text' },
+          { path: '/p12/funding', label: '资金与规则', icon: 'wallet' }
+        ]
+      },
+      {
+        label: '策略研究',
+        items: [
+          { path: '/research', label: 'A 股研究', icon: 'fund' },
+          { path: '/candidates', label: '候选验证', icon: 'experiment' },
+          { path: '/attribution', label: '归因分析', icon: 'deployment-unit' }
+        ]
+      }
     ]
   }),
   computed: {
-    initials () { return (this.user.username || 'Q').slice(0, 2).toUpperCase() }
+    initials () { return (this.user.username || 'Q').slice(0, 2).toUpperCase() },
+    isAccountArea () { return this.$route.meta.area === 'p12' }
   },
   created () { if (this.authenticated) this.bootstrap() },
   methods: {

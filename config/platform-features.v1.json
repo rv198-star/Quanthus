@@ -1,6 +1,6 @@
 {
   "schema_version": "quanthus.platform.features.v1",
-  "manifest_version": "1.1.0",
+  "manifest_version": "1.2.0",
   "process_roles": [
     "api",
     "migration",
@@ -158,6 +158,26 @@
       "migrations": [],
       "web_routes": [
         "/catalog"
+      ]
+    },
+    {
+      "id": "quanthus-p12-desktop-v1",
+      "enabled": true,
+      "source_capabilities": [],
+      "routes": [
+        "p12.accounts.list",
+        "p12.workbench.read",
+        "p12.records.read",
+        "p12.funding.read",
+        "p12.reports.submit",
+        "p12.facts.correct"
+      ],
+      "startup_hooks": [],
+      "migrations": [],
+      "web_routes": [
+        "/p12",
+        "/p12/records",
+        "/p12/funding"
       ]
     }
   ],

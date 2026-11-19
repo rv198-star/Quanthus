@@ -47,6 +47,7 @@ from quanthus.platform.jobs import (
 )
 from quanthus.platform.manifest import FeatureManifest
 from quanthus.platform.observability import JsonFormatter, Metrics, request_id, request_id_context
+from quanthus.platform.p12.http import P12Endpoints, P12Runtime
 from quanthus.platform.persistence import (
     DuplicateRecordError,
     IdempotencyConflictError,
@@ -371,10 +372,12 @@ class PlatformHttpApp:
         data_catalog: DataIndicatorCatalog,
         candidate_approvals: CandidateApprovalService,
         metrics: Metrics,
+        p12_runtime: P12Runtime | None = None,
     ) -> None:
         self.manifest = manifest
         self._store = store
         self._identity = identity
+        self._p12 = P12Endpoints(p12_runtime)
         self._jobs = jobs
         self._replay_jobs = replay_jobs
         self._gate_query = gate_query
@@ -632,6 +635,104 @@ class PlatformHttpApp:
         )
         self._add("jobs.read", "/api/platform/v1/jobs/<job_id>", "GET", self._read_job)
         self._add("jobs.cancel", "/api/platform/v1/jobs/<job_id>/cancel", "POST", self._cancel_job)
+        self._add("p12.accounts.list", "/api/p12/v1/accounts", "GET", self._p12_accounts)
+        self._add(
+            "p12.workbench.read",
+            "/api/p12/v1/accounts/<account_id>/workbench",
+            "GET",
+            self._p12_workbench,
+        )
+        self._add(
+            "p12.records.read",
+            "/api/p12/v1/accounts/<account_id>/records",
+            "GET",
+            self._p12_records,
+        )
+        self._add(
+            "p12.funding.read",
+            "/api/p12/v1/accounts/<account_id>/funding-rules",
+            "GET",
+            self._p12_funding_rules,
+        )
+        self._add(
+            "p12.reports.submit",
+            "/api/p12/v1/accounts/<account_id>/execution-reports",
+            "POST",
+            self._p12_submit_fill,
+        )
+        self._add(
+            "p12.facts.correct",
+            "/api/p12/v1/accounts/<account_id>/fact-corrections",
+            "POST",
+            self._p12_correct_fill,
+        )
+
+    def _p12_accounts(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.accounts(principal, observed_request.request_id)
+        return _json_response(payload, status)
+
+    def _p12_workbench(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.workbench(
+            principal,
+            params["account_id"],
+            observed_request.query_string,
+            observed_request.request_id,
+        )
+        return _json_response(payload, status)
+
+    def _p12_records(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.records(
+            principal,
+            params["account_id"],
+            observed_request.query_string,
+            observed_request.request_id,
+        )
+        return _json_response(payload, status)
+
+    def _p12_funding_rules(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.funding_rules(
+            principal,
+            params["account_id"],
+            observed_request.query_string,
+            observed_request.request_id,
+        )
+        return _json_response(payload, status)
+
+    def _p12_submit_fill(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:report")
+        status, payload = self._p12.submit_fill(
+            principal,
+            params["account_id"],
+            observed_request.json_object(),
+            observed_request.request_id,
+        )
+        return _json_response(payload, status)
+
+    def _p12_correct_fill(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:report")
+        status, payload = self._p12.correct_fill(
+            principal,
+            params["account_id"],
+            observed_request.json_object(),
+            observed_request.request_id,
+        )
+        return _json_response(payload, status)
 
     def _structure_mvp_qualification_health(self) -> dict[str, Any] | None:
         enabled = os.environ.get(_STRUCTURE_MVP_HEALTH_PROBE_ENV, "0").strip()
@@ -1270,6 +1371,7 @@ def create_http_app(
     data_catalog: DataIndicatorCatalog,
     candidate_approvals: CandidateApprovalService,
     metrics: Metrics,
+    p12_runtime: P12Runtime | None = None,
 ) -> PlatformHttpApp:
     return PlatformHttpApp(
         manifest=manifest,
@@ -1285,4 +1387,5 @@ def create_http_app(
         data_catalog=data_catalog,
         candidate_approvals=candidate_approvals,
         metrics=metrics,
+        p12_runtime=p12_runtime,
     )

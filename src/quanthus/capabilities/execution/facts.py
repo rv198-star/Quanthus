@@ -76,10 +76,13 @@ class ExecutionReport:
     source_sequence: str
     intended_quantity: int
     intended_price_cap: Decimal
+    suggestion_id: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("report_id", "security_code", "source_id", "source_sequence"):
             _text(getattr(self, name), name)
+        if self.suggestion_id is not None:
+            _text(self.suggestion_id, "suggestion_id")
         if self.side != "buy":
             raise FactError("UNSUPPORTED_FACT", "slice supports confirmed buys")
         _quantity(self.quantity)
@@ -107,7 +110,7 @@ class ExecutionReport:
         return tuple(result)
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "report_id": self.report_id,
             "security_code": self.security_code,
             "side": self.side,
@@ -120,6 +123,11 @@ class ExecutionReport:
             "intended_quantity": self.intended_quantity,
             "intended_price_cap": format(self.intended_price_cap.quantize(Decimal("0.01")), "f"),
         }
+        # Optional plan link (contract `suggestion_id?`); omitted when absent so earlier
+        # synthetic receipts keep their original payload digest.
+        if self.suggestion_id is not None:
+            payload["suggestion_id"] = self.suggestion_id
+        return payload
 
 
 def validate_report(report: ExecutionReport) -> ExecutionReport:

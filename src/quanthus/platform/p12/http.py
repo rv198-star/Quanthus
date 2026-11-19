@@ -201,3 +201,23 @@ class P12Endpoints:
             return payload
 
         return self._run(request_id, call)
+
+    def submit_order_event(
+        self,
+        principal: AuthenticatedPrincipal,
+        account_id: str,
+        body: dict[str, Any],
+        request_id: str,
+        query_string: str = "",
+    ) -> Result:
+        def call(runtime: P12Runtime) -> dict[str, Any]:
+            binding = runtime.binding_for(principal, account_id)
+            self._scope_query(binding, query_string)
+            command = _transport().parse_order_event(body)
+            app = binding.application
+            payload: dict[str, Any] = _transport().outcome_dto(
+                app.submit_order_event(app.scope, command)
+            )
+            return payload
+
+        return self._run(request_id, call)

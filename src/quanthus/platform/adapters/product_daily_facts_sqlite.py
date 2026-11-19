@@ -17,12 +17,19 @@ from quanthus.capabilities.accounting import (
     Posting,
     apply_buy_delta,
     apply_correction_delta,
+    apply_sell_delta,
 )
 from quanthus.capabilities.execution import (
+    BASELINE_COVERAGE_UNKNOWN,
+    FINAL_FILL_GAP,
     Correction,
     ExecutionReport,
+    FeeAssessment,
+    OrderObservation,
     SyntheticContext,
     baseline_coverage_gap,
+    coverage_gap_at,
+    effective_order_state,
     validate_context,
 )
 from quanthus.product_daily.application.history import (
@@ -31,8 +38,11 @@ from quanthus.product_daily.application.history import (
     CurrentFact,
     FactHistory,
     LedgerEvent,
+    OrderRecord,
     PlanStatus,
     ReceivedCorrection,
+    ReceivedFeeAssessment,
+    ReceivedOrderObservation,
     ReceivedReport,
 )
 from quanthus.product_daily.application.models import (
@@ -111,7 +121,7 @@ class SQLiteSyntheticFactsAdapter:
             tables = connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
-            if version not in (0, 1) or (version == 0 and tables):
+            if version not in (0, 1, 2) or (version == 0 and tables):
                 raise FactError(
                     "STORE_SCHEMA_MISMATCH",
                     "unversioned candidate store is retained; use a fresh synthetic store",
@@ -134,6 +144,7 @@ class SQLiteSyntheticFactsAdapter:
                   account_id TEXT NOT NULL, mode TEXT NOT NULL, report_id TEXT NOT NULL,
                   payload_digest TEXT NOT NULL, receipt_id TEXT NOT NULL,
                   payload_json TEXT NOT NULL, received_at TEXT NOT NULL,
+                  kind TEXT NOT NULL DEFAULT 'fill',
                   status TEXT NOT NULL, result_json TEXT, PRIMARY KEY(account_id, mode, report_id));
                 CREATE TABLE IF NOT EXISTS conflicts(
                   account_id TEXT NOT NULL, mode TEXT NOT NULL, identity TEXT NOT NULL,
@@ -152,7 +163,25 @@ class SQLiteSyntheticFactsAdapter:
                   account_id TEXT NOT NULL, mode TEXT NOT NULL, fact_id TEXT NOT NULL,
                   security_code TEXT NOT NULL, quantity INTEGER NOT NULL, price TEXT NOT NULL,
                   confirmed_fee TEXT NOT NULL, fact_revision INTEGER NOT NULL,
+                  side TEXT NOT NULL DEFAULT 'buy', order_id TEXT,
                   PRIMARY KEY(account_id, mode, fact_id));
+                CREATE TABLE IF NOT EXISTS order_states(
+                  account_id TEXT NOT NULL, mode TEXT NOT NULL, order_id TEXT NOT NULL,
+                  security_code TEXT NOT NULL, side TEXT NOT NULL,
+                  accepted_total_qty INTEGER NOT NULL, price_bound TEXT NOT NULL,
+                  estimated_fee_upper TEXT NOT NULL,
+                  known_fill_qty INTEGER NOT NULL DEFAULT 0,
+                  status TEXT NOT NULL, order_state_revision INTEGER NOT NULL DEFAULT 0,
+                  final_cumulative_fill_qty INTEGER, cancelled_qty INTEGER,
+                  needs_reconciliation INTEGER NOT NULL DEFAULT 0,
+                  reason_codes_json TEXT NOT NULL DEFAULT '[]',
+                  last_observation_id TEXT,
+                  PRIMARY KEY(account_id, mode, order_id));
+                CREATE TABLE IF NOT EXISTS order_fees(
+                  account_id TEXT NOT NULL, mode TEXT NOT NULL, fee_id TEXT NOT NULL,
+                  order_id TEXT NOT NULL, amount TEXT NOT NULL,
+                  occurred_at TEXT NOT NULL,
+                  PRIMARY KEY(account_id, mode, fee_id));
                 CREATE TABLE IF NOT EXISTS source_facts(
                   account_id TEXT NOT NULL, mode TEXT NOT NULL, source_fact_id TEXT NOT NULL,
                   report_receipt_id TEXT NOT NULL, PRIMARY KEY(account_id, mode, source_fact_id));
@@ -174,13 +203,30 @@ class SQLiteSyntheticFactsAdapter:
                   account_id TEXT NOT NULL, mode TEXT NOT NULL, binding_digest TEXT NOT NULL,
                   binding_json TEXT NOT NULL, recorded_at TEXT NOT NULL,
                   PRIMARY KEY(account_id, mode));
-                PRAGMA user_version=1;
+                PRAGMA user_version=2;
                 CREATE TABLE IF NOT EXISTS outbox(
                   outbox_id INTEGER PRIMARY KEY AUTOINCREMENT, account_id TEXT NOT NULL,
                   mode TEXT NOT NULL, event_id TEXT NOT NULL, payload_json TEXT NOT NULL,
                   delivered_at TEXT);
                 """
             )
+            # Upgrade a version-1 store in place; existing facts stay order-less buys.
+            inbox_cols = {
+                r[1] for r in connection.execute("PRAGMA table_info(inbox)").fetchall()
+            }
+            if "kind" not in inbox_cols:
+                connection.execute(
+                    "ALTER TABLE inbox ADD COLUMN kind TEXT NOT NULL DEFAULT 'fill'"
+                )
+            fact_cols = {
+                r[1] for r in connection.execute("PRAGMA table_info(facts)").fetchall()
+            }
+            if "side" not in fact_cols:
+                connection.execute(
+                    "ALTER TABLE facts ADD COLUMN side TEXT NOT NULL DEFAULT 'buy'"
+                )
+            if "order_id" not in fact_cols:
+                connection.execute("ALTER TABLE facts ADD COLUMN order_id TEXT")
 
     def establish_baseline(self, baseline: Baseline) -> AccountProjection:
         context = baseline.context
@@ -280,7 +326,7 @@ class SQLiteSyntheticFactsAdapter:
                     )
                 receipt_id = "receipt-" + self._identity(context, "report", report.report_id)
                 connection.execute(
-                    "INSERT INTO inbox VALUES(?,?,?,?,?,?,?,?,NULL)",
+                    "INSERT INTO inbox VALUES(?,?,?,?,?,?,?,?,?,NULL)",
                     (
                         context.account_id,
                         context.mode,
@@ -289,6 +335,7 @@ class SQLiteSyntheticFactsAdapter:
                         receipt_id,
                         json.dumps(report.to_dict(), sort_keys=True),
                         self._timestamp(),
+                        "fill",
                         "RECEIVED",
                     ),
                 )
@@ -335,13 +382,28 @@ class SQLiteSyntheticFactsAdapter:
                 if gap is not None:
                     raise FactError(gap, "fact predates the takeover snapshot without coverage")
                 current = self._projection(connection, context)
-                updated, postings = apply_buy_delta(
-                    current,
-                    security_code=report.security_code,
-                    quantity=report.quantity,
-                    price=report.price,
-                    fee=report.confirmed_fee,
-                )
+                sell_cost_basis: Decimal | None = None
+                if report.side == "sell":
+                    sell_cost_basis = self._cost_basis(
+                        connection, context, report.security_code, report.quantity
+                    )
+                    impact = apply_sell_delta(
+                        current,
+                        security_code=report.security_code,
+                        quantity=report.quantity,
+                        price=report.price,
+                        fee=report.confirmed_fee,
+                        cost_basis=sell_cost_basis,
+                    )
+                    updated, postings = impact.projection, impact.postings
+                else:
+                    updated, postings = apply_buy_delta(
+                        current,
+                        security_code=report.security_code,
+                        quantity=report.quantity,
+                        price=report.price,
+                        fee=report.confirmed_fee,
+                    )
                 affected = self._plans(connection, context)
                 event_id = "fill:" + self._identity(context, "report", report.report_id)
                 event_json = json.dumps(
@@ -351,8 +413,13 @@ class SQLiteSyntheticFactsAdapter:
                         "receipt_id": receipt.receipt_id,
                         "affected_plans": list(affected),
                         "security_code": report.security_code,
+                        "side": report.side,
+                        "order_id": report.order_id,
                         "quantity": report.quantity,
                         "price": format(report.price, "f"),
+                        "cost_basis": (
+                            None if sell_cost_basis is None else format(sell_cost_basis, "f")
+                        ),
                         "confirmed_fee": format(report.confirmed_fee, "f"),
                         "occurred_at": report.occurred_at.isoformat(),
                         "received_at": inbox["received_at"],
@@ -376,7 +443,7 @@ class SQLiteSyntheticFactsAdapter:
                     self._fault_hook("after_fact_event_before_projection")
                 self._write_projection(connection, context, updated)
                 connection.execute(
-                    "INSERT INTO facts VALUES(?,?,?,?,?,?,?,?)",
+                    "INSERT INTO facts VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (
                         context.account_id,
                         context.mode,
@@ -386,12 +453,15 @@ class SQLiteSyntheticFactsAdapter:
                         format(report.price, "f"),
                         format(report.confirmed_fee, "f"),
                         1,
+                        report.side,
+                        report.order_id,
                     ),
                 )
                 connection.execute(
                     "INSERT INTO source_facts VALUES(?,?,?,?)",
                     (context.account_id, context.mode, report.source_fact_id, receipt.receipt_id),
                 )
+                self._apply_fill_to_order(connection, context, report)
                 self._outbox(
                     connection,
                     context,
@@ -420,6 +490,11 @@ class SQLiteSyntheticFactsAdapter:
                     "SOURCE_FACT_DUPLICATE",
                     "INSUFFICIENT_CASH",
                     "BASELINE_COVERAGE_UNKNOWN",
+                    "NEGATIVE_POSITION",
+                    "POSITION_MISMATCH",
+                    "UNKNOWN_ORDER_EXPOSURE",
+                    "ORDER_CONTEXT_MISMATCH",
+                    FINAL_FILL_GAP,
                 }:
                     raise
                 with self._connect() as pending:
@@ -441,6 +516,396 @@ class SQLiteSyntheticFactsAdapter:
                             context.account_id,
                             context.mode,
                             report.report_id,
+                        ),
+                    )
+                    pending.commit()
+                return result
+            except Exception:
+                connection.rollback()
+                raise
+
+    # ---- order observations and fees ------------------------------------------------
+    def _receive_kind(
+        self,
+        context: SyntheticContext,
+        *,
+        kind: str,
+        identity: str,
+        payload: dict[str, object],
+    ) -> Receipt:
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._require_baseline(connection, context)
+                row = connection.execute(
+                    "SELECT * FROM inbox WHERE account_id=? AND mode=? AND report_id=?",
+                    (context.account_id, context.mode, identity),
+                ).fetchone()
+                digest_value = digest(payload)
+                if row is not None:
+                    if row["payload_digest"] == digest_value:
+                        connection.commit()
+                        return Receipt(row["receipt_id"], "DUPLICATE", digest_value)
+                    connection.execute(
+                        "INSERT OR IGNORE INTO conflicts VALUES(?,?,?,?,?,?)",
+                        (
+                            context.account_id,
+                            context.mode,
+                            self._identity(context, kind, identity),
+                            row["payload_digest"],
+                            digest_value,
+                            json.dumps(payload, sort_keys=True),
+                        ),
+                    )
+                    connection.commit()
+                    return Receipt(
+                        row["receipt_id"],
+                        "IDEMPOTENCY_CONFLICT",
+                        row["payload_digest"],
+                        ("REPORT_ID_PAYLOAD_CONFLICT",),
+                    )
+                receipt_id = "receipt-" + self._identity(context, kind, identity)
+                connection.execute(
+                    "INSERT INTO inbox VALUES(?,?,?,?,?,?,?,?,?,NULL)",
+                    (
+                        context.account_id,
+                        context.mode,
+                        identity,
+                        digest_value,
+                        receipt_id,
+                        json.dumps(payload, sort_keys=True),
+                        self._timestamp(),
+                        kind,
+                        "RECEIVED",
+                    ),
+                )
+                connection.commit()
+                return Receipt(receipt_id, "RECEIVED")
+            except Exception:
+                connection.rollback()
+                raise
+
+    def _check_source(
+        self, connection: sqlite3.Connection, context: SyntheticContext,
+        source_id: str, source_sequence: str, receipt_id: str,
+    ) -> None:
+        duplicate = connection.execute(
+            "SELECT report_receipt_id FROM source_facts "
+            "WHERE account_id=? AND mode=? AND source_fact_id=?",
+            (context.account_id, context.mode, digest([source_id, source_sequence])),
+        ).fetchone()
+        if duplicate is not None and duplicate[0] != receipt_id:
+            raise FactError("SOURCE_FACT_DUPLICATE", "source fact already posted")
+        connection.execute(
+            "INSERT INTO source_facts VALUES(?,?,?,?)",
+            (context.account_id, context.mode, digest([source_id, source_sequence]), receipt_id),
+        )
+
+    def receive_order_observation(
+        self, context: SyntheticContext, observation: OrderObservation
+    ) -> Receipt:
+        return self._receive_kind(
+            context,
+            kind="order_observation",
+            identity=observation.observation_id,
+            payload=observation.to_dict(),
+        )
+
+    def post_order_observation(
+        self,
+        context: SyntheticContext,
+        receipt: Receipt,
+        observation: OrderObservation,
+        accepted_total_qty: int,
+        side: str,
+        security_code: str,
+        price_bound: Decimal,
+        estimated_fee_upper: Decimal,
+    ) -> SubmissionResult:
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                inbox = connection.execute(
+                    "SELECT * FROM inbox WHERE account_id=? AND mode=? AND receipt_id=?",
+                    (context.account_id, context.mode, receipt.receipt_id),
+                ).fetchone()
+                if inbox is None or inbox["payload_digest"] != digest(observation.to_dict()):
+                    raise FactError("IDEMPOTENCY_CONFLICT", "receipt payload differs")
+                if inbox["status"] == "POSTED":
+                    stored = json.loads(inbox["result_json"])
+                    connection.commit()
+                    return SubmissionResult(
+                        receipt.receipt_id,
+                        "POSTED",
+                        self._projection_from_dict(stored["projection"]),
+                    )
+                self._check_source(
+                    connection, context, observation.source_id,
+                    observation.source_sequence, receipt.receipt_id,
+                )
+                baseline_row = connection.execute(
+                    "SELECT as_of FROM baselines WHERE account_id=? AND mode=?",
+                    (context.account_id, context.mode),
+                ).fetchone()
+                gap = coverage_gap_at(
+                    observation.observed_at, datetime.fromisoformat(baseline_row["as_of"])
+                )
+                if gap is not None:
+                    raise FactError(gap, "observation predates the baseline without coverage")
+
+                order = self._order_state_row(connection, context, observation.order_id)
+                if order is None:
+                    connection.execute(
+                        "INSERT INTO order_states "
+                        "(account_id,mode,order_id,security_code,side,accepted_total_qty,"
+                        "price_bound,estimated_fee_upper,known_fill_qty,status,"
+                        "order_state_revision,last_observation_id) "
+                        "VALUES(?,?,?,?,?,?,?,?,0,'open',0,?)",
+                        (
+                            context.account_id,
+                            context.mode,
+                            observation.order_id,
+                            security_code,
+                            side,
+                            accepted_total_qty,
+                            format(price_bound, "f"),
+                            format(estimated_fee_upper, "f"),
+                            observation.observation_id,
+                        ),
+                    )
+                else:
+                    connection.execute(
+                        "UPDATE order_states SET last_observation_id=? "
+                        "WHERE account_id=? AND mode=? AND order_id=?",
+                        (
+                            observation.observation_id,
+                            context.account_id,
+                            context.mode,
+                            observation.order_id,
+                        ),
+                    )
+                self._refresh_order_state(connection, context, observation.order_id, observation)
+
+                event_id = "observation:" + self._identity(
+                    context, "order_observation", observation.observation_id
+                )
+                current = self._projection(connection, context)
+                updated = AccountProjection(
+                    current.revision,
+                    current.event_sequence + 1,
+                    current.cash,
+                    current.positions,
+                    current.fact_count,
+                )
+                event_json = json.dumps(
+                    {
+                        "kind": "order_observation",
+                        "fact_id": observation.observation_id,
+                        "receipt_id": receipt.receipt_id,
+                        "order_id": observation.order_id,
+                        "status": observation.status,
+                        "final_cumulative_fill_qty": observation.final_cumulative_fill_qty,
+                        "cancelled_qty": observation.cancelled_qty,
+                        "observed_at": observation.observed_at.isoformat(),
+                        "received_at": inbox["received_at"],
+                        "recorded_at": self._timestamp(),
+                        "quantity": 0,
+                    },
+                    sort_keys=True,
+                )
+                connection.execute(
+                    "INSERT INTO events VALUES(?,?,?,?,?,?)",
+                    (
+                        context.account_id,
+                        context.mode,
+                        event_id,
+                        updated.event_sequence,
+                        updated.revision,
+                        event_json,
+                    ),
+                )
+                self._write_projection(connection, context, updated)
+                result = SubmissionResult(
+                    receipt.receipt_id,
+                    "POSTED",
+                    updated,
+                    (),
+                    affected_plans=(),
+                )
+                self._store_submission(connection, inbox, result)
+                connection.commit()
+                return result
+            except FactError as exc:
+                connection.rollback()
+                if exc.reason_code not in {
+                    "SOURCE_FACT_DUPLICATE",
+                    "BASELINE_COVERAGE_UNKNOWN",
+                    FINAL_FILL_GAP,
+                    "ORDER_STATE_GAP",
+                }:
+                    raise
+                with self._connect() as pending:
+                    pending.execute("BEGIN IMMEDIATE")
+                    current = self._projection(pending, context)
+                    result = SubmissionResult(
+                        receipt.receipt_id,
+                        "NEEDS_RECONCILIATION",
+                        current,
+                        (),
+                        (exc.reason_code,),
+                    )
+                    pending.execute(
+                        "UPDATE inbox SET status='NEEDS_RECONCILIATION', result_json=? "
+                        "WHERE account_id=? AND mode=? AND report_id=?",
+                        (
+                            json.dumps(self._submission_dict(result), sort_keys=True),
+                            context.account_id,
+                            context.mode,
+                            observation.observation_id,
+                        ),
+                    )
+                    pending.commit()
+                return result
+            except Exception:
+                connection.rollback()
+                raise
+
+    def receive_fee_assessment(
+        self, context: SyntheticContext, fee: FeeAssessment
+    ) -> Receipt:
+        return self._receive_kind(
+            context,
+            kind="fee",
+            identity=fee.fee_id,
+            payload=fee.to_dict(),
+        )
+
+    def post_fee_assessment(
+        self, context: SyntheticContext, receipt: Receipt, fee: FeeAssessment
+    ) -> SubmissionResult:
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                inbox = connection.execute(
+                    "SELECT * FROM inbox WHERE account_id=? AND mode=? AND receipt_id=?",
+                    (context.account_id, context.mode, receipt.receipt_id),
+                ).fetchone()
+                if inbox is None or inbox["payload_digest"] != digest(fee.to_dict()):
+                    raise FactError("IDEMPOTENCY_CONFLICT", "receipt payload differs")
+                if inbox["status"] == "POSTED":
+                    stored = json.loads(inbox["result_json"])
+                    connection.commit()
+                    return SubmissionResult(
+                        receipt.receipt_id,
+                        "POSTED",
+                        self._projection_from_dict(stored["projection"]),
+                    )
+                self._check_source(
+                    connection, context, fee.source_id, fee.source_sequence, receipt.receipt_id
+                )
+                baseline_row = connection.execute(
+                    "SELECT as_of FROM baselines WHERE account_id=? AND mode=?",
+                    (context.account_id, context.mode),
+                ).fetchone()
+                gap = coverage_gap_at(
+                    fee.occurred_at, datetime.fromisoformat(baseline_row["as_of"])
+                )
+                if gap is not None:
+                    raise FactError(gap, "fee predates the baseline without coverage")
+                order = self._order_state_row(connection, context, fee.order_id)
+                if order is None:
+                    raise FactError("UNKNOWN_ORDER_EXPOSURE", "fee references an unknown order")
+                current = self._projection(connection, context)
+                cash = (current.cash - fee.amount).quantize(Decimal("0.01"))
+                if cash < 0:
+                    raise FactError("INSUFFICIENT_CASH", "confirmed fee exceeds cash")
+                updated = AccountProjection(
+                    current.revision + 1,
+                    current.event_sequence + 1,
+                    cash,
+                    current.positions,
+                    current.fact_count + 1,
+                )
+                event_id = "fee:" + self._identity(context, "fee", fee.fee_id)
+                event_json = json.dumps(
+                    {
+                        "kind": "fee",
+                        "fact_id": fee.fee_id,
+                        "receipt_id": receipt.receipt_id,
+                        "order_id": fee.order_id,
+                        "amount": format(fee.amount, "f"),
+                        "occurred_at": fee.occurred_at.isoformat(),
+                        "received_at": inbox["received_at"],
+                        "recorded_at": self._timestamp(),
+                        "quantity": 0,
+                    },
+                    sort_keys=True,
+                )
+                connection.execute(
+                    "INSERT INTO events VALUES(?,?,?,?,?,?)",
+                    (
+                        context.account_id,
+                        context.mode,
+                        event_id,
+                        updated.event_sequence,
+                        updated.revision,
+                        event_json,
+                    ),
+                )
+                self._insert_postings(
+                    connection,
+                    event_id,
+                    (
+                        Posting("ASSET_CASH", -fee.amount),
+                        Posting("EXPENSE_CONFIRMED_FEE", fee.amount),
+                    ),
+                )
+                self._write_projection(connection, context, updated)
+                connection.execute(
+                    "INSERT INTO order_fees VALUES(?,?,?,?,?,?)",
+                    (
+                        context.account_id,
+                        context.mode,
+                        fee.fee_id,
+                        fee.order_id,
+                        format(fee.amount, "f"),
+                        fee.occurred_at.isoformat(),
+                    ),
+                )
+                self._refresh_order_state(connection, context, fee.order_id)
+                result = SubmissionResult(
+                    receipt.receipt_id, "POSTED", updated, (), affected_plans=()
+                )
+                self._store_submission(connection, inbox, result)
+                connection.commit()
+                return result
+            except FactError as exc:
+                connection.rollback()
+                if exc.reason_code not in {
+                    "SOURCE_FACT_DUPLICATE",
+                    "INSUFFICIENT_CASH",
+                    "BASELINE_COVERAGE_UNKNOWN",
+                    "UNKNOWN_ORDER_EXPOSURE",
+                }:
+                    raise
+                with self._connect() as pending:
+                    pending.execute("BEGIN IMMEDIATE")
+                    current = self._projection(pending, context)
+                    result = SubmissionResult(
+                        receipt.receipt_id,
+                        "NEEDS_RECONCILIATION",
+                        current,
+                        (),
+                        (exc.reason_code,),
+                    )
+                    pending.execute(
+                        "UPDATE inbox SET status='NEEDS_RECONCILIATION', result_json=? "
+                        "WHERE account_id=? AND mode=? AND report_id=?",
+                        (
+                            json.dumps(self._submission_dict(result), sort_keys=True),
+                            context.account_id,
+                            context.mode,
+                            fee.fee_id,
                         ),
                     )
                     pending.commit()
@@ -711,12 +1176,40 @@ class SQLiteSyntheticFactsAdapter:
             ):
                 event = json.loads(row["event_json"])
                 if event["kind"] == "fill":
-                    projection, _ = apply_buy_delta(
-                        projection,
-                        security_code=event["security_code"],
-                        quantity=event["quantity"],
-                        price=Decimal(event["price"]),
-                        fee=Decimal(event["confirmed_fee"]),
+                    if event.get("side", "buy") == "sell":
+                        impact = apply_sell_delta(
+                            projection,
+                            security_code=event["security_code"],
+                            quantity=event["quantity"],
+                            price=Decimal(event["price"]),
+                            fee=Decimal(event["confirmed_fee"]),
+                            cost_basis=Decimal(event["cost_basis"]),
+                        )
+                        projection = impact.projection
+                    else:
+                        projection, _ = apply_buy_delta(
+                            projection,
+                            security_code=event["security_code"],
+                            quantity=event["quantity"],
+                            price=Decimal(event["price"]),
+                            fee=Decimal(event["confirmed_fee"]),
+                        )
+                elif event["kind"] == "fee":
+                    updated = AccountProjection(
+                        projection.revision + 1,
+                        projection.event_sequence + 1,
+                        (projection.cash - Decimal(event["amount"])).quantize(Decimal("0.01")),
+                        projection.positions,
+                        projection.fact_count + 1,
+                    )
+                    projection = updated
+                elif event["kind"] == "order_observation":
+                    projection = AccountProjection(
+                        projection.revision,
+                        projection.event_sequence + 1,
+                        projection.cash,
+                        projection.positions,
+                        projection.fact_count,
                     )
                 else:
                     projection, _ = apply_correction_delta(
@@ -803,7 +1296,7 @@ class SQLiteSyntheticFactsAdapter:
             raise FactError("BASELINE_NOT_FOUND", "baseline is unavailable")
         reports = []
         for row in connection.execute(
-            "SELECT * FROM inbox WHERE account_id=? AND mode=? ORDER BY rowid",
+            "SELECT * FROM inbox WHERE account_id=? AND mode=? AND kind='fill' ORDER BY rowid",
             (context.account_id, context.mode),
         ):
             raw = json.loads(row["payload_json"])
@@ -821,6 +1314,7 @@ class SQLiteSyntheticFactsAdapter:
                 int(raw["intended_quantity"]),
                 Decimal(raw["intended_price_cap"]),
                 raw.get("suggestion_id"),
+                raw.get("order_id"),
             )
             reports.append(
                 ReceivedReport(
@@ -839,6 +1333,7 @@ class SQLiteSyntheticFactsAdapter:
                     suggestion_id=report.suggestion_id,
                     deviations=report.deviations,
                     conflicts=tuple(stored.get("conflicts", ())),
+                    order_id=report.order_id,
                 )
             )
         facts = tuple(
@@ -900,7 +1395,7 @@ class SQLiteSyntheticFactsAdapter:
                     quantity_delta=int(
                         event["quantity"]
                         if event["kind"] == "fill"
-                        else event["quantity_delta"]
+                        else event.get("quantity_delta", event.get("quantity", 0))
                     ),
                     recorded_at=event["recorded_at"],
                 )
@@ -909,6 +1404,105 @@ class SQLiteSyntheticFactsAdapter:
             PlanStatus(row["plan_id"], row["status"], int(row["based_on_revision"]))
             for row in connection.execute(
                 "SELECT * FROM dependent_plans WHERE account_id=? AND mode=? ORDER BY plan_id",
+                (context.account_id, context.mode),
+            )
+        )
+        order_rows = connection.execute(
+            "SELECT * FROM order_states WHERE account_id=? AND mode=? ORDER BY order_id",
+            (context.account_id, context.mode),
+        ).fetchall()
+        orders = []
+        for row in order_rows:
+            fees = self._order_fees(connection, context, row["order_id"])
+            fee_total = sum((f.amount for f in fees), Decimal("0"))
+            state = effective_order_state(
+                order_id=row["order_id"],
+                side=row["side"],
+                accepted_total_qty=int(row["accepted_total_qty"]),
+                price_bound=Decimal(row["price_bound"]),
+                known_fill_qty=int(row["known_fill_qty"]),
+                latest_observation=None,
+                confirmed_fees=fees,
+                estimated_fee_upper=Decimal(row["estimated_fee_upper"]),
+            )
+            status = row["status"]
+            needs = bool(row["needs_reconciliation"])
+            reasons = tuple(json.loads(row["reason_codes_json"]))
+            if status == "terminal":
+                unreported = max(
+                    0, int(row["final_cumulative_fill_qty"]) - int(row["known_fill_qty"])
+                )
+                hold_amount = (
+                    Decimal(unreported) * Decimal(row["price_bound"])
+                    + max(Decimal("0"), Decimal(row["estimated_fee_upper"]) - fee_total)
+                ).quantize(Decimal("0.01"))
+            else:
+                hold_amount = (
+                    Decimal(int(row["accepted_total_qty"]) - int(row["known_fill_qty"]))
+                    * Decimal(row["price_bound"])
+                    + max(Decimal("0"), Decimal(row["estimated_fee_upper"]) - fee_total)
+                ).quantize(Decimal("0.01"))
+            if row["side"] == "sell":
+                hold_amount = Decimal("0.00")
+            orders.append(
+                OrderRecord(
+                    order_id=row["order_id"],
+                    security_code=row["security_code"],
+                    side=row["side"],
+                    price_bound=Decimal(row["price_bound"]),
+                    accepted_total_qty=int(row["accepted_total_qty"]),
+                    known_fill_qty=int(row["known_fill_qty"]),
+                    unreported_fill_qty=(
+                        max(0, int(row["final_cumulative_fill_qty"] or 0) - int(row["known_fill_qty"]))
+                        if status == "terminal"
+                        else 0
+                    ),
+                    hold_qty=(
+                        max(0, int(row["final_cumulative_fill_qty"] or 0) - int(row["known_fill_qty"]))
+                        if status == "terminal"
+                        else int(row["accepted_total_qty"]) - int(row["known_fill_qty"])
+                    ),
+                    hold_amount=hold_amount,
+                    status=status,
+                    needs_reconciliation=needs,
+                    reason_codes=reasons,
+                    fee_confirmed_total=fee_total.quantize(Decimal("0.01")),
+                    settlement_ready=(
+                        status == "terminal" and not needs and int(row["known_fill_qty"]) > 0
+                    ),
+                )
+            )
+        observations = tuple(
+            ReceivedOrderObservation(
+                observation_id=row["report_id"],
+                receipt_id=row["receipt_id"],
+                order_id=json.loads(row["payload_json"])["order_id"],
+                status=json.loads(row["payload_json"])["status"],
+                observed_at=json.loads(row["payload_json"])["observed_at"],
+                final_cumulative_fill_qty=json.loads(row["payload_json"])[
+                    "final_cumulative_fill_qty"
+                ],
+                cancelled_qty=json.loads(row["payload_json"])["cancelled_qty"],
+                order_revision=int(json.loads(row["payload_json"])["order_revision"]),
+                store_status=row["status"],
+            )
+            for row in connection.execute(
+                "SELECT * FROM inbox WHERE account_id=? AND mode=? AND kind='order_observation' "
+                "ORDER BY rowid",
+                (context.account_id, context.mode),
+            )
+        )
+        fees_received = tuple(
+            ReceivedFeeAssessment(
+                fee_id=row["report_id"],
+                receipt_id=row["receipt_id"],
+                order_id=json.loads(row["payload_json"])["order_id"],
+                amount=Decimal(json.loads(row["payload_json"])["amount"]),
+                occurred_at=json.loads(row["payload_json"])["occurred_at"],
+                store_status=row["status"],
+            )
+            for row in connection.execute(
+                "SELECT * FROM inbox WHERE account_id=? AND mode=? AND kind='fee' ORDER BY rowid",
                 (context.account_id, context.mode),
             )
         )
@@ -930,6 +1524,9 @@ class SQLiteSyntheticFactsAdapter:
             corrections=tuple(corrections),
             events=tuple(events),
             plans=plans,
+            orders=tuple(orders),
+            observations=observations,
+            fees=fees_received,
             outbox_pending=int(pending),
         )
 
@@ -1004,6 +1601,144 @@ class SQLiteSyntheticFactsAdapter:
                 "INSERT INTO postings VALUES(?,?,?,?)",
                 (event_id, index, posting.account, format(posting.amount, "f")),
             )
+
+    def _cost_basis(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        security_code: str,
+        sell_quantity: int,
+    ) -> Decimal:
+        """Weighted-average cost of the sold quantity from posted buy facts + baseline.
+
+        A baseline-held position joins at the average posted buy price; with no buy
+        facts at all the sell stays received and unreconciled instead of inventing
+        a cost.
+        """
+        baseline = connection.execute(
+            "SELECT quantity, security_code FROM baselines WHERE account_id=? AND mode=?",
+            (context.account_id, context.mode),
+        ).fetchone()
+        buy_rows = connection.execute(
+            "SELECT quantity, price FROM facts "
+            "WHERE account_id=? AND mode=? AND security_code=? AND side='buy' ORDER BY rowid",
+            (context.account_id, context.mode, security_code),
+        ).fetchall()
+        posted_qty = sum(int(r["quantity"]) for r in buy_rows)
+        posted_principal = sum(Decimal(r["price"]) * int(r["quantity"]) for r in buy_rows)
+        total_qty = posted_qty
+        principal = posted_principal
+        if baseline is not None and baseline["security_code"] == security_code:
+            base_qty = int(baseline["quantity"])
+            total_qty += base_qty
+            if posted_qty:
+                principal += (posted_principal / posted_qty) * base_qty
+        if total_qty == 0:
+            raise FactError("POSITION_MISMATCH", "sell has no posted position")
+        if baseline is not None and baseline["security_code"] == security_code and not buy_rows:
+            # Baseline cost is unknown in the synthetic slice; carry the position at
+            # zero basis and let the account view mark the cost as unknown.
+            return Decimal("0.00")
+        unit = (principal / Decimal(total_qty)).quantize(Decimal("0.0001"))
+        return (unit * sell_quantity).quantize(Decimal("0.01"))
+
+    def _order_fees(
+        self, connection: sqlite3.Connection, context: SyntheticContext, order_id: str
+    ) -> tuple[FeeAssessment, ...]:
+        return tuple(
+            FeeAssessment(
+                r["fee_id"], r["order_id"], Decimal(r["amount"]),
+                "stored", r["fee_id"], datetime.fromisoformat(r["occurred_at"]),
+            )
+            for r in connection.execute(
+                "SELECT * FROM order_fees WHERE account_id=? AND mode=? AND order_id=? "
+                "ORDER BY rowid",
+                (context.account_id, context.mode, order_id),
+            )
+        )
+
+    def _order_state_row(
+        self, connection: sqlite3.Connection, context: SyntheticContext, order_id: str
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            "SELECT * FROM order_states WHERE account_id=? AND mode=? AND order_id=?",
+            (context.account_id, context.mode, order_id),
+        ).fetchone()
+
+    def _refresh_order_state(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        order_id: str,
+        latest_observation: OrderObservation | None = None,
+    ) -> None:
+        row = self._order_state_row(connection, context, order_id)
+        if row is None:
+            return
+        obs = latest_observation
+        if obs is None and row["last_observation_id"] is not None:
+            obs_row = connection.execute(
+                "SELECT payload_json FROM inbox WHERE account_id=? AND mode=? AND report_id=?",
+                (context.account_id, context.mode, row["last_observation_id"]),
+            ).fetchone()
+            if obs_row is not None:
+                raw = json.loads(obs_row["payload_json"])
+                obs = OrderObservation(
+                    raw["observation_id"], raw["order_id"], raw["status"],
+                    datetime.fromisoformat(raw["observed_at"]), raw["source_id"],
+                    raw["source_sequence"], raw["final_cumulative_fill_qty"],
+                    raw["cancelled_qty"], raw["order_revision"],
+                    raw["expected_order_state_revision"],
+                )
+        state = effective_order_state(
+            order_id=order_id,
+            side=row["side"],
+            accepted_total_qty=int(row["accepted_total_qty"]),
+            price_bound=Decimal(row["price_bound"]),
+            known_fill_qty=int(row["known_fill_qty"]),
+            latest_observation=obs,
+            confirmed_fees=self._order_fees(connection, context, order_id),
+            estimated_fee_upper=Decimal(row["estimated_fee_upper"]),
+        )
+        connection.execute(
+            "UPDATE order_states SET status=?, order_state_revision=?, "
+            "final_cumulative_fill_qty=?, cancelled_qty=?, needs_reconciliation=?, "
+            "reason_codes_json=? WHERE account_id=? AND mode=? AND order_id=?",
+            (
+                state.status,
+                state.order_state_revision,
+                None if obs is None else obs.final_cumulative_fill_qty,
+                None if obs is None else obs.cancelled_qty,
+                1 if state.needs_reconciliation else 0,
+                json.dumps(list(state.reason_codes)),
+                context.account_id,
+                context.mode,
+                order_id,
+            ),
+        )
+
+    def _apply_fill_to_order(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        report: ExecutionReport,
+    ) -> None:
+        if report.order_id is None:
+            return
+        row = self._order_state_row(connection, context, report.order_id)
+        if row is None:
+            raise FactError("UNKNOWN_ORDER_EXPOSURE", "fill references an unknown order")
+        if row["security_code"] != report.security_code or row["side"] != report.side:
+            raise FactError("ORDER_CONTEXT_MISMATCH", "fill does not match its order")
+        known = int(row["known_fill_qty"]) + report.quantity
+        if known > int(row["accepted_total_qty"]):
+            raise FactError(FINAL_FILL_GAP, "fill exceeds the accepted order quantity")
+        connection.execute(
+            "UPDATE order_states SET known_fill_qty=? "
+            "WHERE account_id=? AND mode=? AND order_id=?",
+            (known, context.account_id, context.mode, report.order_id),
+        )
+        self._refresh_order_state(connection, context, report.order_id)
 
     def _current_chain(
         self, connection: sqlite3.Connection, context: SyntheticContext, fact: sqlite3.Row

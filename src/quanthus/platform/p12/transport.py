@@ -19,6 +19,7 @@ from quanthus.product_daily.application.desktop import (
     FundingRulesView,
     RecordsView,
     SubmitFill,
+    SubmitOrderEvent,
     WorkbenchView,
 )
 from quanthus.product_daily.application.desktop.views import (
@@ -295,6 +296,7 @@ def records_dto(value: RecordsView) -> dict[str, Any]:
                     "intended_price_cap": _money(item.report.intended_price_cap),
                     "deviations": _reasons(item.deviations),
                     "conflicts": _reasons(item.report.conflicts),
+                    "order_id": item.report.order_id,
                 }
                 for item in value.reports
             ],
@@ -348,6 +350,50 @@ def records_dto(value: RecordsView) -> dict[str, Any]:
                     "based_on_revision": item.based_on_revision,
                 }
                 for item in value.plans
+            ],
+            "orders": [
+                {
+                    "order_id": o.order_id,
+                    "security_code": o.security_code,
+                    "side": o.side,
+                    "price_bound": _money(o.price_bound),
+                    "accepted_total_qty": o.accepted_total_qty,
+                    "known_fill_qty": o.known_fill_qty,
+                    "unreported_fill_qty": o.unreported_fill_qty,
+                    "hold_qty": o.hold_qty,
+                    "hold_amount": _money(o.hold_amount),
+                    "status": o.status,
+                    "needs_reconciliation": o.needs_reconciliation,
+                    "reason_codes": _reasons(o.reason_codes),
+                    "fee_confirmed_total": _money(o.fee_confirmed_total),
+                    "settlement_ready": o.settlement_ready,
+                }
+                for o in value.orders
+            ],
+            "observations": [
+                {
+                    "observation_id": o.observation_id,
+                    "receipt_id": o.receipt_id,
+                    "order_id": o.order_id,
+                    "status": o.status,
+                    "observed_at": o.observed_at,
+                    "final_cumulative_fill_qty": o.final_cumulative_fill_qty,
+                    "cancelled_qty": o.cancelled_qty,
+                    "order_revision": o.order_revision,
+                    "store_status": o.store_status,
+                }
+                for o in history.observations
+            ],
+            "fees": [
+                {
+                    "fee_id": f.fee_id,
+                    "receipt_id": f.receipt_id,
+                    "order_id": f.order_id,
+                    "amount": _money(f.amount),
+                    "occurred_at": f.occurred_at,
+                    "store_status": f.store_status,
+                }
+                for f in history.fees
             ],
             "outbox_pending": history.outbox_pending,
         },
@@ -474,4 +520,35 @@ def parse_correct_fill(body: dict[str, Any]) -> CorrectFill:
         quantity=body["quantity"],
         price=parse_decimal_text(body["price"], "price"),
         reason=body["reason"],
+    )
+
+
+def parse_order_event(body: dict[str, Any]) -> SubmitOrderEvent:
+    _require_version(body)
+    validate("SubmitOrderEventRequest", body)
+
+    def money(name: str) -> Decimal | None:
+        value = body.get(name)
+        return None if value is None else parse_decimal_text(value, name)
+
+    def quantity(name: str) -> int | None:
+        return body.get(name)
+
+    return SubmitOrderEvent(
+        report_id=body["report_id"],
+        kind=body["kind"],
+        order_id=body["order_id"],
+        occurred_at=datetime.fromisoformat(body["occurred_at"]),
+        side=body.get("side") or "buy",
+        security_code=body.get("security_code") or "",
+        quantity=quantity("quantity"),
+        price=money("price"),
+        confirmed_fee=money("confirmed_fee"),
+        accepted_total_qty=quantity("accepted_total_qty"),
+        order_status=body.get("order_status"),
+        final_cumulative_fill_qty=quantity("final_cumulative_fill_qty"),
+        cancelled_qty=quantity("cancelled_qty"),
+        price_bound=money("price_bound"),
+        fee_upper_bound=money("fee_upper_bound"),
+        order_revision=body.get("order_revision") or 1,
     )

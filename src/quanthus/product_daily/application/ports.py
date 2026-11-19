@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Protocol
 
 from quanthus.capabilities.accounting import AccountProjection
-from quanthus.capabilities.execution import Correction, ExecutionReport, SyntheticContext
+from quanthus.capabilities.execution import (
+    Correction,
+    ExecutionReport,
+    FeeAssessment,
+    OrderObservation,
+    SyntheticContext,
+)
 from quanthus.product_daily.application.history import (
     AccountSnapshot,
     ConfigurationBinding,
@@ -26,6 +33,24 @@ class SyntheticFactsPort(Protocol):
 
     def post_report(
         self, context: SyntheticContext, receipt: Receipt, report: ExecutionReport
+    ) -> SubmissionResult: ...
+
+    def receive_order_observation(
+        self, context: SyntheticContext, observation: OrderObservation
+    ) -> Receipt: ...
+
+    def post_order_observation(
+        self, context: SyntheticContext, receipt: Receipt, observation: OrderObservation,
+        accepted_total_qty: int, side: str, security_code: str, price_bound: Decimal,
+        estimated_fee_upper: Decimal,
+    ) -> SubmissionResult: ...
+
+    def receive_fee_assessment(
+        self, context: SyntheticContext, fee: FeeAssessment
+    ) -> Receipt: ...
+
+    def post_fee_assessment(
+        self, context: SyntheticContext, receipt: Receipt, fee: FeeAssessment
     ) -> SubmissionResult: ...
 
     def correct_fact(

@@ -130,6 +130,66 @@
           </div>
         </aside>
       </div>
+
+      <section class="panel p12-section p12-order-panel" data-testid="p12-order-panel">
+        <div class="panel-head">
+          <div><h2>实际订单登记</h2><p>同一委托可以分笔成交；撤单以券商确认结果为准，未报齐的成交继续占用</p></div>
+        </div>
+        <form class="p12-form" data-testid="p12-order-form" @submit.prevent="submitOrder">
+          <div class="p12-form-row">
+            <label>订单编号<input v-model.trim="orderForm.order_id" data-testid="p12-order-id" placeholder="ORD-1" /></label>
+            <label>类型
+              <select v-model="orderForm.kind" class="p12-select" data-testid="p12-order-kind">
+                <option value="fill">一笔成交</option>
+                <option value="observation">订单状态（进行中/撤单/终结）</option>
+                <option value="fee">整单确认费用</option>
+              </select>
+            </label>
+            <label v-if="orderForm.kind !== 'fee'">方向
+              <select v-model="orderForm.side" class="p12-select" data-testid="p12-order-side">
+                <option value="buy">买入</option>
+                <option value="sell">卖出</option>
+              </select>
+            </label>
+            <label>发生时间<input v-model="orderForm.time" type="datetime-local" data-testid="p12-order-time" /></label>
+          </div>
+          <div v-if="orderForm.kind === 'fill'" class="p12-form-row">
+            <label>证券代码<input v-model.trim="orderForm.security_code" data-testid="p12-order-security" placeholder="600000" /></label>
+            <label>本笔数量<input v-model.trim="orderForm.quantity" inputmode="numeric" data-testid="p12-order-quantity" /></label>
+            <label>本笔价格<input v-model.trim="orderForm.price" inputmode="decimal" data-testid="p12-order-price" /></label>
+            <label>本笔费用<input v-model.trim="orderForm.fee" inputmode="decimal" placeholder="0.00" data-testid="p12-order-fill-fee" /></label>
+          </div>
+          <div v-if="orderForm.kind === 'observation'" class="p12-form-row">
+            <label>状态
+              <select v-model="orderForm.order_status" class="p12-select" data-testid="p12-order-status">
+                <option value="in_progress">进行中</option>
+                <option value="cancel_requested">已申请撤单</option>
+                <option value="terminal">已终结</option>
+              </select>
+            </label>
+            <label v-if="orderForm.order_status === 'terminal'">终结累计成交<input v-model.trim="orderForm.final_cumulative_fill_qty" inputmode="numeric" placeholder="未知留空" data-testid="p12-order-final" /></label>
+            <label v-if="orderForm.order_status === 'terminal'">取消数量<input v-model.trim="orderForm.cancelled_qty" inputmode="numeric" placeholder="未知留空" data-testid="p12-order-cancelled" /></label>
+            <label v-if="orderForm.order_status === 'in_progress'">委托总量<input v-model.trim="orderForm.accepted_total_qty" inputmode="numeric" data-testid="p12-order-accepted" /></label>
+            <label v-if="orderForm.order_status === 'in_progress'">价格上界<input v-model.trim="orderForm.price_bound" inputmode="decimal" data-testid="p12-order-bound" /></label>
+            <label v-if="orderForm.order_status === 'in_progress'">费用预留<input v-model.trim="orderForm.fee_upper_bound" inputmode="decimal" placeholder="0.00" data-testid="p12-order-fee-bound" /></label>
+          </div>
+          <div v-if="orderForm.kind === 'fee'" class="p12-form-row">
+            <label>整单确认费用<input v-model.trim="orderForm.fee" inputmode="decimal" data-testid="p12-order-fee" /></label>
+          </div>
+          <p v-if="orderError" class="p12-form-error" data-testid="p12-order-error">{{ orderError }}</p>
+          <a-button type="primary" html-type="submit" :loading="orderSaving" data-testid="p12-order-submit">登记订单事实</a-button>
+          <small class="p12-hint">编号 {{ orderForm.report_id }}；重复提交返回同一回执。</small>
+        </form>
+        <div v-if="orderOutcome" class="p12-outcome" data-testid="p12-order-outcome">
+          <h3>{{ label('receipt_status', orderOutcome.status) }}</h3>
+          <dl>
+            <div><dt>现金</dt><dd data-testid="p12-order-cash">{{ money(orderOutcome.account.cash_total) }}</dd></div>
+            <div><dt>已占用</dt><dd data-testid="p12-order-occupied">{{ money(orderOutcome.account.cash_occupied) }}</dd></div>
+            <div><dt>可用于新买入</dt><dd data-testid="p12-order-available">{{ formatMaybe(orderOutcome.account.cash_available_for_new).text }}</dd></div>
+            <div><dt>事实核对</dt><dd>{{ label('reconciliation_status', orderOutcome.account.reconciliation_status) }}</dd></div>
+          </dl>
+        </div>
+      </section>
     </template>
   </div>
 </template>
@@ -137,15 +197,15 @@
 import AccountSummary from '../components/AccountSummary.vue'
 import PriceChart from '../components/PriceChart.vue'
 import accountMixin from '../accountMixin.js'
-import { loadWorkbench, newClientId, submitFill } from '../client.js'
-import { formatMoney, formatQuantity, formatTime, label, normaliseMoneyInput, reasonText, timezoneSuffix } from '../format.js'
+import { loadWorkbench, newClientId, submitFill, submitOrderEvent } from '../client.js'
+import { formatMaybe, formatMoney, formatQuantity, formatTime, label, normaliseMoneyInput, reasonText, timezoneSuffix } from '../format.js'
 
 const GROUPS = ['reconcile', 'exit', 'entry', 'holding', 'unassigned', 'watch', 'ended']
 
 export default {
   components: { AccountSummary, PriceChart },
   mixins: [accountMixin],
-  data: () => ({ workbench: null, selectedId: null, chainOpen: false, chainPinned: false, form: {}, formError: '', submitting: false, outcome: null, outcomeBefore: null, lastFee: null }),
+  data: () => ({ workbench: null, selectedId: null, chainOpen: false, chainPinned: false, form: {}, formError: '', submitting: false, outcome: null, outcomeBefore: null, lastFee: null, orderForm: {}, orderError: '', orderSaving: false, orderOutcome: null }),
   computed: {
     groups () {
       const items = this.workbench?.opportunities || []
@@ -182,6 +242,80 @@ export default {
       this.form = { reportId: newClientId('fill'), quantity: plan ? String(Math.max(this.selected.applicability.delta_qty, 0) || plan.delta_qty) : '', price: plan ? plan.price_cap : '', fee: '', time: clock.slice(0, 16) }
       this.formError = ''
       this.outcome = null
+      this.resetOrderForm()
+    },
+    resetOrderForm () {
+      const clock = this.workbench?.clock || ''
+      this.orderForm = {
+        report_id: newClientId('ord'),
+        kind: 'fill',
+        order_id: '',
+        side: 'buy',
+        security_code: '',
+        quantity: '',
+        price: '',
+        fee: '',
+        accepted_total_qty: '',
+        order_status: 'in_progress',
+        final_cumulative_fill_qty: '',
+        cancelled_qty: '',
+        price_bound: '',
+        fee_upper_bound: '',
+        time: clock.slice(0, 16)
+      }
+      this.orderError = ''
+    },
+    async submitOrder () {
+      const f = this.orderForm
+      const body = {
+        report_id: f.report_id,
+        kind: f.kind,
+        order_id: f.order_id,
+        occurred_at: `${f.time}:00${timezoneSuffix(this.workbench?.clock)}`
+      }
+      if (!f.order_id) { this.orderError = '请填写订单编号'; return }
+      if (!f.time) { this.orderError = '请填写发生时间'; return }
+      const num = (v) => (v === '' || v === null || v === undefined ? null : Number.parseInt(v, 10))
+      if (f.kind === 'fill') {
+        const quantity = num(f.quantity)
+        const price = normaliseMoneyInput(f.price)
+        if (!quantity || quantity <= 0) { this.orderError = '本笔数量需为正整数'; return }
+        if (!price) { this.orderError = '本笔价格需为合法金额'; return }
+        body.side = f.side
+        body.security_code = f.security_code
+        body.quantity = quantity
+        body.price = price
+        body.confirmed_fee = normaliseMoneyInput(f.fee || '0') || '0.00'
+        body.accepted_total_qty = num(f.accepted_total_qty)
+        body.price_bound = f.price_bound ? normaliseMoneyInput(f.price_bound) : null
+        body.fee_upper_bound = f.fee_upper_bound ? normaliseMoneyInput(f.fee_upper_bound) : null
+      } else if (f.kind === 'observation') {
+        body.order_status = f.order_status
+        body.side = f.side
+        body.security_code = f.security_code
+        body.final_cumulative_fill_qty = num(f.final_cumulative_fill_qty)
+        body.cancelled_qty = num(f.cancelled_qty)
+        body.accepted_total_qty = num(f.accepted_total_qty)
+        body.price_bound = f.price_bound ? normaliseMoneyInput(f.price_bound) : null
+        body.fee_upper_bound = f.fee_upper_bound ? normaliseMoneyInput(f.fee_upper_bound) : null
+      } else {
+        const fee = normaliseMoneyInput(f.fee)
+        if (fee === null) { this.orderError = '费用需为合法金额'; return }
+        body.confirmed_fee = fee
+      }
+      this.orderError = ''
+      this.orderSaving = true
+      try {
+        this.orderOutcome = await submitOrderEvent(this.accountId, body)
+        const outcome = this.orderOutcome
+        await this.load(this.accountId)
+        this.orderOutcome = outcome
+        this.orderForm.report_id = newClientId('ord')
+      } catch (error) {
+        this.orderError = reasonText(error.reasonCode) || '登记失败，请核对内容后重试'
+      } finally {
+        this.orderSaving = false
+      }
     },
     async submit () {
       const plan = this.selected.plan
@@ -228,6 +362,7 @@ export default {
     qty: formatQuantity,
     time: formatTime,
     reason: reasonText,
+    formatMaybe,
     label
   }
 }

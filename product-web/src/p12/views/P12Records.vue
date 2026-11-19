@@ -39,6 +39,22 @@
         </table>
       </section>
 
+      <section v-if="records.orders.length || records.observations.length || records.fees.length" class="panel p12-section" data-testid="p12-records-orders">
+        <div class="panel-head"><div><h2>实际订单</h2><p>同一委托的分笔成交、终结观察与整单费用；撤单后未报齐的成交继续占用</p></div></div>
+        <table v-if="records.orders.length" class="p12-table">
+          <thead><tr><th>订单</th><th>方向</th><th>委托量</th><th>已入账</th><th>待补报</th><th>占用</th><th>已确认费用</th><th>状态</th></tr></thead>
+          <tbody><tr v-for="order in records.orders" :key="order.order_id" :data-testid="`p12-order-${order.order_id}`"><td><code>{{ order.order_id }}</code></td><td>{{ label('order_side', order.side) }} {{ order.security_code }}</td><td>{{ qty(order.accepted_total_qty) }}</td><td>{{ qty(order.known_fill_qty) }}</td><td>{{ qty(order.unreported_fill_qty) }}</td><td>{{ money(order.hold_amount) }}（{{ qty(order.hold_qty) }}）</td><td>{{ money(order.fee_confirmed_total) }}</td><td><span :class="['status-tag', order.needs_reconciliation ? 'control' : (order.status === 'terminal' ? 'accepted' : 'locked')]">{{ label('order_status', order.status) }}</span><small v-if="order.reason_codes.length"><br />{{ order.reason_codes.map(reason).join('；') }}</small></td></tr></tbody>
+        </table>
+        <table v-if="records.observations.length" class="p12-table">
+          <thead><tr><th>观察</th><th>订单</th><th>状态</th><th>终结累计成交</th><th>取消数量</th><th>时间</th></tr></thead>
+          <tbody><tr v-for="obs in records.observations" :key="obs.observation_id"><td><code>{{ obs.observation_id }}</code></td><td><code>{{ obs.order_id }}</code></td><td>{{ label('order_status', obs.status) }}</td><td>{{ obs.final_cumulative_fill_qty === null ? '未报' : qty(obs.final_cumulative_fill_qty) }}</td><td>{{ obs.cancelled_qty === null ? '—' : qty(obs.cancelled_qty) }}</td><td>{{ time(obs.observed_at) }}</td></tr></tbody>
+        </table>
+        <table v-if="records.fees.length" class="p12-table">
+          <thead><tr><th>费用</th><th>订单</th><th>金额</th><th>时间</th></tr></thead>
+          <tbody><tr v-for="fee in records.fees" :key="fee.fee_id"><td><code>{{ fee.fee_id }}</code></td><td><code>{{ fee.order_id }}</code></td><td>{{ money(fee.amount) }}</td><td>{{ time(fee.occurred_at) }}</td></tr></tbody>
+        </table>
+      </section>
+
       <section class="panel p12-section" data-testid="p12-records-facts">
         <div class="panel-head"><div><h2>成交事实与更正链</h2><p>当前有效值来自更正链末端；更正需基于最新版本</p></div></div>
         <p v-if="!records.facts.length" class="p12-empty">暂无成交事实。</p>

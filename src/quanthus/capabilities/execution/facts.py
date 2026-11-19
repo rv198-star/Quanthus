@@ -77,14 +77,17 @@ class ExecutionReport:
     intended_quantity: int
     intended_price_cap: Decimal
     suggestion_id: str | None = None
+    order_id: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("report_id", "security_code", "source_id", "source_sequence"):
             _text(getattr(self, name), name)
         if self.suggestion_id is not None:
             _text(self.suggestion_id, "suggestion_id")
-        if self.side != "buy":
-            raise FactError("UNSUPPORTED_FACT", "slice supports confirmed buys")
+        if self.order_id is not None:
+            _text(self.order_id, "order_id")
+        if self.side not in ("buy", "sell"):
+            raise FactError("UNSUPPORTED_FACT", "side must be buy or sell")
         _quantity(self.quantity)
         _quantity(self.intended_quantity, "intended_quantity")
         _money(self.price, "price", positive=True)
@@ -127,7 +130,107 @@ class ExecutionReport:
         # synthetic receipts keep their original payload digest.
         if self.suggestion_id is not None:
             payload["suggestion_id"] = self.suggestion_id
+        if self.order_id is not None:
+            payload["order_id"] = self.order_id
         return payload
+
+
+FINAL_FILL_GAP = "FINAL_FILL_GAP"
+
+
+@dataclass(frozen=True)
+class OrderObservation:
+    """One observed state of an actual order (in progress, cancel requested or terminal).
+
+    Terminal observations satisfy ``final_cumulative_fill_qty + cancelled_qty ==
+    accepted_total_qty``; a missing final cumulative keeps the last provable hold.
+    """
+
+    observation_id: str
+    order_id: str
+    status: str  # "in_progress" | "cancel_requested" | "terminal"
+    observed_at: datetime
+    source_id: str
+    source_sequence: str
+    final_cumulative_fill_qty: int | None = None
+    cancelled_qty: int | None = None
+    order_revision: int = 1
+    expected_order_state_revision: int | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("observation_id", "order_id", "source_id", "source_sequence"):
+            _text(getattr(self, name), name)
+        if self.status not in ("in_progress", "cancel_requested", "terminal"):
+            raise FactError("INVALID_REPORT_SHAPE", f"unknown order status {self.status}")
+        _aware(self.observed_at, "observed_at")
+        if not isinstance(self.order_revision, int) or self.order_revision <= 0:
+            raise FactError("INVALID_REPORT_SHAPE", "order_revision must be positive")
+        if (
+            self.expected_order_state_revision is not None
+            and (
+                not isinstance(self.expected_order_state_revision, int)
+                or self.expected_order_state_revision <= 0
+            )
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "expected_order_state_revision is invalid")
+        for name in ("final_cumulative_fill_qty", "cancelled_qty"):
+            value = getattr(self, name)
+            if value is not None and (
+                not isinstance(value, int) or isinstance(value, bool) or value < 0
+            ):
+                raise FactError("INVALID_REPORT_SHAPE", f"{name} is invalid")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "observation_id": self.observation_id,
+            "order_id": self.order_id,
+            "status": self.status,
+            "observed_at": self.observed_at.isoformat(),
+            "source_id": self.source_id,
+            "source_sequence": self.source_sequence,
+            "final_cumulative_fill_qty": self.final_cumulative_fill_qty,
+            "cancelled_qty": self.cancelled_qty,
+            "order_revision": self.order_revision,
+            "expected_order_state_revision": self.expected_order_state_revision,
+        }
+
+
+@dataclass(frozen=True)
+class FeeAssessment:
+    """A confirmed fee covering one whole order (scope ``order`` in this slice)."""
+
+    fee_id: str
+    order_id: str
+    amount: Decimal
+    source_id: str
+    source_sequence: str
+    occurred_at: datetime
+
+    def __post_init__(self) -> None:
+        for name in ("fee_id", "order_id", "source_id", "source_sequence"):
+            _text(getattr(self, name), name)
+        _money(self.amount, "amount")
+        _aware(self.occurred_at, "occurred_at")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "fee_id": self.fee_id,
+            "order_id": self.order_id,
+            "amount": format(self.amount.quantize(Decimal("0.01")), "f"),
+            "source_id": self.source_id,
+            "source_sequence": self.source_sequence,
+            "occurred_at": self.occurred_at.isoformat(),
+        }
+
+
+def validate_observation(observation: OrderObservation) -> OrderObservation:
+    observation.__post_init__()
+    return observation
+
+
+def validate_fee_assessment(fee: FeeAssessment) -> FeeAssessment:
+    fee.__post_init__()
+    return fee
 
 
 def validate_report(report: ExecutionReport) -> ExecutionReport:
@@ -195,3 +298,113 @@ class Correction:
 def validate_correction(correction: Correction) -> Correction:
     correction.__post_init__()
     return correction
+
+
+# ---- order aggregation -----------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class OrderState:
+    """Effective state of one actual order derived from its observations and fills."""
+
+    order_id: str
+    status: str  # "open" | "cancel_pending" | "terminal" | "needs_reconciliation"
+    order_state_revision: int
+    accepted_total_qty: int
+    known_fill_qty: int
+    unreported_fill_qty: int
+    hold_qty: int
+    hold_amount: Decimal
+    needs_reconciliation: bool
+    reason_codes: tuple[str, ...]
+
+
+def effective_order_state(
+    *,
+    order_id: str,
+    side: str,
+    accepted_total_qty: int,
+    price_bound: Decimal,
+    known_fill_qty: int,
+    latest_observation: OrderObservation | None,
+    confirmed_fees: tuple[FeeAssessment, ...],
+    estimated_fee_upper: Decimal,
+) -> OrderState:
+    """Fold one order's fills and observations into its current effective state.
+
+    ``known_fill_qty`` is the baseline-covered plus posted fill quantity.  A terminal
+    observation releases only the confirmed ``cancelled_qty``; the gap between the
+    final cumulative and the known quantity stays occupied as unreported fills.  A
+    missing final cumulative keeps the last provable hold.
+    """
+
+    _quantity(accepted_total_qty, "accepted_total_qty")
+    _money(price_bound, "price_bound", positive=True)
+    _money(estimated_fee_upper, "estimated_fee_upper")
+    if known_fill_qty < 0 or known_fill_qty > accepted_total_qty:
+        raise FactError("INVALID_REPORT_SHAPE", "known_fill_qty out of range")
+
+    reasons: list[str] = []
+    needs_reconciliation = False
+    status = "open"
+    revision = 0
+    final_qty: int | None = None
+    cancelled: int | None = None
+    if latest_observation is not None:
+        revision = latest_observation.order_revision
+        if latest_observation.status == "terminal":
+            final_qty = latest_observation.final_cumulative_fill_qty
+            cancelled = latest_observation.cancelled_qty
+            if (
+                final_qty is None
+                or cancelled is None
+                or final_qty + cancelled != accepted_total_qty
+                or final_qty < known_fill_qty
+            ):
+                status = "needs_reconciliation"
+                needs_reconciliation = True
+                reasons.append(FINAL_FILL_GAP)
+            else:
+                status = "terminal"
+        elif latest_observation.status == "cancel_requested":
+            status = "cancel_pending"
+        else:
+            status = "open"
+        if (
+            latest_observation.expected_order_state_revision is not None
+            and latest_observation.expected_order_state_revision != revision - 1
+        ):
+            needs_reconciliation = True
+            reasons.append("ORDER_STATE_GAP")
+
+    unreported = 0
+    hold_qty = accepted_total_qty - known_fill_qty
+    if status == "terminal":
+        unreported = final_qty - known_fill_qty  # type: ignore[operator]
+        hold_qty = unreported
+    elif status == "needs_reconciliation":
+        unreported = accepted_total_qty - known_fill_qty
+        hold_qty = accepted_total_qty - known_fill_qty
+    if side == "sell":
+        hold_amount = Decimal("0.00")
+    else:
+        principal = Decimal(hold_qty) * price_bound
+        fees = sum((f.amount for f in confirmed_fees), Decimal("0"))
+        outstanding_fee = max(Decimal("0"), estimated_fee_upper - fees)
+        hold_amount = principal + outstanding_fee
+    if unreported > 0 or status == "needs_reconciliation":
+        reasons.append(FINAL_FILL_GAP)
+    if unreported > 0:
+        needs_reconciliation = True
+    return OrderState(
+        order_id=order_id,
+        status=status,
+        order_state_revision=revision,
+        accepted_total_qty=accepted_total_qty,
+        known_fill_qty=known_fill_qty,
+        unreported_fill_qty=unreported,
+        hold_qty=hold_qty,
+        hold_amount=hold_amount.quantize(Decimal("0.01")),
+        needs_reconciliation=needs_reconciliation or status == "needs_reconciliation",
+        reason_codes=tuple(dict.fromkeys(reasons)),
+    )

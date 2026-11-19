@@ -14,8 +14,11 @@ from quanthus.product_daily.application.history import (
     CurrentFact,
     FactHistory,
     LedgerEvent,
+    OrderRecord,
     PlanStatus,
     ReceivedCorrection,
+    ReceivedFeeAssessment,
+    ReceivedOrderObservation,
     ReceivedReport,
 )
 from quanthus.shared.values import AccountScope, MaybeDecimal, VersionRef
@@ -168,6 +171,7 @@ class RecordsView:
     facts: tuple[FactRecord, ...]
     events: tuple[LedgerEvent, ...]
     plans: tuple[PlanStatus, ...]
+    orders: tuple[OrderRecord, ...]
 
 
 @dataclass(frozen=True)
@@ -202,6 +206,35 @@ class CorrectFill:
     quantity: int
     price: Decimal
     reason: str
+
+
+@dataclass(frozen=True)
+class SubmitOrderEvent:
+    """One user-confirmed execution fact tied to an actual order.
+
+    ``kind`` is ``fill`` for one fill, ``observation`` for an order state
+    observation (in_progress / cancel_requested / terminal) and ``fee`` for a
+    confirmed whole-order fee.  Fills carry quantity/price; observations carry
+    the terminal counts when known; the first registration of an order also
+    declares its accepted quantity, side, price bound and fee provision.
+    """
+
+    report_id: str
+    kind: str
+    order_id: str
+    occurred_at: datetime
+    side: str = "buy"
+    security_code: str = ""
+    quantity: int | None = None
+    price: Decimal | None = None
+    confirmed_fee: Decimal | None = None
+    accepted_total_qty: int | None = None
+    order_status: str | None = None
+    final_cumulative_fill_qty: int | None = None
+    cancelled_qty: int | None = None
+    price_bound: Decimal | None = None
+    fee_upper_bound: Decimal | None = None
+    order_revision: int = 1
 
 
 @dataclass(frozen=True)

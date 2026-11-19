@@ -1,0 +1,282 @@
+"""v8 EX02 (two fills on one sell order) and EX08 (cancel with unreported fills)."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+from quanthus.capabilities.decision_access import validate_decision_set
+from quanthus.capabilities.execution import SyntheticContext
+from quanthus.platform.adapters.p12_synthetic_fixture import (
+    FixtureDecisionSource,
+    load_synthetic_fixture,
+)
+from quanthus.platform.adapters.product_daily_facts_sqlite import (
+    build_synthetic_fact_service,
+)
+from quanthus.platform.p12.assembly import STORE_NAME
+from quanthus.product_daily.application.desktop import (
+    P12DesktopApplication,
+    SubmitOrderEvent,
+)
+from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
+from quanthus.shared.values import AccountScope
+from quanthus.product_daily.application.desktop import SubmitOrderEvent
+
+ROOT = Path(__file__).resolve().parents[2]
+FIXTURE = ROOT / "config/p12/synthetic-desktop.v1.json"
+T0 = datetime.fromisoformat("2026-11-19T09:30:00+08:00")
+T1 = datetime.fromisoformat("2026-11-19T09:31:00+08:00")
+T2 = datetime.fromisoformat("2026-11-19T09:32:00+08:00")
+T3 = datetime.fromisoformat("2026-11-19T09:33:00+08:00")
+T4 = datetime.fromisoformat("2026-11-19T09:34:00+08:00")
+
+
+def _app(tmp_path: Path, account: str = "SYN-P12-A"):
+    fixture = load_synthetic_fixture(FIXTURE)
+    spec = fixture.account(account)
+    context = SyntheticContext(
+        spec.account_id, "synthetic", spec.source_id, spec.as_of, spec.coverage_id
+    )
+    auth = SyntheticRuntimeAuthorization(
+        f"test:{fixture.fixture_ref.digest}", frozenset({spec.account_id})
+    )
+    facts = build_synthetic_fact_service(
+        tmp_path / STORE_NAME, context=context, authorization=auth,
+        clock=lambda: fixture.clock,
+    )
+    app = P12DesktopApplication(
+        scope=spec.scope,
+        context=context,
+        facts=facts,
+        decisions=FixtureDecisionSource(fixture),
+        policy=fixture.policy,
+        clock=lambda: fixture.clock,
+        clock_kind="synthetic_fixed",
+    )
+    return app
+
+
+def _reopen(tmp_path: Path, account: str = "SYN-P12-A"):
+    app = _app(tmp_path, account)
+    app.bind_configuration()
+    return app
+
+
+def _event(report_id, order_id, kind, at, **kw) -> SubmitOrderEvent:
+    return SubmitOrderEvent(report_id, kind, order_id, at, **kw)
+
+
+# ---- EX02 ----------------------------------------------------------------------
+
+
+def _ex02_setup(app) -> None:
+    # Take over an account already holding 600 shares; baseline cost is unknown.
+    app.establish_baseline(
+        request_id="ex02-baseline", cash=Decimal("0.00"), quantity=600,
+        security_code="600000",
+    )
+    app.bind_configuration()
+
+
+def test_ex02_two_fills_one_order_fee_and_single_settlement(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    _ex02_setup(app)
+
+    first = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex02-sell-1", "ORD-EX02", "fill", T1,
+            side="sell", security_code="600000", quantity=200, price=Decimal("10.00"),
+            confirmed_fee=Decimal("0.00"), accepted_total_qty=600,
+            price_bound=Decimal("10.10"), fee_upper_bound=Decimal("0.00"),
+        ),
+    )
+    assert first.status == "POSTED"
+    assert first.account.positions[0].quantity == 400
+    mid = app.workbench(app.scope).account
+    assert mid.cash_total == Decimal("2000.00")
+
+    second = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex02-sell-2", "ORD-EX02", "fill", T2,
+            side="sell", security_code="600000", quantity=400, price=Decimal("10.10"),
+            confirmed_fee=Decimal("0.00"),
+        ),
+    )
+    assert second.status == "POSTED"
+    assert second.account.cash_total == Decimal("6040.00")
+    assert second.account.positions == ()
+
+    terminal = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex02-terminal", "ORD-EX02", "observation", T3,
+            order_status="terminal", final_cumulative_fill_qty=600, cancelled_qty=0,
+        ),
+    )
+    assert terminal.status == "POSTED"
+
+    fee = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex02-fee", "ORD-EX02", "fee", T4, confirmed_fee=Decimal("6.00"),
+        ),
+    )
+    assert fee.status == "POSTED"
+    account = app.workbench(app.scope).account
+    assert account.cash_total == Decimal("6034.00")
+    assert account.cash_occupied == Decimal("0.00")
+    assert account.positions == ()
+
+    records = app.records(app.scope)
+    order = next(o for o in records.orders if o.order_id == "ORD-EX02")
+    assert order.status == "terminal"
+    assert order.known_fill_qty == 600
+    assert order.fee_confirmed_total == Decimal("6.00")
+    assert order.settlement_ready is True
+    fee_events = [e for e in records.events if e.kind == "fee"]
+    assert len(fee_events) == 1
+
+    # Retrying the same facts returns the original receipts without re-posting.
+    retry = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex02-fee", "ORD-EX02", "fee", T4, confirmed_fee=Decimal("6.00"),
+        ),
+    )
+    assert retry.status == "POSTED" and retry.receipt_id == fee.receipt_id
+    assert app.workbench(app.scope).account.cash_total == Decimal("6034.00")
+
+    # Reopen and rebuild reproduce the same ledger.
+    again = _reopen(tmp_path)
+    assert again.rebuild_matches(again.scope)
+    assert again.workbench(again.scope).account.cash_total == Decimal("6034.00")
+
+
+# ---- EX08 ----------------------------------------------------------------------
+
+
+def _ex08_setup(app) -> None:
+    app.establish_baseline(request_id="ex08-baseline", cash=Decimal("20000.00"))
+    app.bind_configuration()
+
+
+def test_ex08_cancel_keeps_unreported_fill_hold(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    _ex08_setup(app)
+
+    # Order accepted: buy 400 at a 12.00 bound with a 5.00 fee provision.
+    opened = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex08-open", "ORD-EX08", "observation", T0,
+            order_status="in_progress", side="buy", security_code="600000",
+            accepted_total_qty=400, price_bound=Decimal("12.00"),
+            fee_upper_bound=Decimal("5.00"),
+        ),
+    )
+    assert opened.status == "POSTED"
+
+    fill = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex08-fill-100", "ORD-EX08", "fill", T1,
+            side="buy", security_code="600000", quantity=100, price=Decimal("12.00"),
+            confirmed_fee=Decimal("0.00"),
+        ),
+    )
+    assert fill.status == "POSTED"
+    assert fill.account.cash_total == Decimal("18800.00")
+    assert fill.account.positions[0].quantity == 100
+
+    cancel = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex08-cancel", "ORD-EX08", "observation", T2,
+            order_status="cancel_requested",
+        ),
+    )
+    assert cancel.status == "POSTED"
+    mid = app.workbench(app.scope).account
+    # During the cancel request the full 300 remaining stay held.
+    assert mid.cash_occupied == Decimal("300") * Decimal("12.00") + Decimal("5.00")
+    assert mid.cash_available_for_new.value == mid.cash_total - mid.cash_occupied
+
+    terminal = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex08-terminal", "ORD-EX08", "observation", T3,
+            order_status="terminal", final_cumulative_fill_qty=150, cancelled_qty=250,
+        ),
+    )
+    assert terminal.status == "POSTED"
+
+    account = app.workbench(app.scope).account
+    assert account.cash_total == Decimal("18800.00")
+    assert account.positions[0].quantity == 100
+    assert account.cash_occupied == Decimal("605.00")
+    assert account.cash_available_for_new.value == Decimal("18195.00")
+    assert account.reconciliation_status == "NEEDS_RECONCILIATION"
+
+    order = next(o for o in app.records(app.scope).orders if o.order_id == "ORD-EX08")
+    assert order.status == "terminal"
+    assert order.known_fill_qty == 100
+    assert order.unreported_fill_qty == 50
+    assert order.hold_amount == Decimal("605.00")
+
+    # Retry the terminal observation; nothing re-posts.
+    retry = app.submit_order_event(
+        app.scope,
+        _event(
+            "ex08-terminal", "ORD-EX08", "observation", T3,
+            order_status="terminal", final_cumulative_fill_qty=150, cancelled_qty=250,
+        ),
+    )
+    assert retry.status == "POSTED" and retry.receipt_id == terminal.receipt_id
+    assert app.workbench(app.scope).account.cash_occupied == Decimal("605.00")
+
+    again = _reopen(tmp_path)
+    assert again.rebuild_matches(again.scope)
+    account2 = again.workbench(again.scope).account
+    assert account2.cash_occupied == Decimal("605.00")
+    assert account2.cash_available_for_new.value == Decimal("18195.00")
+
+
+def test_ex08_missing_final_cumulative_keeps_last_provable_hold(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    _ex08_setup(app)
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "ex08-open", "ORD-EX08", "observation", T0,
+            order_status="in_progress", side="buy", security_code="600000",
+            accepted_total_qty=400, price_bound=Decimal("12.00"),
+            fee_upper_bound=Decimal("5.00"),
+        ),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "ex08-fill-100", "ORD-EX08", "fill", T1,
+            side="buy", security_code="600000", quantity=100, price=Decimal("12.00"),
+            confirmed_fee=Decimal("0.00"),
+        ),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event(
+            "ex08-terminal", "ORD-EX08", "observation", T3,
+            order_status="terminal", final_cumulative_fill_qty=None, cancelled_qty=None,
+        ),
+    )
+    account = app.workbench(app.scope).account
+    # The missing final count keeps the whole unconfirmed remainder held.
+    assert account.cash_occupied == Decimal("300") * Decimal("12.00") + Decimal("5.00")
+    assert account.reconciliation_status == "NEEDS_RECONCILIATION"
+    order = next(o for o in app.records(app.scope).orders if o.order_id == "ORD-EX08")
+    assert order.needs_reconciliation is True

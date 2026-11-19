@@ -135,7 +135,7 @@ export interface FactOutcome {
   conflicts: Array<ReasonCode>
   current_fact_revision: number | null
   deviations: Array<ReasonCode>
-  kind: "correction" | "fill"
+  kind: "correction" | "fee" | "fill" | "observation"
   next_action: "EXECUTE_AND_REPORT" | "NONE" | "REASSESS_AFFECTED_PLANS" | "REASSESS_PLAN" | "RECONCILE_FACTS" | "RESOLVE_CONFLICT" | "WAIT_FOR_ADOPTION" | "WAIT_FOR_WINDOW"
   quantity_delta: number | null
   receipt_id: string
@@ -152,6 +152,15 @@ export interface FactRecord {
   price: Money
   quantity: number
   security_code: string
+}
+
+export interface FeeRecord {
+  amount: Money
+  fee_id: string
+  occurred_at: Timestamp
+  order_id: string
+  receipt_id: string
+  store_status: string
 }
 
 export interface Funding {
@@ -183,7 +192,7 @@ export interface LedgerEvent {
   event_id: string
   event_sequence: number
   fact_id: string
-  kind: "correction" | "fill"
+  kind: "correction" | "fill" | "order_observation" | "fee"
   position_delta: Money
   quantity_delta: number
   recorded_at: Timestamp
@@ -223,6 +232,35 @@ export interface Opportunity {
   security_name: string
   stage: "ended" | "entry_plan" | "exit_plan" | "holding" | "input_blocked" | "waiting"
   status_code: "ENDED" | "EXPIRED" | "MISSING_INPUT" | "NEEDS_REASSESSMENT" | "NEEDS_RECONCILIATION" | "POLICY_NOT_ADOPTED" | "READY" | "WAITING"
+}
+
+export interface OrderObservationRecord {
+  cancelled_qty: number | null
+  final_cumulative_fill_qty: number | null
+  observation_id: string
+  observed_at: Timestamp
+  order_id: string
+  order_revision: number
+  receipt_id: string
+  status: "in_progress" | "cancel_requested" | "terminal"
+  store_status: string
+}
+
+export interface OrderRecord {
+  accepted_total_qty: number
+  fee_confirmed_total: Money
+  hold_amount: Money
+  hold_qty: number
+  known_fill_qty: number
+  needs_reconciliation: boolean
+  order_id: string
+  price_bound: Money
+  reason_codes: Array<ReasonCode>
+  security_code: string
+  settlement_ready: boolean
+  side: "buy" | "sell"
+  status: "open" | "cancel_pending" | "terminal" | "needs_reconciliation"
+  unreported_fill_qty: number
 }
 
 export interface Package {
@@ -296,13 +334,16 @@ export interface PublishedPlan {
 
 export type Ratio = string // pattern ^-?[0-9]+\.[0-9]{4}$
 
-export type ReasonCode = "ACCOUNT_NOT_ADMITTED" | "BASELINE_COVERAGE_UNKNOWN" | "BASELINE_NOT_FOUND" | "BUCKET_ASSIGNMENT_CONFLICT" | "BUDGET_CAPACITY" | "CANDIDATE_NOT_ELIGIBLE" | "CAPACITY_AVAILABLE" | "CASH_CAPACITY" | "CAS_CONFLICT" | "CONCENTRATION_CAPACITY" | "CONFIGURATION_BINDING_MISMATCH" | "CYCLE_ALREADY_ACTIVE" | "CYCLE_PREPARED" | "DAY_LIMIT" | "ENTRY_OBSERVED" | "ENTRY_RESERVED" | "ENTRY_WINDOW_EXPIRED" | "EVENT_SEPARATION" | "EXECUTION_WINDOW_INVALID" | "EXISTING_SECURITY_CYCLE" | "EXPERT_ENTRY_BLOCKED" | "EXTERNAL_TRADE" | "FACT_NOT_FOUND" | "FEE_PENDING" | "FINAL_FILL_GAP" | "FIXED_CYCLE_SETTLED" | "FUNDING_CYCLE_NOT_BOUND" | "HOLD_AND_ALERT" | "IDEMPOTENCY_CONFLICT" | "IDEMPOTENT_REPLAY" | "INDUSTRY_CAPACITY" | "INPUT_UNAVAILABLE" | "INSUFFICIENT_CAPACITY" | "INSUFFICIENT_CASH" | "INVALID_REPORT_SHAPE" | "KNOWLEDGE_CUTOFF_BREACH" | "LATE_DELTA_APPLIED" | "NEGATIVE_POSITION" | "NEW_ENTRY_SIGNAL" | "NO_EMPTY_BUCKET" | "NO_POSITION" | "OUTSIDE_PLAN_WINDOW" | "P12_RUNTIME_NOT_CONFIGURED" | "PERMISSION_DENIED" | "PLAN_NOT_EXECUTABLE" | "PLAN_NOT_FOUND" | "POLICY_NOT_ADOPTED" | "POSITION_COOLDOWN" | "POSITION_MISMATCH" | "POSSIBLE_DUPLICATE" | "PRICE_DEVIATION" | "QUANTITY_DEVIATION" | "RECONCILIATION_PENDING" | "REPORT_ID_PAYLOAD_CONFLICT" | "RESERVE_TRANSFER_APPLIED" | "RISK_LIMIT_REACHED" | "SCHEMA_VERSION_MISMATCH" | "SETTLEMENT_ALREADY_COMPLETED" | "SETTLEMENT_NOT_READY" | "SOURCE_FACT_DUPLICATE" | "STALE_FACT_REVISION" | "STALE_MARKET_INPUT" | "STOCK_CAPACITY" | "TOTAL_CAPACITY" | "UNAUTHORIZED_CONTEXT" | "UNCLASSIFIED_FACT_ERROR" | "UNKNOWN_ORDER_EXPOSURE" | "UNSUPPORTED_FACT" | "VALUATION_UNAVAILABLE" | "WAITING_FOR_PULLBACK"
+export type ReasonCode = "ACCOUNT_NOT_ADMITTED" | "BASELINE_COVERAGE_UNKNOWN" | "BASELINE_NOT_FOUND" | "BUCKET_ASSIGNMENT_CONFLICT" | "BUDGET_CAPACITY" | "CANDIDATE_NOT_ELIGIBLE" | "CAPACITY_AVAILABLE" | "CASH_CAPACITY" | "CAS_CONFLICT" | "CONCENTRATION_CAPACITY" | "CONFIGURATION_BINDING_MISMATCH" | "CYCLE_ALREADY_ACTIVE" | "CYCLE_PREPARED" | "DAY_LIMIT" | "ENTRY_OBSERVED" | "ENTRY_RESERVED" | "ENTRY_WINDOW_EXPIRED" | "EVENT_SEPARATION" | "EXECUTION_WINDOW_INVALID" | "EXISTING_SECURITY_CYCLE" | "EXPERT_ENTRY_BLOCKED" | "EXTERNAL_TRADE" | "FACT_NOT_FOUND" | "FEE_PENDING" | "FINAL_FILL_GAP" | "FIXED_CYCLE_SETTLED" | "FUNDING_CYCLE_NOT_BOUND" | "HOLD_AND_ALERT" | "IDEMPOTENCY_CONFLICT" | "IDEMPOTENT_REPLAY" | "INDUSTRY_CAPACITY" | "INPUT_UNAVAILABLE" | "INSUFFICIENT_CAPACITY" | "INSUFFICIENT_CASH" | "INVALID_REPORT_SHAPE" | "KNOWLEDGE_CUTOFF_BREACH" | "LATE_DELTA_APPLIED" | "NEGATIVE_POSITION" | "NEW_ENTRY_SIGNAL" | "NO_EMPTY_BUCKET" | "NO_POSITION" | "OUTSIDE_PLAN_WINDOW" | "P12_RUNTIME_NOT_CONFIGURED" | "PERMISSION_DENIED" | "PLAN_NOT_EXECUTABLE" | "PLAN_NOT_FOUND" | "POLICY_NOT_ADOPTED" | "POSITION_COOLDOWN" | "POSITION_MISMATCH" | "POSSIBLE_DUPLICATE" | "PRICE_DEVIATION" | "QUANTITY_DEVIATION" | "RECONCILIATION_PENDING" | "REPORT_ID_PAYLOAD_CONFLICT" | "RESERVE_TRANSFER_APPLIED" | "RISK_LIMIT_REACHED" | "SCHEMA_VERSION_MISMATCH" | "SETTLEMENT_ALREADY_COMPLETED" | "SETTLEMENT_NOT_READY" | "SOURCE_FACT_DUPLICATE" | "STALE_FACT_REVISION" | "STALE_MARKET_INPUT" | "STOCK_CAPACITY" | "TOTAL_CAPACITY" | "UNAUTHORIZED_CONTEXT" | "UNCLASSIFIED_FACT_ERROR" | "UNKNOWN_ORDER_EXPOSURE" | "UNSUPPORTED_FACT" | "VALUATION_UNAVAILABLE" | "WAITING_FOR_PULLBACK" | "ORDER_STATE_GAP" | "ORDER_CONTEXT_MISMATCH" | "ORDER_ALREADY_FILLED"
 
 export interface Records {
   account: AccountSummary
   baseline: Baseline
   events: Array<LedgerEvent>
   facts: Array<FactRecord>
+  fees: Array<FeeRecord>
+  observations: Array<OrderObservationRecord>
+  orders: Array<OrderRecord>
   outbox_pending: number
   package: Package | null
   plans: Array<PlanStatus>
@@ -319,6 +360,7 @@ export interface ReportRecord {
   intended_price_cap: Money
   intended_quantity: number
   occurred_at: Timestamp
+  order_id: string | null
   plan_id: string | null
   price: Money
   quantity: number
@@ -355,6 +397,26 @@ export interface SubmitFillRequest {
   quantity: number
   report_id: string
   schema_version: SchemaVersion
+}
+
+export interface SubmitOrderEventRequest {
+  accepted_total_qty: number | null
+  cancelled_qty: number | null
+  confirmed_fee: Money | null
+  fee_upper_bound: Money | null
+  final_cumulative_fill_qty: number | null
+  kind: "fill" | "observation" | "fee"
+  occurred_at: Timestamp
+  order_id: string
+  order_revision: number
+  order_status: "in_progress" | "cancel_requested" | "terminal" | null
+  price: Money | null
+  price_bound: Money | null
+  quantity: number | null
+  report_id: string
+  schema_version: SchemaVersion
+  security_code: string
+  side: "buy" | "sell"
 }
 
 export type Timestamp = string

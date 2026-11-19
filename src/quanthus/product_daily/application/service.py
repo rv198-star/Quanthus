@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from quanthus.capabilities.accounting import AccountProjection
 from quanthus.capabilities.execution import (
     Correction,
     ExecutionReport,
+    FeeAssessment,
+    OrderObservation,
     SyntheticContext,
     validate_context,
     validate_correction,
+    validate_fee_assessment,
+    validate_observation,
     validate_report,
 )
 from quanthus.product_daily.application.history import (
@@ -65,6 +71,47 @@ class SyntheticFactService:
 
     def correct_fact(self, context: SyntheticContext, correction: Correction) -> CorrectionResult:
         return self._port.correct_fact(self._authorize(context), validate_correction(correction))
+
+    def submit_order_observation(
+        self,
+        context: SyntheticContext,
+        observation: OrderObservation,
+        *,
+        accepted_total_qty: int,
+        side: str,
+        security_code: str,
+        price_bound: Decimal,
+        estimated_fee_upper: Decimal,
+    ) -> SubmissionResult:
+        validated = self._authorize(context)
+        validate_observation(observation)
+        receipt = self._port.receive_order_observation(validated, observation)
+        if receipt.status == "IDEMPOTENCY_CONFLICT":
+            return SubmissionResult(
+                receipt.receipt_id,
+                receipt.status,
+                self._port.projection(validated),
+                conflicts=receipt.conflicts,
+            )
+        return self._port.post_order_observation(
+            validated, receipt, observation,
+            accepted_total_qty, side, security_code, price_bound, estimated_fee_upper,
+        )
+
+    def submit_fee_assessment(
+        self, context: SyntheticContext, fee: FeeAssessment
+    ) -> SubmissionResult:
+        validated = self._authorize(context)
+        validate_fee_assessment(fee)
+        receipt = self._port.receive_fee_assessment(validated, fee)
+        if receipt.status == "IDEMPOTENCY_CONFLICT":
+            return SubmissionResult(
+                receipt.receipt_id,
+                receipt.status,
+                self._port.projection(validated),
+                conflicts=receipt.conflicts,
+            )
+        return self._port.post_fee_assessment(validated, receipt, fee)
 
     def projection(self, context: SyntheticContext) -> AccountProjection:
         return self._port.projection(self._authorize(context))

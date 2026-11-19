@@ -46,6 +46,7 @@ export const loadRecords = accountId => call('p12.records.read', accountId)
 export const loadFundingRules = accountId => call('p12.funding.read', accountId)
 export const submitFill = (accountId, fill) => call('p12.reports.submit', accountId, fill)
 export const correctFill = (accountId, correction) => call('p12.facts.correct', accountId, correction)
+export const submitOrderEvent = (accountId, event) => call('p12.order_events.submit', accountId, event)
 
 export function newClientId (prefix) {
   const random = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10)

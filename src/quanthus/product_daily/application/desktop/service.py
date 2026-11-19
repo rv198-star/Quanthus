@@ -25,6 +25,8 @@ from quanthus.capabilities.execution import (
     BASELINE_COVERAGE_UNKNOWN,
     Correction,
     ExecutionReport,
+    FeeAssessment,
+    OrderObservation,
     SyntheticContext,
     coverage_gap_at,
 )
@@ -53,6 +55,7 @@ from quanthus.product_daily.application.desktop.views import (
     RecordsView,
     ReportRecord,
     SubmitFill,
+    SubmitOrderEvent,
     WorkbenchView,
 )
 from quanthus.product_daily.application.history import ConfigurationBinding, FactHistory
@@ -153,13 +156,23 @@ class P12DesktopApplication:
         return decisions
 
     # ---- baseline -------------------------------------------------------------------
-    def establish_baseline(self, *, request_id: str, cash: Decimal) -> AccountProjection:
-        """Create the trusted cash-only baseline with the current plans as dependants."""
+    def establish_baseline(
+        self,
+        *,
+        request_id: str,
+        cash: Decimal,
+        quantity: int = 0,
+        security_code: str | None = None,
+    ) -> AccountProjection:
+        """Create the trusted baseline; a held position joins with unknown cost."""
 
         decisions = self._current_decisions()
-        first = decisions.decisions[0].security_code if decisions.decisions else "CASH"
+        first = (
+            security_code
+            or (decisions.decisions[0].security_code if decisions.decisions else "CASH")
+        )
         return self._facts.establish_baseline(
-            Baseline(self._context, request_id, cash, 0, first, 0, plan_ids(decisions))
+            Baseline(self._context, request_id, cash, quantity, first, 0, plan_ids(decisions))
         )
 
     def bind_configuration(self) -> ConfigurationBinding:
@@ -438,12 +451,21 @@ class P12DesktopApplication:
                 )
             )
         pending = self._pending(history)
-        occupied = Decimal("0.00")
-        available = (
-            MaybeDecimal.unknown(RECONCILIATION_PENDING)
-            if pending
-            else MaybeDecimal.known(max(Decimal("0.00"), projection.cash - occupied))
-        )
+        occupied = sum(
+            (order.hold_amount for order in history.orders),
+            Decimal("0.00"),
+        ).quantize(CNY_QUANTUM)
+        order_pending = any(o.needs_reconciliation for o in history.orders)
+        if occupied > 0:
+            # A bounded order hold keeps a known residual even while it needs
+            # reconciliation (EX08: 605 held, 18,195 still usable).
+            available = MaybeDecimal.known(
+                max(Decimal("0.00"), projection.cash - occupied)
+            )
+        elif pending or order_pending:
+            available = MaybeDecimal.unknown(RECONCILIATION_PENDING)
+        else:
+            available = MaybeDecimal.known(projection.cash)
         if top is not None:
             concentration = MaybeDecimal.known(top[0])
         elif projection.positions:
@@ -466,8 +488,12 @@ class P12DesktopApplication:
             reserve=funding.reserve,
             top_concentration=concentration,
             top_concentration_security=top[1] if top else None,
-            reconciliation_status="NEEDS_RECONCILIATION" if pending else "CLEAN",
-            pending_reconciliations=pending,
+            reconciliation_status=(
+                "NEEDS_RECONCILIATION" if (pending or order_pending) else "CLEAN"
+            ),
+            pending_reconciliations=pending + sum(
+                1 for o in history.orders if o.needs_reconciliation
+            ),
             ledger_digest=projection.digest,
             positions=tuple(lines),
         )
@@ -742,6 +768,7 @@ class P12DesktopApplication:
             facts=facts,
             events=history.events,
             plans=exposed.plans,
+            orders=history.orders,
         )
 
     def funding_rules(self, scope: AccountScope) -> FundingRulesView:
@@ -799,6 +826,174 @@ class P12DesktopApplication:
             result.receipt_id,
             result.status,
             deviations,
+            result.conflicts,
+            result.affected_plans,
+            result.next_action,
+            None,
+            None,
+            command.report_id if result.status == "POSTED" else None,
+        )
+
+    def submit_order_event(
+        self, scope: AccountScope, command: SubmitOrderEvent
+    ) -> FactOutcome:
+        """Register one fill, order observation or order fee against an actual order.
+
+        The first fact seen for an order establishes it; an ``in_progress``
+        observation may also carry the order's accepted quantity and bounds.
+        """
+
+        self._require(scope)
+        if not isinstance(command.occurred_at, datetime) or command.occurred_at.tzinfo is None:
+            raise FactError("INVALID_REPORT_SHAPE", "occurred_at must be aware")
+        if command.occurred_at > self._now():
+            raise FactError("INVALID_REPORT_SHAPE", "occurred_at cannot be in the future")
+        if command.kind not in ("fill", "observation", "fee"):
+            raise FactError("INVALID_REPORT_SHAPE", f"unknown order event kind {command.kind}")
+
+        history = self._facts.history(self._context)
+        existing = next((o for o in history.orders if o.order_id == command.order_id), None)
+
+        if command.kind == "observation":
+            observation = OrderObservation(
+                observation_id=command.report_id,
+                order_id=command.order_id,
+                status=command.order_status or "in_progress",
+                observed_at=command.occurred_at,
+                source_id=FACT_SOURCE_ID,
+                source_sequence=command.report_id,
+                final_cumulative_fill_qty=command.final_cumulative_fill_qty,
+                cancelled_qty=command.cancelled_qty,
+                order_revision=command.order_revision,
+            )
+            accepted = command.accepted_total_qty or (
+                existing.accepted_total_qty if existing is not None else None
+            )
+            if accepted is None:
+                raise FactError(
+                    "INVALID_REPORT_SHAPE",
+                    "first observation must declare accepted_total_qty",
+                )
+            result = self._facts.submit_order_observation(
+                self._context,
+                observation,
+                accepted_total_qty=accepted,
+                side=existing.side if existing is not None else command.side,
+                security_code=(
+                    existing.security_code
+                    if existing is not None
+                    else command.security_code
+                ),
+                price_bound=(
+                    command.price_bound
+                    if command.price_bound is not None
+                    else (
+                        existing.price_bound if existing is not None else Decimal("0.01")
+                    )
+                ),
+                estimated_fee_upper=(
+                    command.fee_upper_bound
+                    if command.fee_upper_bound is not None
+                    else Decimal("0.00")
+                ),
+            )
+            return self._outcome(
+                "observation",
+                result.receipt_id,
+                result.status,
+                (),
+                result.conflicts,
+                (),
+                result.next_action,
+                None,
+                None,
+                command.report_id if result.status == "POSTED" else None,
+            )
+
+        if command.kind == "fee":
+            if existing is None:
+                raise FactError("UNKNOWN_ORDER_EXPOSURE", "fee references an unknown order")
+            fee = FeeAssessment(
+                fee_id=command.report_id,
+                order_id=command.order_id,
+                amount=command.confirmed_fee if command.confirmed_fee is not None else Decimal("0"),
+                source_id=FACT_SOURCE_ID,
+                source_sequence=command.report_id,
+                occurred_at=command.occurred_at,
+            )
+            result = self._facts.submit_fee_assessment(self._context, fee)
+            return self._outcome(
+                "fee",
+                result.receipt_id,
+                result.status,
+                (),
+                result.conflicts,
+                (),
+                result.next_action,
+                None,
+                None,
+                command.report_id if result.status == "POSTED" else None,
+            )
+
+        # kind == "fill": a fill is an ExecutionReport linked to the order.
+        if command.quantity is None or command.price is None:
+            raise FactError("INVALID_REPORT_SHAPE", "fill needs quantity and price")
+        if existing is None:
+            # First fact for this order: register it in progress with the declared
+            # accepted quantity, then post the fill against it.
+            accepted = command.accepted_total_qty
+            if accepted is None or command.price_bound is None:
+                raise FactError(
+                    "INVALID_REPORT_SHAPE",
+                    "first fill must declare accepted_total_qty and price_bound",
+                )
+            opening = OrderObservation(
+                observation_id=f"{command.report_id}:open",
+                order_id=command.order_id,
+                status="in_progress",
+                observed_at=command.occurred_at,
+                source_id=FACT_SOURCE_ID,
+                source_sequence=f"{command.report_id}:open",
+                order_revision=command.order_revision,
+            )
+            self._facts.submit_order_observation(
+                self._context,
+                opening,
+                accepted_total_qty=accepted,
+                side=command.side,
+                security_code=command.security_code,
+                price_bound=command.price_bound,
+                estimated_fee_upper=command.fee_upper_bound or Decimal("0.00"),
+            )
+        report = ExecutionReport(
+            report_id=command.report_id,
+            security_code=command.security_code
+            or (existing.security_code if existing is not None else ""),
+            side=command.side if existing is None else existing.side,
+            quantity=command.quantity,
+            price=command.price,
+            confirmed_fee=command.confirmed_fee or Decimal("0.00"),
+            occurred_at=command.occurred_at,
+            source_id=FACT_SOURCE_ID,
+            source_sequence=command.report_id,
+            intended_quantity=(
+                existing.accepted_total_qty
+                if existing is not None
+                else (command.accepted_total_qty or command.quantity)
+            ),
+            intended_price_cap=(
+                command.price_bound
+                if command.price_bound is not None
+                else command.price
+            ),
+            order_id=command.order_id,
+        )
+        result = self._facts.submit_report(self._context, report)
+        return self._outcome(
+            "fill",
+            result.receipt_id,
+            result.status,
+            result.deviations,
             result.conflicts,
             result.affected_plans,
             result.next_action,

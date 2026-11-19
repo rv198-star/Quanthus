@@ -26,6 +26,7 @@ class ReceivedReport:
     suggestion_id: str | None
     deviations: tuple[str, ...]
     conflicts: tuple[str, ...]
+    order_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,49 @@ class PlanStatus:
 
 
 @dataclass(frozen=True)
+class ReceivedOrderObservation:
+    observation_id: str
+    receipt_id: str
+    order_id: str
+    status: str
+    observed_at: str
+    final_cumulative_fill_qty: int | None
+    cancelled_qty: int | None
+    order_revision: int
+    store_status: str
+
+
+@dataclass(frozen=True)
+class ReceivedFeeAssessment:
+    fee_id: str
+    receipt_id: str
+    order_id: str
+    amount: Decimal
+    occurred_at: str
+    store_status: str
+
+
+@dataclass(frozen=True)
+class OrderRecord:
+    """Effective per-order ledger state the desktop shows."""
+
+    order_id: str
+    security_code: str
+    side: str
+    price_bound: Decimal
+    accepted_total_qty: int
+    known_fill_qty: int
+    unreported_fill_qty: int
+    hold_qty: int
+    hold_amount: Decimal
+    status: str
+    needs_reconciliation: bool
+    reason_codes: tuple[str, ...]
+    fee_confirmed_total: Decimal
+    settlement_ready: bool
+
+
+@dataclass(frozen=True)
 class FactHistory:
     baseline_request_id: str
     baseline_cash: Decimal
@@ -86,6 +130,9 @@ class FactHistory:
     corrections: tuple[ReceivedCorrection, ...]
     events: tuple[LedgerEvent, ...]
     plans: tuple[PlanStatus, ...]
+    orders: tuple[OrderRecord, ...]
+    observations: tuple[ReceivedOrderObservation, ...]
+    fees: tuple[ReceivedFeeAssessment, ...]
     outbox_pending: int
 
 

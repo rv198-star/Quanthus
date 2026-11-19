@@ -666,6 +666,12 @@ class PlatformHttpApp:
             "POST",
             self._p12_correct_fill,
         )
+        self._add(
+            "p12.order_events.submit",
+            "/api/p12/v1/accounts/<account_id>/order-events",
+            "POST",
+            self._p12_submit_order_event,
+        )
 
     def _p12_accounts(
         self, observed_request: HttpRequest, params: Mapping[str, str]
@@ -728,6 +734,19 @@ class PlatformHttpApp:
     ) -> HttpResponse:
         principal = _principal(self._identity, observed_request, "p12:report")
         status, payload = self._p12.correct_fill(
+            principal,
+            params["account_id"],
+            observed_request.json_object(),
+            observed_request.request_id,
+            observed_request.query_string,
+        )
+        return _json_response(payload, status)
+
+    def _p12_submit_order_event(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:report")
+        status, payload = self._p12.submit_order_event(
             principal,
             params["account_id"],
             observed_request.json_object(),

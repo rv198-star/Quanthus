@@ -18,6 +18,7 @@ from quanthus.product_daily.application.desktop.views import (
     FundingRulesView,
     RecordsView,
     SubmitFill,
+    SubmitOrderEvent,
     WorkbenchView,
 )
 
@@ -34,6 +35,7 @@ __all__ = [
     "P12DesktopApplication",
     "RecordsView",
     "SubmitFill",
+    "SubmitOrderEvent",
     "WorkbenchView",
     "plan_ids",
 ]

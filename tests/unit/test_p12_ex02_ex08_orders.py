@@ -597,3 +597,110 @@ def test_ex08_same_time_conflicting_terminal_flags_reconciliation(tmp_path: Path
     assert order.needs_reconciliation is True
     # The contested unreported exposure is held conservatively, not released.
     assert account.cash_available_for_new.value <= Decimal("18195.00")
+
+
+def test_ex08_contested_terminal_survives_fee_and_order_restore(tmp_path: Path) -> None:
+    """A contested same-time terminal pair must keep its conservative hold after a
+    later fee confirmation and after a derived order_states row is rebuilt."""
+    app = _app(tmp_path)
+    _ex08_setup(app)
+    app.submit_order_event(
+        app.scope,
+        _event("bo", "ORD-EX08", "observation", T0,
+               order_status="in_progress", side="buy", security_code="600000",
+               accepted_total_qty=400, price_bound=Decimal("12.00"),
+               fee_upper_bound=Decimal("5.00")),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event("b1", "ORD-EX08", "fill", T1,
+               side="buy", security_code="600000", quantity=100, price=Decimal("12.00"),
+               confirmed_fee=Decimal("0.00")),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event("oa", "ORD-EX08", "observation", T3,
+               order_status="terminal", final_cumulative_fill_qty=100, cancelled_qty=300),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event("ob", "ORD-EX08", "observation", T3,
+               order_status="terminal", final_cumulative_fill_qty=150, cancelled_qty=250),
+    )
+
+    # An unrelated whole-order fee confirmation must not clear the dispute.
+    conf = app.submit_order_event(
+        app.scope,
+        _event("cf", "ORD-EX08", "fee", T4, confirmed_fee=Decimal("5.00")),
+    )
+    assert conf.status == "POSTED"
+    after_fee = app.workbench(app.scope).account
+    assert after_fee.reconciliation_status == "NEEDS_RECONCILIATION"
+    assert after_fee.cash_available_for_new.value <= Decimal("18195.00")
+
+    # Rebuilding the derived order projection must re-derive the same dispute.
+    with __import__("sqlite3").connect(tmp_path / STORE_NAME) as conn:
+        conn.execute("DELETE FROM order_states WHERE order_id=?", ("ORD-EX08",))
+        conn.commit()
+    again = _reopen(tmp_path)
+    restored = again.workbench(again.scope).account
+    order = next(o for o in again.records(again.scope).orders if o.order_id == "ORD-EX08")
+    assert restored.reconciliation_status == "NEEDS_RECONCILIATION"
+    assert order.needs_reconciliation is True
+    assert restored.cash_available_for_new.value <= Decimal("18195.00")
+
+
+def test_ex02_older_fee_row_recovered_out_of_order_keeps_latest_total(
+    tmp_path: Path,
+) -> None:
+    """Recovering only the superseded 6-yuan row while the 7-yuan row stands must
+    keep the effective total at 7 yuan and stay idempotent on a same-amount retry."""
+    app = _app(tmp_path)
+    _ex02_setup(app)
+    app.submit_order_event(
+        app.scope,
+        _event("s1", "ORD-EX02", "fill", T1,
+               side="sell", security_code="600000", quantity=200, price=Decimal("10.00"),
+               accepted_total_qty=600, price_bound=Decimal("10.10"),
+               confirmed_fee=Decimal("0.00")),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event("s2", "ORD-EX02", "fill", T2,
+               side="sell", security_code="600000", quantity=400, price=Decimal("10.10"),
+               confirmed_fee=Decimal("0.00")),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event("sf", "ORD-EX02", "observation", T3,
+               order_status="terminal", final_cumulative_fill_qty=600, cancelled_qty=0,
+               confirmed_fee=Decimal("0.00")),
+    )
+    app.submit_order_event(
+        app.scope, _event("f6", "ORD-EX02", "fee", T4, confirmed_fee=Decimal("6.00"))
+    )
+    app.submit_order_event(
+        app.scope, _event("f7", "ORD-EX02", "fee", T4, confirmed_fee=Decimal("7.00"))
+    )
+    assert app.workbench(app.scope).account.cash_total == Decimal("6033.00")
+
+    # Drop only the older derived fee row; the newer 7-yuan row and events stay.
+    with __import__("sqlite3").connect(tmp_path / STORE_NAME) as conn:
+        conn.execute(
+            "DELETE FROM order_fees WHERE fee_id=?", ("f6",)
+        )
+        conn.commit()
+
+    again = _reopen(tmp_path)
+    order = next(o for o in again.records(again.scope).orders if o.order_id == "ORD-EX02")
+    # The recovered older row stays superseded; the effective total remains 7.
+    assert order.fee_confirmed_total == Decimal("7.00")
+    assert again.workbench(again.scope).account.cash_total == Decimal("6033.00")
+
+    # Re-confirming the same 7-yuan total posts no further charge.
+    dup = again.submit_order_event(
+        again.scope,
+        _event("f7b", "ORD-EX02", "fee", T4, confirmed_fee=Decimal("7.00")),
+    )
+    assert dup.status == "POSTED"
+    assert again.workbench(again.scope).account.cash_total == Decimal("6033.00")

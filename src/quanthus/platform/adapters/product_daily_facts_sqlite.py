@@ -734,25 +734,8 @@ class SQLiteSyntheticFactsAdapter:
                         # cumulative and cancelled counts as the effective terminal
                         # until reconciliation picks one.  effective_order_state then
                         # derives the conservative hold and FINAL_FILL_GAP itself.
-                        conservative = OrderObservation(
-                            f"{observation.observation_id}:contested",
-                            observation.order_id,
-                            "terminal",
-                            max(observation.observed_at, current_observed_at),
-                            observation.source_id,
-                            observation.source_sequence,
-                            max(
-                                current_terminal_final or 0,
-                                observation.final_cumulative_fill_qty or 0,
-                            ),
-                            max(
-                                current_terminal_cancelled or 0,
-                                observation.cancelled_qty or 0,
-                            ),
-                            observation.order_revision,
-                        )
                         self._refresh_order_state(
-                            connection, context, observation.order_id, conservative
+                            connection, context, observation.order_id
                         )
                         self._store_submission(connection, inbox, SubmissionResult(
                             receipt.receipt_id, "POSTED",
@@ -1805,6 +1788,83 @@ class SQLiteSyntheticFactsAdapter:
             (context.account_id, context.mode, order_id),
         ).fetchone()
 
+    def _effective_terminal_observation(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        order_id: str,
+        fallback_observation_id: str | None,
+    ) -> OrderObservation | None:
+        """Return the effective terminal observation for an order.
+
+        The effective reading is the posted terminal observation with the
+        largest observed_at.  When two or more posted terminal observations
+        share that largest observed_at but disagree on the confirmed counts,
+        they cannot be ordered, so a conservative synthetic reading keeps the
+        larger final cumulative and cancelled counts.  Deriving it from the
+        posted observations (not a stored row) means a fee confirmation, an
+        ordinary reopen, or a derived-row rebuild all reproduce the same
+        disputed terminal state until reconciliation resolves it.
+        """
+
+        rows = connection.execute(
+            "SELECT payload_json FROM inbox WHERE account_id=? AND mode=? "
+            "AND kind='order_observation'",
+            (context.account_id, context.mode),
+        ).fetchall()
+        observations = []
+        for obs_row in rows:
+            raw = json.loads(obs_row["payload_json"])
+            if raw["order_id"] != order_id or raw["status"] != "terminal":
+                continue
+            observations.append(
+                OrderObservation(
+                    raw["observation_id"], raw["order_id"], raw["status"],
+                    datetime.fromisoformat(raw["observed_at"]), raw["source_id"],
+                    raw["source_sequence"], raw["final_cumulative_fill_qty"],
+                    raw["cancelled_qty"], raw["order_revision"],
+                    raw["expected_order_state_revision"],
+                )
+            )
+        if not observations:
+            # No terminal observation posted yet: keep the stored latest
+            # observation so a non-terminal latest reading is still honoured.
+            if fallback_observation_id is None:
+                return None
+            obs_row = connection.execute(
+                "SELECT payload_json FROM inbox WHERE account_id=? AND mode=? AND report_id=?",
+                (context.account_id, context.mode, fallback_observation_id),
+            ).fetchone()
+            if obs_row is None:
+                return None
+            raw = json.loads(obs_row["payload_json"])
+            return OrderObservation(
+                raw["observation_id"], raw["order_id"], raw["status"],
+                datetime.fromisoformat(raw["observed_at"]), raw["source_id"],
+                raw["source_sequence"], raw["final_cumulative_fill_qty"],
+                raw["cancelled_qty"], raw["order_revision"],
+                raw["expected_order_state_revision"],
+            )
+        latest_at = max(o.observed_at for o in observations)
+        candidates = [o for o in observations if o.observed_at == latest_at]
+        if len(candidates) == 1:
+            return candidates[0]
+        # Contested simultaneous terminal readings: merge into the conservative
+        # envelope so the disputed unreported exposure stays held.
+        first = candidates[0]
+        return OrderObservation(
+            f"{first.observation_id}:contested",
+            order_id,
+            "terminal",
+            latest_at,
+            first.source_id,
+            first.source_sequence,
+            max((o.final_cumulative_fill_qty or 0) for o in candidates),
+            max((o.cancelled_qty or 0) for o in candidates),
+            first.order_revision,
+        )
+
+
     def _refresh_order_state(
         self,
         connection: sqlite3.Connection,
@@ -1816,20 +1876,17 @@ class SQLiteSyntheticFactsAdapter:
         if row is None:
             return
         obs = latest_observation
-        if obs is None and row["last_observation_id"] is not None:
-            obs_row = connection.execute(
-                "SELECT payload_json FROM inbox WHERE account_id=? AND mode=? AND report_id=?",
-                (context.account_id, context.mode, row["last_observation_id"]),
-            ).fetchone()
-            if obs_row is not None:
-                raw = json.loads(obs_row["payload_json"])
-                obs = OrderObservation(
-                    raw["observation_id"], raw["order_id"], raw["status"],
-                    datetime.fromisoformat(raw["observed_at"]), raw["source_id"],
-                    raw["source_sequence"], raw["final_cumulative_fill_qty"],
-                    raw["cancelled_qty"], raw["order_revision"],
-                    raw["expected_order_state_revision"],
-                )
+        if obs is None:
+            # Derive the effective terminal reading from every posted terminal
+            # observation for this order, not only the last accepted one.  When
+            # the largest observed_at carries two or more terminal readings that
+            # disagree on the confirmed counts, they cannot be ordered, so the
+            # effective reading keeps the larger final cumulative and cancelled
+            # counts: the conservative hold then survives a fee confirmation or
+            # a derived-row rebuild until reconciliation resolves the dispute.
+            obs = self._effective_terminal_observation(
+                connection, context, order_id, row["last_observation_id"]
+            )
         state = effective_order_state(
             order_id=order_id,
             side=row["side"],
@@ -1908,7 +1965,6 @@ class SQLiteSyntheticFactsAdapter:
             # live rows already carry the latest fills and must not be replayed.
             order_missing = self._order_state_row(connection, context, order_id) is None
             exists = not order_missing
-            last_obs: OrderObservation | None = None
             for event in events:
                 if event["kind"] == "order_observation":
                     if not order_missing:
@@ -1950,10 +2006,15 @@ class SQLiteSyntheticFactsAdapter:
                                 row["last_observation_id"],
                             ),
                         ).fetchone()
+                        # Mirror the live guard exactly: a terminal replayed
+                        # observation strictly earlier than the stored one is
+                        # stale and skipped, but one at the same observed_at is
+                        # admitted so a contested pair rebuilds to the same
+                        # conservative effective terminal the live path holds.
                         if (
                             current_ts is not None
                             and datetime.fromisoformat(event["observed_at"])
-                            <= datetime.fromisoformat(
+                            < datetime.fromisoformat(
                                 json.loads(current_ts["payload_json"])["observed_at"]
                             )
                         ):
@@ -1964,14 +2025,6 @@ class SQLiteSyntheticFactsAdapter:
                         (context.account_id, context.mode, event["fact_id"]),
                     ).fetchone()
                     if obs_row is not None:
-                        raw = json.loads(obs_row["payload_json"])
-                        last_obs = OrderObservation(
-                            raw["observation_id"], raw["order_id"], raw["status"],
-                            datetime.fromisoformat(raw["observed_at"]), raw["source_id"],
-                            raw["source_sequence"], raw["final_cumulative_fill_qty"],
-                            raw["cancelled_qty"], raw["order_revision"],
-                            raw["expected_order_state_revision"],
-                        )
                         connection.execute(
                             "UPDATE order_states SET last_observation_id=? "
                             "WHERE account_id=? AND mode=? AND order_id=?",
@@ -2002,18 +2055,61 @@ class SQLiteSyntheticFactsAdapter:
                         (context.account_id, context.mode, event["fact_id"]),
                     ).fetchone()
                     if present is None:
-                        # Restore the supersedes chain the live path wrote: each
-                        # restated total replaces the previous effective row, so
-                        # only the latest replayed fee stays effective.
-                        connection.execute(
-                            "UPDATE order_fees SET supersedes=? "
+                        # Restore this one missing fee row from its event.  The
+                        # whole-order fee is a single business fact restated by
+                        # a correction chain, so the effective row is the latest
+                        # confirmed total.  A row replayed out of event order
+                        # (an older total recovered while a newer row still
+                        # stands) must not displace the newer effective row: it
+                        # is inserted already superseded, keeping both original
+                        # events traceable while the effective total stays the
+                        # highest confirmed version.
+                        current = connection.execute(
+                            "SELECT fee_id, amount, occurred_at, supersedes FROM order_fees "
                             "WHERE account_id=? AND mode=? AND order_id=? AND supersedes IS NULL",
-                            (event["fact_id"], context.account_id, context.mode, order_id),
-                        )
+                            (context.account_id, context.mode, order_id),
+                        ).fetchone()
+                        supersedes: str | None = None
+                        if current is None:
+                            # No effective row survives: this replayed row becomes it.
+                            supersedes = None
+                        else:
+                            # Compare the two rows by their position in this
+                            # order's own fee-correction chain.  The events
+                            # list is already in committed event order, so the
+                            # fee whose event appears later is the later
+                            # restatement — regardless of wall-clock
+                            # occurred_at ties between same-second postings.
+                            fee_order = [
+                                e["fact_id"] for e in events if e["kind"] == "fee"
+                            ]
+                            newer = (
+                                event["fact_id"] in fee_order
+                                and current["fee_id"] in fee_order
+                                and fee_order.index(event["fact_id"])
+                                > fee_order.index(current["fee_id"])
+                            )
+                            if newer:
+                                # The replayed row is the later restatement: it
+                                # supersedes the standing row and becomes effective.
+                                connection.execute(
+                                    "UPDATE order_fees SET supersedes=? "
+                                    "WHERE account_id=? AND mode=? AND fee_id=?",
+                                    (event["fact_id"], context.account_id, context.mode,
+                                     current["fee_id"]),
+                                )
+                                supersedes = None
+                            else:
+                                # The replayed row is not newer than the standing
+                                # effective row (older, or a same-time version whose
+                                # standing row already carries the latest total).
+                                # Keep it traceable as already superseded without
+                                # disturbing the standing row's own chain link.
+                                supersedes = current["supersedes"] or current["fee_id"]
                         connection.execute(
                             "INSERT INTO order_fees "
                             "(account_id,mode,fee_id,order_id,amount,occurred_at,supersedes) "
-                            "VALUES(?,?,?,?,?,?,NULL)",
+                            "VALUES(?,?,?,?,?,?,?)",
                             (
                                 context.account_id,
                                 context.mode,
@@ -2021,12 +2117,16 @@ class SQLiteSyntheticFactsAdapter:
                                 order_id,
                                 event["amount"],
                                 event["occurred_at"],
+                                supersedes,
                             ),
                         )
             # Refresh only when this replay actually rebuilt the row; a live order
             # already reflects its confirmed facts and must not be recomputed.
             if order_missing and exists:
-                self._refresh_order_state(connection, context, order_id, last_obs)
+                # Recompute from the same posted-observation set the live path
+                # uses, so a contested simultaneous terminal pair rebuilds to
+                # the identical conservative effective terminal.
+                self._refresh_order_state(connection, context, order_id)
 
     def _current_chain(
         self, connection: sqlite3.Connection, context: SyntheticContext, fact: sqlite3.Row

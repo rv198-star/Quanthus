@@ -143,6 +143,8 @@ class WorkbenchView:
     clock_kind: str
     account: AccountSummary
     opportunities: tuple[OpportunityView, ...]
+    # Per-order ledger for the on-screen sell task: filled/remaining/finalization.
+    orders: tuple[OrderRecord, ...]
     action_blockers: tuple[str, ...]
 
 

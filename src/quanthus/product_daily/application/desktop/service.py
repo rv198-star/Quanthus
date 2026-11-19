@@ -935,6 +935,7 @@ class P12DesktopApplication:
             clock_kind=self._clock_kind,
             account=account,
             opportunities=tuple(items),
+            orders=history.orders,
             action_blockers=blockers,
         )
 

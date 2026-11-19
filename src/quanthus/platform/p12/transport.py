@@ -258,6 +258,25 @@ def workbench_dto(value: WorkbenchView) -> dict[str, Any]:
             "clock_kind": value.clock_kind,
             "account": _account(value.account),
             "opportunities": [_opportunity(item) for item in value.opportunities],
+            "orders": [
+                {
+                    "order_id": o.order_id,
+                    "security_code": o.security_code,
+                    "side": o.side,
+                    "price_bound": _money(o.price_bound),
+                    "accepted_total_qty": o.accepted_total_qty,
+                    "known_fill_qty": o.known_fill_qty,
+                    "unreported_fill_qty": o.unreported_fill_qty,
+                    "hold_qty": o.hold_qty,
+                    "hold_amount": _money(o.hold_amount),
+                    "status": o.status,
+                    "needs_reconciliation": o.needs_reconciliation,
+                    "reason_codes": _reasons(o.reason_codes),
+                    "fee_confirmed_total": _money(o.fee_confirmed_total),
+                    "settlement_ready": o.settlement_ready,
+                }
+                for o in value.orders
+            ],
             "action_blockers": list(value.action_blockers),
         },
     )

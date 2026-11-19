@@ -2559,6 +2559,7 @@
      "clock",
      "clock_kind",
      "opportunities",
+    "orders",
      "package",
      "publication",
      "schema_version",
@@ -2591,6 +2592,12 @@
        "$ref": "#/components/schemas/Opportunity"
       }
      },
+    "orders": {
+     "type": "array",
+     "items": {
+      "$ref": "#/components/schemas/OrderRecord"
+     }
+    },
      "package": {
       "anyOf": [
        {

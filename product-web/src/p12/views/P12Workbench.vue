@@ -61,6 +61,7 @@
               <span>主要约束</span>
               <b>{{ selected.primary_constraint ? reason(selected.primary_constraint) : '无' }}</b>
               <p v-if="otherReasons.length">同时：{{ otherReasons.map(reason).join('；') }}</p>
+              <p v-if="endedReasons.length" class="p12-history">历史原因：{{ endedReasons.map(reason).join('；') }}</p>
             </div>
           </div>
           <div class="p12-chain">
@@ -84,7 +85,7 @@
 
         <aside v-if="selected" class="panel p12-task" data-testid="p12-task">
           <div class="panel-head"><div><h2>{{ selected.plan ? '下一交易日计划' : '今天的任务' }}</h2><p v-if="selected.applicability">{{ label('applicability_status', selected.applicability.status) }}</p></div></div>
-          <template v-if="selected.plan">
+          <template v-if="selected.plan && selected.plan.side === 'buy'">
             <dl class="p12-plan" data-testid="p12-plan">
               <div><dt>当前持有</dt><dd>{{ qty(selected.applicability.current_qty) }}</dd></div>
               <div><dt>计划目标</dt><dd>{{ qty(selected.plan.target_qty) }}</dd></div>
@@ -108,9 +109,38 @@
               <small class="p12-hint">报告编号 {{ form.reportId }}；网络重试会沿用同一编号。</small>
             </form>
           </template>
+          <template v-else-if="selected.stage === 'exit_plan'">
+            <dl class="p12-plan" data-testid="p12-sell-plan">
+              <div><dt>当前持有</dt><dd>{{ qty(sellTask ? sellTask.held : 0) }}</dd></div>
+              <div><dt>卖出数量</dt><dd>{{ sellTask ? qty(sellTask.total) : '—' }}</dd></div>
+              <div><dt>已成交</dt><dd data-testid="p12-sell-filled">{{ sellTask ? qty(sellTask.filled) : '0 股' }}</dd></div>
+              <div><dt>剩余待成交</dt><dd data-testid="p12-sell-remaining">{{ sellTask ? qty(sellTask.remaining) : '—' }}</dd></div>
+              <div><dt>执行窗口</dt><dd>次一交易日 09:30–15:00</dd></div>
+            </dl>
+            <p class="p12-next" data-testid="p12-sell-next">{{ sellNext }}</p>
+            <div v-if="sellTask && !sellTask.settled" class="p12-form p12-sell-entry" data-testid="p12-sell-entry">
+              <h3>登记实际卖出成交</h3>
+              <p class="p12-hint">同一委托可分笔成交；登记每一笔，最后确认整单费用并终结。系统不代为下单。</p>
+              <a-button size="small" type="primary" data-testid="p12-open-sell-form" @click="prefillSell">登记卖出成交（已预填）</a-button>
+            </div>
+          </template>
+          <template v-else-if="selected.plan">
+            <dl class="p12-plan" data-testid="p12-plan">
+              <div><dt>当前持有</dt><dd>{{ qty(selected.applicability.current_qty) }}</dd></div>
+              <div><dt>计划目标</dt><dd>{{ qty(selected.plan.target_qty) }}</dd></div>
+              <div><dt>还差</dt><dd data-testid="p12-delta">{{ qty(selected.applicability.delta_qty) }}</dd></div>
+              <div><dt>有效窗口</dt><dd>{{ time(selected.plan.eligible_at) }} 至 {{ time(selected.plan.expires_at).slice(11) }}</dd></div>
+              <div><dt>价格上限</dt><dd>{{ selected.plan.price_cap }}</dd></div>
+            </dl>
+            <div class="p12-invalid"><span>失效条件</span><ul><li v-for="item in selected.plan.invalidations" :key="item">{{ item }}</li></ul></div>
+            <p class="p12-next">{{ label('next_step', selected.applicability.next_step) }}</p>
+          </template>
+
           <div v-else class="p12-noop">
             <b>{{ label('action_code', selected.action_code) }}</b>
-            <p>{{ selected.next_observation || '无需操作' }}</p>
+            <p v-if="selected.stage === 'exit_plan' && selected.status_code === 'ENDED'" data-testid="p12-ended-note">{{ actionSentence }}</p>
+            <p v-else-if="selected.stage === 'exit_plan'" data-testid="p12-sell-note">{{ actionSentence }}</p>
+            <p v-else>{{ selected.next_observation || '无需操作' }}</p>
             <small>最近检查：{{ workbench.package.market_date }} 收盘</small>
           </div>
 
@@ -218,17 +248,78 @@ export default {
     otherReasons () {
       const item = this.selected
       if (!item) return []
-      return item.reason_codes.filter(code => code !== item.primary_constraint && code !== 'CAPACITY_AVAILABLE' && !code.startsWith('NEW_') && code !== 'WAITING_FOR_PULLBACK')
+      // A finished opportunity keeps its trigger reason as history, not as a
+      // live "also" constraint, so EXIT_SIGNAL no longer reads as a current ask.
+      const ended = item.status_code === 'ENDED'
+      return item.reason_codes.filter(code =>
+        code !== item.primary_constraint &&
+        code !== 'CAPACITY_AVAILABLE' &&
+        !code.startsWith('NEW_') &&
+        code !== 'WAITING_FOR_PULLBACK' &&
+        !(ended && code === 'EXIT_SIGNAL'))
+    },
+    endedReasons () {
+      // The exit that already ran shows its reason once, as history.
+      const item = this.selected
+      if (!item || item.status_code !== 'ENDED') return []
+      return item.reason_codes.filter(code => code === 'EXIT_SIGNAL')
+    },
+    sellOrders () {
+      const code = this.selected?.security_code
+      if (!code) return []
+      return (this.workbench?.orders || []).filter(o => o.security_code === code && o.side === 'sell')
+    },
+    sellTask () {
+      const item = this.selected
+      if (!item || item.stage !== 'exit_plan') return null
+      const orders = this.sellOrders
+      const filled = orders.reduce((sum, o) => sum + (o.known_fill_qty || 0), 0)
+      const accepted = orders.find(o => o.accepted_total_qty)
+      const planned = item.plan ? Math.abs(item.plan.delta_qty || item.plan.target_qty || 0) : null
+      const open = orders.filter(o => o.status !== 'terminal')
+      const position = (this.workbench?.account?.positions || []).find(p => p.security_code === item.security_code)
+      const held = position ? position.quantity : 0
+      const total = accepted ? accepted.accepted_total_qty : (planned || held + filled)
+      const remaining = Math.max((total || 0) - filled, 0)
+      const settled = item.status_code === 'ENDED' || (total !== null && filled >= total && !open.length)
+      return { filled, total, remaining, open, settled, planned, held }
+    },
+    sellNext () {
+      const item = this.selected
+      if (!item || item.stage !== 'exit_plan') return ''
+      const t = this.sellTask || { filled: 0, remaining: null, settled: false, open: [], total: null }
+      if (item.status_code === 'ENDED' || t.settled) {
+        const when = this.workbench?.publication?.market_date || ''
+        return `该机会已于 ${when} 卖出 ${formatQuantity(t.filled || t.total || 0)} 结束，无需操作`
+      }
+      if (t.filled > 0) {
+        const open = t.open.length
+        return `已成交 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)}；同一委托待终结确认${open ? `（${open} 笔进行中）` : ''}`
+      }
+      return `今天任务：卖出 ${formatQuantity(t.total || 0)}，在交易窗口内登记实际成交`
     },
     actionSentence () {
       const item = this.selected
       if (!item) return ''
       const plan = item.plan
+      const delta = item.applicability ? Math.abs(item.applicability.delta_qty) : null
       if (item.action_code === 'BUY' && plan) return `${formatTime(plan.eligible_at).slice(0, 10)} 开盘后买入 ${formatQuantity(item.applicability.delta_qty)}，成交价不高于 ${plan.price_cap}`
+      if (item.action_code === 'SELL') {
+        const t = this.sellTask || { filled: 0, remaining: Math.abs(item.applicability ? item.applicability.delta_qty : 0) }
+        if (t.filled > 0) return `已卖出 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)} 待成交并在同委托终结`
+        const qty = t.remaining || Math.abs((item.applicability && item.applicability.delta_qty) || 0)
+        const when = item.applicability && item.applicability.status === 'SCHEDULED' ? '次日开盘后' : '今天'
+        return `${when}卖出 ${formatQuantity(qty)}，在交易窗口内登记实际成交`
+      }
       if (item.action_code === 'REVIEW' && item.applicability) return label('next_step', item.applicability.next_step)
       if (item.action_code === 'PAUSED') return reasonText(item.primary_constraint) || '新增买入暂停'
       if (item.action_code === 'WAIT') return item.next_observation || reasonText(item.primary_constraint) || '继续等待'
       if (item.action_code === 'HOLD') return '继续持有，等待下一次检查'
+      if (item.action_code === 'NONE' && item.stage === 'exit_plan') {
+        const qty = this.sellTask && this.sellTask.filled ? formatQuantity(this.sellTask.filled) : '全部持仓'
+        const when = this.workbench?.publication?.market_date || ''
+        return `该机会已于 ${when} 卖出 ${qty} 结束`
+      }
       return '今天没有需要执行的操作'
     }
   },
@@ -375,6 +466,33 @@ export default {
       if (['NEEDS_RECONCILIATION', 'NEEDS_REASSESSMENT', 'MISSING_INPUT', 'POLICY_NOT_ADOPTED'].includes(code)) return 'control'
       if (['EXPIRED', 'ENDED'].includes(code)) return 'locked'
       return 'locked'
+    },
+    prefillSell () {
+      const item = this.selected
+      const clock = (this.workbench?.clock || '').slice(0, 16)
+      const plan = item.plan
+      const remaining = this.sellTask ? this.sellTask.remaining : Math.abs(plan ? plan.delta_qty : 0)
+      this.orderForm = {
+        report_id: newClientId('ord'),
+        kind: 'fill',
+        order_id: this.sellTask && this.sellTask.open.length ? this.sellTask.open[0].order_id : '',
+        side: 'sell',
+        security_code: item.security_code,
+        quantity: remaining ? String(remaining) : '',
+        price: plan && plan.price_cap ? String(plan.price_cap) : '',
+        fee: '',
+        accepted_total_qty: plan ? String(Math.abs(plan.delta_qty)) : '',
+        order_status: 'in_progress',
+        final_cumulative_fill_qty: '',
+        cancelled_qty: '',
+        price_bound: plan && plan.price_cap ? String(plan.price_cap) : '',
+        fee_upper_bound: '',
+        time: clock
+      }
+      this.orderError = ''
+      this.orderOutcome = null
+      const el = this.$el.querySelector('[data-testid="p12-order-form"]')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     },
     money: formatMoney,
     qty: formatQuantity,

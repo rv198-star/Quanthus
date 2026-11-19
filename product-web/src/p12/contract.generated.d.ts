@@ -439,6 +439,7 @@ export interface Workbench {
   clock: Timestamp
   clock_kind: "synthetic_fixed" | "system"
   opportunities: Array<Opportunity>
+  orders: Array<OrderRecord>
   package: Package | null
   publication: PublicationStatus
   schema_version: SchemaVersion

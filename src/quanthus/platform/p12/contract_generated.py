@@ -7,7 +7,7 @@ from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
 SCHEMA_VERSION = 'p12.desktop.v1'
-SCHEMA_DIGEST = 'sha256:791261b5524ae5be6f2ab1744cb166d852c77cd3647214f8c7cb00ff14384e52'
+SCHEMA_DIGEST = 'sha256:1be1cbdc08b4de2df9761ee0fd82334cb80c69746d652ee1b6287635689b3b20'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -1135,6 +1135,8 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                                              'type': 'string'},
                               'opportunities': {'items': {'$ref': '#/components/schemas/Opportunity'},
                                                 'type': 'array'},
+                              'orders': {'items': {'$ref': '#/components/schemas/OrderRecord'},
+                                         'type': 'array'},
                               'package': {'anyOf': [{'$ref': '#/components/schemas/Package'},
                                                     {'type': 'null'}]},
                               'publication': {'$ref': '#/components/schemas/PublicationStatus'},
@@ -1145,6 +1147,7 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                             'clock',
                             'clock_kind',
                             'opportunities',
+                            'orders',
                             'package',
                             'publication',
                             'schema_version',

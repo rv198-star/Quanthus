@@ -22,7 +22,7 @@
           <a-alert v-if="rules.funding.status_reason" class="p12-alert inner" type="info" show-icon :message="reason(rules.funding.status_reason)" :description="`初始分区对应账户版本 ${rules.funding.bound_account_revision}，当前账户版本 ${rules.account_revision}；资金周期接入实际成交后显示实时桶内现金。`" />
           <table class="p12-table">
             <thead><tr><th>资金桶</th><th>目标额度</th><th>桶内现金</th><th>欠资差额</th><th>下次可用额度</th><th>锁定预算</th><th>试仓上限</th><th>状态</th><th>周期</th></tr></thead>
-            <tbody><tr v-for="bucket in rules.funding.buckets" :key="bucket.bucket_id"><td>{{ bucket.bucket_id }}</td><td>{{ money(bucket.target_notional) }}</td><td :title="maybe(bucket.cash).reason">{{ maybe(bucket.cash).text }}</td><td :title="maybe(bucket.underfunded).reason">{{ maybe(bucket.underfunded).text }}</td><td :title="maybe(bucket.next_available).reason">{{ maybe(bucket.next_available).text }}</td><td :title="maybe(bucket.locked_cycle_budget).reason">{{ maybe(bucket.locked_cycle_budget).text }}</td><td :title="maybe(bucket.trial_notional_cap).reason">{{ maybe(bucket.trial_notional_cap).text }}</td><td>{{ bucket.cash.value === null ? '未接入实际成交' : (bucket.phase === 'empty' ? '空闲' : bucket.phase) }}</td><td>{{ bucket.cycle_id || '—' }}</td></tr></tbody>
+            <tbody><tr v-for="bucket in rules.funding.buckets" :key="bucket.bucket_id"><td>{{ bucket.bucket_id }}</td><td>{{ money(bucket.target_notional) }}</td><td :title="bucketCashHint(bucket)">{{ maybe(bucket.cash).text }}</td><td :title="maybe(bucket.underfunded).reason">{{ maybe(bucket.underfunded).text }}<span v-if="isOverspent(bucket)" class="p12-flag" data-testid="p12-underfunded-flag">待核对</span></td><td :title="maybe(bucket.next_available).reason">{{ maybe(bucket.next_available).text }}</td><td :title="maybe(bucket.locked_cycle_budget).reason">{{ maybe(bucket.locked_cycle_budget).text }}</td><td :title="maybe(bucket.trial_notional_cap).reason">{{ maybe(bucket.trial_notional_cap).text }}</td><td>{{ bucketStatus(bucket) }}</td><td>{{ bucket.cycle_id || '—' }}</td></tr></tbody>
           </table>
           <dl class="p12-inline"><div><dt>共享储备</dt><dd :title="maybe(rules.funding.reserve).reason">{{ maybe(rules.funding.reserve).text }}</dd></div><div><dt>待分摊差额</dt><dd>{{ maybe(rules.funding.unallocated_adjustment).text }}</dd></div><div><dt>资金版本</dt><dd>{{ rules.funding.funding_revision === null ? '—' : rules.funding.funding_revision }}</dd></div></dl>
           <p class="p12-hint" data-testid="p12-retained-mode">盈亏留桶模式：后续能力，当前版本未开放，不能切换。</p>
@@ -77,6 +77,20 @@ export default {
     money: formatMoney,
     percent: ratioToPercent,
     reason: reasonText,
+    // A fill posted above the plan price leaves the bucket owing money: the
+    // cash cell then reads unknown(INSUFFICIENT_CASH) while underfunded holds
+    // the real gap.  Say the fill is recorded and the gap is the bucket's
+    // budget shortfall; only flag the underfunded amount as the item to check.
+    isOverspent (bucket) { return bucket.cash.value === null && bucket.cash.reason_code === 'INSUFFICIENT_CASH' },
+    bucketStatus (bucket) {
+      if (this.isOverspent(bucket)) return '成交已入账·桶内欠资'
+      if (bucket.cash.value === null) return '未接入实际成交'
+      return bucket.phase === 'empty' ? '空闲' : bucket.phase
+    },
+    bucketCashHint (bucket) {
+      if (this.isOverspent(bucket)) return '该笔成交已记入账户账本；缺口是 5,000 元桶预算的欠资，桶内现金暂时无法给出确定值。欠资差额一项标为待核对。'
+      return this.maybe(bucket.cash).reason
+    },
     label
   }
 }

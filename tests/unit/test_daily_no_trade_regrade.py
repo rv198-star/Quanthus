@@ -68,6 +68,8 @@ def held_fixture(tmp_path, *, raw: bytes | None = None, reason: str = "invalid_n
     root = tmp_path
     previous = root / (str(DAY) + "-20261020T093000000000Z")
     (previous / "core").mkdir(parents=True)
+    core_manifest = previous / "core/manifest.json"
+    cycle.write(core_manifest, {"market_date": str(DAY), "contents": "original-core"})
     market = root / "sources/daily" / str(DAY) / "market"
     events = root / "sources/daily" / str(DAY) / "events"
     for source in (market, events):
@@ -113,6 +115,7 @@ def held_fixture(tmp_path, *, raw: bytes | None = None, reason: str = "invalid_n
         "market_date": str(DAY),
         "status": "CORE_READY_5M_HELD_SOURCE_QUALITY",
         "core": str(previous / "core"),
+        "core_manifest_sha256": cycle.file_sha(core_manifest),
         "native_source": str(source),
         "native_manifest_sha256": cycle.file_sha(source / "manifest.json"),
         "source_manifest_sha256": {
@@ -366,9 +369,50 @@ def test_main_regrade_reuses_only_verified_same_day_qualified_product(
     assert not list(tmp_path.glob(str(DAY) + "-*"))
 
 
-def test_main_regrades_frozen_captures_without_recollection(monkeypatch, tmp_path):
+@pytest.mark.parametrize("issue", ["missing", "different"])
+def test_main_rejects_missing_or_changed_core_before_registering(monkeypatch, tmp_path, issue):
+    root, previous, _, config, old = held_fixture(tmp_path)
+    manifest = previous / "core/manifest.json"
+    if issue == "missing":
+        manifest.unlink()
+    else:
+        cycle.atomic(manifest, {"market_date": str(DAY), "contents": "replacement-core"})
+    index = root / "DATES.json"
+    cycle.write(index, {"kind": cycle.KIND, "dates": {str(DAY): old}})
+    before = index.read_bytes()
+    config_path = root / "config.json"
+    cycle.write(config_path, config)
+    monkeypatch.setattr(cycle, "load", cycle.object_at)
+    monkeypatch.setattr(cycle, "resources", lambda *a: pytest.fail("regrade started a run"))
+    monkeypatch.setattr(cycle, "provider", lambda *a, **kw: pytest.fail("regrade started provider"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "cycle",
+            "--config",
+            str(config_path),
+            "--day",
+            str(DAY),
+            "--recovery",
+            "--no-trade-regrade",
+        ],
+    )
+    with pytest.raises(ValueError, match="NO_TRADE_REGRADE_CORE_CHANGED"):
+        cycle.main()
+    assert list(root.glob(str(DAY) + "-*")) == [previous]
+    assert index.read_bytes() == before
+    assert not (root / "CURRENT_DAILY_1D5M_BASE24.json").exists()
+
+
+@pytest.mark.parametrize("late_core_change", [False, True])
+def test_main_regrades_frozen_captures_without_recollection(
+    monkeypatch, tmp_path, late_core_change
+):
     root, previous, source, config, old = held_fixture(tmp_path)
-    cycle.write(root / "DATES.json", {"kind": cycle.KIND, "dates": {str(DAY): old}})
+    index = root / "DATES.json"
+    cycle.write(index, {"kind": cycle.KIND, "dates": {str(DAY): old}})
+    before = index.read_bytes()
     second = root / (str(DAY) + "-20261020T131500000000Z")
     second.mkdir()
     cycle.write(second / "registration.json", {"market_date": str(DAY)})
@@ -379,19 +423,35 @@ def test_main_regrades_frozen_captures_without_recollection(monkeypatch, tmp_pat
 
     def fake_provider(cfg, run, label, action, *arguments, timeout=3600):
         calls.append((label, action, arguments))
+        if late_core_change:
+            cycle.atomic(
+                previous / "core/manifest.json",
+                {"market_date": str(DAY), "contents": "replacement-core"},
+            )
         return {"package_path": str(regraded)}
 
-    finished = {}
+    def fake_build(*, core, native5m, output, **kwargs):
+        assert core == previous / "core"
+        assert native5m == regraded
+        output.mkdir()
+        manifest = output / "manifest.json"
+        cycle.write(manifest, {"identity": {"core": cycle.file_sha(core / "manifest.json")}})
+        return {"manifest_sha256": cycle.file_sha(manifest)}
 
-    def fake_finish(cfg, run, day, value, market, events, native_root=None, seed=None):
-        finished.update(value=value, native_root=native_root, run=run)
-        return {**value, "status": "QUALIFIED_1D_NATIVE5M"}
+    def fake_verify(product):
+        manifest = product / "manifest.json"
+        return {
+            **cycle.object_at(manifest),
+            "manifest_sha256": cycle.file_sha(manifest),
+            "row_counts": {},
+        }
 
     cycle.write(root / "config.json", config)
     monkeypatch.setattr(cycle, "load", lambda p: dict(config))
     monkeypatch.setattr(cycle, "resources", lambda *a, **kw: {})
     monkeypatch.setattr(cycle, "provider", fake_provider)
-    monkeypatch.setattr(cycle, "finish_native", fake_finish)
+    monkeypatch.setattr(cycle, "build", fake_build)
+    monkeypatch.setattr(cycle, "verify", fake_verify)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -405,26 +465,41 @@ def test_main_regrades_frozen_captures_without_recollection(monkeypatch, tmp_pat
             "--no-trade-regrade",
         ],
     )
-    assert cycle.main() == 0
+    if late_core_change:
+        with pytest.raises(ValueError, match="NO_TRADE_REGRADE_PRODUCT_CORE_CHANGED"):
+            cycle.main()
+        assert index.read_bytes() == before
+        assert not (root / "CURRENT_DAILY_1D5M_BASE24.json").exists()
+    else:
+        assert cycle.main() == 0
     assert len(calls) == 1
     label, action, arguments = calls[0]
     assert action == "native" and label == "native-regrade"
     assert str(previous / "daily-reference.json") in arguments
     assert str(previous / "capture-5m") in arguments
-    assert finished["native_root"] == regraded
-    assert finished["value"]["collector_revision"] == cycle.COLLECTOR
+    (run,) = (p.parent for p in root.glob(str(DAY) + "-*/no-trade-regrade-continuation.json"))
+    staged = cycle.object_at(run / "core-receipt.json")
+    assert staged["collector_revision"] == cycle.COLLECTOR
     assert (
-        finished["value"]["no_trade_regrade"]["original_native_manifest_sha256"]
+        staged["no_trade_regrade"]["original_native_manifest_sha256"]
         == (old["native_manifest_sha256"])
     )
-    run = finished["run"]
     evidence = json.loads((run / "no-trade-regrade-continuation.json").read_bytes())
     assert evidence["contract"] == regrade.CONTRACT
     assert evidence["full_daily_reacquisition"] is False
+    assert evidence["original_core_manifest_sha256"] == old["core_manifest_sha256"]
     assert evidence["original_native_manifest_sha256"] == old["native_manifest_sha256"]
     assert evidence["continuation_collector_revision"] == cycle.COLLECTOR
-    assert (run / "core-receipt.json").is_file()
-    assert json.loads((root / "DATES.json").read_bytes())["dates"][str(DAY)] == old
+    assert (run / "READY").exists() is not late_core_change
+    if late_core_change:
+        assert (
+            cycle.object_at(run / "failure.json")["reason"]
+            == "NO_TRADE_REGRADE_PRODUCT_CORE_CHANGED"
+        )
+    else:
+        entry = cycle.object_at(index)["dates"][str(DAY)]
+        assert entry["status"] == "QUALIFIED_1D_NATIVE5M"
+        assert entry["core_manifest_sha256"] == old["core_manifest_sha256"]
     assert (previous / "receipt.json").read_bytes() == cycle.canonical(old) + b"\n"
 
 

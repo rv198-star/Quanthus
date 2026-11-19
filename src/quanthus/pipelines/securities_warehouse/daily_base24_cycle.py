@@ -567,6 +567,8 @@ def finish_native(
     checked = verify(run / "product")
     if checked["manifest_sha256"] != result["manifest_sha256"]:
         raise ValueError("DAILY_CYCLE_PRODUCT_CHANGED_BEFORE_PUBLICATION")
+    if "no_trade_regrade" in value and checked["identity"]["core"] != value["core_manifest_sha256"]:
+        raise ValueError("NO_TRADE_REGRADE_PRODUCT_CORE_CHANGED")
     time_gate(day, "delivery", bool(config.get("recovery_mode")))
     value.update(
         status="QUALIFIED_1D_NATIVE5M",
@@ -1025,6 +1027,7 @@ def main() -> int:
                         "contract": REGRADE_CONTRACT,
                         "market_date": str(day),
                         "original_core": value["core"],
+                        "original_core_manifest_sha256": value["core_manifest_sha256"],
                         "original_native_source": value["native_source"],
                         "original_native_manifest_sha256": value["native_manifest_sha256"],
                         "original_capture_root": str(captures),

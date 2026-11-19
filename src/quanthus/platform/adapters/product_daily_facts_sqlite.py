@@ -735,7 +735,8 @@ class SQLiteSyntheticFactsAdapter:
                         # until reconciliation picks one.  effective_order_state then
                         # derives the conservative hold and FINAL_FILL_GAP itself.
                         self._refresh_order_state(
-                            connection, context, observation.order_id
+                            connection, context, observation.order_id,
+                            pending_observation_id=observation.observation_id,
                         )
                         self._store_submission(connection, inbox, SubmissionResult(
                             receipt.receipt_id, "POSTED",
@@ -767,7 +768,8 @@ class SQLiteSyntheticFactsAdapter:
                             observation.order_id,
                         ),
                     )
-                self._refresh_order_state(connection, context, observation.order_id, observation)
+                self._refresh_order_state(connection, context, observation.order_id,
+                                       pending_observation_id=observation.observation_id)
 
                 event_id = "observation:" + self._identity(
                     context, "order_observation", observation.observation_id
@@ -1794,6 +1796,7 @@ class SQLiteSyntheticFactsAdapter:
         context: SyntheticContext,
         order_id: str,
         fallback_observation_id: str | None,
+        pending_observation_id: str | None = None,
     ) -> OrderObservation | None:
         """Return the effective terminal observation for an order.
 
@@ -1808,12 +1811,20 @@ class SQLiteSyntheticFactsAdapter:
         """
 
         rows = connection.execute(
-            "SELECT payload_json FROM inbox WHERE account_id=? AND mode=? "
-            "AND kind='order_observation'",
+            "SELECT payload_json, status, report_id FROM inbox "
+            "WHERE account_id=? AND mode=? AND kind='order_observation'",
             (context.account_id, context.mode),
         ).fetchall()
         observations = []
         for obs_row in rows:
+            # Admit only posted observations, plus the one currently posting so
+            # its own transaction sees it.  RECEIVED-only and rejected receipts
+            # never take effect.
+            if obs_row["status"] != "POSTED" and (
+                pending_observation_id is None
+                or obs_row["report_id"] != pending_observation_id
+            ):
+                continue
             raw = json.loads(obs_row["payload_json"])
             if raw["order_id"] != order_id or raw["status"] != "terminal":
                 continue
@@ -1870,23 +1881,21 @@ class SQLiteSyntheticFactsAdapter:
         connection: sqlite3.Connection,
         context: SyntheticContext,
         order_id: str,
-        latest_observation: OrderObservation | None = None,
+        pending_observation_id: str | None = None,
     ) -> None:
         row = self._order_state_row(connection, context, order_id)
         if row is None:
             return
-        obs = latest_observation
-        if obs is None:
-            # Derive the effective terminal reading from every posted terminal
-            # observation for this order, not only the last accepted one.  When
-            # the largest observed_at carries two or more terminal readings that
-            # disagree on the confirmed counts, they cannot be ordered, so the
-            # effective reading keeps the larger final cumulative and cancelled
-            # counts: the conservative hold then survives a fee confirmation or
-            # a derived-row rebuild until reconciliation resolves the dispute.
-            obs = self._effective_terminal_observation(
-                connection, context, order_id, row["last_observation_id"]
-            )
+        # Derive the effective terminal reading from the admitted (posted)
+        # terminal observations for this order — never from a single stored or
+        # incoming row.  The observation currently being posted is admitted via
+        # pending_observation_id so its own transaction sees it before the
+        # receipt flips to POSTED; a same-version restatement therefore folds
+        # into the admitted set instead of overwriting a contested pair.
+        obs = self._effective_terminal_observation(
+            connection, context, order_id, row["last_observation_id"],
+            pending_observation_id,
+        )
         state = effective_order_state(
             order_id=order_id,
             side=row["side"],

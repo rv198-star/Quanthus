@@ -704,3 +704,107 @@ def test_ex02_older_fee_row_recovered_out_of_order_keeps_latest_total(
     )
     assert dup.status == "POSTED"
     assert again.workbench(again.scope).account.cash_total == Decimal("6033.00")
+
+
+def test_ex08_unadmitted_and_restated_terminal_do_not_release_hold(
+    tmp_path: Path,
+) -> None:
+    """A received-but-not-posted, a rejected, or a same-version restatement all
+    leave the contested 50-share exposure held: none supplies an admitted
+    correction to the posted terminal reading."""
+    from quanthus.capabilities.execution import OrderObservation
+    from quanthus.platform.adapters.product_daily_facts_sqlite import (
+        SQLiteSyntheticFactsAdapter,
+    )
+    from quanthus.product_daily.application.desktop import FACT_SOURCE_ID
+
+    app = _app(tmp_path)
+    _ex08_setup(app)
+    app.submit_order_event(
+        app.scope,
+        _event("bo", "ORD-EX08", "observation", T0,
+               order_status="in_progress", side="buy", security_code="600000",
+               accepted_total_qty=400, price_bound=Decimal("12.00"),
+               fee_upper_bound=Decimal("5.00")),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event("b1", "ORD-EX08", "fill", T1,
+               side="buy", security_code="600000", quantity=100, price=Decimal("12.00"),
+               confirmed_fee=Decimal("0.00")),
+    )
+    # Posted terminal reading: 150 filled, 250 cancelled, 50 still unreported.
+    app.submit_order_event(
+        app.scope,
+        _event("t150", "ORD-EX08", "observation", T3,
+               order_status="terminal", final_cumulative_fill_qty=150, cancelled_qty=250),
+    )
+    assert app.workbench(app.scope).account.cash_available_for_new.value == Decimal("18195.00")
+
+    # A later observation is only received (RECEIVED), never posted.  It carries
+    # a fresh source sequence so intake accepts the receipt without posting it.
+    fixture = load_synthetic_fixture(FIXTURE)
+    spec = fixture.account("SYN-P12-A")
+    context = SyntheticContext(
+        spec.account_id, "synthetic", spec.source_id, spec.as_of, spec.coverage_id
+    )
+    port = SQLiteSyntheticFactsAdapter(tmp_path / STORE_NAME)
+    later = OrderObservation(
+        "later-100", "ORD-EX08", "terminal", T4, FACT_SOURCE_ID,
+        "fresh-sequence", 100, 300, 1,
+    )
+    receipt = port.receive_order_observation(context, later)
+    assert receipt.status == "RECEIVED"
+    # The unposted receipt must not change the effective terminal reading.
+    after_intake = app.workbench(app.scope).account
+    assert after_intake.reconciliation_status == "NEEDS_RECONCILIATION"
+    assert after_intake.cash_available_for_new.value <= Decimal("18195.00")
+
+    # A fee confirmation afterwards still cannot release the unreported fill.
+    app.submit_order_event(
+        app.scope,
+        _event("cf", "ORD-EX08", "fee", T4, confirmed_fee=Decimal("5.00")),
+    )
+    after_fee = app.workbench(app.scope).account
+    assert after_fee.reconciliation_status == "NEEDS_RECONCILIATION"
+    assert after_fee.cash_available_for_new.value <= Decimal("18195.00")
+
+
+def test_ex08_same_version_restatement_keeps_contested_hold(tmp_path: Path) -> None:
+    """Restating one of two contested same-time terminal readings under a new
+    form number does not supply a fact that resolves the dispute."""
+    app = _app(tmp_path)
+    _ex08_setup(app)
+    app.submit_order_event(
+        app.scope,
+        _event("bo", "ORD-EX08", "observation", T0,
+               order_status="in_progress", side="buy", security_code="600000",
+               accepted_total_qty=400, price_bound=Decimal("12.00"),
+               fee_upper_bound=Decimal("5.00")),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event("b1", "ORD-EX08", "fill", T1,
+               side="buy", security_code="600000", quantity=100, price=Decimal("12.00"),
+               confirmed_fee=Decimal("0.00")),
+    )
+    for rid, final in (("ta", 100), ("tb", 150)):
+        app.submit_order_event(
+            app.scope,
+            _event(rid, "ORD-EX08", "observation", T3, order_status="terminal",
+                   order_revision=1, final_cumulative_fill_qty=final,
+                   cancelled_qty=400 - final),
+        )
+    assert app.workbench(app.scope).account.reconciliation_status == "NEEDS_RECONCILIATION"
+
+    # Restating the 100-share version under a new form number is not a correction.
+    app.submit_order_event(
+        app.scope,
+        _event("ta2", "ORD-EX08", "observation", T3, order_status="terminal",
+               order_revision=1, final_cumulative_fill_qty=100, cancelled_qty=300),
+    )
+    account = app.workbench(app.scope).account
+    order = next(o for o in app.records(app.scope).orders if o.order_id == "ORD-EX08")
+    assert account.reconciliation_status == "NEEDS_RECONCILIATION"
+    assert order.needs_reconciliation is True
+    assert account.cash_available_for_new.value <= Decimal("18195.00")

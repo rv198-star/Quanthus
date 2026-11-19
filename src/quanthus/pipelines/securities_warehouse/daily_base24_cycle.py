@@ -567,6 +567,8 @@ def finish_native(
     checked = verify(run / "product")
     if checked["manifest_sha256"] != result["manifest_sha256"]:
         raise ValueError("DAILY_CYCLE_PRODUCT_CHANGED_BEFORE_PUBLICATION")
+    if "no_trade_regrade" in value and checked["identity"]["core"] != value["core_manifest_sha256"]:
+        raise ValueError("NO_TRADE_REGRADE_PRODUCT_CORE_CHANGED")
     time_gate(day, "delivery", bool(config.get("recovery_mode")))
     value.update(
         status="QUALIFIED_1D_NATIVE5M",
@@ -872,7 +874,15 @@ def main() -> int:
     parser.add_argument("--recovery", action="store_true")
     parser.add_argument("--no-trade-regrade", action="store_true")
     args = parser.parse_args()
+    sources = (args.market, args.events, args.native)
+    if args.no_trade_regrade and (not args.recovery or args.native_only or any(sources)):
+        raise ValueError("NO_TRADE_REGRADE_MODE_NOT_ELIGIBLE")
     config = load(args.config)
+    regrade_enabled = config.get("no_trade_regrade_continuation", False)
+    if not isinstance(regrade_enabled, bool):
+        raise ValueError("NO_TRADE_REGRADE_FLAG_INVALID")
+    if regrade_enabled and not args.no_trade_regrade:
+        raise ValueError("NO_TRADE_REGRADE_MODE_NOT_ELIGIBLE")
     config["recovery_mode"] = args.recovery
     day = args.day or datetime.now(CST).date()
     if day > datetime.now(CST).date():
@@ -880,7 +890,7 @@ def main() -> int:
     root = Path(config["root"])
     run = root / (str(day) + "-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"))
     lock_path = physical_path(root / (str(day) + ".lock"))
-    exact_inputs = [physical_path(p) for p in [args.market, args.events, args.native] if p]
+    exact_inputs = [physical_path(p) for p in sources if p]
     # Supplied source roots must be protected before lock, mkdir or registration.
     disjoint_output(run, exact_inputs)
     disjoint_output(lock_path, exact_inputs)
@@ -897,15 +907,29 @@ def main() -> int:
         auction_resume = None
         regrade_resume = None
         index_path = root / "DATES.json"
-        if index_path.exists() and not args.native_only:
-            old = object_at(index_path).get("dates", {}).get(str(day), {})
-            if old.get("status") == "QUALIFIED_1D_NATIVE5M":
+        if not args.native_only:
+            dates = object_at(index_path).get("dates", {}) if index_path.exists() else {}
+            old = dates.get(str(day), {})
+            status = old.get("status")
+            # Regrade is a continuation of retained data, never a fresh run.
+            if args.no_trade_regrade and (
+                old.get("market_date") != str(day)
+                or status not in ("CORE_READY_5M_HELD_SOURCE_QUALITY", "QUALIFIED_1D_NATIVE5M")
+            ):
+                raise ValueError("NO_TRADE_REGRADE_INDEXED_ENTRY_NOT_ELIGIBLE")
+            if status == "QUALIFIED_1D_NATIVE5M":
                 checked = verify(Path(old["product"]))
-                if checked["manifest_sha256"] != old["product_manifest_sha256"]:
+                if checked["manifest_sha256"] != old["product_manifest_sha256"] or (
+                    args.no_trade_regrade and checked.get("market_date") != str(day)
+                ):
                     raise ValueError("DAILY_CYCLE_REUSE_PRODUCT_CHANGED")
                 print(json.dumps({"status": "VERIFIED_UNCHANGED_REUSE", "entry": old}))
                 return 0
-            if old.get("status") == "AUTHORITATIVE_CLOSED_EVENT_SOURCE_READY":
+            if args.no_trade_regrade:
+                from .daily_no_trade_regrade import continuation as regrade_continuation
+
+                regrade_resume = regrade_continuation(config, day, old)
+            elif status == "AUTHORITATIVE_CLOSED_EVENT_SOURCE_READY":
                 if (
                     file_sha(Path(old["event_source"]) / "release.json")
                     != old["event_manifest_sha256"]
@@ -913,18 +937,13 @@ def main() -> int:
                     raise ValueError("DAILY_CYCLE_CLOSED_SOURCE_CHANGED")
                 print(json.dumps({"status": "VERIFIED_CLOSED_SOURCE_REUSE", "entry": old}))
                 return 0
-            if old.get("status") == "CORE_READY_5M_HELD_SOURCE_QUALITY":
-                if any([args.market, args.events, args.native]):
+            elif status == "CORE_READY_5M_HELD_SOURCE_QUALITY":
+                if any(sources):
                     raise ValueError("AUCTION_HELD_EXACT_INPUTS_ALREADY_FROZEN")
-                if args.no_trade_regrade:
-                    from .daily_no_trade_regrade import continuation as regrade_continuation
+                from .daily_auction_recovery import held_continuation
 
-                    regrade_resume = regrade_continuation(config, day, old)
-                else:
-                    from .daily_auction_recovery import held_continuation
-
-                    auction_resume = held_continuation(config, day, old)
-            if old.get("status") == "CORE_READY_5M_FAILED":
+                auction_resume = held_continuation(config, day, old)
+            elif status == "CORE_READY_5M_FAILED":
                 if args.recovery:
                     # A capture-budget failure can reuse source bytes. Reference
                     # failure retains its separately bounded pre-acquisition path.
@@ -937,7 +956,7 @@ def main() -> int:
                         continuation = reference_continuation(config, day, old)
                 else:
                     continuation = reference_continuation(config, day, old)
-                if any([args.market, args.events, args.native]):
+                if any(sources):
                     raise ValueError("DAILY_CYCLE_CONTINUATION_EXACT_INPUTS_ALREADY_FROZEN")
         if not args.native_only:
             time_gate(day, "delivery", args.recovery)
@@ -1008,6 +1027,7 @@ def main() -> int:
                         "contract": REGRADE_CONTRACT,
                         "market_date": str(day),
                         "original_core": value["core"],
+                        "original_core_manifest_sha256": value["core_manifest_sha256"],
                         "original_native_source": value["native_source"],
                         "original_native_manifest_sha256": value["native_manifest_sha256"],
                         "original_capture_root": str(captures),

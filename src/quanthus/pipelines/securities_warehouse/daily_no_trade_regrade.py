@@ -71,6 +71,9 @@ def continuation(
     )
     if not receipt_runs or object_at(receipt_runs[-1] / "receipt.json") != old:
         raise ValueError("NO_TRADE_REGRADE_RECEIPT_CHANGED")
+    core_manifest = physical_path(core / "manifest.json")
+    if not core_manifest.is_file() or file_sha(core_manifest) != old.get("core_manifest_sha256"):
+        raise ValueError("NO_TRADE_REGRADE_CORE_CHANGED")
     if (
         file_sha(source / "manifest.json") != old["native_manifest_sha256"]
         or object_at(source / "manifest.json").get("research_ready") is not False

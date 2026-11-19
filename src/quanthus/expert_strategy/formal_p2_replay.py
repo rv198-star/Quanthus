@@ -481,9 +481,7 @@ class FormalP2ReplayRuntime:
             market_value = _money(
                 sum((_market_value(item.ledger) for item in runtimes.values()), Decimal("0"))
             )
-            system_equity = _money(
-                sum((_wealth(item.ledger) for item in runtimes.values()), Decimal("0"))
-            )
+            system_equity = self._portfolio_equity(runtimes)
             equity.append(
                 {
                     "market_date": frame.execution_date.isoformat(),
@@ -515,9 +513,7 @@ class FormalP2ReplayRuntime:
         reconciliation = {
             "initial_equity": str(initial_equity),
             "ending_equity": equity[-1]["system_equity"],
-            "unit_wealth": str(
-                _money(sum((_wealth(item.ledger) for item in runtimes.values()), Decimal("0")))
-            ),
+            "unit_wealth": str(self._portfolio_equity(runtimes)),
             "decision_count": len(decision_payload),
             "engine_event_count": len(event_payload),
             "fill_count": sum(item.event_type is EventType.FILL for item in ordered_events),
@@ -525,8 +521,7 @@ class FormalP2ReplayRuntime:
                 item.event_type is EventType.LEDGER_ENTRY for item in ordered_events
             ),
             "sealed_partition_access": False,
-            "reconciled": equity[-1]["system_equity"]
-            == str(_money(sum((_wealth(item.ledger) for item in runtimes.values()), Decimal("0")))),
+            "reconciled": equity[-1]["system_equity"] == str(self._portfolio_equity(runtimes)),
         }
         if not reconciliation["reconciled"]:
             raise ExpertEvaluationError(
@@ -539,6 +534,7 @@ class FormalP2ReplayRuntime:
             "daily-returns.json": canonical_json_bytes(daily_returns),
             "final-ledgers.json": canonical_json_bytes(final_ledgers),
             "reconciliation.json": canonical_json_bytes(reconciliation),
+            **self._portfolio_artifacts(),
         }
         replay_digest = digest_value(
             {name: digest_value(json.loads(payload)) for name, payload in sorted(artifacts.items())}
@@ -1056,6 +1052,7 @@ class FormalP2ReplayRuntime:
             if item.disposition is AllocationDisposition.RESERVED
             and item.considered_unit_id is not None
         }
+        self._prepare_entry_sizing(frame, runtimes)
         for unit_id in sorted(runtimes):
             runtime = runtimes[unit_id]
             if runtime.sell_schedule is not None:
@@ -1068,20 +1065,7 @@ class FormalP2ReplayRuntime:
                 continue
             candidate = by_unit.get(unit_id)
             if runtime.lifecycle.stage is PositionStage.EMPTY and candidate is not None:
-                target = candidate.decision.target_maximum_position or Decimal(
-                    str(position["base_trial_position_fraction"])
-                )
-                close = None if candidate.feature is None else candidate.feature.close_price
-                quantity = 0
-                if close is not None:
-                    quantity = (
-                        int(
-                            (unit_notional * target / close / Decimal("100")).to_integral_value(
-                                rounding=ROUND_DOWN
-                            )
-                        )
-                        * 100
-                    )
+                quantity = self._size_entry(frame, runtime, candidate, unit_notional, position)
                 filled = False
                 if quantity > 0:
                     signal = self._signal(
@@ -1117,6 +1101,7 @@ class FormalP2ReplayRuntime:
                         (item for item in result.events if item.event_type is EventType.FILL), None
                     )
                     if fill is not None:
+                        self._validate_entry_fill(candidate, fill)
                         runtime.panel_security_id = candidate.item.panel_security_id
                         runtime.formal_security_id = candidate.item.record.identity.security_id
                         runtime.opportunity_id = candidate.opportunity_id
@@ -1154,6 +1139,7 @@ class FormalP2ReplayRuntime:
                         filled,
                     )
                 )
+
                 continue
             if runtime.lifecycle.stage is PositionStage.CLOSED:
                 runtime.cooldown_sessions += 1
@@ -1226,6 +1212,55 @@ class FormalP2ReplayRuntime:
                 )
             )
 
+        self._settle_portfolio_frame(frame, runtimes)
+
+    def _prepare_entry_sizing(
+        self, frame: StrategyReplayFrame, runtimes: Mapping[str, _UnitRuntime]
+    ) -> None:
+        pass
+
+    def _size_entry(
+        self,
+        frame: StrategyReplayFrame,
+        runtime: _UnitRuntime,
+        candidate: _EntryCandidate,
+        unit_notional: Decimal,
+        position: Mapping[str, Any],
+    ) -> int:
+        target = candidate.decision.target_maximum_position or Decimal(
+            str(position["base_trial_position_fraction"])
+        )
+        close = None if candidate.feature is None else candidate.feature.close_price
+        if close is None:
+            return 0
+        return (
+            int(
+                (unit_notional * target / close / Decimal("100")).to_integral_value(
+                    rounding=ROUND_DOWN
+                )
+            )
+            * 100
+        )
+
+    def _validate_entry_fill(self, candidate: _EntryCandidate, fill: EngineEvent) -> None:
+        pass
+
+    def _settle_portfolio_frame(
+        self, frame: StrategyReplayFrame, runtimes: Mapping[str, _UnitRuntime]
+    ) -> None:
+        pass
+
+    def _portfolio_equity(self, runtimes: Mapping[str, _UnitRuntime]) -> Decimal:
+        return _money(sum((_wealth(item.ledger) for item in runtimes.values()), Decimal("0")))
+
+    def _portfolio_artifacts(self) -> dict[str, bytes]:
+        return {}
+
+    def _observe_full_exit(
+        self, runtime: _UnitRuntime, schedule: _SellSchedule, frame: StrategyReplayFrame
+    ) -> None:
+        pass
+
     def _apply_sell_schedule(
         self,
         frame: StrategyReplayFrame,
@@ -1292,6 +1327,7 @@ class FormalP2ReplayRuntime:
         transitions.append(transition)
         runtime.sell_schedule = None
         if schedule.full_exit:
+            self._observe_full_exit(runtime, schedule, frame)
             runtime.cooldown_sessions = 0
         else:
             runtime.strategy_reduction_count += 1

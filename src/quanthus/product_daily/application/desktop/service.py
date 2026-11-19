@@ -61,6 +61,12 @@ from quanthus.product_daily.application.desktop.views import (
 from quanthus.product_daily.application.history import ConfigurationBinding, FactHistory
 from quanthus.product_daily.application.models import Baseline
 from quanthus.product_daily.application.service import SyntheticFactService
+from quanthus.product_daily.funding import (
+    CycleSettlementEvidence,
+    FundingDecision,
+    FundingState,
+    SettlementRequest,
+)
 from quanthus.shared.fact_contracts import FactError, digest
 from quanthus.shared.values import (
     CNY_QUANTUM,
@@ -399,6 +405,15 @@ class P12DesktopApplication:
             if exc.reason_code != BUCKET_ASSIGNMENT_CONFLICT:
                 raise
             return describe_unbound_funding(self._policy.funding, BUCKET_ASSIGNMENT_CONFLICT)
+        # A normal start whose baseline already equals the configured buckets plus
+        # reserve binds that fresh partition so settle/prepare see FUNDING bound
+        # instead of an unexplained gap.
+        bind = getattr(self._facts, "bind_funding_state", None)
+        if bind is not None and not history.baseline_quantity:
+            try:
+                bind(self._context, state)
+            except FactError:
+                pass
         return describe_funding(
             self._policy.funding,
             state,
@@ -810,9 +825,9 @@ class P12DesktopApplication:
         scope: AccountScope,
         *,
         settlement_id: str,
-        requests,
-        close_bucket_ids,
-    ):
+        requests: tuple[SettlementRequest, ...],
+        close_bucket_ids: tuple[str, ...] | None,
+    ) -> FundingDecision:
         """Settle closed buckets once their facts prove completeness.
 
         The application owns the transaction: it verifies the admitted order
@@ -828,24 +843,41 @@ class P12DesktopApplication:
             close_bucket_ids=close_bucket_ids,
         )
 
-    def prepare_funding_cycle(self, scope: AccountScope, *, bucket_id: str, cycle_id: str):
+    def prepare_funding_cycle(
+        self, scope: AccountScope, *, bucket_id: str, cycle_id: str
+    ) -> FundingDecision:
         """Lock the next cycle budget for a settled or empty bucket."""
         self._require(scope)
         return self._facts.prepare_funding_cycle(
             self._context, bucket_id=bucket_id, cycle_id=cycle_id
         )
 
-    def funding_settlement_evidence(self, scope: AccountScope):
+    def funding_settlement_evidence(
+        self, scope: AccountScope, security_codes: set[str] | None = None
+    ) -> CycleSettlementEvidence:
         """Readiness derived from the same admitted facts the user sees."""
         self._require(scope)
-        return self._facts.funding_settlement_evidence(self._context)
+        return self._facts.funding_settlement_evidence(
+            self._context, security_codes=security_codes
+        )
 
-    def bind_funding(self, scope: AccountScope, state):
-        """Persist the account's initial fixed-bucket partition once."""
+    def bind_funding(
+        self,
+        scope: AccountScope,
+        state: FundingState,
+        bucket_securities: dict[str, str] | None = None,
+    ) -> FundingState:
+        """Persist the account's initial fixed-bucket partition once.
+
+        ``bucket_securities`` maps each settled bucket to the single security
+        whose fills it funds, letting settlement attribute orders to a cycle.
+        """
         self._require(scope)
-        return self._facts.bind_funding_state(self._context, state)
+        return self._facts.bind_funding_state(
+            self._context, state, bucket_securities=bucket_securities
+        )
 
-    def funding_state(self, scope: AccountScope):
+    def funding_state(self, scope: AccountScope) -> tuple[FundingState, int] | None:
         """Current persisted funding partition plus its bound account revision."""
         self._require(scope)
         return self._facts.funding_state(self._context)

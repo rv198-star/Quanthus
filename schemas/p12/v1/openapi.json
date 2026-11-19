@@ -909,6 +909,7 @@
      "locked_cycle_budget",
      "phase",
      "target_notional",
+     "trial_notional_cap",
      "underfunded"
     ],
     "properties": {
@@ -948,6 +949,16 @@
       ]
      },
      "underfunded": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MaybeMoney"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "trial_notional_cap": {
       "anyOf": [
        {
         "$ref": "#/components/schemas/MaybeMoney"

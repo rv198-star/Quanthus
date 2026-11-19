@@ -36,6 +36,7 @@ class FixedBucketPolicy:
     bucket_budget: Decimal
     initial_reserve: Decimal
     reserve_cap: Decimal | None
+    trial_fraction: Decimal = Decimal("0.30")
 
     def __post_init__(self) -> None:
         if not isinstance(self.unit_count, int) or isinstance(self.unit_count, bool):
@@ -103,6 +104,7 @@ class BucketView:
     cycle_id: str | None
     locked_cycle_budget: MaybeDecimal | None = None
     underfunded: MaybeDecimal | None = None
+    trial_notional_cap: MaybeDecimal | None = None
 
 
 @dataclass(frozen=True)
@@ -145,6 +147,11 @@ def describe_funding(
                 item.cycle_id,
                 amount(item.locked_cycle_budget),
                 amount(max(Decimal("0.00"), item.target_notional - item.cash)),
+                amount(
+                    (policy.trial_fraction * item.locked_cycle_budget).quantize(CNY_QUANTUM)
+                    if item.locked_cycle_budget
+                    else Decimal("0.00")
+                ),
             )
             for item in sorted(state.buckets, key=lambda x: x.bucket_id)
         ),
@@ -188,6 +195,7 @@ def describe_unbound_funding(policy: FixedBucketPolicy, reason_code: str) -> Fun
                 policy.bucket_budget,
                 unknown,
                 None,
+                unknown,
                 unknown,
                 unknown,
             )

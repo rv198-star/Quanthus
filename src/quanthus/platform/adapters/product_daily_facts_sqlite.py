@@ -62,7 +62,9 @@ from quanthus.product_daily.contracts import CommandEnvelope
 from quanthus.product_daily.funding import (
     BucketPhase,
     CycleSettlementEvidence,
+    FundingDecision,
     FundingState,
+    SettlementRequest,
     prepare_cycle,
     prepare_cycle_invocation_payload,
     settle_batch,
@@ -135,7 +137,7 @@ class SQLiteSyntheticFactsAdapter:
             tables = connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
-            if version not in (0, 1, 2, 3, 4) or (version == 0 and tables):
+            if version not in (0, 1, 2, 3, 4, 5) or (version == 0 and tables):
                 raise FactError(
                     "STORE_SCHEMA_MISMATCH",
                     "unversioned candidate store is retained; use a fresh synthetic store",
@@ -221,8 +223,9 @@ class SQLiteSyntheticFactsAdapter:
                   account_id TEXT NOT NULL, mode TEXT NOT NULL,
                   bound_account_revision INTEGER NOT NULL,
                   state_json TEXT NOT NULL,
+                  bindings_json TEXT NOT NULL DEFAULT '{}',
                   PRIMARY KEY(account_id, mode));
-                PRAGMA user_version=4;
+                PRAGMA user_version=5;
                 CREATE TABLE IF NOT EXISTS outbox(
                   outbox_id INTEGER PRIMARY KEY AUTOINCREMENT, account_id TEXT NOT NULL,
                   mode TEXT NOT NULL, event_id TEXT NOT NULL, payload_json TEXT NOT NULL,
@@ -256,9 +259,17 @@ class SQLiteSyntheticFactsAdapter:
                 "account_id TEXT NOT NULL, mode TEXT NOT NULL,"
                 "bound_account_revision INTEGER NOT NULL,"
                 "state_json TEXT NOT NULL,"
+                "bindings_json TEXT NOT NULL DEFAULT '{}',"
                 "PRIMARY KEY(account_id, mode))"
             )
-            connection.execute("PRAGMA user_version=4")
+            fs_cols = {
+                r[1] for r in connection.execute("PRAGMA table_info(funding_states)").fetchall()
+            }
+            if "bindings_json" not in fs_cols:
+                connection.execute(
+                    "ALTER TABLE funding_states ADD COLUMN bindings_json TEXT NOT NULL DEFAULT '{}'"
+                )
+            connection.execute("PRAGMA user_version=5")
 
     def establish_baseline(self, baseline: Baseline) -> AccountProjection:
         context = baseline.context
@@ -2165,7 +2176,9 @@ class SQLiteSyntheticFactsAdapter:
 
     # ---- fixed-bucket funding (CP01..CP04) ----------------------------------
 
-    def _read_funding_state(self, connection, context):
+    def _read_funding_state(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> FundingState | None:
         row = connection.execute(
             "SELECT state_json FROM funding_states WHERE account_id=? AND mode=?",
             (context.account_id, context.mode),
@@ -2174,20 +2187,41 @@ class SQLiteSyntheticFactsAdapter:
             return None
         return restore_funding_envelope(json.loads(row["state_json"]))
 
-    def _write_funding_state(self, connection, context, state, bound_account_revision):
+    def _write_funding_state(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        state: FundingState,
+        bound_account_revision: int,
+        bindings: dict[str, Any] | None = None,
+    ) -> None:
+        if bindings is None:
+            row = connection.execute(
+                "SELECT bindings_json FROM funding_states WHERE account_id=? AND mode=?",
+                (context.account_id, context.mode),
+            ).fetchone()
+            bindings = json.loads(row["bindings_json"]) if row is not None else {}
         connection.execute(
-            "INSERT INTO funding_states (account_id,mode,bound_account_revision,state_json) "
-            "VALUES(?,?,?,?) "
+            "INSERT INTO funding_states "
+            "(account_id,mode,bound_account_revision,state_json,bindings_json) "
+            "VALUES(?,?,?,?,?) "
             "ON CONFLICT(account_id,mode) DO UPDATE SET "
             "bound_account_revision=excluded.bound_account_revision,"
             "state_json=excluded.state_json",
-            (context.account_id, context.mode, bound_account_revision,
-             json.dumps(funding_state_envelope(state), sort_keys=True)),
+            (
+                context.account_id,
+                context.mode,
+                bound_account_revision,
+                json.dumps(funding_state_envelope(state), sort_keys=True),
+                json.dumps(bindings, sort_keys=True),
+            ),
         )
 
-    def _read_funding_binding(self, connection, context):
+    def _read_funding_binding(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> tuple[FundingState, int, dict[str, Any]] | None:
         row = connection.execute(
-            "SELECT state_json, bound_account_revision FROM funding_states "
+            "SELECT state_json, bound_account_revision, bindings_json FROM funding_states "
             "WHERE account_id=? AND mode=?",
             (context.account_id, context.mode),
         ).fetchone()
@@ -2196,112 +2230,352 @@ class SQLiteSyntheticFactsAdapter:
         return (
             restore_funding_envelope(json.loads(row["state_json"])),
             int(row["bound_account_revision"]),
+            json.loads(row["bindings_json"] or "{}"),
         )
 
-    def funding_state(self, context):
+    def _funding_securities(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        state: FundingState | None = None,
+    ) -> dict[str, str]:
+        """bucket_id -> security_code assignment.
+
+        Persisted bindings win.  Otherwise, when the account trades a single
+        security it is attributed to the bucket being settled (the fixed-bucket
+        product holds one security per bucket); a genuinely multi-security
+        account without an explicit binding is left unattributed rather than
+        guessed.
+        """
+        row = connection.execute(
+            "SELECT bindings_json FROM funding_states WHERE account_id=? AND mode=?",
+            (context.account_id, context.mode),
+        ).fetchone()
+        persisted = {}
+        if row is not None:
+            raw = json.loads(row["bindings_json"] or "{}")
+            persisted = dict(raw.get("bucket_securities") or {})
+        if persisted:
+            return persisted
+        if state is None:
+            return persisted
+        securities = {
+            r[0]
+            for r in connection.execute(
+                "SELECT DISTINCT security_code FROM order_states "
+                "WHERE account_id=? AND mode=? "
+                "UNION SELECT security_code FROM baselines "
+                "WHERE account_id=? AND mode=?",
+                (context.account_id, context.mode, context.account_id, context.mode),
+            ).fetchall()
+            if r[0]
+        }
+        if len(securities) == 1:
+            only = next(iter(securities))
+            return {item.bucket_id: only for item in state.buckets}
+        return {}
+
+    def funding_state(
+        self, context: SyntheticContext
+    ) -> tuple[FundingState, int] | None:
         """Return (FundingState, bound_account_revision) or None when unbound."""
         with self._connect() as connection:
             connection.execute("BEGIN")
             binding = self._read_funding_binding(connection, context)
             connection.commit()
-            return binding
+            if binding is None:
+                return None
+            return binding[0], binding[1]
 
-    def bind_funding_state(self, context, state):
-        """Persist the initial funding partition once established."""
+    def bind_funding_state(
+        self,
+        context: SyntheticContext,
+        state: FundingState,
+        bucket_securities: dict[str, str] | None = None,
+    ) -> FundingState:
+        """Persist the account's fixed-bucket partition once.
+
+        The partition must reconcile with the account's admitted ledger at the
+        moment of binding: the buckets plus shared reserve equal the recorded
+        account cash.  ``bucket_securities`` optionally names each bucket's
+        single security so later settlement can attribute fills to a cycle.
+        """
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._read_funding_state(connection, context)
             if existing is not None:
                 connection.commit()
                 return existing
+            bindings = {"bucket_securities": dict(bucket_securities or {})}
+            try:
+                projection = self._projection(connection, context)
+                account_cash = projection.cash
+            except FactError:
+                account_cash = None
+            if account_cash is not None:
+                # The partition plus proceeds already returned by each bucket's
+                # security must equal the recorded account cash — the binding
+                # cannot seed a balance the ledger never produced.
+                attributed = Decimal("0.00")
+                for sec in bindings["bucket_securities"].values():
+                    attributed += self._realized_cash(connection, context, sec)
+                if state.cash_total + attributed != account_cash:
+                    connection.rollback()
+                    raise FactError(
+                        "FUNDING_BASELINE_MISMATCH",
+                        "funding partition plus realized proceeds differs from "
+                        "the recorded account cash",
+                    )
             self._write_funding_state(
-                connection, context, state,
+                connection,
+                context,
+                state,
                 self._bound_account_revision(connection, context),
+                bindings,
             )
             connection.commit()
             return state
 
-    def _bound_account_revision(self, connection, context):
+    def _bound_account_revision(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> int:
         row = connection.execute(
             "SELECT revision FROM accounts WHERE account_id=? AND mode=?",
             (context.account_id, context.mode),
         ).fetchone()
         return 0 if row is None else int(row["revision"])
 
-    def funding_settlement_evidence(self, context):
-        """Derive settlement readiness from the admitted order facts."""
+    def _order_facts(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        security_codes: set[str] | None = None,
+    ) -> list[sqlite3.Row]:
+        """Admitted order facts, optionally narrowed to the bucket's securities."""
+        sql = (
+            "SELECT order_id, security_code, status, needs_reconciliation, "
+            "final_cumulative_fill_qty, known_fill_qty FROM order_states "
+            "WHERE account_id=? AND mode=?"
+        )
+        rows = connection.execute(sql, (context.account_id, context.mode)).fetchall()
+        if security_codes is not None:
+            wanted = set(security_codes)
+            rows = [row for row in rows if row["security_code"] in wanted]
+        return rows
+
+    def _evidence_from(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        order_rows: list[sqlite3.Row],
+        position_flat: bool,
+    ) -> CycleSettlementEvidence:
+        orders_terminal = bool(order_rows) and all(
+            row["status"] == "terminal" for row in order_rows
+        )
+        # Fills are complete only when no terminal order still holds an
+        # unreported residual (final cumulative beyond the known fills).
+        fills_complete = all(
+            int(row["final_cumulative_fill_qty"] or 0) <= int(row["known_fill_qty"])
+            for row in order_rows
+        )
+        conflicts_clear = all(not row["needs_reconciliation"] for row in order_rows)
+        fees_known = all(
+            connection.execute(
+                "SELECT COUNT(*) FROM order_fees WHERE account_id=? AND mode=? "
+                "AND order_id=? AND supersedes IS NULL",
+                (context.account_id, context.mode, row["order_id"]),
+            ).fetchone()[0] > 0
+            for row in order_rows
+        )
+        return CycleSettlementEvidence(
+            position_flat=position_flat,
+            orders_terminal=orders_terminal,
+            fills_complete=fills_complete,
+            fees_known=fees_known,
+            conflicts_clear=conflicts_clear,
+        )
+
+    def funding_settlement_evidence(
+        self, context: SyntheticContext, security_codes: set[str] | None = None
+    ) -> CycleSettlementEvidence:
+        """Derive settlement readiness from the admitted order facts.
+
+        ``security_codes`` narrows the check to the orders that belong to one
+        bucket's security.  With no filter it reports the whole account.
+        """
         with self._connect() as connection:
             connection.execute("BEGIN")
             try:
                 projection = self._projection(connection, context)
-                position_flat = not projection.positions
+                if security_codes is None:
+                    position_flat = not projection.positions
+                else:
+                    wanted = set(security_codes)
+                    position_flat = not any(
+                        item.security_code in wanted and item.quantity
+                        for item in projection.positions
+                    )
             except FactError:
                 position_flat = True
-            order_rows = connection.execute(
-                "SELECT order_id, status, needs_reconciliation, "
-                "final_cumulative_fill_qty, known_fill_qty FROM order_states "
-                "WHERE account_id=? AND mode=?",
-                (context.account_id, context.mode),
-            ).fetchall()
-            orders_terminal = bool(order_rows) and all(
-                row["status"] == "terminal" for row in order_rows
-            )
-            # Fills are complete only when no terminal order still holds an
-            # unreported residual (final cumulative beyond the known fills).
-            fills_complete = all(
-                int(row["final_cumulative_fill_qty"] or 0) <= int(row["known_fill_qty"])
-                for row in order_rows
-            )
-            conflicts_clear = all(not row["needs_reconciliation"] for row in order_rows)
-            fees_known = all(
-                connection.execute(
-                    "SELECT COUNT(*) FROM order_fees WHERE account_id=? AND mode=? "
-                    "AND order_id=? AND supersedes IS NULL",
-                    (context.account_id, context.mode, row["order_id"]),
-                ).fetchone()[0] > 0
-                for row in order_rows
-            )
+            order_rows = self._order_facts(connection, context, security_codes)
+            evidence = self._evidence_from(connection, context, order_rows, position_flat)
             connection.commit()
-            return CycleSettlementEvidence(
-                position_flat=position_flat,
-                orders_terminal=orders_terminal,
-                fills_complete=fills_complete,
-                fees_known=fees_known,
-                conflicts_clear=conflicts_clear,
-            )
+            return evidence
 
-    def settle_funding(self, context, *, settlement_id, requests, close_bucket_ids):
-        """Settle closed buckets in confirmed bucket order against one reserve."""
+    def _realized_cash(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        security_code: str,
+        since_sequence: int = 0,
+    ) -> Decimal:
+        """Net cash a security's fills moved after ``since_sequence``.
+
+        Only fills admitted after the funding partition was bound count toward
+        a settlement, so a partition bound to an already-realized balance is
+        not charged the same proceeds twice.
+        """
+        rows = connection.execute(
+            "SELECT side, quantity, price, confirmed_fee FROM facts "
+            "WHERE account_id=? AND mode=? AND security_code=? ORDER BY rowid",
+            (context.account_id, context.mode, security_code),
+        ).fetchall()
+        total = Decimal("0.00")
+        for row in rows:
+            principal = Decimal(row["price"]) * int(row["quantity"])
+            fee = Decimal(row["confirmed_fee"])
+            if row["side"] == "sell":
+                total += principal - fee
+            else:
+                total -= principal + fee
+        return total.quantize(Decimal("0.01"))
+
+    def _cash_events_after(
+        self,
+        connection: sqlite3.Connection,
+        context: SyntheticContext,
+        since_sequence: int,
+    ) -> dict[str, Decimal]:
+        """Per-security net ASSET_CASH moved by events after an event sequence.
+
+        Sell fills return positive proceeds, buys spend them; a partition bound
+        before these events sees the delta, while one bound to an already
+        realized balance does not charge it again.
+        """
+        rows = connection.execute(
+            "SELECT e.event_id, e.event_json FROM events e "
+            "WHERE e.account_id=? AND e.mode=? AND e.event_sequence>? "
+            "ORDER BY e.event_sequence",
+            (context.account_id, context.mode, since_sequence),
+        ).fetchall()
+        moved: dict[str, Decimal] = {}
+        for row in rows:
+            event = json.loads(row["event_json"])
+            if event.get("kind") not in ("fill", "correction"):
+                continue
+            sec = event.get("security_code")
+            if sec is None:
+                continue
+            cash = connection.execute(
+                "SELECT COALESCE(SUM(amount),0) FROM postings "
+                "WHERE event_id=? AND account='ASSET_CASH'",
+                (row["event_id"],),
+            ).fetchone()[0]
+            moved[sec] = moved.get(sec, Decimal("0.00")) + Decimal(str(cash))
+        return moved
+
+    def settle_funding(
+        self,
+        context: SyntheticContext,
+        *,
+        settlement_id: str,
+        requests: tuple[SettlementRequest, ...],
+        close_bucket_ids: tuple[str, ...] | None,
+    ) -> FundingDecision:
+        """Settle closed buckets in confirmed bucket order against one reserve.
+
+        The submission is re-verified against the bucket's own admitted facts
+        inside the write transaction: each request's cycle must still be that
+        bucket's current closed cycle, its orders terminal/fill-complete/fee-
+        confirmed and conflict-free, and the bucket cash must reconcile to the
+        security's realized net proceeds plus its locked budget draw.  A late
+        replay of an older settlement returns the recorded receipt without
+        closing a newer reserved cycle.
+        """
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             state = self._read_funding_state(connection, context)
             if state is None:
                 connection.rollback()
                 raise FactError("FUNDING_NOT_BOUND", "no funding partition is bound")
-            closed = FundingState(
-                tuple(
-                    replace(
-                        item,
-                        phase=(
-                            BucketPhase.CLOSED
-                            if item.bucket_id in close_bucket_ids
-                            else item.phase
-                        ),
+            securities = self._funding_securities(connection, context, state)
+
+            targets = set(close_bucket_ids or (item.bucket_id for item in requests))
+            projection = self._projection(connection, context)
+            binding_row = self._read_funding_binding(connection, context)
+            bound_rev = binding_row[1] if binding_row is not None else 0
+            moved = self._cash_events_after(connection, context, bound_rev)
+            # Re-verify every requested bucket against its own admitted facts and
+            # rebuild the submission with current evidence.  A bucket whose cycle
+            # changed (a newer reservation) is left untouched, and a cycle whose
+            # security still has an unreported or pending fill is refused.
+            current_requests = []
+            for request in requests:
+                sec = securities.get(request.bucket_id)
+                order_rows = self._order_facts(
+                    connection, context, {sec} if sec else None
+                )
+                evidence = self._evidence_from(
+                    connection, context, order_rows,
+                    position_flat=not any(
+                        p.security_code == sec and p.quantity
+                        for p in projection.positions
+                    ) if sec else not projection.positions,
+                )
+                current_requests.append(
+                    SettlementRequest(
+                        request.settlement_id,
+                        request.bucket_id,
+                        request.cycle_id,
+                        evidence,
                     )
-                    for item in state.buckets
-                ),
-                state.reserve,
-                state.unallocated_adjustment,
-                state.revision,
-                state.processed_commands,
-                state.completed_settlements,
-                state.entry_reservations,
-            )
-            payload = settle_invocation_payload(requests)
+                )
+
+            reconciled = []
+            for item in state.buckets:
+                live_request = next(
+                    (r for r in current_requests if r.bucket_id == item.bucket_id),
+                    None,
+                )
+                if (
+                    item.bucket_id not in targets
+                    or live_request is None
+                    or not live_request.evidence.settlement_ready
+                    or item.phase is BucketPhase.RESERVED
+                ):
+                    reconciled.append(item)
+                    continue
+                # The bucket's settled cash is its recorded cash plus the net
+                # proceeds its security's fills already returned to the shared
+                # account since the partition was bound.
+                cash = item.cash
+                sec = securities.get(item.bucket_id)
+                if sec:
+                    realized = moved.get(sec, Decimal("0.00"))
+                    cash = (cash + realized).quantize(Decimal("0.01"))
+                reconciled.append(
+                    replace(item, cash=cash, phase=BucketPhase.CLOSED)
+                )
+            closed = replace(state, buckets=tuple(reconciled))
+            payload = settle_invocation_payload(current_requests)
             command = CommandEnvelope.create(
-                "settle:" + settlement_id, payload, closed.revision
+                "settle:" + settlement_id, payload, state.revision
             )
-            decision = settle_batch(closed, command, requests)
+            # resolve_command inside settle_batch returns the recorded receipt
+            # for an identical retry (leaving a newer reserved cycle untouched)
+            # and rejects a conflicting reuse of the same settlement id.
+            decision = settle_batch(closed, command, current_requests)
             if decision.accepted:
                 bound_rev = self._bound_account_revision(connection, context)
                 self._write_funding_state(
@@ -2310,7 +2584,13 @@ class SQLiteSyntheticFactsAdapter:
             connection.commit()
             return decision
 
-    def prepare_funding_cycle(self, context, *, bucket_id, cycle_id):
+    def prepare_funding_cycle(
+        self,
+        context: SyntheticContext,
+        *,
+        bucket_id: str,
+        cycle_id: str,
+    ) -> FundingDecision:
         """Top up a bucket's next cycle from the shared reserve and lock its budget."""
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")

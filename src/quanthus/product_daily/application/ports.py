@@ -24,6 +24,12 @@ from quanthus.product_daily.application.models import (
     Receipt,
     SubmissionResult,
 )
+from quanthus.product_daily.funding import (
+    CycleSettlementEvidence,
+    FundingDecision,
+    FundingState,
+    SettlementRequest,
+)
 
 
 class SyntheticFactsPort(Protocol):
@@ -65,24 +71,33 @@ class SyntheticFactsPort(Protocol):
 
     def snapshot(self, context: SyntheticContext) -> AccountSnapshot: ...
 
-    def funding_state(self, context: SyntheticContext): ...
+    def funding_state(
+        self, context: SyntheticContext
+    ) -> tuple[FundingState, int] | None: ...
 
-    def bind_funding_state(self, context: SyntheticContext, state): ...
+    def bind_funding_state(
+        self,
+        context: SyntheticContext,
+        state: FundingState,
+        bucket_securities: dict[str, str] | None = None,
+    ) -> FundingState: ...
 
-    def funding_settlement_evidence(self, context: SyntheticContext): ...
+    def funding_settlement_evidence(
+        self, context: SyntheticContext, security_codes: set[str] | None = None
+    ) -> CycleSettlementEvidence: ...
 
     def settle_funding(
         self,
         context: SyntheticContext,
         *,
         settlement_id: str,
-        requests,
-        close_bucket_ids,
-    ): ...
+        requests: tuple[SettlementRequest, ...],
+        close_bucket_ids: tuple[str, ...] | None,
+    ) -> FundingDecision: ...
 
     def prepare_funding_cycle(
         self, context: SyntheticContext, *, bucket_id: str, cycle_id: str
-    ): ...
+    ) -> FundingDecision: ...
 
     def bind_configuration(
         self, context: SyntheticContext, binding_digest: str, binding: dict[str, object]

@@ -70,7 +70,9 @@ def _policy_decimal(value: Decimal) -> str:
     return text
 
 
-def _maybe(value: MaybeDecimal, *, ratio: bool = False) -> dict[str, Any]:
+def _maybe(value: MaybeDecimal | None, *, ratio: bool = False) -> dict[str, Any] | None:
+    if value is None:
+        return None
     if value.value is None:
         return {"value": None, "reason_code": reason(value.reason_code)}
     return {"value": _ratio(value.value) if ratio else _money(value.value), "reason_code": None}
@@ -423,6 +425,7 @@ def funding_rules_dto(value: FundingRulesView) -> dict[str, Any]:
                         "cycle_id": item.cycle_id,
                         "locked_cycle_budget": _maybe(item.locked_cycle_budget),
                         "underfunded": _maybe(item.underfunded),
+                        "trial_notional_cap": _maybe(item.trial_notional_cap),
                     }
                     for item in funding.buckets
                 ],

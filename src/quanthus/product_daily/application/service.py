@@ -29,6 +29,12 @@ from quanthus.product_daily.application.models import (
     SyntheticRuntimeAuthorization,
 )
 from quanthus.product_daily.application.ports import SyntheticFactsPort
+from quanthus.product_daily.funding import (
+    CycleSettlementEvidence,
+    FundingDecision,
+    FundingState,
+    SettlementRequest,
+)
 from quanthus.shared.fact_contracts import FactError
 
 
@@ -127,17 +133,37 @@ class SyntheticFactService:
         """Projection and history from one committed state."""
         return self._port.snapshot(self._authorize(context))
 
-    def funding_state(self, context):
+    def funding_state(
+        self, context: SyntheticContext
+    ) -> tuple[FundingState, int] | None:
         """Persisted fixed-bucket partition, or None when not yet bound."""
         return self._port.funding_state(self._authorize(context))
 
-    def bind_funding_state(self, context, state):
-        return self._port.bind_funding_state(self._authorize(context), state)
+    def bind_funding_state(
+        self,
+        context: SyntheticContext,
+        state: FundingState,
+        bucket_securities: dict[str, str] | None = None,
+    ) -> FundingState:
+        return self._port.bind_funding_state(
+            self._authorize(context), state, bucket_securities=bucket_securities
+        )
 
-    def funding_settlement_evidence(self, context):
-        return self._port.funding_settlement_evidence(self._authorize(context))
+    def funding_settlement_evidence(
+        self, context: SyntheticContext, security_codes: set[str] | None = None
+    ) -> CycleSettlementEvidence:
+        return self._port.funding_settlement_evidence(
+            self._authorize(context), security_codes=security_codes
+        )
 
-    def settle_funding(self, context, *, settlement_id, requests, close_bucket_ids):
+    def settle_funding(
+        self,
+        context: SyntheticContext,
+        *,
+        settlement_id: str,
+        requests: tuple[SettlementRequest, ...],
+        close_bucket_ids: tuple[str, ...] | None,
+    ) -> FundingDecision:
         return self._port.settle_funding(
             self._authorize(context),
             settlement_id=settlement_id,
@@ -145,7 +171,9 @@ class SyntheticFactService:
             close_bucket_ids=close_bucket_ids,
         )
 
-    def prepare_funding_cycle(self, context, *, bucket_id, cycle_id):
+    def prepare_funding_cycle(
+        self, context: SyntheticContext, *, bucket_id: str, cycle_id: str
+    ) -> FundingDecision:
         return self._port.prepare_funding_cycle(
             self._authorize(context), bucket_id=bucket_id, cycle_id=cycle_id
         )

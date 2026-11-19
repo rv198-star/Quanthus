@@ -7,7 +7,7 @@ from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
 SCHEMA_VERSION = 'p12.desktop.v1'
-SCHEMA_DIGEST = 'sha256:a387d14b5b2bbff3ae9458704416b53d39ea0069fd9ebab96cdab377baee76c1'
+SCHEMA_DIGEST = 'sha256:c6e181cd2543ca28f6173b5aa0b887cad3e75acbf2520fbd5612d323eb032728'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -343,6 +343,8 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                                                              {'type': 'null'}]},
                            'phase': {'minLength': 1, 'type': 'string'},
                            'target_notional': {'$ref': '#/components/schemas/Money'},
+                           'trial_notional_cap': {'anyOf': [{'$ref': '#/components/schemas/MaybeMoney'},
+                                                            {'type': 'null'}]},
                            'underfunded': {'anyOf': [{'$ref': '#/components/schemas/MaybeMoney'},
                                                      {'type': 'null'}]}},
             'required': ['bucket_id',
@@ -351,6 +353,7 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                          'locked_cycle_budget',
                          'phase',
                          'target_notional',
+                         'trial_notional_cap',
                          'underfunded'],
             'type': 'object'},
  'Chart': {'additionalProperties': False,

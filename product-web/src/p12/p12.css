@@ -107,3 +107,6 @@
 .p12-rules-grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:14px; }
 .p12-rules-grid .p12-plan { padding:6px 16px 12px; }
 .p12-section .p12-hint { padding:0 16px 14px; }
+.p12-unpublished { padding:24px; }
+.p12-unpublished h2 { margin:0 0 6px; font-size:16px; }
+.p12-unpublished p { margin:0; color:var(--muted); font-size:13px; }

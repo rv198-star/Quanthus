@@ -24,6 +24,7 @@ from quanthus.product_daily.application.desktop import (
 from quanthus.product_daily.application.desktop.views import (
     AccountSummary,
     OpportunityView,
+    PublicationStatus,
     PublishedPackage,
     PublishedPlan,
 )
@@ -171,6 +172,14 @@ def _package(value: PublishedPackage) -> dict[str, Any]:
     }
 
 
+def _publication(value: PublicationStatus) -> dict[str, Any]:
+    return {
+        "status": value.status,
+        "market_date": value.market_date.isoformat(),
+        "published_at": _ts(value.published_at),
+    }
+
+
 def _opportunity(value: OpportunityView) -> dict[str, Any]:
     chart = value.chart
     applicability = value.applicability
@@ -239,7 +248,8 @@ def workbench_dto(value: WorkbenchView) -> dict[str, Any]:
         {
             "schema_version": SCHEMA_VERSION,
             "scope": _scope(value.scope),
-            "package": _package(value.package),
+            "package": None if value.package is None else _package(value.package),
+            "publication": _publication(value.publication),
             "clock": _ts(value.clock),
             "clock_kind": value.clock_kind,
             "account": _account(value.account),
@@ -256,7 +266,8 @@ def records_dto(value: RecordsView) -> dict[str, Any]:
         {
             "schema_version": SCHEMA_VERSION,
             "scope": _scope(value.scope),
-            "package": _package(value.package),
+            "package": None if value.package is None else _package(value.package),
+            "publication": _publication(value.publication),
             "account": _account(value.account),
             "baseline": {
                 "request_id": history.baseline_request_id,

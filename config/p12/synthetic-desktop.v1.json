@@ -1,7 +1,7 @@
 {
   "schema_version": "quanthus.p12.synthetic-desktop-fixture.v1",
   "fixture_id": "p12-synthetic-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "synthetic": true,
   "mode": "synthetic",
   "purpose": "P12 G1 framework acceptance only: fixed synthetic account, plan and prices. Not market data, not a strategy result, no trading authority.",
@@ -297,10 +297,11 @@
   },
   "decision_set": {
     "source_id": "p12-synthetic-decisions",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "market_date": "2026-11-18",
     "knowledge_cutoff": "2026-11-18T15:00:00+08:00",
     "published_at": "2026-11-18T18:30:00+08:00",
+    "next_session": "2026-11-19",
     "decisions": [
       {
         "opportunity_id": "OPP-SYN-600000",

@@ -248,6 +248,7 @@ def load_synthetic_fixture(path: Path) -> SyntheticDesktopFixture:
             market_date=date.fromisoformat(decision_raw["market_date"]),
             knowledge_cutoff=_aware(decision_raw["knowledge_cutoff"], "knowledge_cutoff"),
             published_at=_aware(decision_raw["published_at"], "published_at"),
+            next_session=date.fromisoformat(decision_raw["next_session"]),
             decisions=tuple(_decision(item) for item in decision_raw["decisions"]),
         )
     )

@@ -16,6 +16,7 @@
     "CASH_CAPACITY": "可用现金限制了数量",
     "CAS_CONFLICT": "版本冲突，请刷新后重试",
     "CONCENTRATION_CAPACITY": "集中度额度不足",
+    "CONFIGURATION_BINDING_MISMATCH": "账户已绑定另一版本的规则，请用原配置打开或新建账户",
     "CYCLE_ALREADY_ACTIVE": "资金周期已在进行",
     "CYCLE_PREPARED": "资金周期已准备",
     "DAY_LIMIT": "当日次数已满",
@@ -23,6 +24,7 @@
     "ENTRY_RESERVED": "已预约资金",
     "ENTRY_WINDOW_EXPIRED": "买入窗口已过",
     "EVENT_SEPARATION": "与上次事件间隔不足",
+    "EXECUTION_WINDOW_INVALID": "执行窗口不在下一交易日的交易时段内，暂不提示操作",
     "EXISTING_SECURITY_CYCLE": "这只股票已有进行中的周期",
     "EXPERT_ENTRY_BLOCKED": "风险检查不允许买入",
     "EXTERNAL_TRADE": "计划外的持仓或交易",
@@ -178,6 +180,10 @@
     "clock_kind": {
       "synthetic_fixed": "合成固定时钟",
       "system": "系统时钟"
+    },
+    "publication_status": {
+      "NOT_YET_PUBLISHED": "盘后计划尚未发布",
+      "PUBLISHED": "已发布"
     }
   },
   "paths": {
@@ -1859,6 +1865,30 @@
           }
         }
       },
+      "PublicationStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "market_date",
+          "published_at",
+          "status"
+        ],
+        "properties": {
+          "market_date": {
+            "$ref": "#/components/schemas/MarketDate"
+          },
+          "published_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_YET_PUBLISHED",
+              "PUBLISHED"
+            ]
+          }
+        }
+      },
       "PublishedPlan": {
         "type": "object",
         "additionalProperties": false,
@@ -1989,6 +2019,7 @@
           "CASH_CAPACITY",
           "CAS_CONFLICT",
           "CONCENTRATION_CAPACITY",
+          "CONFIGURATION_BINDING_MISMATCH",
           "CYCLE_ALREADY_ACTIVE",
           "CYCLE_PREPARED",
           "DAY_LIMIT",
@@ -1996,6 +2027,7 @@
           "ENTRY_RESERVED",
           "ENTRY_WINDOW_EXPIRED",
           "EVENT_SEPARATION",
+          "EXECUTION_WINDOW_INVALID",
           "EXISTING_SECURITY_CYCLE",
           "EXPERT_ENTRY_BLOCKED",
           "EXTERNAL_TRADE",
@@ -2060,30 +2092,22 @@
           "outbox_pending",
           "package",
           "plans",
+          "publication",
           "reports",
           "schema_version",
           "scope"
         ],
         "properties": {
-          "schema_version": {
-            "$ref": "#/components/schemas/SchemaVersion"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/Scope"
-          },
-          "package": {
-            "$ref": "#/components/schemas/Package"
-          },
           "account": {
             "$ref": "#/components/schemas/AccountSummary"
           },
           "baseline": {
             "$ref": "#/components/schemas/Baseline"
           },
-          "reports": {
+          "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ReportRecord"
+              "$ref": "#/components/schemas/LedgerEvent"
             }
           },
           "facts": {
@@ -2092,11 +2116,19 @@
               "$ref": "#/components/schemas/FactRecord"
             }
           },
-          "events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LedgerEvent"
-            }
+          "outbox_pending": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "package": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Package"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "plans": {
             "type": "array",
@@ -2104,9 +2136,20 @@
               "$ref": "#/components/schemas/PlanStatus"
             }
           },
-          "outbox_pending": {
-            "type": "integer",
-            "minimum": 0
+          "publication": {
+            "$ref": "#/components/schemas/PublicationStatus"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRecord"
+            }
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/SchemaVersion"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
           }
         }
       },
@@ -2339,18 +2382,20 @@
           "clock_kind",
           "opportunities",
           "package",
+          "publication",
           "schema_version",
           "scope"
         ],
         "properties": {
-          "schema_version": {
-            "$ref": "#/components/schemas/SchemaVersion"
+          "account": {
+            "$ref": "#/components/schemas/AccountSummary"
           },
-          "scope": {
-            "$ref": "#/components/schemas/Scope"
-          },
-          "package": {
-            "$ref": "#/components/schemas/Package"
+          "action_blockers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "clock": {
             "$ref": "#/components/schemas/Timestamp"
@@ -2362,21 +2407,30 @@
               "system"
             ]
           },
-          "account": {
-            "$ref": "#/components/schemas/AccountSummary"
-          },
           "opportunities": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Opportunity"
             }
           },
-          "action_blockers": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            }
+          "package": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Package"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publication": {
+            "$ref": "#/components/schemas/PublicationStatus"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/SchemaVersion"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
           }
         }
       }

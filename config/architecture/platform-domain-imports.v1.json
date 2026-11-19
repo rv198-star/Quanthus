@@ -1,6 +1,6 @@
 {
   "schema_version": "quanthus.platform.domain-imports.v1",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "activation_authority": false,
   "purpose": "P12 engineering-contract v1.1 infrastructure implements application ports using typed public execution facts; no runtime execution capability admission",
   "exceptions": [
@@ -11,6 +11,7 @@
         "Correction",
         "ExecutionReport",
         "SyntheticContext",
+        "baseline_coverage_gap",
         "validate_context"
       ],
       "consumer": "P12 U05 synthetic SQLite facts adapter",

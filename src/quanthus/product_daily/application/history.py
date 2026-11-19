@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
+
+from quanthus.capabilities.accounting import AccountProjection
 
 
 @dataclass(frozen=True)
@@ -84,3 +87,20 @@ class FactHistory:
     events: tuple[LedgerEvent, ...]
     plans: tuple[PlanStatus, ...]
     outbox_pending: int
+
+
+@dataclass(frozen=True)
+class AccountSnapshot:
+    """Projection and history committed together; one read never mixes two revisions."""
+
+    projection: AccountProjection
+    history: FactHistory
+
+
+@dataclass(frozen=True)
+class ConfigurationBinding:
+    """Composition and decision source an account store was first published with."""
+
+    binding_digest: str
+    binding: dict[str, Any]
+    recorded_at: str

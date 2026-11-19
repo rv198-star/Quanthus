@@ -17,6 +17,7 @@ from quanthus.capabilities.decision_access import (
     MarketDecision,
     MarketDecisionSet,
     OpportunityStage,
+    execution_window_issue,
     validate_decision_set,
 )
 from quanthus.capabilities.execution import Correction, ExecutionReport, SyntheticContext
@@ -39,6 +40,7 @@ from quanthus.product_daily.application.desktop.views import (
     OpportunityView,
     PlanApplicability,
     PositionLine,
+    PublicationStatus,
     PublishedPackage,
     PublishedPlan,
     RecordsView,
@@ -46,7 +48,7 @@ from quanthus.product_daily.application.desktop.views import (
     SubmitFill,
     WorkbenchView,
 )
-from quanthus.product_daily.application.history import FactHistory
+from quanthus.product_daily.application.history import ConfigurationBinding, FactHistory
 from quanthus.product_daily.application.models import Baseline
 from quanthus.product_daily.application.service import SyntheticFactService
 from quanthus.shared.fact_contracts import FactError, digest
@@ -62,6 +64,7 @@ PACKAGE_SCHEMA_VERSION = "p12.daily-decision-package.v1"
 FACT_SOURCE_ID = "desktop-user-confirmation"
 OUTSIDE_PLAN_WINDOW = "OUTSIDE_PLAN_WINDOW"
 RECONCILIATION_PENDING = "RECONCILIATION_PENDING"
+CONFIGURATION_BINDING_MISMATCH = "CONFIGURATION_BINDING_MISMATCH"
 _GROUP_ORDER = {
     "reconcile": 0,
     "exit": 1,
@@ -151,6 +154,70 @@ class P12DesktopApplication:
             Baseline(self._context, request_id, cash, 0, first, 0, plan_ids(decisions))
         )
 
+    def bind_configuration(self) -> ConfigurationBinding:
+        """Bind this account store to one composition and decision source, once.
+
+        Published plans are derived from (composition, decisions, baseline).  Reopening the
+        same store with a different policy would silently re-size historical plans, so the
+        first configuration is recorded and any other one is refused with guidance; a new
+        account store may use a new policy.  Stores created before bindings existed are
+        adopted only if every plan-linked report matches the plan this configuration
+        publishes.
+        """
+
+        decisions = self._current_decisions()
+        binding: dict[str, object] = {
+            "mode": self._scope.mode,
+            "composition": self._policy.composition_ref.to_dict(),
+            "decision_source": decisions.source_ref.to_dict(),
+            "execution_profile": self._policy.execution_profile,
+        }
+        binding_digest = digest(binding)
+        existing = self._facts.configuration_binding(self._context)
+        if existing is None:
+            snapshot = self._facts.snapshot(self._context)
+            plans = {p.plan_id: p for p in self._publish(decisions, snapshot.history).plans}
+            for report in snapshot.history.reports:
+                if report.suggestion_id is None:
+                    continue
+                plan = plans.get(report.suggestion_id)
+                if (
+                    plan is None
+                    or plan.delta_qty != report.intended_quantity
+                    or plan.price_cap != report.intended_price_cap
+                ):
+                    raise FactError(
+                        CONFIGURATION_BINDING_MISMATCH,
+                        f"report {report.report_id} was filed against a different plan; "
+                        "reopen this store with its original configuration",
+                    )
+            existing = self._facts.bind_configuration(self._context, binding_digest, binding)
+        if existing.binding_digest != binding_digest:
+            stored = existing.binding
+            composition = stored.get("composition", {})
+            source = stored.get("decision_source", {})
+            raise FactError(
+                CONFIGURATION_BINDING_MISMATCH,
+                "account store is bound to composition "
+                f"{composition.get('ref_id')}@{composition.get('version')} "
+                f"({composition.get('digest')}) and decisions {source.get('ref_id')}@"
+                f"{source.get('version')} ({source.get('digest')}); reopen it with that "
+                "configuration or start a new account store for the new policy",
+            )
+        return existing
+
+    @staticmethod
+    def _visible(decisions: MarketDecisionSet, now: datetime) -> bool:
+        """A package and its plans exist for the user only from its publication time."""
+        return now >= decisions.published_at
+
+    def _publication(self, decisions: MarketDecisionSet, now: datetime) -> PublicationStatus:
+        return PublicationStatus(
+            status="PUBLISHED" if self._visible(decisions, now) else "NOT_YET_PUBLISHED",
+            market_date=decisions.market_date,
+            published_at=decisions.published_at,
+        )
+
     # ---- package publication ----------------------------------------------------------
     def _publish(self, decisions: MarketDecisionSet, history: FactHistory) -> PublishedPackage:
         """Size each entry intent against the package's account revision (the baseline)."""
@@ -177,6 +244,9 @@ class P12DesktopApplication:
         plans = []
         for item in decisions.decisions:
             if item.entry is None:
+                continue
+            if execution_window_issue(self._policy.execution_profile, decisions, item.entry):
+                # No plan is published for a window the execution profile does not admit.
                 continue
             sizing = size_entry(
                 self._policy.risk,
@@ -281,7 +351,11 @@ class P12DesktopApplication:
         history: FactHistory,
         decisions: MarketDecisionSet,
         funding: FundingView,
+        now: datetime,
     ) -> AccountSummary:
+        # Closing prices are market facts known at the cutoff; plan links wait for publication.
+        market = decisions if now >= decisions.knowledge_cutoff else None
+        linked = decisions if self._visible(decisions, now) else None
         principal: dict[str, MaybeDecimal] = {}
         for fact in history.facts:
             known = principal.get(fact.security_code, MaybeDecimal.known(Decimal("0")))
@@ -295,12 +369,14 @@ class P12DesktopApplication:
             )
         valuation = value_account(
             projection,
-            marks=_marks(decisions),
-            valuation_ref=_valuation_ref(decisions),
+            marks=_marks(market) if market else {},
+            valuation_ref=_valuation_ref(market) if market else None,
             cost_principal=principal,
         )
-        names = {item.security_code: item.security_name for item in decisions.decisions}
-        opportunities = {item.security_code: item.opportunity_id for item in decisions.decisions}
+        names = {item.security_code: item.security_name for item in (market or decisions).decisions}
+        opportunities = {
+            item.security_code: item.opportunity_id for item in (linked.decisions if linked else ())
+        }
         equity = valuation.economic_equity.value
         lines = []
         top: tuple[Decimal, str] | None = None
@@ -345,7 +421,7 @@ class P12DesktopApplication:
             scope=self._scope,
             account_revision=projection.revision,
             event_sequence=projection.event_sequence,
-            as_of=self._now(),
+            as_of=now,
             valuation_ref=valuation.valuation_ref,
             economic_equity=valuation.economic_equity,
             cash_total=projection.cash.quantize(CNY_QUANTUM),
@@ -373,9 +449,9 @@ class P12DesktopApplication:
         projection: AccountProjection,
         history: FactHistory,
         blockers: tuple[str, ...],
+        now: datetime,
     ) -> PlanApplicability:
         statuses = {item.plan_id: item.status for item in history.plans}
-        now = self._now()
         current = projection.quantity(plan.security_code)
         reasons: list[str] = []
         if plan.plan_id not in statuses:
@@ -412,14 +488,18 @@ class P12DesktopApplication:
     def _opportunity(
         self,
         item: MarketDecision,
+        decisions: MarketDecisionSet,
         package: PublishedPackage,
         projection: AccountProjection,
         history: FactHistory,
         account: AccountSummary,
         blockers: tuple[str, ...],
+        now: datetime,
     ) -> OpportunityView:
         plan = next((p for p in package.plans if p.opportunity_id == item.opportunity_id), None)
-        applicability = self._applicability(plan, projection, history, blockers) if plan else None
+        applicability = (
+            self._applicability(plan, projection, history, blockers, now) if plan else None
+        )
         reconcile = any(
             r.security_code == item.security_code and r.status == "NEEDS_RECONCILIATION"
             for r in history.reports
@@ -441,7 +521,16 @@ class P12DesktopApplication:
         stage = item.stage
         reasons = list(item.reason_codes)
         primary = plan.primary_constraint if plan else None
-        if stage is OpportunityStage.ENTRY_PLAN and (plan is None or plan.delta_qty <= 0):
+        window_issue = (
+            execution_window_issue(self._policy.execution_profile, decisions, item.entry)
+            if item.entry is not None
+            else None
+        )
+        if window_issue is not None:
+            action, status = "PAUSED", "MISSING_INPUT"
+            primary = window_issue
+            reasons.append(window_issue)
+        elif stage is OpportunityStage.ENTRY_PLAN and (plan is None or plan.delta_qty <= 0):
             # Published without an executable quantity (for example INSUFFICIENT_CAPACITY).
             action, status = "WAIT", "WAITING"
             if plan is not None:
@@ -518,26 +607,30 @@ class P12DesktopApplication:
 
     def _state(
         self,
-    ) -> tuple[MarketDecisionSet, FactHistory, AccountProjection, PublishedPackage, FundingView]:
+    ) -> tuple[
+        MarketDecisionSet, FactHistory, AccountProjection, PublishedPackage, FundingView, datetime
+    ]:
+        now = self._now()  # one clock reading per read model
         decisions = self._current_decisions()
-        history = self._facts.history(self._context)
-        projection = self._facts.projection(self._context)
+        snapshot = self._facts.snapshot(self._context)
+        history, projection = snapshot.history, snapshot.projection
         package = self._publish(decisions, history)
         funding = self._funding(history, projection.revision)
-        return decisions, history, projection, package, funding
+        return decisions, history, projection, package, funding, now
 
     # ---- queries --------------------------------------------------------------------
     def workbench(self, scope: AccountScope) -> WorkbenchView:
         self._require(scope)
-        decisions, history, projection, package, funding = self._state()
-        account = self._account(projection, history, decisions, funding)
+        decisions, history, projection, package, funding, now = self._state()
+        account = self._account(projection, history, decisions, funding, now)
         blockers = self._policy.missing_for_action(scope.mode)
+        visible = self._visible(decisions, now)
         items = [
-            self._opportunity(item, package, projection, history, account, blockers)
-            for item in decisions.decisions
+            self._opportunity(item, decisions, package, projection, history, account, blockers, now)
+            for item in (decisions.decisions if visible else ())
         ]
         known = {item.security_code for item in decisions.decisions}
-        for line in account.positions:
+        for line in account.positions if visible else ():
             if line.security_code in known:
                 continue
             items.append(
@@ -563,8 +656,9 @@ class P12DesktopApplication:
         items.sort(key=lambda x: (_GROUP_ORDER[x.queue_group], x.opportunity_id))
         return WorkbenchView(
             scope=scope,
-            package=package,
-            clock=self._now(),
+            package=package if visible else None,
+            publication=self._publication(decisions, now),
+            clock=now,
             clock_kind=self._clock_kind,
             account=account,
             opportunities=tuple(items),
@@ -573,8 +667,9 @@ class P12DesktopApplication:
 
     def records(self, scope: AccountScope) -> RecordsView:
         self._require(scope)
-        decisions, history, projection, package, funding = self._state()
-        plans = {plan.plan_id: plan for plan in package.plans}
+        decisions, history, projection, package, funding, now = self._state()
+        visible = self._visible(decisions, now)
+        plans = {plan.plan_id: plan for plan in package.plans} if visible else {}
         reports = []
         for report in history.reports:
             deviations = list(report.deviations)
@@ -595,8 +690,9 @@ class P12DesktopApplication:
         )
         return RecordsView(
             scope=scope,
-            package=package,
-            account=self._account(projection, history, decisions, funding),
+            package=package if visible else None,
+            publication=self._publication(decisions, now),
+            account=self._account(projection, history, decisions, funding, now),
             history=history,
             reports=tuple(reports),
             facts=facts,
@@ -606,7 +702,7 @@ class P12DesktopApplication:
 
     def funding_rules(self, scope: AccountScope) -> FundingRulesView:
         self._require(scope)
-        _, history, projection, _, funding = self._state()
+        _, history, projection, _, funding, _ = self._state()
         return FundingRulesView(
             scope=scope,
             composition_ref=self._policy.composition_ref,
@@ -630,7 +726,8 @@ class P12DesktopApplication:
         decisions = self._current_decisions()
         history = self._facts.history(self._context)
         package = self._publish(decisions, history)
-        plan = next((p for p in package.plans if p.plan_id == command.plan_id), None)
+        plans = package.plans if self._visible(decisions, self._now()) else ()
+        plan = next((p for p in plans if p.plan_id == command.plan_id), None)
         if plan is None:
             raise FactError("PLAN_NOT_FOUND", "fill must reference a published plan in this slice")
         if plan.delta_qty <= 0:
@@ -663,7 +760,7 @@ class P12DesktopApplication:
             result.next_action,
             None,
             None,
-            1 if result.status == "POSTED" else None,
+            command.report_id if result.status == "POSTED" else None,
         )
 
     def correct_fill(self, scope: AccountScope, command: CorrectFill) -> FactOutcome:
@@ -679,10 +776,6 @@ class P12DesktopApplication:
                 reason=command.reason,
             ),
         )
-        history = self._facts.history(self._context)
-        revision = next(
-            (f.fact_revision for f in history.facts if f.fact_id == command.fact_id), None
-        )
         return self._outcome(
             "correction",
             result.receipt_id,
@@ -693,7 +786,7 @@ class P12DesktopApplication:
             result.next_action,
             result.cash_delta.quantize(CNY_QUANTUM),
             result.quantity_delta,
-            revision,
+            command.fact_id,
         )
 
     def _outcome(
@@ -707,14 +800,18 @@ class P12DesktopApplication:
         next_action: str,
         cash_delta: Decimal | None,
         quantity_delta: int | None,
-        fact_revision: int | None,
+        fact_id: str | None,
     ) -> FactOutcome:
-        decisions, history, projection, _, funding = self._state()
+        # Account and fact revision come from the same committed snapshot.
+        decisions, history, projection, _, funding, now = self._state()
+        fact_revision = next(
+            (f.fact_revision for f in history.facts if fact_id and f.fact_id == fact_id), None
+        )
         return FactOutcome(
             kind=kind,
             receipt_id=receipt_id,
             status=status,
-            account=self._account(projection, history, decisions, funding),
+            account=self._account(projection, history, decisions, funding, now),
             deviations=deviations,
             conflicts=conflicts,
             affected_plans=affected,

@@ -22,8 +22,9 @@
       </section>
 
       <section class="panel p12-section" data-testid="p12-records-plans">
-        <div class="panel-head"><div><h2>原计划</h2><p>决策包 {{ records.package.package_id }} · {{ records.package.market_date }} 收盘后发布，发布后不再修改</p></div></div>
-        <table class="p12-table">
+        <div v-if="records.package" class="panel-head"><div><h2>原计划</h2><p>决策包 {{ records.package.package_id }} · {{ records.package.market_date }} 收盘后发布，发布后不再修改</p></div></div>
+        <div v-else class="panel-head"><div><h2>原计划</h2><p>{{ records.publication.market_date }} 的盘后计划将于 {{ time(records.publication.published_at) }} 发布</p></div></div>
+        <table v-if="records.package" class="p12-table">
           <thead><tr><th>计划</th><th>证券</th><th>目标</th><th>价格上限</th><th>窗口</th><th>账户状态</th></tr></thead>
           <tbody><tr v-for="plan in records.package.plans" :key="plan.plan_id"><td><code>{{ plan.plan_id }}</code></td><td>{{ plan.security_code }}</td><td>{{ qty(plan.target_qty) }}</td><td>{{ plan.price_cap }}</td><td>{{ time(plan.eligible_at) }} – {{ time(plan.expires_at).slice(11) }}</td><td>{{ label('plan_status', planStatus(plan.plan_id)) }}</td></tr></tbody>
         </table>
@@ -34,7 +35,7 @@
         <p v-if="!records.reports.length" class="p12-empty">还没有登记过成交。</p>
         <table v-else class="p12-table">
           <thead><tr><th>报告</th><th>成交</th><th>计划</th><th>偏离</th><th>状态</th><th>接收时间</th></tr></thead>
-          <tbody><tr v-for="item in records.reports" :key="item.report_id"><td><code>{{ item.report_id }}</code></td><td>{{ qty(item.quantity) }} @ {{ item.price }} · 费用 {{ money(item.confirmed_fee) }}<br /><small>{{ time(item.occurred_at) }}</small></td><td>{{ qty(item.intended_quantity) }} ≤ {{ item.intended_price_cap }}</td><td>{{ item.deviations.length ? item.deviations.map(reason).join('；') : '无' }}</td><td><span :class="['status-tag', item.status === 'POSTED' ? 'accepted' : 'control']">{{ label('receipt_status', item.status) }}</span></td><td>{{ time(item.received_at) }}</td></tr></tbody>
+          <tbody><tr v-for="item in records.reports" :key="item.report_id"><td><code>{{ item.report_id }}</code></td><td>{{ qty(item.quantity) }} @ {{ item.price }} · 费用 {{ money(item.confirmed_fee) }}<br /><small>{{ time(item.occurred_at) }}</small></td><td>{{ qty(item.intended_quantity) }} ≤ {{ item.intended_price_cap }}</td><td>{{ item.deviations.length ? item.deviations.map(reason).join('；') : '无' }}</td><td><span :class="['status-tag', item.status === 'POSTED' ? 'accepted' : 'control']">{{ label('receipt_status', item.status) }}</span><small v-if="item.conflicts.length" data-testid="p12-report-conflicts"><br />{{ item.conflicts.map(reason).join('；') }}</small></td><td>{{ time(item.received_at) }}</td></tr></tbody>
         </table>
       </section>
 

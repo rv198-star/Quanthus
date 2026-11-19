@@ -4,7 +4,8 @@
       <div>
         <span class="eyebrow">MY ACCOUNT · WORKBENCH</span>
         <h1>工作台</h1>
-        <p v-if="workbench">盘后计划 {{ workbench.package.market_date }} · 信息截至 {{ time(workbench.package.knowledge_cutoff) }} · 发布于 {{ time(workbench.package.published_at) }}</p>
+        <p v-if="workbench && workbench.package">盘后计划 {{ workbench.package.market_date }} · 信息截至 {{ time(workbench.package.knowledge_cutoff) }} · 发布于 {{ time(workbench.package.published_at) }}</p>
+        <p v-else-if="workbench">{{ workbench.publication.market_date }} 的盘后计划将于 {{ time(workbench.publication.published_at) }} 发布</p>
       </div>
       <div class="heading-actions">
         <select v-if="accounts.length > 1" class="p12-select" :value="accountId" aria-label="选择账户" @change="selectAccount($event.target.value)">
@@ -22,7 +23,11 @@
       <AccountSummary :account="workbench.account" />
       <a-alert v-if="workbench.action_blockers.length" class="p12-alert" type="warning" show-icon message="部分规则尚未采用，新增买入暂停；已发生的成交仍可登记" :description="`缺少：${workbench.action_blockers.join('、')}`" />
 
-      <div class="p12-grid">
+      <section v-if="!workbench.package" class="panel p12-unpublished" data-testid="p12-unpublished">
+        <h2>{{ label('publication_status', workbench.publication.status) }}</h2>
+        <p>{{ workbench.publication.market_date }} 收盘后的计划将于 {{ time(workbench.publication.published_at) }} 发布。发布前不显示建议和数量；账户与已登记的成交照常可查。</p>
+      </section>
+      <div v-else class="p12-grid">
         <aside class="panel p12-queue" aria-label="待办和机会队列" data-testid="p12-queue">
           <div class="panel-head"><div><h2>待办与机会</h2><p>先核对，再处理退出、新建仓和观察</p></div></div>
           <div v-for="group in groups" :key="group.key" class="p12-queue-group">
@@ -115,7 +120,7 @@
               <div><dt>回执</dt><dd><code>{{ outcome.receipt_id.slice(0, 22) }}…</code></dd></div>
               <div><dt>现金</dt><dd data-testid="p12-outcome-cash">{{ money(outcomeBefore) }} → {{ money(outcome.account.cash_total) }}</dd></div>
               <div><dt>持仓</dt><dd data-testid="p12-outcome-position">{{ positionText(outcome.account) }}</dd></div>
-              <div><dt>费用</dt><dd>已确认 {{ money(lastFee) }}</dd></div>
+              <div><dt>费用</dt><dd>{{ outcome.status === 'POSTED' ? `已确认 ${money(lastFee)}` : `已登记 ${money(lastFee)}，待核对后入账` }}</dd></div>
               <div><dt>账户版本</dt><dd>{{ outcome.account.account_revision }}</dd></div>
             </dl>
             <p v-if="outcome.deviations.length" class="p12-deviation" data-testid="p12-outcome-deviations">偏离说明：{{ outcome.deviations.map(reason).join('；') }}</p>

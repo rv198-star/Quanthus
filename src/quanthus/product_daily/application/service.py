@@ -11,7 +11,11 @@ from quanthus.capabilities.execution import (
     validate_correction,
     validate_report,
 )
-from quanthus.product_daily.application.history import FactHistory
+from quanthus.product_daily.application.history import (
+    AccountSnapshot,
+    ConfigurationBinding,
+    FactHistory,
+)
 from quanthus.product_daily.application.models import (
     Baseline,
     CorrectionResult,
@@ -71,3 +75,15 @@ class SyntheticFactService:
     def history(self, context: SyntheticContext) -> FactHistory:
         """Original reports, current facts, corrections and ledger events for one account."""
         return self._port.history(self._authorize(context))
+
+    def snapshot(self, context: SyntheticContext) -> AccountSnapshot:
+        """Projection and history from one committed state."""
+        return self._port.snapshot(self._authorize(context))
+
+    def bind_configuration(
+        self, context: SyntheticContext, binding_digest: str, binding: dict[str, object]
+    ) -> ConfigurationBinding:
+        return self._port.bind_configuration(self._authorize(context), binding_digest, binding)
+
+    def configuration_binding(self, context: SyntheticContext) -> ConfigurationBinding | None:
+        return self._port.configuration_binding(self._authorize(context))

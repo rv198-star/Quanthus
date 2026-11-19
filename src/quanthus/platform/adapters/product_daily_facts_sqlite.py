@@ -22,9 +22,12 @@ from quanthus.capabilities.execution import (
     Correction,
     ExecutionReport,
     SyntheticContext,
+    baseline_coverage_gap,
     validate_context,
 )
 from quanthus.product_daily.application.history import (
+    AccountSnapshot,
+    ConfigurationBinding,
     CurrentFact,
     FactHistory,
     LedgerEvent,
@@ -167,6 +170,10 @@ class SQLiteSyntheticFactsAdapter:
                   account_id TEXT NOT NULL,mode TEXT NOT NULL,plan_id TEXT NOT NULL,
                   based_on_revision INTEGER NOT NULL,status TEXT NOT NULL,
                   PRIMARY KEY(account_id,mode,plan_id));
+                CREATE TABLE IF NOT EXISTS configuration_bindings(
+                  account_id TEXT NOT NULL, mode TEXT NOT NULL, binding_digest TEXT NOT NULL,
+                  binding_json TEXT NOT NULL, recorded_at TEXT NOT NULL,
+                  PRIMARY KEY(account_id, mode));
                 PRAGMA user_version=1;
                 CREATE TABLE IF NOT EXISTS outbox(
                   outbox_id INTEGER PRIMARY KEY AUTOINCREMENT, account_id TEXT NOT NULL,
@@ -320,6 +327,13 @@ class SQLiteSyntheticFactsAdapter:
                 ).fetchone()
                 if duplicate is not None and duplicate[0] != receipt.receipt_id:
                     raise FactError("SOURCE_FACT_DUPLICATE", "source fact already posted")
+                baseline_row = connection.execute(
+                    "SELECT as_of FROM baselines WHERE account_id=? AND mode=?",
+                    (context.account_id, context.mode),
+                ).fetchone()
+                gap = baseline_coverage_gap(report, datetime.fromisoformat(baseline_row["as_of"]))
+                if gap is not None:
+                    raise FactError(gap, "fact predates the takeover snapshot without coverage")
                 current = self._projection(connection, context)
                 updated, postings = apply_buy_delta(
                     current,
@@ -402,24 +416,35 @@ class SQLiteSyntheticFactsAdapter:
                 return result
             except FactError as exc:
                 connection.rollback()
-                if exc.reason_code not in {"SOURCE_FACT_DUPLICATE", "INSUFFICIENT_CASH"}:
+                if exc.reason_code not in {
+                    "SOURCE_FACT_DUPLICATE",
+                    "INSUFFICIENT_CASH",
+                    "BASELINE_COVERAGE_UNKNOWN",
+                }:
                     raise
                 with self._connect() as pending:
                     pending.execute("BEGIN IMMEDIATE")
-                    pending.execute(
-                        "UPDATE inbox SET status='NEEDS_RECONCILIATION' WHERE account_id=? AND "
-                        "mode=? AND report_id=?",
-                        (context.account_id, context.mode, report.report_id),
-                    )
                     current = self._projection(pending, context)
+                    result = SubmissionResult(
+                        receipt.receipt_id,
+                        "NEEDS_RECONCILIATION",
+                        current,
+                        report.deviations,
+                        (exc.reason_code,),
+                    )
+                    # Keep the reason with the received report so records show why it waits.
+                    pending.execute(
+                        "UPDATE inbox SET status='NEEDS_RECONCILIATION', result_json=? "
+                        "WHERE account_id=? AND mode=? AND report_id=?",
+                        (
+                            json.dumps(self._submission_dict(result), sort_keys=True),
+                            context.account_id,
+                            context.mode,
+                            report.report_id,
+                        ),
+                    )
                     pending.commit()
-                return SubmissionResult(
-                    receipt.receipt_id,
-                    "NEEDS_RECONCILIATION",
-                    current,
-                    report.deviations,
-                    (exc.reason_code,),
-                )
+                return result
             except Exception:
                 connection.rollback()
                 raise
@@ -706,143 +731,207 @@ class SQLiteSyntheticFactsAdapter:
     def history(self, context: SyntheticContext) -> FactHistory:
         """Read-only audit view assembled from the same committed rows the ledger uses."""
         with self._connect() as connection:
-            baseline = connection.execute(
-                "SELECT * FROM baselines WHERE account_id=? AND mode=?",
+            return self._history(connection, context)
+
+    def snapshot(self, context: SyntheticContext) -> AccountSnapshot:
+        """Projection and history read inside one SQLite read transaction.
+
+        The shared lock held by the deferred transaction makes a concurrent writer wait for
+        commit, so one snapshot shows either the complete old state or the complete new one.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            try:
+                projection = self._projection(connection, context)
+                if self._fault_hook is not None:
+                    self._fault_hook("snapshot_between_projection_and_history")
+                history = self._history(connection, context)
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+            return AccountSnapshot(projection, history)
+
+    def bind_configuration(
+        self, context: SyntheticContext, binding_digest: str, binding: dict[str, object]
+    ) -> ConfigurationBinding:
+        """Record the first configuration bound to this account; return the stored one."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._require_baseline(connection, context)
+                connection.execute(
+                    "INSERT OR IGNORE INTO configuration_bindings VALUES(?,?,?,?,?)",
+                    (
+                        context.account_id,
+                        context.mode,
+                        binding_digest,
+                        json.dumps(binding, sort_keys=True),
+                        self._timestamp(),
+                    ),
+                )
+                row = connection.execute(
+                    "SELECT * FROM configuration_bindings WHERE account_id=? AND mode=?",
+                    (context.account_id, context.mode),
+                ).fetchone()
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+            return ConfigurationBinding(
+                row["binding_digest"], json.loads(row["binding_json"]), row["recorded_at"]
+            )
+
+    def configuration_binding(self, context: SyntheticContext) -> ConfigurationBinding | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM configuration_bindings WHERE account_id=? AND mode=?",
                 (context.account_id, context.mode),
             ).fetchone()
-            if baseline is None:
-                raise FactError("BASELINE_NOT_FOUND", "baseline is unavailable")
-            reports = []
-            for row in connection.execute(
-                "SELECT * FROM inbox WHERE account_id=? AND mode=? ORDER BY rowid",
-                (context.account_id, context.mode),
-            ):
-                raw = json.loads(row["payload_json"])
-                stored = json.loads(row["result_json"]) if row["result_json"] else {}
-                report = ExecutionReport(
-                    raw["report_id"],
-                    raw["security_code"],
-                    raw["side"],
-                    int(raw["quantity"]),
-                    Decimal(raw["price"]),
-                    Decimal(raw["confirmed_fee"]),
-                    datetime.fromisoformat(raw["occurred_at"]),
-                    raw["source_id"],
-                    raw["source_sequence"],
-                    int(raw["intended_quantity"]),
-                    Decimal(raw["intended_price_cap"]),
-                    raw.get("suggestion_id"),
-                )
-                reports.append(
-                    ReceivedReport(
-                        report_id=row["report_id"],
-                        receipt_id=row["receipt_id"],
-                        status=row["status"],
-                        received_at=row["received_at"],
-                        security_code=report.security_code,
-                        side=report.side,
-                        quantity=report.quantity,
-                        price=report.price,
-                        confirmed_fee=report.confirmed_fee,
-                        occurred_at=raw["occurred_at"],
-                        intended_quantity=report.intended_quantity,
-                        intended_price_cap=report.intended_price_cap,
-                        suggestion_id=report.suggestion_id,
-                        deviations=report.deviations,
-                        conflicts=tuple(stored.get("conflicts", ())),
-                    )
-                )
-            facts = tuple(
-                CurrentFact(
-                    row["fact_id"],
-                    row["security_code"],
-                    int(row["quantity"]),
-                    Decimal(row["price"]),
-                    Decimal(row["confirmed_fee"]),
-                    int(row["fact_revision"]),
-                )
-                for row in connection.execute(
-                    "SELECT * FROM facts WHERE account_id=? AND mode=? ORDER BY rowid",
-                    (context.account_id, context.mode),
+        if row is None:
+            return None
+        return ConfigurationBinding(
+            row["binding_digest"], json.loads(row["binding_json"]), row["recorded_at"]
+        )
+
+    def _history(self, connection: sqlite3.Connection, context: SyntheticContext) -> FactHistory:
+        baseline = connection.execute(
+            "SELECT * FROM baselines WHERE account_id=? AND mode=?",
+            (context.account_id, context.mode),
+        ).fetchone()
+        if baseline is None:
+            raise FactError("BASELINE_NOT_FOUND", "baseline is unavailable")
+        reports = []
+        for row in connection.execute(
+            "SELECT * FROM inbox WHERE account_id=? AND mode=? ORDER BY rowid",
+            (context.account_id, context.mode),
+        ):
+            raw = json.loads(row["payload_json"])
+            stored = json.loads(row["result_json"]) if row["result_json"] else {}
+            report = ExecutionReport(
+                raw["report_id"],
+                raw["security_code"],
+                raw["side"],
+                int(raw["quantity"]),
+                Decimal(raw["price"]),
+                Decimal(raw["confirmed_fee"]),
+                datetime.fromisoformat(raw["occurred_at"]),
+                raw["source_id"],
+                raw["source_sequence"],
+                int(raw["intended_quantity"]),
+                Decimal(raw["intended_price_cap"]),
+                raw.get("suggestion_id"),
+            )
+            reports.append(
+                ReceivedReport(
+                    report_id=row["report_id"],
+                    receipt_id=row["receipt_id"],
+                    status=row["status"],
+                    received_at=row["received_at"],
+                    security_code=report.security_code,
+                    side=report.side,
+                    quantity=report.quantity,
+                    price=report.price,
+                    confirmed_fee=report.confirmed_fee,
+                    occurred_at=raw["occurred_at"],
+                    intended_quantity=report.intended_quantity,
+                    intended_price_cap=report.intended_price_cap,
+                    suggestion_id=report.suggestion_id,
+                    deviations=report.deviations,
+                    conflicts=tuple(stored.get("conflicts", ())),
                 )
             )
-            corrections = []
+        facts = tuple(
+            CurrentFact(
+                row["fact_id"],
+                row["security_code"],
+                int(row["quantity"]),
+                Decimal(row["price"]),
+                Decimal(row["confirmed_fee"]),
+                int(row["fact_revision"]),
+            )
             for row in connection.execute(
-                "SELECT * FROM correction_inbox WHERE account_id=? AND mode=? ORDER BY rowid",
+                "SELECT * FROM facts WHERE account_id=? AND mode=? ORDER BY rowid",
                 (context.account_id, context.mode),
-            ):
-                raw = json.loads(row["payload_json"])
-                corrections.append(
-                    ReceivedCorrection(
-                        correction_id=row["correction_id"],
-                        receipt_id=row["receipt_id"],
-                        fact_id=raw["fact_id"],
-                        expected_fact_revision=int(raw["expected_fact_revision"]),
-                        quantity=int(raw["quantity"]),
-                        price=Decimal(raw["price"]),
-                        reason=raw["reason"],
-                        status=row["status"],
-                        error_code=row["error_code"],
-                        received_at=row["received_at"],
-                    )
-                )
-            events = []
-            for row in connection.execute(
-                "SELECT * FROM events WHERE account_id=? AND mode=? ORDER BY event_sequence",
-                (context.account_id, context.mode),
-            ):
-                event = json.loads(row["event_json"])
-                lines = {
-                    item["account"]: Decimal(item["amount"])
-                    for item in connection.execute(
-                        "SELECT account, amount FROM postings WHERE event_id=? ORDER BY line_no",
-                        (row["event_id"],),
-                    )
-                }
-                events.append(
-                    LedgerEvent(
-                        event_id=row["event_id"],
-                        event_sequence=int(row["event_sequence"]),
-                        revision=int(row["revision"]),
-                        kind=event["kind"],
-                        fact_id=event["fact_id"],
-                        cash_delta=lines.get("ASSET_CASH", Decimal("0.00")),
-                        position_delta=lines.get("ASSET_POSITION", Decimal("0.00")),
-                        quantity_delta=int(
-                            event["quantity"]
-                            if event["kind"] == "fill"
-                            else event["quantity_delta"]
-                        ),
-                        recorded_at=event["recorded_at"],
-                    )
-                )
-            plans = tuple(
-                PlanStatus(row["plan_id"], row["status"], int(row["based_on_revision"]))
-                for row in connection.execute(
-                    "SELECT * FROM dependent_plans WHERE account_id=? AND mode=? ORDER BY plan_id",
-                    (context.account_id, context.mode),
+            )
+        )
+        corrections = []
+        for row in connection.execute(
+            "SELECT * FROM correction_inbox WHERE account_id=? AND mode=? ORDER BY rowid",
+            (context.account_id, context.mode),
+        ):
+            raw = json.loads(row["payload_json"])
+            corrections.append(
+                ReceivedCorrection(
+                    correction_id=row["correction_id"],
+                    receipt_id=row["receipt_id"],
+                    fact_id=raw["fact_id"],
+                    expected_fact_revision=int(raw["expected_fact_revision"]),
+                    quantity=int(raw["quantity"]),
+                    price=Decimal(raw["price"]),
+                    reason=raw["reason"],
+                    status=row["status"],
+                    error_code=row["error_code"],
+                    received_at=row["received_at"],
                 )
             )
-            pending = connection.execute(
-                "SELECT count(*) FROM outbox "
-                "WHERE account_id=? AND mode=? AND delivered_at IS NULL",
-                (context.account_id, context.mode),
-            ).fetchone()[0]
-            return FactHistory(
-                baseline_request_id=baseline["request_id"],
-                baseline_cash=Decimal(baseline["cash"]),
-                baseline_quantity=int(baseline["quantity"]),
-                baseline_security_code=baseline["security_code"],
-                baseline_as_of=baseline["as_of"],
-                baseline_source_id=baseline["source_id"],
-                baseline_coverage_id=baseline["coverage_id"],
-                reports=tuple(reports),
-                facts=facts,
-                corrections=tuple(corrections),
-                events=tuple(events),
-                plans=plans,
-                outbox_pending=int(pending),
+        events = []
+        for row in connection.execute(
+            "SELECT * FROM events WHERE account_id=? AND mode=? ORDER BY event_sequence",
+            (context.account_id, context.mode),
+        ):
+            event = json.loads(row["event_json"])
+            lines = {
+                item["account"]: Decimal(item["amount"])
+                for item in connection.execute(
+                    "SELECT account, amount FROM postings WHERE event_id=? ORDER BY line_no",
+                    (row["event_id"],),
+                )
+            }
+            events.append(
+                LedgerEvent(
+                    event_id=row["event_id"],
+                    event_sequence=int(row["event_sequence"]),
+                    revision=int(row["revision"]),
+                    kind=event["kind"],
+                    fact_id=event["fact_id"],
+                    cash_delta=lines.get("ASSET_CASH", Decimal("0.00")),
+                    position_delta=lines.get("ASSET_POSITION", Decimal("0.00")),
+                    quantity_delta=int(
+                        event["quantity"]
+                        if event["kind"] == "fill"
+                        else event["quantity_delta"]
+                    ),
+                    recorded_at=event["recorded_at"],
+                )
             )
+        plans = tuple(
+            PlanStatus(row["plan_id"], row["status"], int(row["based_on_revision"]))
+            for row in connection.execute(
+                "SELECT * FROM dependent_plans WHERE account_id=? AND mode=? ORDER BY plan_id",
+                (context.account_id, context.mode),
+            )
+        )
+        pending = connection.execute(
+            "SELECT count(*) FROM outbox "
+            "WHERE account_id=? AND mode=? AND delivered_at IS NULL",
+            (context.account_id, context.mode),
+        ).fetchone()[0]
+        return FactHistory(
+            baseline_request_id=baseline["request_id"],
+            baseline_cash=Decimal(baseline["cash"]),
+            baseline_quantity=int(baseline["quantity"]),
+            baseline_security_code=baseline["security_code"],
+            baseline_as_of=baseline["as_of"],
+            baseline_source_id=baseline["source_id"],
+            baseline_coverage_id=baseline["coverage_id"],
+            reports=tuple(reports),
+            facts=facts,
+            corrections=tuple(corrections),
+            events=tuple(events),
+            plans=plans,
+            outbox_pending=int(pending),
+        )
 
     def _require_baseline(self, connection: sqlite3.Connection, context: SyntheticContext) -> None:
         if (

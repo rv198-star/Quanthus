@@ -30,6 +30,23 @@ Rule ownership: quantity solving and exposure limits stay in `product_daily.risk
 `capabilities.accounting`; fact validation in `capabilities.execution`; PIT validation of market
 decisions in `capabilities.decision_access`. The application layer only composes them.
 
+## Account store rules (repair 02)
+
+- A fill that happened before the takeover snapshot (`occurred_at` earlier than the baseline
+  `as_of`) keeps its receipt and stays `NEEDS_RECONCILIATION` with
+  `BASELINE_COVERAGE_UNKNOWN`; nothing is posted (`capabilities.execution.baseline_coverage_gap`).
+- Each account store is bound once to its composition, decision source and execution profile
+  (`P12DesktopApplication.bind_configuration`). Reopening it with a different configuration fails
+  with `CONFIGURATION_BINDING_MISMATCH`; a new store may use a new policy. Stores created before
+  bindings existed are adopted only when every plan-linked report matches the plan the presented
+  configuration publishes. A persistent package library remains D1-B work.
+- A package and its plans are hidden until `published_at`. Under `close-to-next-open-v1` an entry
+  window must lie inside the next trading session (09:30-15:00, exchange time); otherwise no plan
+  is published and the opportunity shows `EXECUTION_WINDOW_INVALID`
+  (`capabilities.decision_access.execution_window_issue`).
+- Every read model is built from one `SyntheticFactsPort.snapshot` (projection and history in one
+  SQLite read transaction), so a read shows either the complete old or the complete new state.
+
 ## Contract workflow
 
 1. Edit `schemas/p12/v1/openapi.json` (closed objects, every property required, null for unknown).

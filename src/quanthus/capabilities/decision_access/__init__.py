@@ -9,7 +9,7 @@ implement the application's ``DecisionPackageSource`` port.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
 
@@ -19,6 +19,13 @@ from quanthus.shared.values import ADMITTED_MODES, VersionRef
 KNOWLEDGE_CUTOFF_BREACH = "KNOWLEDGE_CUTOFF_BREACH"
 POLICY_NOT_ADOPTED = "POLICY_NOT_ADOPTED"
 STALE_MARKET_INPUT = "STALE_MARKET_INPUT"
+EXECUTION_WINDOW_INVALID = "EXECUTION_WINDOW_INVALID"
+CLOSE_TO_NEXT_OPEN = "close-to-next-open-v1"
+# Session bounds of the active daily profile: signals after the T close, first execution at
+# the T+1 open (AGENTS.md invariants, config/p2-gates.v1.json accepted_profile).
+_EXCHANGE_TZ = timezone(timedelta(hours=8))
+_SESSION_OPEN = time(9, 30)
+_SESSION_CLOSE = time(15, 0)
 
 
 class OpportunityStage(str, Enum):
@@ -112,6 +119,7 @@ class MarketDecisionSet:
     market_date: date
     knowledge_cutoff: datetime
     published_at: datetime
+    next_session: date
     decisions: tuple[MarketDecision, ...]
 
 
@@ -129,6 +137,8 @@ def validate_decision_set(value: MarketDecisionSet) -> MarketDecisionSet:
         raise FactError(KNOWLEDGE_CUTOFF_BREACH, "package published before its knowledge cutoff")
     if value.knowledge_cutoff.date() != value.market_date:
         raise FactError(KNOWLEDGE_CUTOFF_BREACH, "knowledge cutoff must fall on the market date")
+    if value.next_session <= value.market_date:
+        raise FactError(KNOWLEDGE_CUTOFF_BREACH, "next session must follow the market date")
     identities = [item.opportunity_id for item in value.decisions]
     if len(identities) != len(set(identities)):
         raise FactError("INVALID_DECISION", "opportunity ids must be unique")
@@ -171,7 +181,32 @@ def validate_decision_set(value: MarketDecisionSet) -> MarketDecisionSet:
     return value
 
 
+def execution_window_issue(
+    profile: str, decisions: MarketDecisionSet, entry: EntryIntent
+) -> str | None:
+    """Profile-bound window check; a non-admitted window yields a reason, never an action.
+
+    Under close-to-next-open-v1 an entry may only be actionable inside the next trading
+    session (exchange time) after the T close; a same-day evening window is rejected.
+    """
+
+    if profile != CLOSE_TO_NEXT_OPEN:
+        return POLICY_NOT_ADOPTED
+    start = entry.eligible_at.astimezone(_EXCHANGE_TZ)
+    end = entry.expires_at.astimezone(_EXCHANGE_TZ)
+    if (
+        start.date() != decisions.next_session
+        or end.date() != decisions.next_session
+        or start.time() < _SESSION_OPEN
+        or end.time() > _SESSION_CLOSE
+    ):
+        return EXECUTION_WINDOW_INVALID
+    return None
+
+
 __all__ = [
+    "CLOSE_TO_NEXT_OPEN",
+    "EXECUTION_WINDOW_INVALID",
     "KNOWLEDGE_CUTOFF_BREACH",
     "POLICY_NOT_ADOPTED",
     "STALE_MARKET_INPUT",
@@ -183,5 +218,6 @@ __all__ = [
     "MarketDecisionSet",
     "OpportunityStage",
     "PriceBar",
+    "execution_window_issue",
     "validate_decision_set",
 ]

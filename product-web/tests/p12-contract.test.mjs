@@ -48,6 +48,10 @@ test('pages keep waiting, pending reconciliation and missing states visible', ()
   }
   for (const code of ['WAITING', 'NEEDS_RECONCILIATION', 'MISSING_INPUT', 'NEEDS_REASSESSMENT']) assert.ok(LABELS.status_code[code])
   assert.equal(LABELS.funding_mode.fixed_bucket, '固定桶额')
+  assert.ok(views[0].includes('data-testid="p12-unpublished"'))
+  assert.ok(views[0].includes('v-else class="p12-grid"'))
+  assert.ok(views[1].includes('v-if="records.package"'))
+  assert.equal(LABELS.publication_status.NOT_YET_PUBLISHED, '盘后计划尚未发布')
 })
 
 test('decimal formatting is exact string manipulation', () => {

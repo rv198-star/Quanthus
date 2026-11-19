@@ -61,6 +61,13 @@ class PublishedPackage:
 
 
 @dataclass(frozen=True)
+class PublicationStatus:
+    status: str
+    market_date: date
+    published_at: datetime
+
+
+@dataclass(frozen=True)
 class PlanApplicability:
     plan_id: str
     status: str
@@ -127,7 +134,8 @@ class AccountSummary:
 @dataclass(frozen=True)
 class WorkbenchView:
     scope: AccountScope
-    package: PublishedPackage
+    package: PublishedPackage | None
+    publication: PublicationStatus
     clock: datetime
     clock_kind: str
     account: AccountSummary
@@ -152,7 +160,8 @@ class FactRecord:
 @dataclass(frozen=True)
 class RecordsView:
     scope: AccountScope
-    package: PublishedPackage
+    package: PublishedPackage | None
+    publication: PublicationStatus
     account: AccountSummary
     history: FactHistory
     reports: tuple[ReportRecord, ...]

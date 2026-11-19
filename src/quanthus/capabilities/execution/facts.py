@@ -135,6 +135,21 @@ def validate_report(report: ExecutionReport) -> ExecutionReport:
     return report
 
 
+BASELINE_COVERAGE_UNKNOWN = "BASELINE_COVERAGE_UNKNOWN"
+
+
+def baseline_coverage_gap(report: ExecutionReport, baseline_as_of: datetime) -> str | None:
+    """A fact that happened before the takeover snapshot may already be inside the baseline.
+
+    Without per-fact coverage evidence it must not be posted; it stays received and pending
+    reconciliation (engineering contract v1.1 section 6).  Facts at or after the snapshot
+    instant post normally, including over-cap or out-of-window fills.
+    """
+
+    _aware(baseline_as_of, "baseline_as_of")
+    return BASELINE_COVERAGE_UNKNOWN if report.occurred_at < baseline_as_of else None
+
+
 @dataclass(frozen=True)
 class Correction:
     correction_id: str

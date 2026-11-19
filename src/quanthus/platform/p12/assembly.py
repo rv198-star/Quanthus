@@ -66,6 +66,7 @@ def synthetic_applications(
             clock_kind=clock_kind,
         )
         application.establish_baseline(request_id=spec.baseline_request_id, cash=spec.baseline_cash)
+        application.bind_configuration()
         applications[spec.account_id] = application
     return applications
 

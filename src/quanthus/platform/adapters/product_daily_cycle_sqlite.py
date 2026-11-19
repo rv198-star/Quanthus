@@ -804,7 +804,15 @@ class SQLiteCycleBridgeAdapter:
                             identity,
                             row["payload_digest"],
                             payload_digest,
-                            json.dumps(payload, sort_keys=True),
+                            json.dumps(
+                                {
+                                    "replacement": payload,
+                                    "host_audited_at": self._timestamp(),
+                                    "previous_received_at": row["received_at"],
+                                    "received_at": context.as_of.isoformat(),
+                                },
+                                sort_keys=True,
+                            ),
                             resolved=True,
                         )
                         connection.execute(
@@ -814,7 +822,7 @@ class SQLiteCycleBridgeAdapter:
                             (
                                 payload_digest,
                                 json.dumps(payload, sort_keys=True),
-                                self._timestamp(),
+                                context.as_of.isoformat(),
                                 context.account_id,
                                 context.mode,
                                 kind,

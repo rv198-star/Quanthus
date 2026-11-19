@@ -603,7 +603,12 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
 
 def test_settlement_unknown_and_fault_rollback_retry(tmp_path: Path) -> None:
     unknown_path = tmp_path / "unknown.sqlite"
-    unknown = build_funding_bridge_service(unknown_path, context=context(), authorization=AUTH)
+    unknown = build_funding_bridge_service(
+        unknown_path,
+        context=context(),
+        authorization=AUTH,
+        clock=lambda: S09_AT + timedelta(days=30),
+    )
     unknown.establish_baseline(baseline())
     intent = entry_intent(
         unknown,
@@ -652,6 +657,14 @@ def test_settlement_unknown_and_fault_rollback_retry(tmp_path: Path) -> None:
         context(S04_AT), settlement_id="unknown-settle", cycle_id=cycle_id
     )
     assert completed.funding.reserve == Decimal("1990.00")
+    with sqlite3.connect(unknown_path) as db:
+        assert (
+            db.execute(
+                "SELECT received_at FROM bridge_operations WHERE kind='settlement' AND "
+                "identity='unknown-settle'"
+            ).fetchone()[0]
+            == S04_AT.isoformat()
+        )
 
     fired: list[str] = []
 

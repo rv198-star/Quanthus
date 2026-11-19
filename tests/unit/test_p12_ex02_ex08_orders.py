@@ -561,3 +561,39 @@ def test_ex02_missing_fee_projection_restored_on_reopen(tmp_path: Path) -> None:
     )
     assert dup.status == "POSTED"
     assert again.workbench(again.scope).account.cash_total == Decimal("6034.00")
+
+
+def test_ex08_same_time_conflicting_terminal_flags_reconciliation(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    _ex08_setup(app)
+    app.submit_order_event(
+        app.scope,
+        _event("bo", "ORD-EX08", "observation", T0,
+               order_status="in_progress", side="buy", security_code="600000",
+               accepted_total_qty=400, price_bound=Decimal("12.00"),
+               fee_upper_bound=Decimal("5.00")),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event("b1", "ORD-EX08", "fill", T1,
+               side="buy", security_code="600000", quantity=100, price=Decimal("12.00"),
+               confirmed_fee=Decimal("0.00")),
+    )
+    app.submit_order_event(
+        app.scope,
+        _event("oa", "ORD-EX08", "observation", T3,
+               order_status="terminal", final_cumulative_fill_qty=100, cancelled_qty=300),
+    )
+    # A second terminal reading at the same observed_at and revision disagrees.
+    conflict = app.submit_order_event(
+        app.scope,
+        _event("ob", "ORD-EX08", "observation", T3,
+               order_status="terminal", final_cumulative_fill_qty=150, cancelled_qty=250),
+    )
+    assert conflict.status == "POSTED"
+    account = app.workbench(app.scope).account
+    assert account.reconciliation_status == "NEEDS_RECONCILIATION"
+    order = next(o for o in app.records(app.scope).orders if o.order_id == "ORD-EX08")
+    assert order.needs_reconciliation is True
+    # The contested unreported exposure is held conservatively, not released.
+    assert account.cash_available_for_new.value <= Decimal("18195.00")

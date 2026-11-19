@@ -229,6 +229,143 @@ def test_changed_capture_bytes_fail_closed(tmp_path):
         regrade.continuation(config, DAY, old)
 
 
+@pytest.mark.parametrize(
+    "state",
+    [
+        "missing-index",
+        "missing-date",
+        "CORE_READY_5M_PENDING",
+        "CORE_READY_5M_FAILED",
+        "AUTHORITATIVE_CLOSED_EVENT_SOURCE_READY",
+        "qualified-for-another-date",
+    ],
+)
+def test_main_regrade_requires_same_day_held_or_qualified_entry(monkeypatch, tmp_path, state):
+    config = tmp_path / "config.json"
+    cycle.write(config, {"root": str(tmp_path)})
+    index = tmp_path / "DATES.json"
+    event_source = tmp_path / "events"
+    event_source.mkdir()
+    cycle.write(event_source / "release.json", {"lane": "events"})
+    product_hash = sha(b"qualified")
+    if state != "missing-index":
+        entry = {
+            "market_date": str(DAY),
+            "status": state,
+            "event_source": str(event_source),
+            "event_manifest_sha256": cycle.file_sha(event_source / "release.json"),
+        }
+        if state == "qualified-for-another-date":
+            entry.update(
+                market_date="2026-10-19",
+                status="QUALIFIED_1D_NATIVE5M",
+                product=str(tmp_path / "product"),
+                product_manifest_sha256=product_hash,
+            )
+        cycle.write(index, {"dates": {} if state == "missing-date" else {str(DAY): entry}})
+    before = index.read_bytes() if index.exists() else None
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("regrade started ordinary processing without an eligible predecessor")
+
+    monkeypatch.setattr(cycle, "load", cycle.object_at)
+    monkeypatch.setattr(cycle, "resources", lambda *a, **kw: {})
+    monkeypatch.setattr(cycle, "collect", unexpected)
+    monkeypatch.setattr(cycle, "provider", unexpected)
+    monkeypatch.setattr(cycle, "reference_continuation", unexpected)
+    monkeypatch.setattr(
+        cycle, "verify", lambda p: {"market_date": "2026-10-19", "manifest_sha256": product_hash}
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["cycle", "--config", str(config), "--day", str(DAY), "--recovery", "--no-trade-regrade"],
+    )
+    with pytest.raises(ValueError, match="NO_TRADE_REGRADE_INDEXED_ENTRY_NOT_ELIGIBLE"):
+        cycle.main()
+    assert (index.read_bytes() if index.exists() else None) == before
+    assert not list(tmp_path.glob(str(DAY) + "-*"))
+
+
+@pytest.mark.parametrize("supplied", ["--native-only", "--market", "--events", "--native"])
+def test_main_regrade_rejects_other_modes_before_loading_config(monkeypatch, supplied):
+    monkeypatch.setattr(cycle, "load", lambda p: pytest.fail("invalid mode loaded config"))
+    options = [supplied] if supplied == "--native-only" else [supplied, "unfrozen-source"]
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["cycle", "--config", "config.json", "--recovery", "--no-trade-regrade", *options],
+    )
+    with pytest.raises(ValueError, match="NO_TRADE_REGRADE_MODE_NOT_ELIGIBLE"):
+        cycle.main()
+
+
+@pytest.mark.parametrize(
+    "flag,recovery,error",
+    [
+        (True, False, "NO_TRADE_REGRADE_MODE_NOT_ELIGIBLE"),
+        (True, True, "NO_TRADE_REGRADE_MODE_NOT_ELIGIBLE"),
+        ("true", True, "NO_TRADE_REGRADE_FLAG_INVALID"),
+    ],
+)
+def test_main_regrade_config_cannot_be_used_as_ordinary_daily(
+    monkeypatch, tmp_path, flag, recovery, error
+):
+    monkeypatch.setattr(
+        cycle, "load", lambda p: {"root": str(tmp_path), "no_trade_regrade_continuation": flag}
+    )
+    monkeypatch.setattr(cycle, "resources", lambda *a: pytest.fail("ordinary daily started"))
+    monkeypatch.setattr(cycle, "time_gate", lambda *a: None)
+    command = ["cycle", "--config", "config.json", "--day", str(DAY)]
+    if recovery:
+        command.append("--recovery")
+    monkeypatch.setattr(sys, "argv", command)
+    with pytest.raises(ValueError, match=error):
+        cycle.main()
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("changed", [None, "manifest", "date"])
+def test_main_regrade_reuses_only_verified_same_day_qualified_product(
+    monkeypatch, tmp_path, capsys, changed
+):
+    product = tmp_path / "product"
+    expected = sha(b"qualified")
+    entry = {
+        "status": "QUALIFIED_1D_NATIVE5M",
+        "market_date": str(DAY),
+        "product": str(product),
+        "product_manifest_sha256": expected,
+    }
+    cycle.write(tmp_path / "DATES.json", {"dates": {str(DAY): entry}})
+
+    def verify(path):
+        assert path == product
+        return {
+            "manifest_sha256": sha(b"changed") if changed == "manifest" else expected,
+            "market_date": "2026-10-19" if changed == "date" else str(DAY),
+        }
+
+    monkeypatch.setattr(cycle, "load", lambda p: {"root": str(tmp_path)})
+    monkeypatch.setattr(cycle, "verify", verify)
+    monkeypatch.setattr(cycle, "resources", lambda *a: pytest.fail("reuse started a new run"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["cycle", "--config", "config.json", "--day", str(DAY), "--recovery", "--no-trade-regrade"],
+    )
+    if changed:
+        with pytest.raises(ValueError, match="DAILY_CYCLE_REUSE_PRODUCT_CHANGED"):
+            cycle.main()
+    else:
+        assert cycle.main() == 0
+        assert json.loads(capsys.readouterr().out) == {
+            "status": "VERIFIED_UNCHANGED_REUSE",
+            "entry": entry,
+        }
+    assert not list(tmp_path.glob(str(DAY) + "-*"))
+
+
 def test_main_regrades_frozen_captures_without_recollection(monkeypatch, tmp_path):
     root, previous, source, config, old = held_fixture(tmp_path)
     cycle.write(root / "DATES.json", {"kind": cycle.KIND, "dates": {str(DAY): old}})
@@ -302,7 +439,7 @@ def test_main_without_recovery_flag_keeps_held_disposition(monkeypatch, tmp_path
         "argv",
         ["cycle", "--config", str(root / "config.json"), "--day", str(DAY), "--no-trade-regrade"],
     )
-    with pytest.raises(ValueError, match="NOT_ELIGIBLE"):
+    with pytest.raises(ValueError, match="NO_TRADE_REGRADE_MODE_NOT_ELIGIBLE"):
         cycle.main()
     assert json.loads((root / "DATES.json").read_bytes())["dates"][str(DAY)] == old
 

@@ -11,9 +11,17 @@
         "ops/bin/run-ods-daily-with-retry",
         "ops/bin/recover-matured-ods-daily",
         "src/quanthus/data_catalog.py",
+        "src/quanthus/pipelines/securities_warehouse/container_jobs.py",
+        "src/quanthus/pipelines/securities_warehouse/daily_base24_cycle.py",
+        "src/quanthus/pipelines/securities_warehouse/daily_no_trade_regrade.py",
+        "config/pipelines/base24-no-trade-regrade-continuation.v1.json",
         "config/schedules/*",
         "tests/unit/test_cn01_ods_orchestrator.py",
         "tests/unit/test_data_catalog.py",
+        "tests/unit/test_daily_auction_recovery.py",
+        "tests/unit/test_daily_base24_cycle.py",
+        "tests/unit/test_daily_no_trade_regrade.py",
+        "tests/unit/test_p10_container_delivery.py",
         "tests/unit/test_schedule_contracts.py"
       ],
       "commands": [
@@ -24,6 +32,11 @@
           "-q",
           "tests/unit/test_cn01_ods_orchestrator.py",
           "tests/unit/test_data_catalog.py",
+          "tests/unit/test_daily_auction_recovery.py",
+          "tests/unit/test_daily_base24_cycle.py",
+          "tests/unit/test_daily_no_trade_regrade.py",
+          "tests/unit/test_p10_container_delivery.py::test_daily_invokes_full_existing_cycle_not_source_only",
+          "tests/unit/test_p10_container_delivery.py::test_container_daily_regrade_opt_in_never_silently_becomes_ordinary_daily",
           "tests/unit/test_schedule_contracts.py"
         ]
       ],

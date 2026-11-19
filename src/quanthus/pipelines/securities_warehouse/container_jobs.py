@@ -18,6 +18,11 @@ from .container_code import verify_bundle
 
 
 def daily(config: Path, day: date, recovery: bool) -> dict[str, Any]:
+    regrade = json.loads(config.read_bytes()).get("no_trade_regrade_continuation", False)
+    if not isinstance(regrade, bool):
+        raise ValueError("P10_NO_TRADE_REGRADE_FLAG_INVALID")
+    if regrade and not recovery:
+        raise ValueError("P10_NO_TRADE_REGRADE_REQUIRES_RECOVERY")
     command = [
         sys.executable,
         "-m",
@@ -29,11 +34,8 @@ def daily(config: Path, day: date, recovery: bool) -> dict[str, Any]:
     ]
     if recovery:
         command.append("--recovery")
-        if (
-            config.is_file()
-            and json.loads(config.read_text()).get("no_trade_regrade_continuation") is True
-        ):
-            command.append("--no-trade-regrade")
+    if regrade:
+        command.append("--no-trade-regrade")
     # Do not buffer provider logs/all rows in application memory.
     with tempfile.TemporaryFile() as log:
         result = subprocess.run(command, stdout=log, stderr=sys.stderr, check=False)

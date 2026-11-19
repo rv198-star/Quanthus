@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 from dataclasses import replace
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -20,11 +20,19 @@ from quanthus.capabilities.execution.order_evidence import (
     WindowStatement,
 )
 from quanthus.platform.adapters.product_daily_cycle_sqlite import build_funding_bridge_service
-from quanthus.product_daily.application.funding_bridge import SyntheticTemporalProfile
+from quanthus.product_daily.application.funding_bridge import (
+    LaterEntryRequest,
+    SyntheticTemporalProfile,
+)
 from quanthus.product_daily.c13_later_signal import OriginalAttemptState, evaluate_later_signal
-from quanthus.product_daily.risk import pending_cash_commitment
+from quanthus.product_daily.risk import (
+    ExpertEntryAction,
+    ExpertEntryEligibility,
+    pending_cash_commitment,
+)
 from quanthus.shared.fact_contracts import FactError
 from tests.unit.test_product_daily_c13_later_signal import (
+    Eligibility,
     calendar,
     current,
     opportunity,
@@ -684,7 +692,6 @@ def _later_source(order_status="cancelled", *, fee=Decimal("2.50"), extra=()):
         fee=fee,
     )
     listed = (original_zero.order_id, cancelled.order_id)
-    statement_orders = listed if extra else (original_zero.order_id,)
     source = ledger(orders=[original_zero, cancelled, *extra], listed=listed)
     source = replace(
         source,
@@ -753,10 +760,13 @@ def test_a11_later_terminal_zero_releases_only_its_attempt_and_slot_stays_consum
     assert after["cash"] == "20996.50" and after["quantity"] == 0 and not after["pending"]
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT count(*) FROM bridge_later_attempts").fetchone()[0] == 1
-        assert db.execute(
-            "SELECT status FROM bridge_obligations WHERE obligation_id=?",
-            (receipt["reservation_id"],),
-        ).fetchone()[0] == "CANCELLED"
+        assert (
+            db.execute(
+                "SELECT status FROM bridge_obligations WHERE obligation_id=?",
+                (receipt["reservation_id"],),
+            ).fetchone()[0]
+            == "CANCELLED"
+        )
     with sqlite3.connect(path) as db:
         occupied = db.execute(
             "SELECT slot_identity,attempt_identity FROM bridge_later_attempts"
@@ -777,6 +787,89 @@ def test_a11_later_terminal_zero_releases_only_its_attempt_and_slot_stays_consum
     restored = cold.reconstruct_order_account(context(LATE))
     assert restored.terminals["later-terminal"] == receipt
     witness("a11-later-terminal", {"receipt": receipt, "state": after, "rebuild": "equal"})
+
+
+def test_a11_later_terminal_keeps_slot_for_a_new_eligible_session_after_rebuild(tmp_path):
+    source, _ = _later_source()
+    path = tmp_path / "a11-next-session.sqlite"
+    decision_at = LATER_OPEN.replace(hour=15, minute=10)
+    temporal_profile = SyntheticTemporalProfile(
+        "a11-two-session-witness", (RESERVE, NOW, LATE, decision_at)
+    )
+
+    def build():
+        return build_funding_bridge_service(
+            path,
+            context=context(BASE),
+            authorization=AUTH,
+            order_source=source,
+            temporal_profile=temporal_profile,
+        )
+
+    bridge = build()
+    bridge.establish_baseline(replace(baseline(), context=context(BASE)))
+    first = _admit_later(bridge)
+    terminal = bridge.observe_later(context(LATE), attempt(), request_id="terminal-first")
+    assert terminal["released"] and terminal["reservation_id"] == first.entry.reservation_id
+    with sqlite3.connect(path) as db:
+        db.execute("DELETE FROM bridge_later_attempts")
+    bridge = build()
+    bridge.rebuild(context(decision_at))
+    second_policy = replace(
+        policy(),
+        policy_version="test-two-session-v2",
+        observation_lifetime_sessions=2,
+        expiry=(LATER_OPEN + timedelta(days=1)).replace(hour=10),
+    )
+    parent = opportunity(
+        account_id=context().account_id,
+        security_id=SEC,
+        original_attempt_state=OriginalAttemptState.TERMINAL_ZERO_FILL_RECONCILED,
+    )
+    preceding = current(security_id=SEC, eligibility=Eligibility.EXPLICIT_FALSE)
+    latest = current(
+        security_id=SEC,
+        signal_session=decision_at.date(),
+        feature_session=decision_at.date(),
+        evidence_at=decision_at - timedelta(minutes=10),
+        available_at=decision_at - timedelta(minutes=5),
+        decision_cutoff=decision_at,
+        evidence_id="a11-next-session",
+    )
+    planned = evaluate_later_signal(
+        opportunity=parent,
+        prior=preceding,
+        current=latest,
+        policy=second_policy,
+        calendar=calendar(),
+    )
+    assert planned.candidate is not None and planned.candidate.identity != attempt()
+    next_id = planned.candidate.identity
+    expert = ExpertEntryEligibility(
+        next_id,
+        SEC,
+        ExpertEntryAction.TRIAL_ENTRY,
+        planned.candidate.later_signal_id,
+        Decimal("0.30"),
+    )
+    before = snapshot(bridge, decision_at)
+    request = LaterEntryRequest(
+        parent,
+        preceding,
+        latest,
+        second_policy,
+        calendar(),
+        intent=entry_intent(
+            bridge,
+            candidate_entry=replace(candidate(next_id, SEC), expert_entry=expert),
+            command_id=next_id,
+            expected_revision=before["revision"],
+            at=decision_at,
+        ),
+    )
+    with pytest.raises(FactError, match="LATER_ATTEMPT_ALREADY_CONSUMED"):
+        bridge.enter_later(context(decision_at), request)
+    assert snapshot(bridge, decision_at) == before
 
 
 @pytest.mark.parametrize(
@@ -826,9 +919,7 @@ def test_a11_wrong_malformed_or_ambiguous_terminal_has_no_effects(tmp_path, muta
             fee=Decimal("2.50"),
             command_id="another-command",
         )
-        source = ledger(
-            orders=[original_zero, order], listed=(original_zero.order_id,)
-        )
+        source = ledger(orders=[original_zero, order], listed=(original_zero.order_id,))
     else:
         source, _ = _later_source()
     path = tmp_path / f"a11-{mutation}.sqlite"
@@ -848,3 +939,19 @@ def test_a11_wrong_malformed_or_ambiguous_terminal_has_no_effects(tmp_path, muta
     assert bridge.observe_later(context(LATE), target, request_id=f"later-{mutation}") == receipt
     verify_rebuild(path, source, LATE, before)
     witness(f"a11-{mutation}", {"receipt": receipt, "state": before, "rebuild": "equal"})
+
+
+def test_a11_terminal_validates_the_persisted_slot_against_the_journal(tmp_path):
+    source, _ = _later_source()
+    path = tmp_path / "a11-different-slot-clock.sqlite"
+    bridge = bridge_at(path, source)
+    _admit_later(bridge)
+    before = snapshot(bridge, LATE)
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "UPDATE bridge_later_attempts SET created_at=?",
+            ((NOW - timedelta(minutes=1)).isoformat(),),
+        )
+    with pytest.raises(FactError, match="STORE_PROJECTION_MISMATCH"):
+        bridge.observe_later(context(LATE), attempt(), request_id="clock-corruption")
+    assert snapshot(bridge, LATE) == before

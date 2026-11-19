@@ -7,7 +7,6 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
-from quanthus.capabilities.execution.order_evidence import OrderWindow as OrderWindow
 from quanthus.capabilities.execution.order_evidence import (
     LaterOrderResult,
     LaterOrderStatus,
@@ -16,6 +15,7 @@ from quanthus.capabilities.execution.order_evidence import (
     WindowStatus,
     evidence_body,
 )
+from quanthus.capabilities.execution.order_evidence import OrderWindow as OrderWindow
 from quanthus.capabilities.execution.order_evidence import (
     SyntheticOrderSource as SyntheticOrderSource,
 )
@@ -401,9 +401,7 @@ def reconcile_later(
         or order.command_id != later["command_id"]
         or order.submitted_at < datetime.fromisoformat(later["created_at"])
     ):
-        receipt.update(
-            status=LaterOrderStatus.UNKNOWN.value, reason="C13_ATTEMPT_BINDING_MISMATCH"
-        )
+        receipt.update(status=LaterOrderStatus.UNKNOWN.value, reason="C13_ATTEMPT_BINDING_MISMATCH")
         return WindowTransition(state, None, receipt)
     matched = next(
         (

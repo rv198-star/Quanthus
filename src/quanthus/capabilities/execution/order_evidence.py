@@ -355,22 +355,22 @@ class SyntheticOrderSource:
             raise FactError("ORDER_SOURCE_CONFLICT", "reported execution differs from provider")
         return order
 
-    def terminal_order(self, attempt: str, at: datetime) -> "LaterOrderResult":
+    def terminal_order(self, attempt: str, at: datetime) -> LaterOrderResult:
         """Resolve the admitted later-attempt terminal fact bound to one persisted attempt."""
         _identity(attempt)
         _time(at)
         candidates = [
             o
             for o in self.orders
-            if o.attempt_id == attempt
-            and o.attempt_id != o.parent_id
-            and o.available_at <= at
+            if o.attempt_id == attempt and o.attempt_id != o.parent_id and o.available_at <= at
         ]
         if len({o.order_id for o in candidates}) != 1 or len(candidates) != 1:
             return LaterOrderResult(LaterOrderStatus.UNKNOWN, "C13_LATER_ORDER_AMBIGUOUS", None)
         order = candidates[0]
-        if order.status == "filled" or (order.filled or 0) > 0 or any(
-            f.order_id == order.order_id and f.available_at <= at for f in self.fills
+        if (
+            order.status == "filled"
+            or (order.filled or 0) > 0
+            or any(f.order_id == order.order_id and f.available_at <= at for f in self.fills)
         ):
             return LaterOrderResult(LaterOrderStatus.FILLED, "LATER_FILL_RECORDED", order)
         if order.terminal_zero:

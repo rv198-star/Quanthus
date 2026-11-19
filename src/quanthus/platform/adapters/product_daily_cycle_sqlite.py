@@ -465,9 +465,10 @@ class SQLiteCycleBridgeAdapter:
             source = self._source(db, context)
             existing = self._evidence_event(db, context, event_id)
             if existing is not None:
-                if existing["attempt_id"] != attempt_identity or existing[
-                    "source_digest"
-                ] != source.identity:
+                if (
+                    existing["attempt_id"] != attempt_identity
+                    or existing["source_digest"] != source.identity
+                ):
                     raise FactError("IDEMPOTENCY_CONFLICT", "terminal request binding differs")
                 expected_request = db.execute(
                     "SELECT result_json FROM bridge_operations WHERE account_id=? AND mode=? "
@@ -481,6 +482,7 @@ class SQLiteCycleBridgeAdapter:
                     raise FactError("STORE_PROJECTION_MISMATCH", "terminal receipt differs")
                 return dict(existing["receipt"])
             state = self._read(db, context)
+            self._validate_later_slots(db, context)
             raw = db.execute(
                 "SELECT received_at FROM bridge_operations WHERE account_id=? AND mode=? "
                 "AND kind='order_terminal' AND identity=?",
@@ -492,16 +494,19 @@ class SQLiteCycleBridgeAdapter:
                 "AND attempt_identity=?",
                 (context.account_id, context.mode, attempt_identity),
             ).fetchone()
-            if later_row is not None and db.execute(
-                "SELECT 1 FROM bridge_later_attempts WHERE account_id=? AND mode=? "
-                "AND parent_opportunity_id=? AND attempt_identity!=?",
-                (
-                    context.account_id,
-                    context.mode,
-                    later_row["parent_opportunity_id"],
-                    attempt_identity,
-                ),
-            ).fetchone():
+            if (
+                later_row is not None
+                and db.execute(
+                    "SELECT 1 FROM bridge_later_attempts WHERE account_id=? AND mode=? "
+                    "AND parent_opportunity_id=? AND attempt_identity!=?",
+                    (
+                        context.account_id,
+                        context.mode,
+                        later_row["parent_opportunity_id"],
+                        attempt_identity,
+                    ),
+                ).fetchone()
+            ):
                 raise FactError(
                     "C13_ATTEMPT_BINDING_MISMATCH", "multiple later attempts share the parent"
                 )

@@ -101,6 +101,8 @@ class BucketView:
     target_notional: Decimal
     cash: MaybeDecimal
     cycle_id: str | None
+    locked_cycle_budget: MaybeDecimal | None = None
+    underfunded: MaybeDecimal | None = None
 
 
 @dataclass(frozen=True)
@@ -141,6 +143,8 @@ def describe_funding(
                 item.target_notional,
                 amount(item.cash),
                 item.cycle_id,
+                amount(item.locked_cycle_budget),
+                amount(max(Decimal("0.00"), item.target_notional - item.cash)),
             )
             for item in sorted(state.buckets, key=lambda x: x.bucket_id)
         ),
@@ -178,7 +182,15 @@ def describe_unbound_funding(policy: FixedBucketPolicy, reason_code: str) -> Fun
         mode=policy.mode,
         funding_revision=None,
         buckets=tuple(
-            BucketView(identity, BucketPhase.EMPTY.value, policy.bucket_budget, unknown, None)
+            BucketView(
+                identity,
+                BucketPhase.EMPTY.value,
+                policy.bucket_budget,
+                unknown,
+                None,
+                unknown,
+                unknown,
+            )
             for identity in policy.bucket_ids()
         ),
         reserve=unknown,

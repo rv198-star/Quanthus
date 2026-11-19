@@ -127,6 +127,29 @@ class SyntheticFactService:
         """Projection and history from one committed state."""
         return self._port.snapshot(self._authorize(context))
 
+    def funding_state(self, context):
+        """Persisted fixed-bucket partition, or None when not yet bound."""
+        return self._port.funding_state(self._authorize(context))
+
+    def bind_funding_state(self, context, state):
+        return self._port.bind_funding_state(self._authorize(context), state)
+
+    def funding_settlement_evidence(self, context):
+        return self._port.funding_settlement_evidence(self._authorize(context))
+
+    def settle_funding(self, context, *, settlement_id, requests, close_bucket_ids):
+        return self._port.settle_funding(
+            self._authorize(context),
+            settlement_id=settlement_id,
+            requests=requests,
+            close_bucket_ids=close_bucket_ids,
+        )
+
+    def prepare_funding_cycle(self, context, *, bucket_id, cycle_id):
+        return self._port.prepare_funding_cycle(
+            self._authorize(context), bucket_id=bucket_id, cycle_id=cycle_id
+        )
+
     def bind_configuration(
         self, context: SyntheticContext, binding_digest: str, binding: dict[str, object]
     ) -> ConfigurationBinding:

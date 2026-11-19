@@ -65,6 +65,25 @@ class SyntheticFactsPort(Protocol):
 
     def snapshot(self, context: SyntheticContext) -> AccountSnapshot: ...
 
+    def funding_state(self, context: SyntheticContext): ...
+
+    def bind_funding_state(self, context: SyntheticContext, state): ...
+
+    def funding_settlement_evidence(self, context: SyntheticContext): ...
+
+    def settle_funding(
+        self,
+        context: SyntheticContext,
+        *,
+        settlement_id: str,
+        requests,
+        close_bucket_ids,
+    ): ...
+
+    def prepare_funding_cycle(
+        self, context: SyntheticContext, *, bucket_id: str, cycle_id: str
+    ): ...
+
     def bind_configuration(
         self, context: SyntheticContext, binding_digest: str, binding: dict[str, object]
     ) -> ConfigurationBinding: ...

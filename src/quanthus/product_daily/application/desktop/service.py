@@ -375,6 +375,24 @@ class P12DesktopApplication:
 
     # ---- account --------------------------------------------------------------------
     def _funding(self, history: FactHistory, revision: int) -> FundingView:
+        # Prefer the persisted funding partition (settled cycles, reservations,
+        # top-ups) when one is bound; only fall back to a fresh partition from
+        # the baseline cash when no funding state has been recorded yet.
+        binding = None
+        read = getattr(self._facts, "funding_state", None)
+        if read is not None:
+            try:
+                binding = read(self._context)
+            except FactError:
+                binding = None
+        if binding is not None:
+            persisted, bound_revision = binding
+            return describe_funding(
+                self._policy.funding,
+                persisted,
+                state_account_revision=bound_revision,
+                current_account_revision=revision,
+            )
         try:
             state = initial_funding_state(self._policy.funding, history.baseline_cash)
         except FactError as exc:
@@ -784,6 +802,53 @@ class P12DesktopApplication:
             action_blockers=self._policy.missing_for_action(scope.mode),
             account_revision=projection.revision,
         )
+
+    # ---- fixed-bucket funding (CP01..CP04) --------------------------------------
+
+    def settle_funding_cycle(
+        self,
+        scope: AccountScope,
+        *,
+        settlement_id: str,
+        requests,
+        close_bucket_ids,
+    ):
+        """Settle closed buckets once their facts prove completeness.
+
+        The application owns the transaction: it verifies the admitted order
+        facts satisfy settlement evidence, then commits the funding partition
+        in the same store the desktop reads.  A duplicate settlement replays
+        the recorded result without moving cash again.
+        """
+        self._require(scope)
+        return self._facts.settle_funding(
+            self._context,
+            settlement_id=settlement_id,
+            requests=requests,
+            close_bucket_ids=close_bucket_ids,
+        )
+
+    def prepare_funding_cycle(self, scope: AccountScope, *, bucket_id: str, cycle_id: str):
+        """Lock the next cycle budget for a settled or empty bucket."""
+        self._require(scope)
+        return self._facts.prepare_funding_cycle(
+            self._context, bucket_id=bucket_id, cycle_id=cycle_id
+        )
+
+    def funding_settlement_evidence(self, scope: AccountScope):
+        """Readiness derived from the same admitted facts the user sees."""
+        self._require(scope)
+        return self._facts.funding_settlement_evidence(self._context)
+
+    def bind_funding(self, scope: AccountScope, state):
+        """Persist the account's initial fixed-bucket partition once."""
+        self._require(scope)
+        return self._facts.bind_funding_state(self._context, state)
+
+    def funding_state(self, scope: AccountScope):
+        """Current persisted funding partition plus its bound account revision."""
+        self._require(scope)
+        return self._facts.funding_state(self._context)
 
     # ---- commands -------------------------------------------------------------------
     def submit_fill(self, scope: AccountScope, command: SubmitFill) -> FactOutcome:

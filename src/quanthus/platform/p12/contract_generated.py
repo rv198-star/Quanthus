@@ -7,7 +7,7 @@ from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
 SCHEMA_VERSION = 'p12.desktop.v1'
-SCHEMA_DIGEST = 'sha256:8a82e822c3a8316c851059995f7b5d9789d958f1fa121282b1bf3e82c330ca37'
+SCHEMA_DIGEST = 'sha256:a387d14b5b2bbff3ae9458704416b53d39ea0069fd9ebab96cdab377baee76c1'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -339,9 +339,19 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                            'cash': {'$ref': '#/components/schemas/MaybeMoney'},
                            'cycle_id': {'anyOf': [{'minLength': 1, 'type': 'string'},
                                                   {'type': 'null'}]},
+                           'locked_cycle_budget': {'anyOf': [{'$ref': '#/components/schemas/MaybeMoney'},
+                                                             {'type': 'null'}]},
                            'phase': {'minLength': 1, 'type': 'string'},
-                           'target_notional': {'$ref': '#/components/schemas/Money'}},
-            'required': ['bucket_id', 'cash', 'cycle_id', 'phase', 'target_notional'],
+                           'target_notional': {'$ref': '#/components/schemas/Money'},
+                           'underfunded': {'anyOf': [{'$ref': '#/components/schemas/MaybeMoney'},
+                                                     {'type': 'null'}]}},
+            'required': ['bucket_id',
+                         'cash',
+                         'cycle_id',
+                         'locked_cycle_budget',
+                         'phase',
+                         'target_notional',
+                         'underfunded'],
             'type': 'object'},
  'Chart': {'additionalProperties': False,
            'properties': {'as_of': {'$ref': '#/components/schemas/Timestamp'},

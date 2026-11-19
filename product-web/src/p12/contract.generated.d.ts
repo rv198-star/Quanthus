@@ -72,8 +72,10 @@ export interface Bucket {
   bucket_id: string
   cash: MaybeMoney
   cycle_id: string | null
+  locked_cycle_budget: MaybeMoney | null
   phase: string
   target_notional: Money
+  underfunded: MaybeMoney | null
 }
 
 export interface Chart {

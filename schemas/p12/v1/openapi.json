@@ -906,8 +906,10 @@
      "bucket_id",
      "cash",
      "cycle_id",
+     "locked_cycle_budget",
      "phase",
-     "target_notional"
+     "target_notional",
+     "underfunded"
     ],
     "properties": {
      "bucket_id": {
@@ -929,6 +931,26 @@
        {
         "type": "string",
         "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "locked_cycle_budget": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MaybeMoney"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "underfunded": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MaybeMoney"
        },
        {
         "type": "null"
@@ -1205,9 +1227,9 @@
       "type": "string",
       "enum": [
        "correction",
-      "fee",
-      "fill",
-      "observation"
+       "fee",
+       "fill",
+       "observation"
       ]
      },
      "receipt_id": {

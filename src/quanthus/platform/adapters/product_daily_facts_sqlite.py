@@ -2447,7 +2447,12 @@ class SQLiteSyntheticFactsAdapter:
             return {
                 bucket_id: sec
                 for bucket_id, sec in persisted.items()
-                if cycles.get(bucket_id, current.get(bucket_id))
+                if cycles.get(
+                    bucket_id,
+                    SQLiteSyntheticFactsAdapter._legacy_binding_cycle(
+                        state, bucket_id
+                    ),
+                )
                 in (current.get(bucket_id), "pending")
             }
         if state is None:
@@ -2633,6 +2638,28 @@ class SQLiteSyntheticFactsAdapter:
             return state
 
     @staticmethod
+    def _legacy_binding_cycle(state: FundingState, bucket_id: str) -> str | None:
+        """The cycle a markerless binding actually served.
+
+        A binding written before cycle tracking belongs to the bucket last
+        settled cycle when that cycle is already closed out, and to the
+        bucket still-open cycle otherwise.  Returns None when neither can
+        be inferred, which leaves occupancy to the live-phase check.
+        """
+        settled = [
+            item.cycle_id
+            for item in state.completed_settlements
+            if item.bucket_id == bucket_id
+        ]
+        if settled:
+            return settled[-1]
+        item = next(
+            (entry for entry in state.buckets if entry.bucket_id == bucket_id),
+            None,
+        )
+        return None if item is None else item.cycle_id
+
+    @staticmethod
     def _attribution_occupies(
         state: FundingState, bucket_id: str, cycle: str | None
     ) -> bool:
@@ -2641,7 +2668,9 @@ class SQLiteSyntheticFactsAdapter:
         The security stays claimed while the bucket is inside the cycle the
         attribution was recorded for — a live reserved or held cycle, or the
         just-closed cycle whose settlement still reads it.  A binding with no
-        recorded cycle (an older store) occupies its bucket's current cycle.
+        recorded cycle (an older store) is inferred through
+        ``_legacy_binding_cycle``: a settled cycle no longer occupies its
+        security, while a still-open cycle does.
         """
         item = next(
             (entry for entry in state.buckets if entry.bucket_id == bucket_id),
@@ -2652,6 +2681,10 @@ class SQLiteSyntheticFactsAdapter:
             BucketPhase.HELD,
         ):
             return False
+        if cycle is None:
+            cycle = SQLiteSyntheticFactsAdapter._legacy_binding_cycle(
+                state, bucket_id
+            )
         served = item.cycle_id if cycle in (None, "pending") else cycle
         return served == item.cycle_id
 
@@ -2707,8 +2740,14 @@ class SQLiteSyntheticFactsAdapter:
             # or closed bucket carries only a pending target and may be
             # reassigned for its next opportunity.
             existing_cycle = cycles.get(bucket_id)
-            if existing_cycle is None and target != "pending":
-                existing_cycle = target
+            if existing_cycle is None:
+                # A markerless binding served its own era's cycle: the bucket's
+                # last settled cycle when it has one, else the still-open cycle.
+                # Inferring the settled one frees the bucket to bind a
+                # different security for its next opportunity.
+                existing_cycle = SQLiteSyntheticFactsAdapter._legacy_binding_cycle(
+                    state, bucket_id
+                )
             if (
                 existing is not None
                 and existing != security_code

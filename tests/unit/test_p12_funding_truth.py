@@ -242,3 +242,55 @@ def test_legacy_holding_retarget_is_refused(tmp_path: Path) -> None:
             (ACCOUNT,),
         ).fetchone()[0]
     assert '"600000"' in bindings and '"000001"' not in bindings
+
+
+def test_legacy_settled_cycle_frees_retarget(tmp_path: Path) -> None:
+    """A legacy binding only occupies the cycle it served.
+
+    After the bucket settles that cycle, a new reservation may bind a
+    different security instead of staying locked to the old one.
+    """
+    app = _app(tmp_path)
+    _reserve(app, B1, "already-live")
+    _assign(app, B1, SEC_A)
+    _trade(app, "prior-buy", SEC_A, "buy", 100, "10.00", 19)
+    _trade(app, "prior-sell", SEC_A, "sell", 100, "11.00", 20)
+    assert _close(app, B1, "already-live", SEC_A, "close-already-live").accepted
+    _strip_cycle_markers(tmp_path)
+
+    app = _app(tmp_path)
+    _reserve(app, B1, "next-cycle")
+    _assign(app, B1, SEC_B)  # no raise
+    _trade(app, "next-buy", SEC_B, "buy", 100, "10.00", 23)
+    _trade(app, "next-sell", SEC_B, "sell", 100, "9.00", 24)
+    assert _close(app, B1, "next-cycle", SEC_B, "close-next-cycle").accepted
+    reopened = _cash(_app(tmp_path))
+    assert reopened["account"] == reopened["partition"] == Decimal("10000.00")
+
+
+def test_legacy_holding_settle_then_retarget(tmp_path: Path) -> None:
+    """An upgraded holding finishes its old cycle, then trades a new security.
+
+    The in-cycle retarget is still refused; after the bucket settles, its
+    next reservation accepts the new security and settles it cleanly.
+    """
+    app = _app(tmp_path)
+    _reserve(app, B1, "already-live")
+    _assign(app, B1, SEC_A)
+    _trade(app, "prior-buy", SEC_A, "buy", 100, "10.00", 19)
+    _strip_cycle_markers(tmp_path)
+
+    app = _app(tmp_path)
+    with pytest.raises(FactError) as error:
+        _assign(app, B1, SEC_B)
+    assert error.value.reason_code == "FUNDING_ATTRIBUTION_UNKNOWN"
+
+    _trade(app, "legacy-sell", SEC_A, "sell", 100, "11.00", 20)
+    assert _close(app, B1, "already-live", SEC_A, "close-already-live").accepted
+    _reserve(app, B1, "next-cycle")
+    _assign(app, B1, SEC_B)
+    _trade(app, "next-buy", SEC_B, "buy", 100, "10.00", 23)
+    _trade(app, "next-sell", SEC_B, "sell", 100, "9.00", 24)
+    assert _close(app, B1, "next-cycle", SEC_B, "close-next-cycle").accepted
+    reopened = _cash(_app(tmp_path))
+    assert reopened["account"] == reopened["partition"] == Decimal("10000.00")

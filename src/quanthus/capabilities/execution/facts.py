@@ -146,8 +146,15 @@ def baseline_coverage_gap(report: ExecutionReport, baseline_as_of: datetime) -> 
     instant post normally, including over-cap or out-of-window fills.
     """
 
+    return coverage_gap_at(report.occurred_at, baseline_as_of)
+
+
+def coverage_gap_at(occurred_at: datetime, baseline_as_of: datetime) -> str | None:
+    """Same rule for a stored fact: earlier than the takeover snapshot means coverage unknown."""
+
+    _aware(occurred_at, "occurred_at")
     _aware(baseline_as_of, "baseline_as_of")
-    return BASELINE_COVERAGE_UNKNOWN if report.occurred_at < baseline_as_of else None
+    return BASELINE_COVERAGE_UNKNOWN if occurred_at < baseline_as_of else None
 
 
 @dataclass(frozen=True)

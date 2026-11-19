@@ -9,6 +9,7 @@ read models.  Fact registration is never blocked by an expired or unadopted sugg
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 
@@ -20,7 +21,13 @@ from quanthus.capabilities.decision_access import (
     execution_window_issue,
     validate_decision_set,
 )
-from quanthus.capabilities.execution import Correction, ExecutionReport, SyntheticContext
+from quanthus.capabilities.execution import (
+    BASELINE_COVERAGE_UNKNOWN,
+    Correction,
+    ExecutionReport,
+    SyntheticContext,
+    coverage_gap_at,
+)
 from quanthus.capabilities.funding import (
     BUCKET_ASSIGNMENT_CONFLICT,
     FundingView,
@@ -64,6 +71,7 @@ PACKAGE_SCHEMA_VERSION = "p12.daily-decision-package.v1"
 FACT_SOURCE_ID = "desktop-user-confirmation"
 OUTSIDE_PLAN_WINDOW = "OUTSIDE_PLAN_WINDOW"
 RECONCILIATION_PENDING = "RECONCILIATION_PENDING"
+CASH_ONLY = "CASH"
 CONFIGURATION_BINDING_MISMATCH = "CONFIGURATION_BINDING_MISMATCH"
 _GROUP_ORDER = {
     "reconcile": 0,
@@ -173,6 +181,7 @@ class P12DesktopApplication:
             "execution_profile": self._policy.execution_profile,
         }
         binding_digest = digest(binding)
+        self._refuse_uncovered_legacy_postings()
         existing = self._facts.configuration_binding(self._context)
         if existing is None:
             snapshot = self._facts.snapshot(self._context)
@@ -210,6 +219,32 @@ class P12DesktopApplication:
     def _visible(decisions: MarketDecisionSet, now: datetime) -> bool:
         """A package and its plans exist for the user only from its publication time."""
         return now >= decisions.published_at
+
+    def _refuse_uncovered_legacy_postings(self) -> None:
+        """Refuse to take over a store that already posted a fact dated before its baseline.
+
+        Builds up to 66ddf73d posted such facts without coverage evidence.  Taking the store
+        over would present that debit as reconciled, so the store is left untouched (ledger,
+        receipts and evidence stay readable with the version that wrote them) and the
+        affected reports are named.  Current code never posts such a fact.
+        """
+
+        history = self._facts.snapshot(self._context).history
+        baseline_as_of = datetime.fromisoformat(history.baseline_as_of)
+        affected = [
+            f"{report.report_id} ({report.receipt_id}, occurred {report.occurred_at})"
+            for report in history.reports
+            if report.status == "POSTED"
+            and coverage_gap_at(datetime.fromisoformat(report.occurred_at), baseline_as_of)
+        ]
+        if affected:
+            raise FactError(
+                BASELINE_COVERAGE_UNKNOWN,
+                "takeover refused: posted reports predate the baseline snapshot "
+                f"{history.baseline_as_of} without coverage evidence: {', '.join(affected)}; "
+                "the store is unchanged; reconcile it with the version that wrote it or "
+                "start a new account store",
+            )
 
     def _publication(self, decisions: MarketDecisionSet, now: datetime) -> PublicationStatus:
         return PublicationStatus(
@@ -688,16 +723,25 @@ class P12DesktopApplication:
             )
             for fact in history.facts
         )
+        # Before publication only facts known then are exposed: dependent-plan states are hidden
+        # and a cash-only baseline names no security (older stores recorded a candidate code).
+        exposed = replace(
+            history,
+            plans=history.plans if visible else (),
+            baseline_security_code=(
+                history.baseline_security_code if history.baseline_quantity else CASH_ONLY
+            ),
+        )
         return RecordsView(
             scope=scope,
             package=package if visible else None,
             publication=self._publication(decisions, now),
             account=self._account(projection, history, decisions, funding, now),
-            history=history,
+            history=exposed,
             reports=tuple(reports),
             facts=facts,
             events=history.events,
-            plans=history.plans,
+            plans=exposed.plans,
         )
 
     def funding_rules(self, scope: AccountScope) -> FundingRulesView:

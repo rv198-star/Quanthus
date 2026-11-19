@@ -221,15 +221,17 @@ def test_windows_outside_the_next_session_publish_no_plan(tmp_path, window) -> N
 def test_read_interleaved_with_a_writer_returns_the_complete_old_state(tmp_path: Path) -> None:
     writer = _app(tmp_path)
     threads: list[threading.Thread] = []
+    armed = threading.Event()  # assembly itself reads a snapshot; interleave only the query
 
     def interleave(point: str) -> None:
-        if point == "snapshot_between_projection_and_history" and not threads:
+        if point == "snapshot_between_projection_and_history" and armed.is_set() and not threads:
             thread = threading.Thread(target=lambda: _fill(writer))
             threads.append(thread)
             thread.start()
             time.sleep(0.3)  # the writer is now blocked on the reader's shared lock
 
     reader = _app(tmp_path, fault_hook=interleave)
+    armed.set()
     split = reader.records(reader.scope)
     threads[0].join(timeout=10)
     assert split.account.cash_total == Decimal("10000.00") and split.account.positions == ()

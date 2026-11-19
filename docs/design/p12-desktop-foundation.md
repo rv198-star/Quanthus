@@ -40,7 +40,11 @@ decisions in `capabilities.decision_access`. The application layer only composes
   with `CONFIGURATION_BINDING_MISMATCH`; a new store may use a new policy. Stores created before
   bindings existed are adopted only when every plan-linked report matches the plan the presented
   configuration publishes. A persistent package library remains D1-B work.
-- A package and its plans are hidden until `published_at`. Under `close-to-next-open-v1` an entry
+- Taking over a store that already posted a fact dated before its baseline (possible only for
+  stores written by 66ddf73d) is refused with `BASELINE_COVERAGE_UNKNOWN`, naming the reports and
+  receipts; the store's data is left unchanged.
+- A package and its plans are hidden until `published_at`; before then the records read also
+  hides dependent-plan states, and a cash-only baseline reports its security as `CASH`. Under `close-to-next-open-v1` an entry
   window must lie inside the next trading session (09:30-15:00, exchange time); otherwise no plan
   is published and the opportunity shows `EXECUTION_WINDOW_INVALID`
   (`capabilities.decision_access.execution_window_issue`).

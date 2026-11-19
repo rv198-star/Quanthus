@@ -1,5 +1,6 @@
 """Exercise the R11-only capital effects against real expert and P2 decisions."""
 
+import hashlib
 import json
 from dataclasses import replace
 from datetime import date, timedelta
@@ -11,6 +12,7 @@ import pytest
 
 from quanthus.aggregator import GovernedAction
 from quanthus.backtest.contracts import MarketSession, OpenExecutionState
+from quanthus.backtest.data_provider import load_replay_data_provider_config
 from quanthus.backtest.engine import BacktestEngine
 from quanthus.backtest.policy import load_execution_policy
 from quanthus.backtest.strategy_replay import StrategyReplayFrame
@@ -20,6 +22,7 @@ from quanthus.expert_evaluation.serialization import ExpertEvaluationError
 from quanthus.expert_strategy import ExpertStrategyRegistry, FormalStrategyRunner
 from quanthus.expert_strategy import formal_p2_replay as replay
 from quanthus.expert_strategy.r11_historical import HistoricalBuyBound, R11HistoricalReplayRuntime
+from quanthus.expert_strategy.r11_provider_admission import expected_r11_reader_manifest
 from quanthus.policy import load_policy
 from tests.unit.test_entry_allocation_audit import at
 from tests.unit.test_formal_expert_strategy import _context, _evidence
@@ -208,3 +211,129 @@ def test_realized_fill_outside_bound_invalidates_candidate(monkeypatch, tmp_path
     )
     with pytest.raises(ExpertEvaluationError, match="decision-time bound"):
         runtime.run_candidate(tmp_path)
+
+
+def test_wrong_admitted_manifest_rejected_before_any_read(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        replay.FormalP2ReplayRuntime,
+        "_load_event_population",
+        lambda self, root: calls.append("events")
+        or (_ for _ in ()).throw(RuntimeError("EVENT_LOAD")),
+    )
+    monkeypatch.setattr(
+        R11HistoricalReplayRuntime,
+        "_open_data_session",
+        lambda self: calls.append("open")
+        or (_ for _ in ()).throw(RuntimeError("PROVIDER_OPEN")),
+    )
+    with pytest.raises(ValueError, match="admitted data"):
+        R11HistoricalReplayRuntime(
+            ROOT,
+            provider_config="config/replay-data-provider.development.v2.json",
+            parent_event_run_digest="sha256:" + "0" * 64,
+            buy_bounds={},
+            admitted_data_manifest_sha256="sha256:" + "f" * 64,
+            consumer_receipt_id="receipt",
+            excluded_security_ids=frozenset({SEC}),
+        )
+    assert calls == []
+
+
+def test_admitted_manifest_matches_pinned_canonical_lineage():
+    config = load_replay_data_provider_config(
+        ROOT / "config/replay-data-provider.development.v2.json"
+    )
+    assert expected_r11_reader_manifest(config) == (
+        "sha256:2821b5923bd1525642d9b4479ed2bd35281203c1f117acf6ba0819c606e4b300"
+    )
+
+
+@pytest.mark.parametrize("manifest_drift", [False, True])
+def test_r11_verifies_shared_manifest_before_loading_events(
+    tmp_path, monkeypatch, manifest_drift,
+):
+    config = json.loads(
+        (ROOT / "config/replay-data-provider.development.v1.json").read_bytes()
+    )
+    source = {"snapshot_id": "synthetic", "manifest_sha256": HASH}
+    replay_manifest = {
+        "bundle_id": "synthetic-projection",
+        "bundle_content_digest": HASH,
+        "source": source,
+    }
+    dwd_manifest = {
+        "package_id": "synthetic-base",
+        "through_date": "2021-12-31",
+        "content_digest": HASH,
+    }
+    dwd_root = tmp_path / "dwd"
+    replay_root = tmp_path / "replay"
+    dwd_root.mkdir()
+    replay_root.mkdir()
+    dwd_bytes = json.dumps(dwd_manifest).encode()
+    replay_bytes = json.dumps(replay_manifest).encode()
+    digest = "sha256:" + hashlib.sha256(replay_bytes).hexdigest()
+    config["dwd_authority"].update(dwd_manifest)
+    config["dwd_authority"]["manifest_sha256"] = (
+        "sha256:" + hashlib.sha256(dwd_bytes).hexdigest()
+    )
+    config["replay_source"].update(
+        bundle_id=replay_manifest["bundle_id"],
+        bundle_content_digest=HASH,
+        source_snapshot_id=source["snapshot_id"],
+        source_manifest_sha256=source["manifest_sha256"],
+        manifest_sha256=digest,
+    )
+    config_path = tmp_path / "provider.json"
+    config_path.write_text(json.dumps(config))
+    (dwd_root / "manifest.json").write_bytes(dwd_bytes)
+    (replay_root / "manifest.json").write_bytes(
+        replay_bytes + b"\n" if manifest_drift else replay_bytes
+    )
+    monkeypatch.setenv(config["replay_source"]["root_env"], str(replay_root))
+    monkeypatch.setenv(config["dwd_authority"]["root_env"], str(dwd_root))
+
+    def event_load_reached(self, root):
+        raise RuntimeError("EVENT_LOAD")
+
+    monkeypatch.setattr(R11HistoricalReplayRuntime, "_load_event_population", event_load_reached)
+    error = (
+        pytest.raises(ValueError, match="shared replay identity differs")
+        if manifest_drift
+        else pytest.raises(RuntimeError, match="EVENT_LOAD")
+    )
+    with error:
+        R11HistoricalReplayRuntime(
+            ROOT,
+            provider_config=str(config_path),
+            parent_event_run_digest=HASH,
+            buy_bounds={},
+            admitted_data_manifest_sha256=digest,
+            consumer_receipt_id="receipt",
+            excluded_security_ids=frozenset({SEC}),
+        )
+
+
+def test_r11_rejects_wrong_direct_dwd_authority_before_loading_events(tmp_path, monkeypatch):
+    path = ROOT / "config/replay-data-provider.development.v2.json"
+    payload = json.loads(path.read_bytes())
+    (tmp_path / "manifest.json").write_text("{}")
+    monkeypatch.setenv(payload["dwd_authority"]["root_env"], str(tmp_path))
+    monkeypatch.setenv(payload["dwd_correction"]["root_env"], str(tmp_path))
+    config = load_replay_data_provider_config(path)
+
+    def event_load_reached(self, root):
+        pytest.fail("event data must not be read before the DWD authority is verified")
+
+    monkeypatch.setattr(R11HistoricalReplayRuntime, "_load_event_population", event_load_reached)
+    with pytest.raises(ValueError, match="DWD identity differs"):
+        R11HistoricalReplayRuntime(
+            ROOT,
+            provider_config=str(path),
+            parent_event_run_digest=HASH,
+            buy_bounds={},
+            admitted_data_manifest_sha256=expected_r11_reader_manifest(config),
+            consumer_receipt_id="receipt",
+            excluded_security_ids=frozenset({SEC}),
+        )

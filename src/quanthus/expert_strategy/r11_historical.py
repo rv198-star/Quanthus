@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.backtest.contracts import EngineEvent, EventType
+from quanthus.backtest.data_provider import (
+    ReplayDataProvider,
+    ReplayDataSession,
+    load_replay_data_provider_config,
+)
 from quanthus.backtest.strategy_replay import StrategyReplayFrame
 from quanthus.expert_evaluation.production import _EventInput
 from quanthus.expert_evaluation.serialization import ExpertEvaluationError, canonical_json_bytes
@@ -25,6 +30,7 @@ from quanthus.expert_strategy.formal_p2_replay import (
     _SellSchedule,
     _UnitRuntime,
 )
+from quanthus.expert_strategy.r11_provider_admission import verify_r11_reader_admission
 from quanthus.industry_mapping import StaticIndustryMapping
 from quanthus.product_daily.contracts import CommandEnvelope
 from quanthus.product_daily.funding import (
@@ -97,6 +103,16 @@ class R11HistoricalReplayRuntime(FormalP2ReplayRuntime):
         self._excluded_security_ids = excluded_security_ids
         self._buy_bounds = dict(buy_bounds)
         self._consumer_receipt_id = consumer_receipt_id
+        self._admitted_data_manifest_sha256 = admitted_data_manifest_sha256
+        self._admitted_provider = ReplayDataProvider(
+            load_replay_data_provider_config(repository_root.resolve() / provider_config)
+        )
+        verify_r11_reader_admission(
+            self._admitted_provider.config,
+            admitted_data_manifest_sha256,
+            scope_start=DECISION_START,
+            scope_end=DECISION_END,
+        )
         super().__init__(
             repository_root,
             provider_config=provider_config,
@@ -105,12 +121,25 @@ class R11HistoricalReplayRuntime(FormalP2ReplayRuntime):
             decision_end=DECISION_END,
             execution_end=EXECUTION_END,
         )
-        if self.session.reader.data_manifest_sha256 != admitted_data_manifest_sha256:
-            self.close()
-            raise ValueError("R11 provider manifest does not match the admitted data")
         if self.frames[0].snapshot.market_date < DECISION_START:
             self.close()
             raise ValueError("R11 replay starts before the admitted decision window")
+
+    def _open_data_session(self) -> ReplayDataSession:
+        verify_r11_reader_admission(
+            self._admitted_provider.config,
+            self._admitted_data_manifest_sha256,
+            scope_start=self._provider_scope_start(),
+            scope_end=self.decision_end,
+        )
+        session = self._admitted_provider.open(
+            scope_start=self._provider_scope_start(),
+            scope_end=self.decision_end,
+        )
+        if session.reader.data_manifest_sha256 != self._admitted_data_manifest_sha256:
+            session.__exit__(None, None, None)
+            raise ValueError("R11 provider manifest does not match the admitted data")
+        return session
 
     def _load_event_population(
         self, event_root: Path

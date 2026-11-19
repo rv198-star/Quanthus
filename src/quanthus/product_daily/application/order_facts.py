@@ -7,13 +7,15 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
-from quanthus.capabilities.execution.order_evidence import OrderWindow as OrderWindow
 from quanthus.capabilities.execution.order_evidence import (
+    LaterOrderResult,
+    LaterOrderStatus,
     SourceOrder,
     WindowResult,
     WindowStatus,
     evidence_body,
 )
+from quanthus.capabilities.execution.order_evidence import OrderWindow as OrderWindow
 from quanthus.capabilities.execution.order_evidence import (
     SyntheticOrderSource as SyntheticOrderSource,
 )
@@ -264,6 +266,30 @@ def reconcile_window(
     if reserved_at is None or order.submitted_at < reserved_at:
         receipt.update(status=WindowStatus.UNKNOWN.value, reason="ORDER_RESERVATION_TIME_MISMATCH")
         return WindowTransition(state, None, receipt)
+    return _release_terminal_zero(
+        source,
+        order,
+        obligation,
+        state,
+        reserved_at,
+        receipt,
+        release_reason="ORIGINAL_HOLD_UNRECONCILED",
+    )
+
+
+def _release_terminal_zero(
+    source: SyntheticOrderSource,
+    order: SourceOrder,
+    obligation: PendingObligation,
+    state: BridgeState,
+    reserved_at: datetime | None,
+    receipt: dict[str, Any],
+    *,
+    release_reason: str,
+) -> WindowTransition:
+    if reserved_at is None or order.submitted_at < reserved_at:
+        receipt.update(status=WindowStatus.UNKNOWN.value, reason="ORDER_RESERVATION_TIME_MISMATCH")
+        return WindowTransition(state, None, receipt)
     settlement_id = order.zero_identity(source.source_id)
     if obligation.status == "CANCELLED" and any(
         s.settlement_id == settlement_id for s in state.funding.completed_settlements
@@ -280,7 +306,7 @@ def reconcile_window(
         or fee > bucket.cash
         or state.account.quantity(order.security_id)
     ):
-        receipt.update(status=WindowStatus.UNKNOWN.value, reason="ORIGINAL_HOLD_UNRECONCILED")
+        receipt.update(status=WindowStatus.UNKNOWN.value, reason=release_reason)
         return WindowTransition(state, None, receipt)
     closed = replace(bucket, phase=BucketPhase.CLOSED, cash=bucket.cash - fee)
     funded = replace(
@@ -325,4 +351,85 @@ def reconcile_window(
         BridgeState(account, settlement.state, account.revision),
         replace(obligation, status="CANCELLED"),
         receipt,
+    )
+
+
+def reconcile_later(
+    source: SyntheticOrderSource,
+    context: SyntheticContext,
+    attempt_identity: str,
+    later: Mapping[str, Any] | None,
+    state: BridgeState,
+    obligations: tuple[PendingObligation, ...],
+    *,
+    unresolved: bool = False,
+) -> WindowTransition:
+    """Release only the bound later attempt's hold on a proven terminal zero fill."""
+
+    result: LaterOrderResult = source.terminal_order(attempt_identity, context.as_of)
+    order = result.order
+    receipt: dict[str, Any] = {
+        "schema": "p12-later-order-result-v1",
+        "source_digest": source.identity,
+        "source_id": source.source_id,
+        "account_id": source.account_id,
+        "mode": "synthetic",
+        "attempt_id": attempt_identity,
+        "parent_id": later["parent_opportunity_id"] if later else None,
+        "as_of": context.as_of.isoformat(),
+        "status": result.status.value,
+        "reason": result.reason,
+        "order_id": order.order_id if order else None,
+        "order_revision": order.revision if order else None,
+        "order_observation": order.observation_id if order else None,
+        "reservation_id": None,
+        "released": False,
+        "fee_posted": "0.00",
+        "settlement_id": None,
+        "account_revision": state.account_revision,
+    }
+    if unresolved and result.status is LaterOrderStatus.ZERO:
+        receipt.update(status=LaterOrderStatus.UNKNOWN.value, reason="UNRESOLVED_ACCOUNT_REPORT")
+        return WindowTransition(state, None, receipt)
+    if order is None or result.status is not LaterOrderStatus.ZERO or not order.terminal_zero:
+        return WindowTransition(state, None, receipt)
+    if (
+        not later
+        or later["attempt_identity"] != attempt_identity
+        or order.parent_id != later["parent_opportunity_id"]
+        or order.attempt_id != attempt_identity
+        or order.command_id != later["command_id"]
+        or order.submitted_at < datetime.fromisoformat(later["created_at"])
+    ):
+        receipt.update(status=LaterOrderStatus.UNKNOWN.value, reason="C13_ATTEMPT_BINDING_MISMATCH")
+        return WindowTransition(state, None, receipt)
+    matched = next(
+        (
+            r
+            for r in state.funding.entry_reservations
+            if r.reservation_id == later["obligation_id"]
+            and r.command_id == order.command_id
+            and r.security_code == order.security_id
+            and r.quantity == order.total
+        ),
+        None,
+    )
+    obligation = next(
+        (ob for ob in obligations if matched and ob.reservation_id == matched.reservation_id),
+        None,
+    )
+    if matched is None or obligation is None or obligation.obligation_id != later["obligation_id"]:
+        receipt.update(
+            status=LaterOrderStatus.UNKNOWN.value, reason="LATER_RESERVATION_UNRECONCILED"
+        )
+        return WindowTransition(state, None, receipt)
+    receipt["reservation_id"] = obligation.reservation_id
+    return _release_terminal_zero(
+        source,
+        order,
+        obligation,
+        state,
+        datetime.fromisoformat(later["created_at"]),
+        receipt,
+        release_reason="LATER_HOLD_UNRECONCILED",
     )

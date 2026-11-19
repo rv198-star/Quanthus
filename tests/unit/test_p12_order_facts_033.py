@@ -20,11 +20,19 @@ from quanthus.capabilities.execution.order_evidence import (
     WindowStatement,
 )
 from quanthus.platform.adapters.product_daily_cycle_sqlite import build_funding_bridge_service
-from quanthus.product_daily.application.funding_bridge import SyntheticTemporalProfile
+from quanthus.product_daily.application.funding_bridge import (
+    LaterEntryRequest,
+    SyntheticTemporalProfile,
+)
 from quanthus.product_daily.c13_later_signal import OriginalAttemptState, evaluate_later_signal
-from quanthus.product_daily.risk import pending_cash_commitment
+from quanthus.product_daily.risk import (
+    ExpertEntryAction,
+    ExpertEntryEligibility,
+    pending_cash_commitment,
+)
 from quanthus.shared.fact_contracts import FactError
 from tests.unit.test_product_daily_c13_later_signal import (
+    Eligibility,
     calendar,
     current,
     opportunity,
@@ -670,3 +678,280 @@ def test_parent_label_cannot_consume_another_parent_slot(tmp_path):
     final = snapshot(bridge, LATE)
     assert final["pending"] == [reserved.reservation_id] and final["quantity"] == 0
     verify_rebuild(path, feed, LATE, final)
+
+
+def _later_source(order_status="cancelled", *, fee=Decimal("2.50"), extra=()):
+    original_zero = replace(
+        external_order(status="cancelled"), fee=Decimal("1.00"), corrections_clear=True
+    )
+    cancelled = replace(
+        external_order(later=True, published=LATE),
+        status=order_status,
+        filled=0,
+        cancelled=500,
+        fee=fee,
+    )
+    listed = (original_zero.order_id, cancelled.order_id)
+    source = ledger(orders=[original_zero, cancelled, *extra], listed=listed)
+    source = replace(
+        source,
+        statements=(
+            replace(
+                source.statements[0],
+                order_ids=(original_zero.order_id,),
+            ),
+        ),
+    )
+    return source, cancelled
+
+
+def _admit_later(bridge):
+    original = reserve_original(bridge)
+    evidence = bridge.observe_original(context(CLOSE), WINDOW, request_id="terminal")
+    assert evidence["released"] and evidence["reservation_id"] == original.reservation_id
+    request = later_request(bridge, security_id=SEC)
+    request = replace(
+        request,
+        opportunity=replace(
+            request.opportunity,
+            original_attempt_state=OriginalAttemptState.TERMINAL_ZERO_FILL_RECONCILED,
+        ),
+    )
+    entry = bridge.enter_later(context(NOW), request)
+    assert entry.entry is not None and entry.entry.accepted
+    return entry
+
+
+def test_a11_later_terminal_zero_releases_only_its_attempt_and_slot_stays_consumed(tmp_path):
+    source, order = _later_source()
+    path = tmp_path / "a11.sqlite"
+    bridge = bridge_at(path, source)
+    entry = _admit_later(bridge)
+    hold = entry.entry.reservation_id
+    before = snapshot(bridge, LATE)
+    assert before["pending"] == [hold] and before["held_cash"] == "5005.00"
+    # A new eligible candidate under a newer policy cannot take the consumed slot.
+    v2 = replace(
+        policy(),
+        policy_version="c13-synthetic-qualified-v2",
+        expiry=datetime.fromisoformat("2026-11-20T10:00:00+08:00"),
+    )
+    second = later_request(bridge, selected_policy=v2, security_id=SEC)
+    second = replace(
+        second,
+        opportunity=replace(
+            second.opportunity,
+            original_attempt_state=OriginalAttemptState.TERMINAL_ZERO_FILL_RECONCILED,
+        ),
+    )
+    with pytest.raises(FactError, match="LATER_ATTEMPT_ALREADY_CONSUMED"):
+        bridge.enter_later(context(NOW), second)
+    assert snapshot(bridge, NOW)["pending"] == [hold]
+    receipt = bridge.observe_later(context(LATE), attempt(), request_id="later-terminal")
+    assert (
+        receipt["status"],
+        receipt["reservation_id"],
+        receipt["released"],
+        receipt["fee_posted"],
+        receipt["order_id"],
+    ) == ("TERMINAL_ZERO_FILL_RECONCILED", hold, True, "2.50", order.order_id)
+    assert bridge.observe_later(context(LATE), attempt(), request_id="later-terminal") == receipt
+    after = snapshot(bridge, LATE)
+    assert after["cash"] == "20996.50" and after["quantity"] == 0 and not after["pending"]
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT count(*) FROM bridge_later_attempts").fetchone()[0] == 1
+        assert (
+            db.execute(
+                "SELECT status FROM bridge_obligations WHERE obligation_id=?",
+                (receipt["reservation_id"],),
+            ).fetchone()[0]
+            == "CANCELLED"
+        )
+    with sqlite3.connect(path) as db:
+        occupied = db.execute(
+            "SELECT slot_identity,attempt_identity FROM bridge_later_attempts"
+        ).fetchall()
+    assert len(occupied) == 1 and occupied[0][1] == attempt()
+    # Journal rebuild restores the occupied slot after the store table is wiped.
+    with sqlite3.connect(path) as db:
+        stored_slots = db.execute("SELECT * FROM bridge_later_attempts").fetchall()
+        db.execute("DELETE FROM bridge_later_attempts")
+    reopened = verify_rebuild(path, source, LATE, after)
+    assert reopened.observe_later(context(LATE), attempt(), request_id="later-terminal") == receipt
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT * FROM bridge_later_attempts").fetchall() == stored_slots
+    cold_path = path.with_name("cold-" + path.name)
+    cold = build_funding_bridge_service(
+        cold_path, context=context(BASE), authorization=AUTH, order_source=source
+    )
+    restored = cold.reconstruct_order_account(context(LATE))
+    assert restored.terminals["later-terminal"] == receipt
+    witness("a11-later-terminal", {"receipt": receipt, "state": after, "rebuild": "equal"})
+
+
+def test_a11_later_terminal_keeps_slot_for_a_new_eligible_session_after_rebuild(tmp_path):
+    source, _ = _later_source()
+    path = tmp_path / "a11-next-session.sqlite"
+    decision_at = LATER_OPEN.replace(hour=15, minute=10)
+    temporal_profile = SyntheticTemporalProfile(
+        "a11-two-session-witness", (RESERVE, NOW, LATE, decision_at)
+    )
+
+    def build():
+        return build_funding_bridge_service(
+            path,
+            context=context(BASE),
+            authorization=AUTH,
+            order_source=source,
+            temporal_profile=temporal_profile,
+        )
+
+    bridge = build()
+    bridge.establish_baseline(replace(baseline(), context=context(BASE)))
+    first = _admit_later(bridge)
+    terminal = bridge.observe_later(context(LATE), attempt(), request_id="terminal-first")
+    assert terminal["released"] and terminal["reservation_id"] == first.entry.reservation_id
+    with sqlite3.connect(path) as db:
+        db.execute("DELETE FROM bridge_later_attempts")
+    bridge = build()
+    bridge.rebuild(context(decision_at))
+    second_policy = replace(
+        policy(),
+        policy_version="test-two-session-v2",
+        observation_lifetime_sessions=2,
+        expiry=(LATER_OPEN + timedelta(days=1)).replace(hour=10),
+    )
+    parent = opportunity(
+        account_id=context().account_id,
+        security_id=SEC,
+        original_attempt_state=OriginalAttemptState.TERMINAL_ZERO_FILL_RECONCILED,
+    )
+    preceding = current(security_id=SEC, eligibility=Eligibility.EXPLICIT_FALSE)
+    latest = current(
+        security_id=SEC,
+        signal_session=decision_at.date(),
+        feature_session=decision_at.date(),
+        evidence_at=decision_at - timedelta(minutes=10),
+        available_at=decision_at - timedelta(minutes=5),
+        decision_cutoff=decision_at,
+        evidence_id="a11-next-session",
+    )
+    planned = evaluate_later_signal(
+        opportunity=parent,
+        prior=preceding,
+        current=latest,
+        policy=second_policy,
+        calendar=calendar(),
+    )
+    assert planned.candidate is not None and planned.candidate.identity != attempt()
+    next_id = planned.candidate.identity
+    expert = ExpertEntryEligibility(
+        next_id,
+        SEC,
+        ExpertEntryAction.TRIAL_ENTRY,
+        planned.candidate.later_signal_id,
+        Decimal("0.30"),
+    )
+    before = snapshot(bridge, decision_at)
+    request = LaterEntryRequest(
+        parent,
+        preceding,
+        latest,
+        second_policy,
+        calendar(),
+        intent=entry_intent(
+            bridge,
+            candidate_entry=replace(candidate(next_id, SEC), expert_entry=expert),
+            command_id=next_id,
+            expected_revision=before["revision"],
+            at=decision_at,
+        ),
+    )
+    with pytest.raises(FactError, match="LATER_ATTEMPT_ALREADY_CONSUMED"):
+        bridge.enter_later(context(decision_at), request)
+    assert snapshot(bridge, decision_at) == before
+
+
+@pytest.mark.parametrize(
+    "mutation,reason",
+    [
+        ("wrong-attempt", "C13_LATER_ORDER_AMBIGUOUS"),
+        ("ambiguous", "C13_LATER_ORDER_AMBIGUOUS"),
+        ("open", "LATER_ORDER_UNRECONCILED"),
+        ("filled", "LATER_FILL_RECORDED"),
+        ("wrong-command", "C13_ATTEMPT_BINDING_MISMATCH"),
+    ],
+)
+def test_a11_wrong_malformed_or_ambiguous_terminal_has_no_effects(tmp_path, mutation, reason):
+    original_zero = replace(
+        external_order(status="cancelled"), fee=Decimal("1.00"), corrections_clear=True
+    )
+    if mutation == "ambiguous":
+        base = replace(
+            external_order(later=True, published=LATE),
+            status="cancelled",
+            filled=0,
+            cancelled=500,
+            fee=Decimal("2.50"),
+        )
+        other = replace(
+            base, observation_id="obs-other", order_id="O-LATER-2", command_id="other-command"
+        )
+        source = ledger(
+            orders=[original_zero, base, other],
+            listed=(original_zero.order_id,),
+        )
+    elif mutation == "open":
+        source, _ = _later_source("open", fee=None)
+    elif mutation == "filled":
+        filled = external_order(later=True, published=LATE)
+        source = ledger(
+            orders=[original_zero, filled],
+            listed=(original_zero.order_id,),
+            fills=[execution(filled, "E-L")],
+        )
+    elif mutation == "wrong-command":
+        order = replace(
+            external_order(later=True, published=LATE),
+            status="cancelled",
+            filled=0,
+            cancelled=500,
+            fee=Decimal("2.50"),
+            command_id="another-command",
+        )
+        source = ledger(orders=[original_zero, order], listed=(original_zero.order_id,))
+    else:
+        source, _ = _later_source()
+    path = tmp_path / f"a11-{mutation}.sqlite"
+    bridge = bridge_at(path, source)
+    entry = _admit_later(bridge)
+    before = snapshot(bridge, LATE)
+    target = "unknown-attempt" if mutation == "wrong-attempt" else attempt()
+    receipt = bridge.observe_later(context(LATE), target, request_id=f"later-{mutation}")
+    expected_status = "ANY_FILL" if mutation == "filled" else "NEEDS_RECONCILIATION"
+    assert (receipt["status"], receipt["reason"], receipt["released"], receipt["fee_posted"]) == (
+        expected_status,
+        reason,
+        False,
+        "0.00",
+    )
+    assert snapshot(bridge, LATE) == before and before["pending"] == [entry.entry.reservation_id]
+    assert bridge.observe_later(context(LATE), target, request_id=f"later-{mutation}") == receipt
+    verify_rebuild(path, source, LATE, before)
+    witness(f"a11-{mutation}", {"receipt": receipt, "state": before, "rebuild": "equal"})
+
+
+def test_a11_terminal_validates_the_persisted_slot_against_the_journal(tmp_path):
+    source, _ = _later_source()
+    path = tmp_path / "a11-different-slot-clock.sqlite"
+    bridge = bridge_at(path, source)
+    _admit_later(bridge)
+    before = snapshot(bridge, LATE)
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "UPDATE bridge_later_attempts SET created_at=?",
+            ((NOW - timedelta(minutes=1)).isoformat(),),
+        )
+    with pytest.raises(FactError, match="STORE_PROJECTION_MISMATCH"):
+        bridge.observe_later(context(LATE), attempt(), request_id="clock-corruption")
+    assert snapshot(bridge, LATE) == before

@@ -171,7 +171,15 @@
         "p12.funding.read",
         "p12.reports.submit",
         "p12.facts.correct",
-        "p12.order_events.submit"
+        "p12.order_events.submit",
+        "p12.paper.session",
+        "p12.paper.quote",
+        "p12.paper.identity",
+        "p12.paper.intraday",
+        "p12.paper.account",
+        "p12.paper.orders",
+        "p12.paper.submit",
+        "p12.paper.cancel"
       ],
       "startup_hooks": [],
       "migrations": [],

@@ -17,6 +17,7 @@ from quanthus.platform.identity import AuthenticatedPrincipal
 from quanthus.platform.p12.errors import error_dto
 
 if TYPE_CHECKING:  # the application closure loads only when a runtime is assembled
+    from quanthus.platform.p12.paper import PaperService
     from quanthus.product_daily.application.desktop import P12DesktopApplication
 
 _LOGGER = logging.getLogger("quanthus.platform.p12")
@@ -66,8 +67,13 @@ def _transport() -> Any:
 
 
 class P12Endpoints:
-    def __init__(self, runtime: P12Runtime | None) -> None:
+    def __init__(
+        self,
+        runtime: P12Runtime | None,
+        paper: PaperService | None = None,
+    ) -> None:
         self._runtime = runtime
+        self._paper = paper
 
     def _run(self, request_id: str, call: Callable[[P12Runtime], dict[str, Any]]) -> Result:
         if self._runtime is None:
@@ -201,6 +207,65 @@ class P12Endpoints:
             return payload
 
         return self._run(request_id, call)
+
+    # ---- paper trading -------------------------------------------------------------
+    def _paper_run(self, request_id: str, call: Callable[[PaperService], dict[str, Any]]) -> Result:
+        if self._paper is None:
+            return 503, error_dto(
+                "P12_RUNTIME_NOT_CONFIGURED",
+                "no paper-trading service is assembled in this environment",
+                request_id,
+            )
+        from quanthus.shared.fact_contracts import FactError
+        try:
+            return 200, call(self._paper)
+        except FactError as exc:
+            status = _STATUS.get(str(exc.reason_code), 409)
+            return status, error_dto(str(exc.reason_code), str(exc).split(": ", 1)[-1], request_id)
+
+    def paper_session(self, principal: AuthenticatedPrincipal, request_id: str) -> Result:
+        return self._paper_run(request_id, lambda svc: svc.session())
+
+    def paper_quote(self, principal: AuthenticatedPrincipal, code: str, request_id: str) -> Result:
+        return self._paper_run(request_id, lambda svc: svc.quote(code))
+
+    def paper_identity(self, principal: AuthenticatedPrincipal, code: str, request_id: str) -> Result:
+        return self._paper_run(request_id, lambda svc: svc.identity(code))
+
+    def paper_intraday(self, principal: AuthenticatedPrincipal, code: str, request_id: str) -> Result:
+        return self._paper_run(request_id, lambda svc: svc.intraday(code))
+
+    def paper_account(
+        self, principal: AuthenticatedPrincipal, account_id: str, request_id: str
+    ) -> Result:
+        def call(runtime: P12Runtime) -> dict[str, Any]:
+            runtime.binding_for(principal, account_id)
+            return self._paper.account_view(account_id)  # type: ignore[union-attr]
+        return self._run(request_id, call) if self._paper is not None else self._paper_run(request_id, lambda svc: svc.account_view(account_id))
+
+    def paper_orders(
+        self, principal: AuthenticatedPrincipal, account_id: str, request_id: str
+    ) -> Result:
+        def call(runtime: P12Runtime) -> dict[str, Any]:
+            runtime.binding_for(principal, account_id)
+            return self._paper.orders(account_id)  # type: ignore[union-attr]
+        return self._run(request_id, call) if self._paper is not None else self._paper_run(request_id, lambda svc: svc.orders(account_id))
+
+    def paper_submit(
+        self, principal: AuthenticatedPrincipal, account_id: str, body: dict[str, Any], request_id: str
+    ) -> Result:
+        def call(runtime: P12Runtime) -> dict[str, Any]:
+            runtime.binding_for(principal, account_id)
+            return self._paper.submit(account_id, body)  # type: ignore[union-attr]
+        return self._run(request_id, call) if self._paper is not None else self._paper_run(request_id, lambda svc: svc.submit(account_id, body))
+
+    def paper_cancel(
+        self, principal: AuthenticatedPrincipal, account_id: str, order_id: str, request_id: str
+    ) -> Result:
+        def call(runtime: P12Runtime) -> dict[str, Any]:
+            runtime.binding_for(principal, account_id)
+            return self._paper.cancel(account_id, order_id)  # type: ignore[union-attr]
+        return self._run(request_id, call) if self._paper is not None else self._paper_run(request_id, lambda svc: svc.cancel(account_id, order_id))
 
     def submit_order_event(
         self,

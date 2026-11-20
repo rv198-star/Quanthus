@@ -89,6 +89,7 @@ def create_platform_kernel(
     data_catalog_sources_path: Path | None = None,
     data_catalog_snapshot_path: Path | None = None,
     p12_runtime: P12Runtime | None = None,
+    p12_paper=None,
 ) -> PlatformKernel:
     root = find_project_root()
     manifest = load_feature_manifest(manifest_path)
@@ -175,6 +176,7 @@ def create_platform_kernel(
         candidate_approvals=candidate_approvals,
         metrics=metrics,
         p12_runtime=p12_runtime,
+        p12_paper=p12_paper,
     )
     return PlatformKernel(
         manifest=manifest,

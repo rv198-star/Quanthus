@@ -373,11 +373,12 @@ class PlatformHttpApp:
         candidate_approvals: CandidateApprovalService,
         metrics: Metrics,
         p12_runtime: P12Runtime | None = None,
+        p12_paper=None,
     ) -> None:
         self.manifest = manifest
         self._store = store
         self._identity = identity
-        self._p12 = P12Endpoints(p12_runtime)
+        self._p12 = P12Endpoints(p12_runtime, p12_paper)
         self._jobs = jobs
         self._replay_jobs = replay_jobs
         self._gate_query = gate_query
@@ -672,6 +673,54 @@ class PlatformHttpApp:
             "POST",
             self._p12_submit_order_event,
         )
+        self._add(
+            "p12.paper.session",
+            "/api/p12/v1/market/session",
+            "GET",
+            self._p12_paper_session,
+        )
+        self._add(
+            "p12.paper.quote",
+            "/api/p12/v1/securities/<code>/quote",
+            "GET",
+            self._p12_paper_quote,
+        )
+        self._add(
+            "p12.paper.identity",
+            "/api/p12/v1/securities/<code>/identity",
+            "GET",
+            self._p12_paper_identity,
+        )
+        self._add(
+            "p12.paper.intraday",
+            "/api/p12/v1/securities/<code>/intraday",
+            "GET",
+            self._p12_paper_intraday,
+        )
+        self._add(
+            "p12.paper.account",
+            "/api/p12/v1/accounts/<account_id>/paper",
+            "GET",
+            self._p12_paper_account,
+        )
+        self._add(
+            "p12.paper.orders",
+            "/api/p12/v1/accounts/<account_id>/sim-orders",
+            "GET",
+            self._p12_paper_orders,
+        )
+        self._add(
+            "p12.paper.submit",
+            "/api/p12/v1/accounts/<account_id>/sim-orders",
+            "POST",
+            self._p12_paper_submit,
+        )
+        self._add(
+            "p12.paper.cancel",
+            "/api/p12/v1/accounts/<account_id>/sim-orders/<order_id>/cancel",
+            "POST",
+            self._p12_paper_cancel,
+        )
 
     def _p12_accounts(
         self, observed_request: HttpRequest, params: Mapping[str, str]
@@ -752,6 +801,82 @@ class PlatformHttpApp:
             observed_request.json_object(),
             observed_request.request_id,
             observed_request.query_string,
+        )
+        return _json_response(payload, status)
+
+    def _p12_paper_session(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.paper_session(principal, observed_request.request_id)
+        return _json_response(payload, status)
+
+    def _p12_paper_quote(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.paper_quote(
+            principal, params["code"], observed_request.request_id
+        )
+        return _json_response(payload, status)
+
+    def _p12_paper_identity(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.paper_identity(
+            principal, params["code"], observed_request.request_id
+        )
+        return _json_response(payload, status)
+
+    def _p12_paper_intraday(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.paper_intraday(
+            principal, params["code"], observed_request.request_id
+        )
+        return _json_response(payload, status)
+
+    def _p12_paper_account(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.paper_account(
+            principal, params["account_id"], observed_request.request_id
+        )
+        return _json_response(payload, status)
+
+    def _p12_paper_orders(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.paper_orders(
+            principal, params["account_id"], observed_request.request_id
+        )
+        return _json_response(payload, status)
+
+    def _p12_paper_submit(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:report")
+        status, payload = self._p12.paper_submit(
+            principal,
+            params["account_id"],
+            observed_request.json_object(),
+            observed_request.request_id,
+        )
+        return _json_response(payload, status)
+
+    def _p12_paper_cancel(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:report")
+        status, payload = self._p12.paper_cancel(
+            principal,
+            params["account_id"],
+            params["order_id"],
+            observed_request.request_id,
         )
         return _json_response(payload, status)
 
@@ -1393,6 +1518,7 @@ def create_http_app(
     candidate_approvals: CandidateApprovalService,
     metrics: Metrics,
     p12_runtime: P12Runtime | None = None,
+    p12_paper=None,
 ) -> PlatformHttpApp:
     return PlatformHttpApp(
         manifest=manifest,
@@ -1409,4 +1535,5 @@ def create_http_app(
         candidate_approvals=candidate_approvals,
         metrics=metrics,
         p12_runtime=p12_runtime,
+        p12_paper=p12_paper,
     )

@@ -14,8 +14,8 @@ import argparse
 import json
 import mimetypes
 import secrets
-from datetime import datetime
 from collections.abc import Callable, Iterable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from wsgiref.simple_server import make_server
@@ -54,10 +54,21 @@ def build_local_kernel(
     runtime = build_synthetic_runtime(
         state_dir=state_dir, account_users=account_users, clock=clock
     )
+    from quanthus.platform.p12.paper import build_paper_service
+
+    paper = build_paper_service(
+        state_dir=state_dir,
+        applications={
+            account_id: binding.application
+            for account_id, binding in runtime.bindings.items()
+        },
+        now=clock,
+    )
     kernel = create_platform_kernel(
         store=InMemoryPlatformStore(),
         cipher=LocalMfaDisabledCipher(),
         p12_runtime=runtime,
+        p12_paper=paper,
     )
     kernel.migrate()
     for username, (role, password) in users.items():

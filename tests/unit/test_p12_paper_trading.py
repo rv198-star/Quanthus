@@ -116,3 +116,49 @@ def test_idempotent_resubmit_and_persist(env, tmp_path):
     assert a2.order("i1")["status"] == "filled"
     again = a2.submit(OrderCommand("i1", "buy", "600000", 100, Decimal("10.70")))
     assert again.status == "filled" and again.receipt_id == out.receipt_id
+
+
+def test_concurrent_match_does_not_revert_filled(env):
+    """R2/N1: racing matchers on one open order leave it filled, exactly once."""
+    apps, box, qbox, store, now = env
+    qbox[0] = _quote("10.80", box[0])
+    app = apps["SYN-P12-A"]
+    a1 = PaperAccount(app=app, store=store, quotes=_quotes(now, qbox), now=now)
+    a1.submit(OrderCommand("c1", "buy", "600000", 100, Decimal("10.90")))
+    assert a1.order("c1")["status"] in ("open", "filled")
+
+    import threading
+    errs = []
+    def worker():
+        try:
+            for _ in range(30):
+                PaperAccount(app=app, store=store, quotes=_quotes(now, qbox), now=now).poll()
+        except Exception as e:
+            errs.append(e)
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    for t_ in threads: t_.start()
+    for t_ in threads: t_.join()
+    assert not errs
+    final = PaperAccount(app=app, store=store, quotes=_quotes(now, qbox), now=now).order("c1")
+    assert final["status"] == "filled"
+    view = PaperAccount(app=app, store=store, quotes=_quotes(now, qbox), now=now).account_view()
+    assert view["cash_held_open_buys"] == "0.00"
+    out = PaperAccount(app=app, store=store, quotes=_quotes(now, qbox), now=now).cancel("c1")
+    assert out["status"] == "filled" and out["cancelled_qty"] == 0
+
+
+def test_cross_account_same_order_id_isolation(env):
+    """R2/N2: another account cannot read/cancel or replay a foreign order id."""
+    apps, box, qbox, store, now = env
+    a = PaperAccount(app=apps["SYN-P12-A"], store=store, quotes=_quotes(now, qbox), now=now)
+    b = PaperAccount(app=apps["SYN-P12-B"], store=store, quotes=_quotes(now, qbox), now=now)
+    a.submit(OrderCommand("dup", "buy", "600000", 100, Decimal("10.80")))
+    assert a.order("dup")["status"] == "filled"
+    assert b.order("dup") is None
+    import pytest as _p
+    with _p.raises(Exception):
+        b.cancel("dup")
+    outb = b.submit(OrderCommand("dup", "buy", "600000", 100, Decimal("10.80")))
+    assert outb.status == "filled"
+    assert [o["order_id"] for o in b.orders()] == ["dup"]
+    assert a.order("dup")["receipt_id"] != outb.receipt_id

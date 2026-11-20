@@ -18,6 +18,8 @@ from quanthus.capabilities.execution import SyntheticContext
 from quanthus.platform.adapters.product_daily_facts_sqlite import build_synthetic_fact_service
 from quanthus.product_daily.application.desktop import P12DesktopApplication
 from quanthus.product_daily.application.desktop.policy import DesktopPolicyBundle
+from dataclasses import replace as _dc_replace
+from quanthus.capabilities.funding import FixedBucketPolicy, initial_funding_state
 from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
 from quanthus.shared.fact_contracts import digest
 from quanthus.shared.values import VersionRef
@@ -52,6 +54,9 @@ class PaperDecisionSource:
             synthetic=True,
             market_date=today,
             knowledge_cutoff=cutoff,
+            # An empty package carries no real publication event: stamp it at
+            # the knowledge cutoff (not a fabricated intraday time) so the
+            # surface reads "no system advice today" rather than a fake 00:00.
             published_at=cutoff,
             next_session=today.fromordinal(today.toordinal() + 1),
             decisions=(),
@@ -92,6 +97,20 @@ def build_paper_application(
         authorization=authorization,
         clock=clock,
     )
+    # The paper account keeps its own fixed-bucket funding policy so the
+    # opening cash partitions cleanly instead of falling into an "unbound /
+    # assignment-conflict" surface.  Two buckets plus a reserve partition the
+    # 100,000 baseline; the structure mirrors the demo policy's fixed_bucket
+    # mode, only sized to this account's cash.
+    paper_funding = FixedBucketPolicy(
+        policy_ref=policy.funding.policy_ref,
+        unit_count=2,
+        bucket_budget=Decimal("45000.00"),
+        initial_reserve=Decimal("10000.00"),
+        reserve_cap=policy.funding.reserve_cap,
+        trial_fraction=policy.funding.trial_fraction,
+    )
+    paper_policy = _dc_replace(policy, funding=paper_funding)
     app = P12DesktopApplication(
         scope=__import__("quanthus.shared.values", fromlist=["AccountScope"]).AccountScope(
             PAPER_ACCOUNT_ID, "synthetic"
@@ -99,10 +118,14 @@ def build_paper_application(
         context=context,
         facts=facts,
         decisions=PaperDecisionSource(clock),
-        policy=policy,
+        policy=paper_policy,
         clock=clock,
         clock_kind="system",
     )
     app.establish_baseline(request_id=PAPER_BASELINE_REQUEST, cash=baseline_cash)
     app.bind_configuration()
+    # Establish the funding partition once so a fresh account shows bound
+    # buckets and a real reserve, never the "assignment conflict" placeholder.
+    if app.funding_state(app.scope) is None:
+        app.bind_funding(app.scope, initial_funding_state(paper_funding, baseline_cash))
     return app

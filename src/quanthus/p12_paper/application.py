@@ -129,17 +129,34 @@ class PaperOrderStore:
         self._init()
 
     def _migrate(self, c: sqlite3.Connection) -> None:
-        """Backfill ``account_id`` on rows written before the column existed.
+        """Backfill ``account_id`` and move to the (account, order) key.
 
         Early R0 stores kept every account's orders in one table without a
         discriminator; those rows are reassigned to ``SYN-P12-A`` (the only
-        account that could have written them) so the shared table stays
-        readable while newer writes carry their own account.
+        account that could have written them).  R1 then keyed the table by
+        ``order_id`` alone, which let one account read or cancel another's
+        order when they shared a client order id.  R2 re-keys the table on
+        ``(account_id, order_id)`` so the same client id can be reused by a
+        different account without collision, and every read/write stays
+        scoped to its own account.
         """
         cols = {row[1] for row in c.execute("PRAGMA table_info(sim_orders)")}
         if "account_id" in cols:
+            # Already has account_id; check whether the PK is composite.
+            pk = [r[1] for r in c.execute("PRAGMA table_info(sim_orders)") if r[5]]
+            if pk == ["account_id", "order_id"]:
+                return
+            # Rebuild: old PK on order_id alone -> composite PK.
+            c.execute("ALTER TABLE sim_orders RENAME TO sim_orders_old")
+            self._create(c)
+            c.execute(
+                "INSERT OR IGNORE INTO sim_orders SELECT * FROM sim_orders_old"
+            )
+            c.execute("DROP TABLE sim_orders_old")
             return
         c.execute("ALTER TABLE sim_orders ADD COLUMN account_id TEXT NOT NULL DEFAULT 'SYN-P12-A'")
+        # column added; next call rebuilds to composite pk
+        self._migrate(c)
 
     def _migrate_legacy(self) -> None:
         # kept for clarity; migration runs inside _init via _migrate
@@ -157,38 +174,44 @@ class PaperOrderStore:
 
     def _init(self) -> None:
         with self._connect() as c:
-            c.execute(
-                """
-                CREATE TABLE IF NOT EXISTS sim_orders(
-                  account_id TEXT NOT NULL,
-                  order_id TEXT PRIMARY KEY,
-                  side TEXT NOT NULL,
-                  security_code TEXT NOT NULL,
-                  security_name TEXT NOT NULL,
-                  quantity INTEGER NOT NULL,
-                  limit_price TEXT NOT NULL,
-                  filled_qty INTEGER NOT NULL DEFAULT 0,
-                  status TEXT NOT NULL,
-                  rule_version TEXT NOT NULL,
-                  accepted_at TEXT NOT NULL,
-                  last_quote_time TEXT,
-                  avg_price TEXT,
-                  reject_reason TEXT,
-                  source TEXT NOT NULL,
-                  receipt_id TEXT,
-                  fill_source_seq TEXT,
-                  updated_at TEXT NOT NULL
-                )
-                """
-            )
+            self._create(c)
             c.execute("CREATE INDEX IF NOT EXISTS sim_orders_status ON sim_orders(status)")
             c.execute("CREATE INDEX IF NOT EXISTS sim_orders_account ON sim_orders(account_id, status)")
             self._migrate(c)
 
-    def get(self, order_id: str) -> PaperOrder | None:
+    @staticmethod
+    def _create(c: sqlite3.Connection) -> None:
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sim_orders(
+              account_id TEXT NOT NULL,
+              order_id TEXT NOT NULL,
+              side TEXT NOT NULL,
+              security_code TEXT NOT NULL,
+              security_name TEXT NOT NULL,
+              quantity INTEGER NOT NULL,
+              limit_price TEXT NOT NULL,
+              filled_qty INTEGER NOT NULL DEFAULT 0,
+              status TEXT NOT NULL,
+              rule_version TEXT NOT NULL,
+              accepted_at TEXT NOT NULL,
+              last_quote_time TEXT,
+              avg_price TEXT,
+              reject_reason TEXT,
+              source TEXT NOT NULL,
+              receipt_id TEXT,
+              fill_source_seq TEXT,
+              updated_at TEXT NOT NULL,
+              PRIMARY KEY (account_id, order_id)
+            )
+            """
+        )
+
+    def get(self, order_id: str, account_id: str) -> PaperOrder | None:
         with self._connect() as c:
             row = c.execute(
-                "SELECT * FROM sim_orders WHERE order_id=?", (order_id,)
+                "SELECT * FROM sim_orders WHERE order_id=? AND account_id=?",
+                (order_id, account_id),
             ).fetchone()
         return None if row is None else self._row(row)
 
@@ -204,15 +227,42 @@ class PaperOrderStore:
     def update(self, order: PaperOrder, *, fill_source_seq: str | None = None) -> None:
         with self._connect() as c:
             c.execute(
-                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=? WHERE order_id=?",
+                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=? WHERE order_id=? AND account_id=?",
                 (
                     order.filled_qty, order.status,
                     None if order.last_quote_time is None else order.last_quote_time.isoformat(),
                     None if order.avg_price is None else format(order.avg_price, "f"),
                     order.reject_reason, order.receipt_id, fill_source_seq,
-                    _utcnow().isoformat(), order.order_id,
+                    _utcnow().isoformat(), order.order_id, order.account_id,
                 ),
             )
+
+    def update_if_status(
+        self,
+        order: PaperOrder,
+        *,
+        expected_status: str,
+        fill_source_seq: str | None = None,
+    ) -> bool:
+        """Write ``order`` only while the stored row still has ``expected_status``.
+
+        Compare-and-set for the matcher: a stale in-memory order from a
+        racing read cannot overwrite a terminal state another thread just
+        committed.  Returns True when the row was updated.
+        """
+        with self._connect() as c:
+            cur = c.execute(
+                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=? WHERE order_id=? AND account_id=? AND status=?",
+                (
+                    order.filled_qty, order.status,
+                    None if order.last_quote_time is None else order.last_quote_time.isoformat(),
+                    None if order.avg_price is None else format(order.avg_price, "f"),
+                    order.reject_reason, order.receipt_id, fill_source_seq,
+                    _utcnow().isoformat(), order.order_id, order.account_id,
+                    expected_status,
+                ),
+            )
+            return cur.rowcount > 0
 
     def list_orders(
         self, account_id: str, *, statuses: tuple[str, ...] | None = None
@@ -237,10 +287,10 @@ class PaperOrderStore:
             rows = c.execute(sql, args).fetchall()
         return [self._row(r) for r in rows]
 
-    def fill_seq_used(self, source_seq: str) -> bool:
+    def fill_seq_used(self, source_seq: str, account_id: str) -> bool:
         with self._connect() as c:
             row = c.execute(
-                "SELECT 1 FROM sim_orders WHERE fill_source_seq=?", (source_seq,)
+                "SELECT 1 FROM sim_orders WHERE fill_source_seq=? AND account_id=?", (source_seq, account_id)
             ).fetchone()
         return row is not None
 
@@ -293,7 +343,7 @@ class PaperAccount:
         return [o.to_dict() for o in self._store.list_orders(self._account_id)]
 
     def order(self, order_id: str) -> dict[str, Any] | None:
-        o = self._store.get(order_id)
+        o = self._store.get(order_id, self._account_id)
         return None if o is None else o.to_dict()
 
     def account_view(self) -> dict[str, Any]:
@@ -380,7 +430,7 @@ class PaperAccount:
         invalid = command.validate()
         if invalid is not None:
             return SubmitOutcome(command.order_id, "rejected", invalid, REJECT[invalid], 0, None, RULE_VERSION, None, None)
-        existing = self._store.get(command.order_id)
+        existing = self._store.get(command.order_id, self._account_id)
         if existing is not None:
             # Idempotent re-submit returns the stored receipt, never double-posts.
             st = "filled" if existing.status == "filled" else ("rejected" if existing.status == "rejected" else "open")
@@ -441,14 +491,15 @@ class PaperAccount:
         obs_result = self._register_order(order)
         if obs_result is not None:
             object.__setattr__(order, "receipt_id", obs_result)
+        # Persist the accepted (still-open) order first so the matcher's
+        # compare-and-set has a stored row to flip.  A racing poll/match that
+        # fills it before this insert commits is rejected by the CAS guard.
+        self._store.insert(order)
         # Immediate match attempt against the live quote (accepted-at or later).
         outcome = self._try_fill(order, quote, session)
         if outcome is None:
             # Not marketable / not tradable now: persists as an open order.
-            self._store.insert(order)
             return SubmitOutcome(command.order_id, "open", "BELOW_LIMIT", REJECT["BELOW_LIMIT"], 0, None, RULE_VERSION, quote.quote_time, None)
-        # Filled on accept: persist order + post the ledger fill.
-        self._store.insert(order, fill_source_seq=f"{order.order_id}:fill:{quote.quote_time.isoformat()}")
         return outcome
 
     def _reject(self, command: OrderCommand, reason: str, quote: Quote | None) -> SubmitOutcome:
@@ -572,28 +623,54 @@ class PaperAccount:
             order_id=order.order_id,
         )
         # Only mark the order filled once the shared ledger actually posts the
-        # fact.  A FactError (insufficient cash, unknown order, ...) or a
-        # non-posted result leaves the order open so a retry still completes
-        # it - the reservation is never released before the fill is proven.
+        # fact.  A FactError (insufficient cash, unknown order, a duplicate
+        # fact from a racing matcher) or a non-posted result does NOT write
+        # back: another thread may already have committed the fill, and
+        # re-writing this stale in-memory "open" copy would revert it (R2/N1).
+        # Instead re-read the stored row and trust the ledger/book state.
         try:
             result = self._app.paper_submit_report(report)
         except FactError:
-            self._store.update(order)
-            return None
+            return self._resolve_after_conflict(order, quote)
         if str(result.status) not in ("POSTED", "DUPLICATE"):
-            self._store.update(order)
-            return None
+            return self._resolve_after_conflict(order, quote)
         object.__setattr__(order, "filled_qty", order.quantity)
         object.__setattr__(order, "status", "filled")
         object.__setattr__(order, "avg_price", fill_price)
         object.__setattr__(order, "last_quote_time", quote.quote_time)
         object.__setattr__(order, "receipt_id", result.receipt_id)
-        self._store.update(order, fill_source_seq=source_seq)
+        # Compare-and-set: only flip while the row is still open.  When a
+        # racing matcher already committed a terminal state the CAS fails and
+        # we fall back to the stored row rather than overwriting it.
+        if not self._store.update_if_status(
+            order, expected_status="open", fill_source_seq=source_seq
+        ):
+            return self._resolve_after_conflict(order, quote)
         self._observe_terminal(order, filled=order.quantity, cancelled=0)
         return SubmitOutcome(
             order.order_id, "filled", None, None, order.filled_qty,
             fill_price, order.rule_version, quote.quote_time, result.receipt_id,
         )
+
+    def _resolve_after_conflict(
+        self, order: PaperOrder, quote: Quote
+    ) -> SubmitOutcome | None:
+        """Return the order's true state after a racing fill/duplicate.
+
+        The shared ledger or a concurrent matcher already decided this order.
+        Re-read the stored row so the caller sees the committed state (a
+        filled order reports filled) instead of a stale "open" echo.
+        """
+        stored = self._store.get(order.order_id, self._account_id)
+        if stored is None:
+            return None
+        if stored.status == "filled":
+            return SubmitOutcome(
+                stored.order_id, "filled", None, None, stored.filled_qty,
+                stored.avg_price, stored.rule_version, stored.last_quote_time,
+                stored.receipt_id,
+            )
+        return None
 
     @staticmethod
     def _price_band(
@@ -638,7 +715,8 @@ class PaperAccount:
             if accepted_day >= trading_day and not day_done:
                 continue
             object.__setattr__(order, "status", "expired")
-            self._store.update(order)
+            if not self._store.update_if_status(order, expected_status="open"):
+                continue
             self._observe_terminal(order, filled=order.filled_qty, cancelled=order.remaining_qty)
             n += 1
         return n
@@ -662,14 +740,21 @@ class PaperAccount:
 
     # ---- cancel / expire -------------------------------------------------------------
     def cancel(self, order_id: str) -> dict[str, Any]:
-        order = self._store.get(order_id)
+        order = self._store.get(order_id, self._account_id)
         if order is None:
             raise FactError("PLAN_NOT_FOUND", "simulated order not found")
         if order.status != "open":
             return {**order.to_dict(), "cancelled_qty": 0, "idempotent": True}
         cancelled = order.remaining_qty
         object.__setattr__(order, "status", "cancelled")
-        self._store.update(order)
+        # Compare-and-set: a cancel only lands while the row is still open.
+        # If a racing matcher filled it first, the CAS fails and the stored
+        # terminal state is returned instead of reverting it to "cancelled".
+        if not self._store.update_if_status(order, expected_status="open"):
+            stored = self._store.get(order_id, self._account_id)
+            if stored is not None:
+                return {**stored.to_dict(), "cancelled_qty": 0, "idempotent": True}
+            raise FactError("PLAN_NOT_FOUND", "simulated order not found")
         self._observe_terminal(order, filled=order.filled_qty, cancelled=cancelled)
         return {**order.to_dict(), "cancelled_qty": cancelled, "idempotent": False}
 
@@ -681,7 +766,8 @@ class PaperAccount:
         n = 0
         for order in self._store.open_for(self._account_id):
             object.__setattr__(order, "status", "expired")
-            self._store.update(order)
+            if not self._store.update_if_status(order, expected_status="open"):
+                continue
             self._observe_terminal(order, filled=order.filled_qty, cancelled=order.remaining_qty)
             n += 1
         return n

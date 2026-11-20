@@ -1,0 +1,164 @@
+{
+  "schema": "quanthus.r11.comparison-proposal.v1",
+  "status": "proposed_not_activated",
+  "base": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+  "one_control": {
+    "id": "legacy-p4-trend-risk-1.0.1",
+    "source": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+    "raw_sha256": "7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+    "semantic_digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+    "frozen_execution_context": {
+      "p0_policy": {
+        "artifact_id": "p0-2026-07-23",
+        "artifact_version": "1.0.0",
+        "digest": "sha256:2a0411f41db50a85de71642a95c5f595f7b7e3f1c2ede09d098b7d413d8d652c",
+        "repository_key": "config/p0-policy.v1.json"
+      },
+      "execution_policy": {
+        "artifact_id": "p2-daily-research-v1",
+        "artifact_version": "1.0.0",
+        "digest": "sha256:7617a62ceb5baf549c69525222d67503289f5cfdecc2c3e62151b220a90904c3",
+        "repository_key": "config/p2-execution-policy.research.v1.json"
+      },
+      "execution_profile": "close-to-next-open-v1",
+      "position_state_machine_version": "1.1.0",
+      "unit_count": 5,
+      "unit_notional": "100000.00",
+      "base_trial_position_fraction": "0.30",
+      "entry_lot_size": 100,
+      "maximum_active_units": 5,
+      "adds_enabled": false,
+      "reductions_enabled": true,
+      "cooldown_sessions": 5,
+      "funding_policy": "finite_total_budget_fixed_unit_no_profit_redeployment",
+      "matching_policy": "p2_daily_open_no_partial_fill",
+      "settlement_policy": "unit_close_date",
+      "cost_policy": "p2-daily-research-v1",
+      "base_position_management": {
+        "intervenable": false,
+        "structural_break_rule": "total_return_index_below_sma60_and_sma20_not_above_sma60",
+        "constraint_stop_loss": "0.08",
+        "deterioration_sessions": 2,
+        "minimum_holding_sessions": 3,
+        "maximum_holding_sessions": 40,
+        "missing_held_evidence": "hold_and_alert"
+      },
+      "hard_guardians": [
+        "point_in_time",
+        "data_quality",
+        "tradability",
+        "accounting",
+        "funding",
+        "hard_position_limits",
+        "concentration"
+      ]
+    },
+    "execution_policy": "config/p2-execution-policy.research.v1.json",
+    "no_R10_learned_child": true
+  },
+  "one_candidate": {
+    "id": "r11-fixed-reserve-account-risk-singleT1-v1",
+    "candidate_identity": "original P4 event and original T+1 window",
+    "shared_core": "repair successor to accepted1.2.0; exact tested final digest before U06",
+    "funding": "fixed target N, finite shared reserve, settlement/preactivation/late-delta existing R11 rules",
+    "account_ratios": {
+      "stock": null,
+      "industry": null,
+      "total": null
+    },
+    "ratio_owner": "P12 configuration + P11 purpose review; no silent numeric defaults",
+    "treatment_differences": [
+      "fixed shared reserve settlement/topup versus legacy nonredeployable pool",
+      "locked actual-cycle B and conservative bound/fee/whole-account sizing versus exact legacy sizing",
+      "declared candidate account caps after explicit adoption; legacy control remains unchanged"
+    ],
+    "attribution": "combined composition effect only; no causal assignment to C13/C15/risk individually"
+  },
+  "shared_conditions": {
+    "initial_total_equity": "500000.00",
+    "bucket_count": 5,
+    "target_N": "100000.00",
+    "initial_reserve": "0.00",
+    "origin": "exact legacy execution context; proposed historical research seed, never a personal account",
+    "trial_fraction": "0.30",
+    "signal_event_expert_exit": "same original P4/Trend/PositionRisk/baseexit; no adds, veto preserved",
+    "fees": "exact frozen P2 research policy both arms",
+    "matching": "P2 open/no-partial-fill research profile; real multifill is separate P12 scope",
+    "window": {
+      "decisions": [
+        "2020-01-01",
+        "2021-12-30"
+      ],
+      "executions_through": "2021-12-31",
+      "required_prior_history": "at least prior60 eligible closes and original P4/listing requirements; do not shrink original window to fit the available source",
+      "protected_after": "2021-12-31"
+    },
+    "universe": "exact original qualified P4 development universe manifest, still to bind; no sample changes by observed results"
+  },
+  "result_metrics": [
+    "whole-account net return",
+    "maximum drawdown",
+    "tail loss",
+    "funded exposure/utilization",
+    "entry/quantity/capacity/exit deltas",
+    "cash/reserve/adjustment/hold identities",
+    "fees/turnover",
+    "unallocated and constrained opportunities",
+    "all changed event/order/fill/settlement lineage"
+  ],
+  "criteria": {
+    "status": "proposal_for_pre_run_purpose_adoption; frozen within this preparation package",
+    "operational_required": "all invariant/source/PIT/fee/cash/lot/expert/replay/ledger gates pass; nonempty qualified control and candidate paths",
+    "favorable": "candidate net return >= control AND candidate max drawdown <= control, with at least one material improvement at the inherited 0.01 absolute return/DD scale",
+    "unfavorable": "both return and drawdown weakly worse with one material deterioration, or required use/operational gate fails",
+    "tradeoff_or_low_information": "mixed return/DD, submaterial differences, empty/unqualified sample or unresolved scientific use; preserve exact evidence, answer at its qualified grade and route unresolved actual preference to Owner after concrete results",
+    "materiality_source": "original expert card has absolute_return_delta>=0.01 or absolute_drawdown_delta>=0.01; action-change>=0.02 remains diagnostic, not economic adoption",
+    "no_posthoc_search": "no extra candidate, tuning, window change, ratio change or stopping based on attractive capital results"
+  },
+  "stage_DAG": [
+    {
+      "id": "Q",
+      "owner": "P10/P11",
+      "materialization": "exact immutable qualified manifest/consumer schema",
+      "lifecycle": "retained input identity",
+      "consumers": [
+        "FEATURES"
+      ]
+    },
+    {
+      "id": "FEATURES",
+      "owner": "one job",
+      "materialization": "signals/facts/calendar/features once, full semantic closure key",
+      "lifecycle": "job-local TMP",
+      "consumers": [
+        "OLD",
+        "NEW"
+      ]
+    },
+    {
+      "id": "OLD",
+      "owner": "old control",
+      "materialization": "own candidate/account/units/settlements",
+      "lifecycle": "jobTMP then evidence"
+    },
+    {
+      "id": "NEW",
+      "owner": "one R11 composition",
+      "materialization": "own candidate/account/buckets/reserve/risk",
+      "lifecycle": "jobTMP then evidence"
+    },
+    {
+      "id": "COMPARE",
+      "owner": "Sol",
+      "materialization": "event complete differences and decision",
+      "lifecycle": "retained evidence"
+    },
+    {
+      "id": "COLD",
+      "owner": "independent construction",
+      "materialization": "fresh exact prerequisites and both paths as contract requires",
+      "lifecycle": "independent evidence"
+    }
+  ],
+  "cost": "DS returns measured code seam/reuse and disjoint remaining hours; original46-92h retained as unvalidated historical quote, no invented new total or savings"
+}

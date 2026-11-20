@@ -1,0 +1,20 @@
+{
+  "schema_version": "quanthus.platform.domain-imports.v1",
+  "version": "1.0.0",
+  "activation_authority": false,
+  "purpose": "P12 engineering-contract v1.1 infrastructure implements application ports using typed public execution facts; no runtime execution capability admission",
+  "exceptions": [
+    {
+      "path": "adapters/product_daily_facts_sqlite.py",
+      "module": "quanthus.capabilities.execution",
+      "names": [
+        "Correction",
+        "ExecutionReport",
+        "SyntheticContext",
+        "validate_context"
+      ],
+      "consumer": "P12 U05 synthetic SQLite facts adapter",
+      "source_contract": "P12 D1 engineering-contract v1.1 sections1A/1B; docs/acceptance/research-r11-u05-synthetic-facts-20261118.md"
+    }
+  ]
+}

@@ -873,6 +873,28 @@
         "TRACE"
       ],
       "contribution": "R11C13/C15共同候选/资金/账户风险用途合同和共享合成政策，按完整问题验证或具名受限停止；不改原模块采用或P12事实责任"
+    },
+    {
+      "id": "P11-R11-USE-002",
+      "issue": 700,
+      "modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "contribution": "继续同一R11用途目标U01-U08；首包精确用途/输入/账户配置及必要未决现金修复，完整研究与日常采用独立验收；保留工程子批历史。"
+    },
+    {
+      "id": "P10-DATA-R11-PURPOSE-001",
+      "issue": 701,
+      "modules": [
+        "DATA",
+        "REPRO",
+        "TRACE"
+      ],
+      "contribution": "P10现成供给的R11精确历史/PIT用途交接请求；源质量留P10，当前只登记受影响消费与缺项，不授予数据或研究准入。"
     }
   ]
 }

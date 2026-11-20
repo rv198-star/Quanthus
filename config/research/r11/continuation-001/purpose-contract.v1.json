@@ -1,0 +1,100 @@
+{
+  "schema": "quanthus.r11.continuation-purpose.v1",
+  "id": "R11-USE-CONTINUATION-002",
+  "version": "1.0.0",
+  "work_item": "P11-R11-USE-002",
+  "issue": 700,
+  "predecessor_engineering_issue": 690,
+  "full_goal_status": "open",
+  "engineering_history": "ACCEPTED1.2.0, retained; newly reproduced pending-cash repair required before new consumer admission",
+  "U01_U08": {
+    "U01": "purpose/control/criteria contract and explicit mode differences",
+    "U02": "P10 exact input/PIT/exposure handoff",
+    "U03": "account/fee/valuation configuration and pending-cash repair",
+    "U04": "candidate/expert exact use qualification including open multi-day wait/rearm",
+    "U05": "P12 minimal accounting/execution transaction and two cycles",
+    "U06": "one old control/one composition complete historical comparison",
+    "U07": "independent cold/reconciliation and whole-use final audit",
+    "U08": "P12 ENG/DECISION/OPS/USE and five open sessions"
+  },
+  "modes": {
+    "synthetic_engineering": {
+      "current": "allowed",
+      "inputs": "explicit synthetic account/fees/clocks and no market data",
+      "acceptance": "operational invariants, independent expected/actual, rollback/replay",
+      "consumer": "P11/P12 engineering interface",
+      "does_satisfy": [
+        "synthetic U03 repair witness"
+      ],
+      "still_required": [
+        "actual A01-A07 consumer adoption"
+      ]
+    },
+    "historical_development_research": {
+      "current": "proposal_only_not_activated",
+      "inputs": "exact development source/member/clock/exposure/universe; qualified declared knowledge view",
+      "seed": "proposed frozen legacy research seed only, distinguished from actual account baseline",
+      "PIT": "strict historical publication purpose requires genuine per-decision availability; retrospective view remains separately declared and needs exact purpose review before use",
+      "acceptance": "pre-registered complete old/new comparison and independent cold at its actual qualified evidence grade",
+      "still_required": [
+        "U02 source/PIT use qualification",
+        "A02 expert daily/use acceptance",
+        "account mode/parameters and exact execution/fee binding",
+        "finite U06 budget and adoption of the purpose differences"
+      ]
+    },
+    "daily_simulated": {
+      "current": "not_adopted",
+      "inputs": "actual same-asof simulated account facts plus qualified prospective market clock and adopted expert/candidate policy",
+      "still_required": [
+        "A01-A07 exact mode adoption",
+        "P12 fact/UoW/OPS/USE"
+      ]
+    },
+    "personal_actual": {
+      "current": "not_activated",
+      "inputs": "Owner-supplied actual full account baseline, broker fees and execution windows, plus qualified adopted policy",
+      "still_required": [
+        "named real personal facts",
+        "P12/P7 exact activation and all original gates"
+      ]
+    }
+  },
+  "C13_scope": {
+    "comparison_first_slice": "original event T_after_close to T+1 open; original22-session separation and5-session position cooldown; original no same-event rearm",
+    "full_C13_remaining": [
+      "multi-day new-buy-point predicate",
+      "expiry semantics for wait beyondT+1",
+      "same-event rearm and history identity",
+      "versioned evidence and actual use acceptance"
+    ],
+    "rule": "T+1 first slice does not close U04 full C13; no silent window/threshold edits"
+  },
+  "expert_scope": {
+    "Trend": "original entry scoring only",
+    "PositionRisk": "original entry maximum/veto and held reduce/exit through same aggregator",
+    "base_exit": {
+      "intervenable": false,
+      "structural_break_rule": "total_return_index_below_sma60_and_sma20_not_above_sma60",
+      "constraint_stop_loss": "0.08",
+      "deterioration_sessions": 2,
+      "minimum_holding_sessions": 3,
+      "maximum_holding_sessions": 40,
+      "missing_held_evidence": "hold_and_alert"
+    },
+    "source_acceptance": "semantic_decision_authority=inconclusive retained until U04",
+    "S02": "not a current C13/C15 prerequisite; R12 deferred"
+  },
+  "authority_current_package": {
+    "metadata": true,
+    "versioned_contract_configuration": true,
+    "necessary_synthetic_pending_cash_repair": true,
+    "new_market_rows": 0,
+    "paid_reference_calls": 0,
+    "training": 0,
+    "historical_capital_run": false,
+    "daily_serving": false,
+    "production": false
+  },
+  "purpose_review": "Mode differences are explicit proposals; no old actual snapshot/PIT/fee hard gate is silently replaced by a research seed or synthetic example."
+}

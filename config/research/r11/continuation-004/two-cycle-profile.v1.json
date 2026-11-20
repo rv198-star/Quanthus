@@ -1,0 +1,41 @@
+{
+  "schema": "quanthus.r11.u05-two-cycle-profile.v1",
+  "version": "r11-u05-two-cycle-0.1",
+  "mode": "synthetic",
+  "account_id": "SYN-TWOCYCLE",
+  "source": "fixture:two-cycle",
+  "coverage": "complete",
+  "starts": {
+    "account_cash": "21000.00",
+    "bucket_cash": "20000.00",
+    "reserve": "1000.00",
+    "fraction": ".30",
+    "expert_cap": ".30",
+    "lot_size": 100
+  },
+  "expected": {
+    "S01_q": 500,
+    "S02_cash": "15995.00",
+    "S03_cash": "21990.00",
+    "S04_reserve": "1990.00",
+    "S05_q": 500,
+    "S06_cash": "21890.00",
+    "S07_cash": "16885.00",
+    "S08_cash": "21380.00",
+    "S09_reserve": "1380.00"
+  },
+  "journal_sequence": [
+    "entry:entry-1",
+    "buy:buy-1",
+    "sell:sell-1",
+    "settlement:settle-1",
+    "entry:entry-2",
+    "late_fee:late-fee-1",
+    "buy:buy-2",
+    "sell:sell-2",
+    "settlement:settle-2"
+  ],
+  "authority": "synthetic_engineering_only",
+  "daily_adopted": false,
+  "production": false
+}

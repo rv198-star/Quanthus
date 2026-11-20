@@ -1,0 +1,31 @@
+{
+  "schema": "quanthus.r11.p12-synthetic-facts.v1",
+  "version": "p12-synthetic-facts-0.1",
+  "modes": [
+    "synthetic"
+  ],
+  "baseline_cash": "10000.00",
+  "baseline_quantity": 0,
+  "cases": {
+    "EX01": {
+      "cash": "4995.00",
+      "quantity": 400
+    },
+    "EX03": {
+      "cash": "4995.00",
+      "quantity": 400
+    },
+    "EX04": {
+      "cash": "6245.00",
+      "quantity": 300
+    }
+  },
+  "authority": "synthetic_engineering_only",
+  "daily_adopted": false,
+  "production": false,
+  "sqlite_schema_version": 1,
+  "trusted_runtime_authorization_required": true,
+  "business_context_can_grant_authority": false,
+  "dependent_plans": "explicit IDs in baseline, same-transaction reassessment/outbox",
+  "accepted_scope": "first synthetic confirmed buy+fee and quantity correction, durable receipt/rebuild only; cross-cycle funding remains pending"
+}

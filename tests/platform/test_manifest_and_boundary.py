@@ -194,14 +194,10 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert '"$REPOSITORY_ROOT/config/product-candidate-evidence.v1.json"' in builder
     assert '"$REPOSITORY_ROOT/config/product-expert-evidence.v1.json"' in builder
     assert (
-        '"$REPOSITORY_ROOT/config/p4-candidate-price-volume-transition.research.v1.json"'
-        in builder
+        '"$REPOSITORY_ROOT/config/p4-candidate-price-volume-transition.research.v1.json"' in builder
     )
     assert '"$REPOSITORY_ROOT/config/expert-strategies/p4-trend-risk.v1.0.1.json"' in builder
-    assert (
-        '"$REPOSITORY_ROOT/config/expert-evaluations/experts/trend-stability.v1.json"'
-        in builder
-    )
+    assert '"$REPOSITORY_ROOT/config/expert-evaluations/experts/trend-stability.v1.json"' in builder
     assert (
         '"$REPOSITORY_ROOT/config/expert-evaluations/specs/'
         'trend-stability-p4-first-passage.evaluation.v1.json"' in builder
@@ -328,7 +324,7 @@ def test_operator_web_is_source_built_and_independently_removable() -> None:
     assert "{{.Config.Image}}" in gc_script
     assert "quanthus-platform-web:git-" in gc_script
     assert '[[ "$candidate" == "$KEEP_TAG" ]] || is_used_ref "$candidate"' in gc_script
-    assert "docker image rm \"$candidate\"" in gc_script
+    assert 'docker image rm "$candidate"' in gc_script
     assert "--force" not in gc_script
     assert "docker image prune" not in gc_script
     assert "COPY --from=builder" in dockerfile
@@ -344,14 +340,31 @@ def test_operator_web_is_source_built_and_independently_removable() -> None:
     assert all(fragment not in server.casefold() for fragment in ("mcp", "broker", "billing"))
 
 
+def _platform_domain_import_allowed(path: str, module: str, names: tuple[str, ...]) -> bool:
+    allowed_domain_imports = {"quanthus.policy", "quanthus.strategy_attribution_publication"}
+    if module.startswith("quanthus.platform") or module in allowed_domain_imports:
+        return True
+    policy = json.loads(
+        PROJECT_ROOT.joinpath("config/architecture/platform-domain-imports.v1.json").read_text()
+    )
+    assert policy["schema_version"] == "quanthus.platform.domain-imports.v1"
+    assert policy["activation_authority"] is False
+    for exception in policy["exceptions"]:
+        if (
+            path == exception["path"]
+            and module == exception["module"]
+            and names
+            and set(names) <= set(exception["names"])
+        ):
+            return True
+    return not any(
+        fragment in module
+        for fragment in ("providers", "backtest", "strategy_runtime", "broker", "execution")
+    )
+
+
 def test_platform_imports_do_not_bypass_quanthus_ports() -> None:
     platform_root = PROJECT_ROOT / "src" / "quanthus" / "platform"
-    allowed_domain_imports = {
-        "quanthus.policy",
-        "quanthus.strategy_attribution_publication",
-    }
-    forbidden_fragments = ("providers", "backtest", "strategy_runtime", "broker", "execution")
-
     for path in sorted(platform_root.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
@@ -360,15 +373,40 @@ def test_platform_imports_do_not_bypass_quanthus_ports() -> None:
                 and node.module
                 and node.module.startswith("quanthus.")
             ):
-                if (
-                    node.module.startswith("quanthus.platform")
-                    or node.module in allowed_domain_imports
-                ):
-                    continue
-                assert not any(fragment in node.module for fragment in forbidden_fragments), (
-                    path,
+                assert _platform_domain_import_allowed(
+                    path.relative_to(platform_root).as_posix(),
                     node.module,
-                )
+                    tuple(alias.name for alias in node.names),
+                ), (path, node.module)
+
+
+@pytest.mark.parametrize(
+    ("path", "module", "names", "allowed"),
+    [
+        (
+            "adapters/product_daily_facts_sqlite.py",
+            "quanthus.capabilities.execution",
+            ("ExecutionReport",),
+            True,
+        ),
+        ("api.py", "quanthus.capabilities.execution", ("ExecutionReport",), False),
+        (
+            "adapters/product_daily_facts_sqlite.py",
+            "quanthus.capabilities.execution",
+            ("place_order",),
+            False,
+        ),
+        (
+            "adapters/product_daily_facts_sqlite.py",
+            "quanthus.capabilities.execution",
+            ("*",),
+            False,
+        ),
+        ("adapters/product_daily_facts_sqlite.py", "quanthus.broker", ("ExecutionReport",), False),
+    ],
+)
+def test_execution_fact_import_exception_is_scoped(path, module, names, allowed) -> None:
+    assert _platform_domain_import_allowed(path, module, names) is allowed
 
 
 def test_feature_manifest_is_canonical_json() -> None:

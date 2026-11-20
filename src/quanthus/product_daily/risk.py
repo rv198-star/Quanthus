@@ -208,6 +208,31 @@ class PendingSell:
 
 
 @dataclass(frozen=True)
+class PendingCashCommitment:
+    principal: Decimal
+    unrecognized_fee: Decimal
+
+    def __post_init__(self) -> None:
+        require_decimal(self.principal, "pending_principal", minimum=Decimal("0"))
+        require_decimal(
+            self.unrecognized_fee,
+            "pending_unrecognized_fee",
+            minimum=Decimal("0"),
+        )
+
+    @property
+    def total(self) -> Decimal:
+        return self.principal + self.unrecognized_fee
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "principal": decimal_text(self.principal) or "0",
+            "unrecognized_fee": decimal_text(self.unrecognized_fee) or "0",
+            "total": decimal_text(self.total) or "0",
+        }
+
+
+@dataclass(frozen=True)
 class RiskSnapshot:
     snapshot_id: str
     as_of: datetime
@@ -235,6 +260,10 @@ class RiskSnapshot:
         sell_ids = [item.sell_id for item in self.pending_sells]
         if len(sell_ids) != len(set(sell_ids)):
             raise ProductDailyError("duplicate_risk_evidence", "pending sell ids must be unique")
+
+    @property
+    def cash_before_internal_holds(self) -> Decimal | None:
+        return self.cash_available
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -308,6 +337,11 @@ class QuantityRequest:
 @dataclass(frozen=True)
 class QuantityDecision:
     quantity: int
+    cash_before_internal_holds: Decimal | None
+    pending_principal: Decimal | None
+    pending_unrecognized_fee: Decimal | None
+    pending_cash_commitment: Decimal | None
+    residual_cash: Decimal | None
     gross: Decimal | None
     fees: Decimal | None
     total_cost: Decimal | None
@@ -347,6 +381,11 @@ class QuantityDecision:
     def to_dict(self) -> dict[str, Any]:
         return {
             "q": self.quantity,
+            "cash_before_internal_holds": decimal_text(self.cash_before_internal_holds),
+            "pending_principal": decimal_text(self.pending_principal),
+            "pending_unrecognized_fee": decimal_text(self.pending_unrecognized_fee),
+            "pending_cash_commitment": decimal_text(self.pending_cash_commitment),
+            "residual_cash": decimal_text(self.residual_cash),
             "gross": decimal_text(self.gross),
             "fees": decimal_text(self.fees),
             "total_cost": decimal_text(self.total_cost),
@@ -389,6 +428,11 @@ class QuantityDecision:
         releases = decimal_or_none("pending_sell_releases")
         return cls(
             quantity=quantity,
+            cash_before_internal_holds=decimal_or_none("cash_before_internal_holds"),
+            pending_principal=decimal_or_none("pending_principal"),
+            pending_unrecognized_fee=decimal_or_none("pending_unrecognized_fee"),
+            pending_cash_commitment=decimal_or_none("pending_cash_commitment"),
+            residual_cash=decimal_or_none("residual_cash"),
             gross=decimal_or_none("gross"),
             fees=decimal_or_none("fees"),
             total_cost=decimal_or_none("total_cost"),
@@ -447,6 +491,22 @@ def _other_pending_evidence(
     return adverse, fees
 
 
+def pending_cash_commitment(snapshot: RiskSnapshot) -> PendingCashCommitment:
+    """Cash already promised to unique pending buys before any new internal hold."""
+
+    principal = Decimal("0")
+    unrecognized_fee = Decimal("0")
+    for item in snapshot.pending_buys:
+        if item.price_bound is None:
+            raise ProductDailyError("input_unavailable", "pending buy lacks a finite price bound")
+        principal += Decimal(item.remaining_quantity) * item.price_bound
+        if not item.fee_already_recognized:
+            if item.unrecognized_fee_upper_bound is None:
+                raise ProductDailyError("input_unavailable", "pending buy fee is unavailable")
+            unrecognized_fee += item.unrecognized_fee_upper_bound
+    return PendingCashCommitment(principal, unrecognized_fee)
+
+
 def evaluate_quantity(
     request: QuantityRequest,
     snapshot: RiskSnapshot,
@@ -474,6 +534,7 @@ def evaluate_quantity(
         reasons.append(ReasonCode.INPUT_UNAVAILABLE)
     try:
         other_adverse, other_fees = _other_pending_evidence(snapshot)
+        cash_commitment = pending_cash_commitment(snapshot)
         if any(item.level1_industry_id is None for item in snapshot.positions) or any(
             item.level1_industry_id is None for item in snapshot.pending_buys
         ):
@@ -534,6 +595,11 @@ def evaluate_quantity(
         ordered = ordered_reasons(reasons)
         return QuantityDecision(
             quantity=0,
+            cash_before_internal_holds=None,
+            pending_principal=None,
+            pending_unrecognized_fee=None,
+            pending_cash_commitment=None,
+            residual_cash=None,
             gross=None,
             fees=None,
             total_cost=None,
@@ -558,6 +624,11 @@ def evaluate_quantity(
         ordered = ordered_reasons(reasons)
         return QuantityDecision(
             quantity=0,
+            cash_before_internal_holds=None,
+            pending_principal=None,
+            pending_unrecognized_fee=None,
+            pending_cash_commitment=None,
+            residual_cash=None,
             gross=None,
             fees=None,
             total_cost=None,
@@ -590,6 +661,7 @@ def evaluate_quantity(
 
     equity = snapshot.equity
     cash_available = snapshot.cash_available
+    residual_cash = max(Decimal("0"), cash_available - cash_commitment.total)
     mark_price = request.mark_price
     price_bound = request.price_bound
     lot_size = request.lot_size
@@ -638,7 +710,7 @@ def evaluate_quantity(
             failed.append(ReasonCode.INPUT_UNAVAILABLE)
         if total_cost > target_cap:
             failed.append(ReasonCode.BUDGET_CAPACITY)
-        if total_cost > cash_available:
+        if total_cost > residual_cash:
             failed.append(ReasonCode.CASH_CAPACITY)
         if security_exposure > stock_limit * post_equity:
             failed.append(ReasonCode.STOCK_CAPACITY)
@@ -650,7 +722,7 @@ def evaluate_quantity(
 
     first_lot = lot_size
     first_failures = failures_for(first_lot)
-    upper_cash = min(cash_available, max(target_cap, Decimal("0")))
+    upper_cash = min(residual_cash, max(target_cap, Decimal("0")))
     upper_lots = int(upper_cash // (price_bound * Decimal(lot_size))) + 1
     lo = 0
     hi_lots = upper_lots
@@ -679,6 +751,11 @@ def evaluate_quantity(
     if quantity <= 0:
         return QuantityDecision(
             quantity=0,
+            cash_before_internal_holds=cash_available,
+            pending_principal=cash_commitment.principal,
+            pending_unrecognized_fee=cash_commitment.unrecognized_fee,
+            pending_cash_commitment=cash_commitment.total,
+            residual_cash=residual_cash,
             gross=Decimal("0"),
             fees=Decimal("0"),
             total_cost=Decimal("0"),
@@ -704,6 +781,11 @@ def evaluate_quantity(
         reasons_out = [ReasonCode.CAPACITY_AVAILABLE]
     return QuantityDecision(
         quantity=quantity,
+        cash_before_internal_holds=cash_available,
+        pending_principal=cash_commitment.principal,
+        pending_unrecognized_fee=cash_commitment.unrecognized_fee,
+        pending_cash_commitment=cash_commitment.total,
+        residual_cash=residual_cash,
         gross=gross,
         fees=fees,
         total_cost=total_cost,

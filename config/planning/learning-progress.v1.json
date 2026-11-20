@@ -15151,6 +15151,1456 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-R11-CONTINUATION-PREPARE-20261117",
+      "recorded_at": "2026-11-17T12:21:37.765578+00:00",
+      "actor": "Quanthus researchlead Sol under verified Owner continuation",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Continue same R11 complete research/daily-use objective after accepted engineering sub-batch; freeze U01-U03 purpose/input/account package and independently reproduced pending-cash P2; P10 request701, R12 deferred.",
+      "evidence": [
+        {
+          "id": "OWNER-CONTINUE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/package-001/authority.json",
+          "sha256": "3f97f215ad1c1ac1be6ca1f54fa71b7d59ee860b6e909136618e2174ceef9510",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Owner continuingU01-U08 and isolated parallel mechanism; no numeric new research grant."
+        },
+        {
+          "id": "PENDING-CASH-BEFORE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/package-001/cash-before.json",
+          "sha256": "a8d4486c8f0bcc2d458a15b6e6a6ecf6dfe05fb9f389dbbcb9db2053fc029870",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent synthetic quantity500 permits14010cash against10000; new consumer cash repair pending."
+        },
+        {
+          "id": "KNOWN-SOURCE-PATHS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/package-001/known-source-paths.json",
+          "sha256": "db1fbdd0a89b8f13a8dcd1b894e396331ab8c355d0d132b4bcc6d8611d8dd016",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Six exact metadata paths checked without market rows; old provider paths absent, retained evidence metadata exists."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "原R11共享工程1.2.0历史接受；当前#700继续U01-U08，U01-U03用途/输入/账户闭包和必要现金P2修复准备。",
+          "remaining": "研究问题未回答；日常用途未完成。U02现成PIT/原窗口输入、U03实际配置、U04多日/专家及U05-U08均待具体交付。",
+          "next_action": "并行隔离现金配置A和精确元信息B；修复后回到完整用途主线。",
+          "evidence": [
+            "OWNER-CONTINUE",
+            "PENDING-CASH-BEFORE",
+            "KNOWN-SOURCE-PATHS"
+          ],
+          "supersedes": "CP-690-R11-FINAL-ACCEPTED-20261116"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "后继#700及P10#701已登记；新relay接棒、Owner并行授权和TPlan继续Mission具名，旧COMPLETE为工程子批历史。",
+          "remaining": "首包执行/内部整合和完整R11终审/日常接收尚待；所有旧费用失败曝光继承。",
+          "next_action": "Sol独占共享控制/整合；A/B按冻结基线和资源隔离返回整包。",
+          "evidence": [
+            "OWNER-CONTINUE",
+            "PENDING-CASH-BEFORE",
+            "KNOWN-SOURCE-PATHS"
+          ],
+          "supersedes": "CP-690-R11-FINAL-ACCEPTED-20261116"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "保留历史受限停放判断；Owner要求继续完整R11研究问题与日常用途，当前仅准备可执行前置和必要修复。",
+          "remaining": "完整比较未执行/未评估、daily_adopted=false；后段原46-92h和P12旧估计待真实复用核价。",
+          "next_action": "补精确用途/PIT/账户和专家前置，推进合格比较、独立重建与U08接收。",
+          "evidence": [
+            "OWNER-CONTINUE",
+            "PENDING-CASH-BEFORE",
+            "KNOWN-SOURCE-PATHS"
+          ],
+          "supersedes": "CP-690-R11-FINAL-ACCEPTED-20261116"
+        }
+      ],
+      "no_change_reason": "Prior accepted engineering remains historical; research question unanswered and daily use not complete. No expert/reproduction quality or consumer admission promotion.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T12:05:08Z",
+          "body_sha256": "a955f2433a8d407393febbc8c6c3345d621ec9455faf9f24712bcb8380b0d06b"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO"
+      ]
+    },
+    {
+      "id": "CP-701-R11-INPUT-REQUEST-20261117",
+      "recorded_at": "2026-11-17T12:21:40.136288+00:00",
+      "actor": "Quanthus researchlead bounded P10 consumer intake",
+      "work_item": "P10-DATA-R11-PURPOSE-001",
+      "outcome": "no_module_change",
+      "summary": "Register exact original development/PIT/source handoff request under permanentP10; existing556/679 source debts retained and U06 held while independent synthetic work continues.",
+      "evidence": [
+        {
+          "id": "KNOWN-SOURCE-PATHS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/package-001/known-source-paths.json",
+          "sha256": "db1fbdd0a89b8f13a8dcd1b894e396331ab8c355d0d132b4bcc6d8611d8dd016",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Known physical path availability only; no market/source qualification."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Only exact consumer request and no-row metadata observations; shared supply qualification, acquisition and consumer admission remain with their owners.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-R11-PURPOSE-001",
+          "number": 701,
+          "title": "[P10-DATA-R11-PURPOSE-001] 交接R11原窗口现成输入与逐决策PIT用途",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T12:09:44Z",
+          "body_sha256": "12da9456a90f916780a0314001384f285a532a1d4d9343f80806015a52879428"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA",
+        "REPRO",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-700-R11-B-PARTIAL-20261117",
+      "recorded_at": "2026-11-17T14:42:33.442335+00:00",
+      "actor": "Quanthus researchlead Sol independent received-package review",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Verify completed B immutable metadata partial, reuse exact existing126closure and route five precise source/PIT differences to P10#701; reject unpriced13-26h total, reconcile native deadline overrun and retain totalR11open.",
+      "evidence": [
+        {
+          "id": "B-PARTIAL-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/lead-b-review-001/disposition.json",
+          "sha256": "245d8575b527054c7bc21f06f49ff5f656f3b45aa363d471f43dc6f371099c45",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Verified metadata envelope/current identities and bounded P10 routing only; U02/U06 remain unqualified."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Source metadata is partial and no market/research/daily admission changes; cashA remains separately pending final acceptance and allU04-U08 retain current scope.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T12:05:08Z",
+          "body_sha256": "a955f2433a8d407393febbc8c6c3345d621ec9455faf9f24712bcb8380b0d06b"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-701-R11-PRECISE-HANDOFF-20261117",
+      "recorded_at": "2026-11-17T14:42:35.174688+00:00",
+      "actor": "Quanthus researchlead Sol minimal consumer demand routing",
+      "work_item": "P10-DATA-R11-PURPOSE-001",
+      "outcome": "no_module_change",
+      "summary": "P10#701 now has existing126member list and exact live DWD roots; request only154mapping/history/clocks/consumer fields/industry differences, preserve source/role ownership and original gates.",
+      "evidence": [
+        {
+          "id": "B-PARTIAL-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/lead-b-review-001/disposition.json",
+          "sha256": "245d8575b527054c7bc21f06f49ff5f656f3b45aa363d471f43dc6f371099c45",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Bounded source handoff request and exact reused metadata; no consumer admission."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "This is a consumer request and evidence reuse, not data repair or qualification.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-R11-PURPOSE-001",
+          "number": 701,
+          "title": "[P10-DATA-R11-PURPOSE-001] 交接R11原窗口现成输入与逐决策PIT用途",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T14:27:10Z",
+          "body_sha256": "12da9456a90f916780a0314001384f285a532a1d4d9343f80806015a52879428"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA",
+        "REPRO",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-700-R11-CASH-INTERNAL-20261117",
+      "recorded_at": "2026-11-17T14:50:35.345058+00:00",
+      "actor": "Quanthus researchlead Sol after completed A_PARTIAL",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Receive fixedA/d72 completed partial with30focused and noLinuxrun; ordinary local merge preserves originalcandidate, repair witnessed redundant canonical input alias,31focused pass; exact SSH native acceptance pending.",
+      "evidence": [
+        {
+          "id": "CASH-LEGACY-PAYLOAD-BEFORE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/lead-b-review-001/legacy-payload-before.json",
+          "sha256": "5ee5f74c33524764bdffca77be772675b7c05f19a97f97399ed5c59a4a90adbc",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Public old-shaped identical command witnesses new alias idempotency regression; targeted correction/internal evidence only."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Necessary synthetic repair still awaits exact final Linux acceptance. Original scientific conclusions, U02/PIT/account/expert dependencies and daily admission remain unchanged.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T12:05:08Z",
+          "body_sha256": "a955f2433a8d407393febbc8c6c3345d621ec9455faf9f24712bcb8380b0d06b"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-700-R11-NATIVE-CASH-U05-ACTIVE-20261118",
+      "recorded_at": "2026-11-17T16:09:56.687134+00:00",
+      "actor": "Quanthus researchlead Sol after exact SSH native completion",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Resume stopped execution: recover GitHub immutable objects, accept exact1.2.1 internal native9431/35, dispatch active isolated U05 durable synthetic facts slice; wholeR11 stays open.",
+      "evidence": [
+        {
+          "id": "R11-CASH-NATIVE-9431",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-native-cache-002/native/check-receipt.json",
+          "sha256": "e9529e1234ff842b67fa6c97911b008826f0cfa01d1ad04528fb0dce620ef38a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal synthetic1.2.1 engineering only; complete use research/daily goals remain open."
+        },
+        {
+          "id": "R11-EXACT-SYNTHETIC-BINDING",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-native-cache-002/engineering-acceptance.json",
+          "sha256": "0bb5481f3a998a979b3a849299a8db4847baa396f92d689553648f139f246d9b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal synthetic1.2.1 engineering only; complete use research/daily goals remain open."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Internal1.2.1 pending-cash and legacy-command compatibility repair accepted at exact9010 source after31focused and CN02full9431/35; U05 first persistent account fact slice002 now executing in isolatedDS workspace.",
+          "remaining": "Complete research question UNANSWERED; daily use NOT_COMPLETE. U02 precise P10 handoff, account/purpose/expert inputs, cross-cycle integration, complete comparison/cold and daily acceptance still required.",
+          "next_action": "Receive completed U05 immutable return, integrate minimal facts then same-core two-cycle transactions; U06 waits source/purpose/account/expert gates.",
+          "evidence": [
+            "R11-CASH-NATIVE-9431",
+            "R11-EXACT-SYNTHETIC-BINDING"
+          ],
+          "supersedes": "CP-700-R11-CONTINUATION-PREPARE-20261117"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Owner all-idle feedback corrected: Sol native source/base verified and full check completed; DS U05 active in independent9010 worktree, shared relay/TPlan single writer; current#608/#700briefs reconciled live.",
+          "remaining": "Complete research question UNANSWERED; daily use NOT_COMPLETE. U02 precise P10 handoff, account/purpose/expert inputs, cross-cycle integration, complete comparison/cold and daily acceptance still required.",
+          "next_action": "Keep native receipts and source closure; DS returns one bounded manifest; preserve complete research/daily scope and full costs.",
+          "evidence": [
+            "R11-CASH-NATIVE-9431",
+            "R11-EXACT-SYNTHETIC-BINDING"
+          ],
+          "supersedes": "CP-700-R11-CONTINUATION-PREPARE-20261117"
+        }
+      ],
+      "no_change_reason": "EXPERT/REPRO/CLOSEOUT scientific, consumer and historical acceptance unchanged; native engineering pass does not change those facets.",
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T16:08:34Z",
+          "body_sha256": "5e8343614e7ac2be711b593ed7fb683855d8b93f26d10fe05e081fd3277cd12d"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-U05-FIRST-FACTS-ACCEPTED-BRIDGE-20261118",
+      "recorded_at": "2026-11-17T18:23:59.645568+00:00",
+      "actor": "Quanthus research lead Sol after exact native and ordinary child merge",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept only the first synthetic durable account-fact slice after independent R01-R10 repairs and exact9450/35 native check; ordinary704 continuation merge verified; bounded DS core/account bridge003 dispatched and observed active.",
+      "evidence": [
+        {
+          "id": "U05-INTERNAL-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-u05-review-003/native-evidence/final/check-receipt.json",
+          "sha256": "c4a71e6a5f2b544c652e68b0423f9c8bd4a8adb52a3ad3a10b407902a8c1f1c8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact9564 synthetic-source full make check9450/35 in CN02Python3.10.12."
+        },
+        {
+          "id": "U05-REVIEWED-STAGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-u05-review-003/engineering-acceptance.json",
+          "sha256": "c3c2f38761bfa966860f7691f3dc588b257dd0d66cc3d0b840345ef56e1007e2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal acceptance of first durable synthetic fact slice only; complete R11 remains open."
+        },
+        {
+          "id": "U05-ORDINARY-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-u05-review-003/merge704-commit.json",
+          "sha256": "ce888bf732db0782c98c92b9e099ed32f9bd4b6181ee81ab24d6b4d90f969169",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary continuation-branch merge704 has exactly the tested source tree."
+        },
+        {
+          "id": "U05-NATIVE-REVIEW-TIMING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-u05-review-003/review006-native-timing.json",
+          "sha256": "488fd38b3e1ebc1821d1c4fc731bcd86ad8c4a88ca1616c13af1fa1418813d29",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual006 native whole-turn cost reconciliation; semantic review and budget compliance separately recorded."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "First synthetic account baseline/buy/confirmed-fee/correction slice now has durable raw reception, atomic posting/reassessment/outbox, stable replay/CAS, fault rollback and cold rebuild; original shared core and31tests unchanged. Exact9564 native9450/35 and ordinary1ad3 tree verified.",
+          "remaining": "Full R11 research question UNANSWERED and daily use NOT_COMPLETE; U01-U04 purpose/source/account/expert gates, remaining U05 transactions/two-cycle/late-fee, U06 comparison, U07 independent whole-use audit and U08 acceptance stay open.",
+          "next_action": "Receive package003 strict full FundingState serialization and app-owned first-entry/buy transaction bridge, then original full cycles.",
+          "evidence": [
+            "U05-INTERNAL-NATIVE",
+            "U05-REVIEWED-STAGE",
+            "U05-ORDINARY-MERGE"
+          ],
+          "supersedes": "CP-700-R11-NATIVE-CASH-U05-ACTIVE-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Immutable initial rejection and R01-R10 fixes/reviews retained; failed/superseded native receipts received/hash-checked; actual006 timing corrected separately. Sol sole shared writer, DS bridge003 actually active in isolated work.",
+          "remaining": "Full R11 research question UNANSWERED and daily use NOT_COMPLETE; U01-U04 purpose/source/account/expert gates, remaining U05 transactions/two-cycle/late-fee, U06 comparison, U07 independent whole-use audit and U08 acceptance stay open.",
+          "next_action": "Keep complete-use evidence and cumulative costs; accept next DS complete return at exact source, re-review changed transaction seam, then one final native run.",
+          "evidence": [
+            "U05-REVIEWED-STAGE",
+            "U05-NATIVE-REVIEW-TIMING"
+          ],
+          "supersedes": "CP-700-R11-NATIVE-CASH-U05-ACTIVE-20261118"
+        }
+      ],
+      "no_change_reason": "EXPERT,REPRO,CLOSEOUT reported maturity and all quality/value/admission facets remain at their existing scopes; this is bounded synthetic engineering only.",
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T18:21:56Z",
+          "body_sha256": "93be608bc77eda040068992f7d067226854d7fe66f17cbe2f70e18f9be6f6180"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-COREBRIDGE003-REJECTED-R1-20261118",
+      "recorded_at": "2026-11-17T19:30:02.779253+00:00",
+      "actor": "Quanthus lead Sol after exact candidate and independent review007",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "rejected",
+      "summary": "Bridge003 happy68tests pass but root/peer reproduce CB01-CB07, including duplicate physical fill and missing prefill cash obligation. Candidate not integrated; grouped R1 repair dispatched and observed active.",
+      "evidence": [
+        {
+          "id": "BRIDGE003-REVIEW007",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-corebridge-review-007/review.json",
+          "sha256": "40ddf5e3968d6a878b1b40f03d102a9e93cad3c9b9255a5437fc839ef1b7e102",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal review of source462c first funding/account bridge; candidate CHANGES_REQUIRED; no complete R11 research or daily admission."
+        },
+        {
+          "id": "BRIDGE003-ROOT-DISPOSITION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-004/review-disposition.json",
+          "sha256": "75e790e21386ac5f5388f3c4f74e8a558131924cf82014abaf6bf2422cce29f2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal review of source462c first funding/account bridge; candidate CHANGES_REQUIRED; no complete R11 research or daily admission."
+        },
+        {
+          "id": "BRIDGE003-SOURCE-ALIAS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-004/witnesses/source-alias-double-post.json",
+          "sha256": "ccff6a453315d0939caa8a4227e6c964ed0adddb72c8f5baba89982cfd079b1c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal review of source462c first funding/account bridge; candidate CHANGES_REQUIRED; no complete R11 research or daily admission."
+        },
+        {
+          "id": "BRIDGE003-GROUPED-REPAIR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-004/grouped-repair-decision.json",
+          "sha256": "e26672dde1bda25097dbc786022af5abda7d0a1557f69128240b1eb4d5d064ab",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal review of source462c first funding/account bridge; candidate CHANGES_REQUIRED; no complete R11 research or daily admission."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Accepted first-fact9450/35 stage and cash1.2.1 retain their exact scopes; unaccepted bridge003 review changes no module maturity or consumer/quality/value facet. Full R11 remains open. Track the repair within existing U05 and preserve original source/rejection/costs.",
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T19:27:52Z",
+          "body_sha256": "79f23476eaf67c60b4e53f1e948b8da2acca52ef7e48e50bf9013d4b0be5b94c"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-FIRST-FUNDING-ACCOUNT-BRIDGE-ACCEPTED-20261118",
+      "recorded_at": "2026-11-17T20:54:38.798965+00:00",
+      "actor": "Quanthus lead Sol after008/009 and final exact native/ordinary705 merge",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept bounded first synthetic entry/buy funding-account bridge; allCB01-CB07 closed, final native exact source passed, ordinary705 tree verified. Next original full two-cycle story; wholeR11 open.",
+      "evidence": [
+        {
+          "id": "BRIDGE-NATIVE-FINAL",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/native-evidence/final/check-receipt.json",
+          "sha256": "30fcf3d70ef9f1dbbd0af6bc27407ed0ce9c533fdae2b137494cb2504078f849",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Final exact87cdf composed-source make check in CN02Python3.10.12; internal synthetic first bridge only."
+        },
+        {
+          "id": "BRIDGE-INTERNAL-ACCEPTANCE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/engineering-acceptance.json",
+          "sha256": "1d4a7f608021da7b46d8abe58823b57a05b7a056ac4ee60570caec83d0b96b85",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "First reservation/buy account-funding bridge accepted; full U05 cycles and whole R11 use remain open."
+        },
+        {
+          "id": "BRIDGE-REVIEW009",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-corebridge-final-review-009/review.json",
+          "sha256": "30478ee8c33de40365a4b278951c7c32a555ec067e5cb407ed5f4dfe464eb3fd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CB02-ASYNC CLOSED; reuse008six closures; bounded independent internal review."
+        },
+        {
+          "id": "BRIDGE-ORDINARY-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/merge705-commit.json",
+          "sha256": "b7d84057cc09dea30d878aa79fbf8d2ae5d6b36a7c1268154ec656ea36bf6f49",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary705 merge into continuation has exactly the tested tree; no main release."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Accepted internal first synthetic public entry/buy bridge: strict complete FundingState restore, truthful5005pending obligation, physical fact/profile/baseline replay identity, one account/funding impact and consistent snapshot, atomic CAS/raw/receipt/hold/outbox and cold reopen. Original shared core/45tests unchanged.",
+          "remaining": "Original completeU05 sell/flat readiness/settlement/second-cycle/late-fee and chronological cold reconstruction, exact purpose/source/PIT/account/expert gates, qualified complete comparison, final whole-use audit and daily acceptance remain open.",
+          "next_action": "Reuse this exact bridge for original complete two-cycle package004; receive actual source facts and chronological replay, then qualified comparison gates.",
+          "evidence": [
+            "BRIDGE-NATIVE-FINAL",
+            "BRIDGE-INTERNAL-ACCEPTANCE",
+            "BRIDGE-REVIEW009",
+            "BRIDGE-ORDINARY-MERGE"
+          ],
+          "supersedes": "CP-700-U05-FIRST-FACTS-ACCEPTED-BRIDGE-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Original003/007 andR1/008 failures preserved; realSQLite concurrent read defect red/green and009 independent pass bound to exact final87cdf native and ordinary705 tree. Sol single shared writer and original complete goal retained.",
+          "remaining": "Original completeU05 sell/flat readiness/settlement/second-cycle/late-fee and chronological cold reconstruction, exact purpose/source/PIT/account/expert gates, qualified complete comparison, final whole-use audit and daily acceptance remain open.",
+          "next_action": "Reuse this exact bridge for original complete two-cycle package004; receive actual source facts and chronological replay, then qualified comparison gates.",
+          "evidence": [
+            "BRIDGE-NATIVE-FINAL",
+            "BRIDGE-INTERNAL-ACCEPTANCE",
+            "BRIDGE-REVIEW009",
+            "BRIDGE-ORDINARY-MERGE"
+          ],
+          "supersedes": "CP-700-U05-FIRST-FACTS-ACCEPTED-BRIDGE-20261118"
+        }
+      ],
+      "no_change_reason": "EXPERT,REPRO,CLOSEOUT maturity and all quality/value/admission facets keep their existing scopes; mechanical native/first bridge acceptance does not complete scientific comparison or daily use.",
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T20:52:55Z",
+          "body_sha256": "deff024993dd85b65d2e9663b5944f6cb6791bc3a93e3cb94537bad94374149c"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-TWOCYCLE004-REJECTED-R1-20261118",
+      "recorded_at": "2026-11-17T22:28:22.112724+00:00",
+      "actor": "Quanthus lead Sol after independent010 and root public witnesses",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "rejected",
+      "summary": "Original004 S01-S09/76pass, but TC01-TC04 integrity gaps block acceptance. GroupedR1 and independent existing-purpose011 observed active.",
+      "evidence": [
+        {
+          "id": "TWOCYCLE004-REVIEW010",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-two-cycle-review-010/review.json",
+          "sha256": "689056c29928690bbfd0132c75e944295e074f8c3586a98d72ea0f7ff0d7af5d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact original004 candidate review; four witnessed integrity findings; no accepted cycle or complete R11 use."
+        },
+        {
+          "id": "TWOCYCLE004-ROOT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/review-disposition.json",
+          "sha256": "d920810824e5f3d2372091004005599a2121b67320873c711ffc37a28981a4d8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact original004 candidate review; four witnessed integrity findings; no accepted cycle or complete R11 use."
+        },
+        {
+          "id": "TWOCYCLE004-REPAIR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/repair-004-r1/ROOT-GROUPED-REPAIR.md",
+          "sha256": "952fced9597b3757a63ed610f9e6c1bdb630459ad245b2e794210dc329c48115",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact original004 candidate review; four witnessed integrity findings; no accepted cycle or complete R11 use."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Unaccepted cycle candidate rejected. Preserve accepted firstbridge and original module maturity; complete research/daily mission remains open.",
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T20:52:55Z",
+          "body_sha256": "deff024993dd85b65d2e9663b5944f6cb6791bc3a93e3cb94537bad94374149c"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-TWOCYCLE004-RECOVERY-METADATA-20261118",
+      "recorded_at": "2026-11-17T22:38:12.997288+00:00",
+      "actor": "Quanthus Sol",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "Updated parent/current briefs to exact rejected004 and activeR1; fixed body/state/title observations after live readback.011 qualification remains source-only.",
+      "evidence": [
+        {
+          "id": "R11-RECOVERY-METADATA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/live-metadata-reconciliation.json",
+          "sha256": "d00335f9d6e81b0ab8fde31cacc29f1a9d56169b51c02491b6bb59602991249c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact parent/child current-body and OPEN state reconciliation only."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Current brief and metadata synchronization; original004 candidate remains rejected and R1active. No module maturation or admission.",
+      "reviewed_modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T22:36:45Z",
+          "body_sha256": "9ed266ae3ed5881f1fe054df5fbde144f5be112db7604a01d2d6355b61bbce7f"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-TWOCYCLE004-R1-REJECTED-R2-20261118",
+      "recorded_at": "2026-11-17T23:00:13.127956+00:00",
+      "actor": "Sol after independent012 and root realSQLite witnesses",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "rejected",
+      "summary": "R1closesTC02; originalTC01/TC03/TC04remain.3L5S selects one bounded common root correction R2, observedactive.",
+      "evidence": [
+        {
+          "id": "TWOCYCLE-R1-REVIEW012",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-two-cycle-r1-review-012/review.json",
+          "sha256": "bf2cda69469bb0708150d70653c297236bb9ccae1f95a9dcede8619c75f739db",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact017R1 rejected;TC02closed andTC01/03/04open.OriginalS01-S09engineeringonly."
+        },
+        {
+          "id": "TWOCYCLE-R1-ROOT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/r1-review-disposition.json",
+          "sha256": "73cf10cb415dec871b1ef65d2821ac3b5696e48860bca88c7bed0cd0e32beea5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact017R1 rejected;TC02closed andTC01/03/04open.OriginalS01-S09engineeringonly."
+        },
+        {
+          "id": "TWOCYCLE-R1-ROOT-STRATEGY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/R1-ROOT-CAUSE-AND-R2.md",
+          "sha256": "85e2e9cd9391eaa86d54ebe616069667086dc768a17831bcd9ffc4236de0e842",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact017R1 rejected;TC02closed andTC01/03/04open.OriginalS01-S09engineeringonly."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Partial repair of an unaccepted candidate changes no current module maturity or admission; original firstbridge and full mission retained.",
+      "reviewed_modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "issue_observations": []
+    },
+    {
+      "id": "CP-700-TWOCYCLE004-R1-METADATA-20261118",
+      "recorded_at": "2026-11-17T23:09:30.624219+00:00",
+      "actor": "Quanthus Sol",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "Updated parent/current briefs to exact rejected017R1 and common root correctionR2active; no module promotion,013parameterproposal remains proposed.",
+      "evidence": [
+        {
+          "id": "R11-RECOVERY-METADATA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/r1-live-metadata-reconciliation.json",
+          "sha256": "4b8590f0711eebf3a7e21870ab21bf7a632fac6c1a0ba5a5126d0246c3c9bf0c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact parent/child current-body and OPEN state reconciliation only."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Current brief and metadata synchronization; original004 candidate remains rejected and R1active. No module maturation or admission.",
+      "reviewed_modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T23:06:39Z",
+          "body_sha256": "08bdde1fe699e889827ba3f8842ef100c71c34c2a628afe30574524a8a5850d9"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-COMPLETE-SYNTHETIC-TWOCYCLE-ACCEPTED-20261118",
+      "recorded_at": "2026-11-18T00:13:51.732429+00:00",
+      "actor": "Quanthus lead Sol after014/015 and final exact305native/ordinary706 merge",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept bounded actual synthetic two-cycle full-lot story and original public coldresults; TC01-TC04closed. Next original actualexpertcomposition; fullR11open.",
+      "evidence": [
+        {
+          "id": "TWOCYCLE-FINAL-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-007/native-final/check-receipt.json",
+          "sha256": "6b8924fcf8a3973c480c994c17aa8029e2ac146893bb35dceb002289664e8edd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact305 CN02Python3.10.12 makecheck9466passed/35skipped; limited synthetic engineering."
+        },
+        {
+          "id": "TWOCYCLE-INTERNAL-ACCEPTANCE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-007/engineering-acceptance.json",
+          "sha256": "ad3bf47a43c03ae215c46a0b9d8e30cf616a62a5338681fa37a324a344accc8f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Bounded complete synthetic full-lot two-cycle story; originalU05otherfactprofiles/purpose/comparison/daily remainopen."
+        },
+        {
+          "id": "TWOCYCLE-MERGE-CLOSURE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-007/merge706-executable-closure.json",
+          "sha256": "28392568fd642f65f5c58288ed7e8d5f3a82089de91615b15b96868ea10f0085",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary706 continuation merge; runtime/config/test/dependency closurebyteidentical, whole tree differs only governance."
+        },
+        {
+          "id": "TWOCYCLE-INDEPENDENT-015",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-final-clock-review-015/review.json",
+          "sha256": "0365a8cb40431714aaab3dcefdaa1f43df784333acdbc321d714fe7fd9902c1b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "TC03closed015; TC01/02/04reuse014; all original failures retained."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Accepted synthetic public two-entry/buy/sell/settlement story plus old-cyclelatefee after secondreservation; immutablefacts, clock/readiness guards, shared impact and ordered raw-input cold result reconstruction. S01-S09cash21380/bucket20000/reserve1380; twoentries/twosettlements/active0/journal9.",
+          "remaining": "Exact purpose/account/expert admission and C13multi-day semantics, P10originalwindow/PIT input, originalU05othercorrection/multi-fill profiles, qualifiedU06completecomparison, U07whole-useaudit and U08daily acceptance remain open.",
+          "next_action": "Reuse exact accepted synthetic asset for originalU04actualexpert→sharedquantity→reservation composition; keep source/purpose/comparison gates visible.",
+          "evidence": [
+            "TWOCYCLE-FINAL-NATIVE",
+            "TWOCYCLE-INTERNAL-ACCEPTANCE",
+            "TWOCYCLE-MERGE-CLOSURE",
+            "TWOCYCLE-INDEPENDENT-015"
+          ],
+          "supersedes": "CP-700-FIRST-FUNDING-ACCOUNT-BRIDGE-ACCEPTED-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Preserved004/R1/R2 and010/012/014/015, Rootred/green and publishedintermediate53recovery. Exact305native9466/35 with4fileSHAreadback; ordinary706merge non-governance closure equal and remainingR11purpose retained.",
+          "remaining": "Exact purpose/account/expert admission and C13multi-day semantics, P10originalwindow/PIT input, originalU05othercorrection/multi-fill profiles, qualifiedU06completecomparison, U07whole-useaudit and U08daily acceptance remain open.",
+          "next_action": "Reuse exact accepted synthetic asset for originalU04actualexpert→sharedquantity→reservation composition; keep source/purpose/comparison gates visible.",
+          "evidence": [
+            "TWOCYCLE-FINAL-NATIVE",
+            "TWOCYCLE-INTERNAL-ACCEPTANCE",
+            "TWOCYCLE-MERGE-CLOSURE",
+            "TWOCYCLE-INDEPENDENT-015"
+          ],
+          "supersedes": "CP-700-FIRST-FUNDING-ACCOUNT-BRIDGE-ACCEPTED-20261118"
+        }
+      ],
+      "no_change_reason": "EXPERT,REPRO,CLOSEOUT maturity and all quality/value/admission facets keep their existing scopes; mechanical native/first bridge acceptance does not complete scientific comparison or daily use.",
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-18T00:13:54Z",
+          "body_sha256": "b66094ecd3fe4f98c871c429415dd73f0924300ad2cbedbc7b2ad7aeb7b264d6"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-EXPERT008-CANDIDATE-METADATA-20261118",
+      "recorded_at": "2026-11-18T00:28:17.385519+00:00",
+      "actor": "Quanthus lead Sol bounded originalU04 synthetic composition",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Originalexpert candidate707 implemented/focused106; independentreview/finalnativepending. Reconcile current700brief, no module maturity change.",
+      "evidence": [
+        {
+          "id": "EXPERT008-CANDIDATE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-expert-entry-008/identity.json",
+          "sha256": "db3dff976fa78adfb3228c2e571813aa5b722b40600f81dd1fde5e1f183735b9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Unaccepted synthetic engineering candidate and exact source identity; no finalnative or independent review claimed."
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "no_change_reason": "Draft707 remains a candidate pending independentreview and finalnative; previous scoped two-cycle engineering and all quality/value/admission remain unchanged.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-18T00:27:18Z",
+          "body_sha256": "be3413ac10087d1214bc0a27a9731c83babc0613cf5fb5febda7f48d86bb1092"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-ORIGINAL-EXPERT-ENTRY-ACCEPTED-20261118",
+      "recorded_at": "2026-11-18T04:53:40.127530+00:00",
+      "actor": "Sol after019exactreview/finalnative/ordinary707 andOwner018adoption",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept bounded originalexpertentrycomposition and retain priorfull-lotstory; exactpolicyadopted, originalreductionseam next. WholeR11open.",
+      "evidence": [
+        {
+          "id": "EXPERT-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-expert-entry-008-control/native-final/check-receipt.json",
+          "sha256": "14a980b7babb22db43b8af6217e08d38a9efd4242197c49008bd101c3aa1cda5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exactb22Python3.10fullcheck; limitedsynthetichelper."
+        },
+        {
+          "id": "EXPERT-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-expert-entry-008-control/engineering-acceptance.json",
+          "sha256": "834e23a883369e371c328ae9cacece2b24ac6774d2866322618769e7b6f7170c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Boundedoriginalexpertentrycomposition; fullR11purpose/dailyremain."
+        },
+        {
+          "id": "EXPERT-019",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-expert-entry-r1-review-019/review.json",
+          "sha256": "fa710bf8ef401ec95b55a700003056d83debf0dbdb669dabf63d9dbf8d4f3a79",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "EE01closed; reuse016otherchecks."
+        },
+        {
+          "id": "EXPERT-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-expert-entry-008-control/merge707-executable-closure.json",
+          "sha256": "bdc5808e72c24a5f4dd6259777b2e9c2e4437a5ab28228f18ec438391603f431",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary707merge non-governanceclosureidentical."
+        },
+        {
+          "id": "OWNER-USE018",
+          "kind": "authority",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/use-adoption-018/owner-adoption-receipt.v1.json",
+          "sha256": "3348c8b07609e8fdd99c85515ffab2cb6b21ff046adad9c40aad4cb0b7bafc62",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Owneradopts exact controlledhistoricalpolicy; inputs/actions/budgetgatesremain."
+        },
+        {
+          "id": "ACTION-018",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/use-decision-018/root-action-source-verification.json",
+          "sha256": "e651e736c9c811a07df9ca66af282187110d6443a603f6ff4710df73303c1488",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "12source/inputbindings, minimalresidualgap; no newprobeclaimed."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Retain acceptedfull-lottwo-cycle asset; actualoriginalexpert→eligibility→sharedquantity→durableentry withstrictflag/time/source/replay/cold closure.",
+          "remaining": "OriginalREDUCE residual-lot/account adapter, P10originalwindow/PIT, exactexpertuse/U06qualifiedcompletecomparison, C13multi-day, U07wholeaudit andU08daily remain.",
+          "next_action": "Original020minimalreductionfactseam only, then qualifiedU06; no genericOMS or newmarketstudy.",
+          "evidence": [
+            "EXPERT-NATIVE",
+            "EXPERT-ACCEPT",
+            "EXPERT-019",
+            "EXPERT-MERGE",
+            "OWNER-USE018",
+            "ACTION-018"
+          ],
+          "supersedes": "CP-700-COMPLETE-SYNTHETIC-TWOCYCLE-ACCEPTED-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "016EE01reject/Rootred-green/019closed/finalnative andordinary707 exactclosure retained; Owner018policy and017direction with12sourceactionbinding andallcosts.",
+          "remaining": "OriginalREDUCE residual-lot/account adapter, P10originalwindow/PIT, exactexpertuse/U06qualifiedcompletecomparison, C13multi-day, U07wholeaudit andU08daily remain.",
+          "next_action": "Original020minimalreductionfactseam only, then qualifiedU06; no genericOMS or newmarketstudy.",
+          "evidence": [
+            "EXPERT-NATIVE",
+            "EXPERT-ACCEPT",
+            "EXPERT-019",
+            "EXPERT-MERGE",
+            "OWNER-USE018",
+            "ACTION-018"
+          ],
+          "supersedes": "CP-700-COMPLETE-SYNTHETIC-TWOCYCLE-ACCEPTED-20261118"
+        }
+      ],
+      "no_change_reason": "EXPERT/REPRO/CLOSEOUT andallquality/value/admissionkeep exactprior scopes; Ownerresearchparameters are not strategyvalue or dailyadoption.",
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-18T04:53:43Z",
+          "body_sha256": "20e75ef048efb210c93455631ec1f8d9d4d65e49978621a4c2cd8abd98428b31"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-U05-RESIDUAL-LOT-ACCEPTED-20261118",
+      "recorded_at": "2026-11-18T07:42:07.997317+00:00",
+      "actor": "Sol after independent 022 and native acceptance",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept bounded U05 residual-lot engineering; keep whole R11 open.",
+      "evidence": [
+        {
+          "id": "JR01-022",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/review-022-receive.json",
+          "sha256": "04773129717f8e07f6a0ca88a6a2ce9e7f80bcaae80f4dc0d81b341e5e5fbe07",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Bounded independent decoder re-review; delivery overrun retained."
+        },
+        {
+          "id": "JR01-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/native-final/check-receipt.json",
+          "sha256": "5149645cf90369290673248d66ac92ce42dc09d563a34f6746823c78b186f753",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact 613 native engineering check."
+        },
+        {
+          "id": "JR01-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/merge708-executable-closure.json",
+          "sha256": "63f53ae4cd93cd9185769247aa8d4556afe3d084732345e3d6f045b9cca105b9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary child merge and whole tree identity."
+        },
+        {
+          "id": "JR01-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-residual-lot-020-control/engineering-acceptance.json",
+          "sha256": "278d1435df45475a60102797b1eee5453a4721f9a92295824b285130372012bf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "U05 residual quantity and cost engineering only."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Accept bounded residual-lot implementation: full reduction order, remaining quantity/cost, later full exit and old fee.",
+          "remaining": "Historical/PIT input handoff, exact U06 use comparison, C13 multi-day, U07 full audit and U08 daily use.",
+          "next_action": "Qualify existing P10 #701 handoff for the approved history window; then route the bounded U06 comparison. Keep C13 multi-day in scope.",
+          "evidence": [
+            "JR01-022",
+            "JR01-NATIVE",
+            "JR01-MERGE",
+            "JR01-ACCEPT"
+          ],
+          "supersedes": "CP-700-ORIGINAL-EXPERT-ENTRY-ACCEPTED-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Preserve 020 partial and 021 declaration, JR01 strict replay validation, independent 022, exact native check and merge identity.",
+          "remaining": "Historical/PIT input handoff, exact U06 use comparison, C13 multi-day, U07 full audit and U08 daily use.",
+          "next_action": "Qualify existing P10 #701 handoff for the approved history window; then route the bounded U06 comparison. Keep C13 multi-day in scope.",
+          "evidence": [
+            "JR01-022",
+            "JR01-NATIVE",
+            "JR01-MERGE",
+            "JR01-ACCEPT"
+          ],
+          "supersedes": "CP-700-ORIGINAL-EXPERT-ENTRY-ACCEPTED-20261118"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "Expert and independent whole-use acceptance retain their prior scopes; no quality, value, or admission update.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-18T07:42:09Z",
+          "body_sha256": "84d5d897db9ccc623be72a741facb3c68e63ef5c4a8d0cb103b8d54c4a769056"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-C13-LATER-SIGNAL-DESIGN-20261118",
+      "recorded_at": "2026-11-18T08:31:05+00:00",
+      "actor": "Sol after independent C13 design review 023",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Source-bound C13 signal and retry design proposal, a synthetic classifier witness and explicit remaining qualification.",
+      "evidence": [
+        {
+          "id": "C13-023",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-c13-review-023/root-receive.json",
+          "sha256": "47a512c48c821fac880e9a72c36818997c238fe9badab0d0a8b717d5afbccb7a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Scope review of fixed source; two previous tests; not adoption."
+        },
+        {
+          "id": "C13-024",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/contract-024-c13-later-signal/SHA256SUMS",
+          "sha256": "e58a359e9fd86961844020b11125ccdc58673662d9472456a053f13a8dcab45a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Versioned proposal and expected acceptance cases; no activation."
+        },
+        {
+          "id": "C13-TREND-SYN",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/contract-024-c13-later-signal/synthetic-classifier-result.json",
+          "sha256": "51ed829fdd7f686efab97406e65bc7594e8fd634c0f54cce85c3d7e1a564d8c6",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Six synthetic pairs exercise only the accepted classifier."
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-18T08:28:54Z",
+          "body_sha256": "20912c630198425e31602a944c93ae1e528f65b93fe710931e85701116185397"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Original independent review and scoped U05 acceptance retained; C13 parent opportunity, signal and attempt identity contract proposed with distinct PIT and order reconciliation gates.",
+          "remaining": "Qualified later-signal producer, versioned calendar/lifetime/retry parameters, original P10 input handoff, complete U06 comparison and U07/U08.",
+          "next_action": "Check and bind producer and per-decision timing before policy adoption; retain original T+1 and current observation-only C13 scope.",
+          "evidence": [
+            "C13-023",
+            "C13-024",
+            "C13-TREND-SYN"
+          ],
+          "supersedes": "CP-700-U05-RESIDUAL-LOT-ACCEPTED-20261118"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "Only design evidence and provenance are accepted. Existing execution, research value, cold rebuild and use eligibility unchanged."
+    },
+    {
+      "id": "CP-700-C13-SYNTHETIC-GATE-ACCEPTED-20261118",
+      "recorded_at": "2026-11-18T10:48:37.889534+00:00",
+      "actor": "Sol after independent 027 and CN02",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept C13 A01–A09 synthetics in the continued branch; remaining original goals open.",
+      "evidence": [
+        {
+          "id": "C13-027-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-c13-review-027/root-receive.json",
+          "sha256": "20c30672464e6e093bf565a419847cca6e8203c4b9b3ebaa1fed118068379651",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed artifact review closes F1–F6."
+        },
+        {
+          "id": "C13-025-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-c13-025-repair/native-final/check-receipt.json",
+          "sha256": "e909f1a8577845c8118b55fabd0a2c8ebcce5a87f8da1c4271fe904a994e6f0a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact fixed-source CN02 full engineering check."
+        },
+        {
+          "id": "C13-709-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-c13-025-repair/merge709-executable-closure.json",
+          "sha256": "7ae59554975bcef232f0df4e6dc7076d08b95f5440bded1ade450e6b7991bb52",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Merge matches native tree byte-for-byte."
+        },
+        {
+          "id": "C13-025-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-c13-025-repair/engineering-acceptance.json",
+          "sha256": "784f2657c76fffd08296ec0512ba5dc35fef2ced17369408c39ed5cfafbbba9f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Pure synthetic C13 A01–A09 and slot identity only."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "C13 pure synthetic later-signal gate with immutable parent, close-time and lifetime checks.",
+          "remaining": "A10–A13 account transactions, qualified producer, explicit adoption, U06/U07/U08.",
+          "next_action": "Use the exact accepted pure gate in one bounded synthetic transaction package; P10 remains a parallel dependency.",
+          "evidence": [
+            "C13-027-REVIEW",
+            "C13-025-NATIVE",
+            "C13-709-MERGE",
+            "C13-025-ACCEPT"
+          ],
+          "supersedes": "CP-700-U05-RESIDUAL-LOT-ACCEPTED-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "025 original evidence/overrun, 026 rejection, fixed 027 and exact native merge retained.",
+          "remaining": "A10–A13 account transactions, qualified producer, explicit adoption, U06/U07/U08.",
+          "next_action": "Use the exact accepted pure gate in one bounded synthetic transaction package; P10 remains a parallel dependency.",
+          "evidence": [
+            "C13-027-REVIEW",
+            "C13-025-NATIVE",
+            "C13-709-MERGE",
+            "C13-025-ACCEPT"
+          ],
+          "supersedes": "CP-700-C13-LATER-SIGNAL-DESIGN-20261118"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "No new expert use, whole-use reproduction, C13 policy, or daily admission.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-18T10:48:39Z",
+          "body_sha256": "36c32b174f94ac55e9260ccaacdcaf0936cb0d97813efd4d00758ed1bb407520"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-C13-A12-ORDER-FACTS-ACCEPTED-20261119",
+      "recorded_at": "2026-11-19T04:26:07.946349+00:00",
+      "actor": "Sol after independent 034 and CN02",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept the fixed source-backed synthetic C13 A12 slice in the R11 continuation.",
+      "evidence": [
+        {
+          "id": "C13-A12-034-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/received/review.json",
+          "sha256": "182a3848b3db9c05fe494170f7f6e827b4a4467f1762bbac29f42b735abb862f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent exact synthetic A12 engineering review."
+        },
+        {
+          "id": "C13-A12-034-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/native/check-receipt.json",
+          "sha256": "5f7b7ec15ca7859233f5e23d4bb849762b808c46ded5a401180e032e2e9a46a7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CN02 full check of the reviewed exact tree."
+        },
+        {
+          "id": "C13-A12-710-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/merge710-executable-closure.json",
+          "sha256": "208cc3e9916d4a927ac0fcce320331d943922c4a944979632aef131fe26a39a1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary merge with identical tree."
+        },
+        {
+          "id": "C13-A12-034-ACCEPT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/review-034-c13-a12/engineering-acceptance.json",
+          "sha256": "1d2b0faa8f69acc1fc68cfeb275688dbb1a8f81a58d65fa8811c17db9a8d72f4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Scoped synthetic A12 engineering acceptance."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Source-backed synthetic A12 order identity, terminal zero and later reservation.",
+          "remaining": "A11 later-terminal proof, signal source/PIT, explicit multi-day adoption, historical candidate runner and P10 #701, U06/U07/U08.",
+          "next_action": "Prepare the original T+1 historical candidate runner while the scoped C13 multi-day use work continues.",
+          "evidence": [
+            "C13-A12-034-REVIEW",
+            "C13-A12-034-NATIVE",
+            "C13-A12-710-MERGE",
+            "C13-A12-034-ACCEPT"
+          ],
+          "supersedes": "CP-700-C13-SYNTHETIC-GATE-ACCEPTED-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Independent review and exact native reconciliation/rebuild trace.",
+          "remaining": "A11 later-terminal proof, signal source/PIT, explicit multi-day adoption, historical candidate runner and P10 #701, U06/U07/U08.",
+          "next_action": "Prepare the original T+1 historical candidate runner while the scoped C13 multi-day use work continues.",
+          "evidence": [
+            "C13-A12-034-REVIEW",
+            "C13-A12-034-NATIVE",
+            "C13-A12-710-MERGE",
+            "C13-A12-034-ACCEPT"
+          ],
+          "supersedes": "CP-700-C13-SYNTHETIC-GATE-ACCEPTED-20261118"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "Research value, expert use and whole-use audit remain separately open.",
+      "issue_observations": [
+        {
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-19T04:26:07Z",
+          "body_sha256": "02b4f369ff428ec215d5ff76c7fc1c76232535c6371303c0a82dd2ec6bc87f5e",
+          "work_item": "P11-R11-USE-002"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-R11-T1-A11-ENGINEERING-20261119",
+      "recorded_at": "2026-11-19T09:47:53.053046+00:00",
+      "actor": "Sol with DS2 and CN02",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept the scoped T+1 synthetic replay binding and A11 terminal orders.",
+      "evidence": [
+        {
+          "id": "R11-035-T1-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/t1-review/REVIEW.md",
+          "sha256": "b2e8506a47fecbb9a5b6a42d5135e8b70d1e8e22ccfbc8170bf2634d52f28c6c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent scoped T+1 engineering review."
+        },
+        {
+          "id": "R11-035-036-ENGINEERING",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/engineering-acceptance.json",
+          "sha256": "15dec2d4eefced969eea34fdd0c25433483d9fe69de3113c650125f6274eeac2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Accepted combined synthetic engineering."
+        },
+        {
+          "id": "R11-035-036-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/native/check-receipt.json",
+          "sha256": "26ba7d76d9c93d3f3f45914584eb8f311b5e6c40757944d84f6c23e6ba8660c5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CN02 full validation of the merged exact tree."
+        },
+        {
+          "id": "R11-037-C13-USE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/priority-execution-035/C13-USE-DISPOSITION.md",
+          "sha256": "85b07e409e1fb452b7fd776a3c3748d0d13166538d2edfed74b0a16d9175cba5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "C13 remains observation only pending actual PIT and policy."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Original replay binding and dynamic funding/sizing, C13 A11 later terminal and restart.",
+          "remaining": "P10 #701, exact source use and finite U06 budget, C13 producer and adopted rules, U06 result, U07 and U08.",
+          "next_action": "Bind qualified original input and time, exclusion crosswalk, and cold/running budgets before U06.",
+          "evidence": [
+            "R11-035-T1-REVIEW",
+            "R11-035-036-ENGINEERING",
+            "R11-035-036-NATIVE",
+            "R11-037-C13-USE"
+          ],
+          "supersedes": "CP-700-C13-A12-ORDER-FACTS-ACCEPTED-20261119"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Exact independent and combined native validation plus scoped C13 use disposition.",
+          "remaining": "P10 #701, exact source use and finite U06 budget, C13 producer and adopted rules, U06 result, U07 and U08.",
+          "next_action": "Bind qualified original input and time, exclusion crosswalk, and cold/running budgets before U06.",
+          "evidence": [
+            "R11-035-T1-REVIEW",
+            "R11-035-036-ENGINEERING",
+            "R11-035-036-NATIVE",
+            "R11-037-C13-USE"
+          ],
+          "supersedes": "CP-700-C13-A12-ORDER-FACTS-ACCEPTED-20261119"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "Research and daily adoption require their own qualified evidence.",
+      "issue_observations": [
+        {
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-19T09:47:51Z",
+          "work_item": "P11-R11-USE-002",
+          "body_sha256": "6214e1e9f90cd0d391b7718585c24cbe863f070b0fc3fc8349082c29671c198a"
+        }
+      ]
     }
   ],
   "history_imports": [

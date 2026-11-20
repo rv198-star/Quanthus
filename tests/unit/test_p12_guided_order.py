@@ -129,7 +129,9 @@ def test_replay_plan_is_executable(state_dir):
         security_code="600000", quantity=plan.delta_qty, limit_price=plan.price_cap,
     ))
     assert out.status == "filled"
-    assert out.filled_qty == plan.delta_qty
+    # The server holds the plan's lot-rounded quantity (1,200 under the
+    # 13,500 trial cap), not the strategy's raw 50% intent of 2,000.
+    assert out.filled_qty == plan.delta_qty == 1200
 
 
 def test_fill_links_back_to_plan_and_survives_relogin(state_dir):
@@ -150,7 +152,7 @@ def test_fill_links_back_to_plan_and_survives_relogin(state_dir):
     history = app2._facts.history(app2._context)
     linked = [r for r in history.reports if r.suggestion_id == plan_id]
     assert linked and linked[0].order_id == f"plan:{plan_id}"
-    assert linked[0].intended_quantity == 2000
+    assert linked[0].intended_quantity == 1200
     assert linked[0].intended_price_cap == Decimal("10.75")
     # The order list also keeps the plan-prefixed id for the user's own book.
     orders = app2_workbench_orders(app2)
@@ -289,7 +291,7 @@ def test_expired_plan_never_submitted_is_refused(state_dir):
     plan_id = "plan-OPP-REPLAY-600000-2026-11-19"
     out = acct.submit(OrderCommand(
         order_id=f"plan:{plan_id}", side="buy",
-        security_code="600000", quantity=2000, limit_price=Decimal("10.75"),
+        security_code="600000", quantity=1200, limit_price=Decimal("10.75"),
     ))
     assert out.status == "rejected"
     assert out.reason_code == "PLAN_NOT_FOUND"
@@ -317,3 +319,48 @@ def test_plan_confirm_uses_server_qty_and_cap_not_client(state_dir):
               if r.suggestion_id == plan.plan_id]
     assert linked[0].intended_quantity == plan.delta_qty
     assert linked[0].intended_price_cap == plan.price_cap
+
+
+def test_trial_cap_binds_below_strategy_intent(state_dir):
+    # The 50% strategy intent (2,000 shares) is capped by the account's
+    # trial_fraction (0.30 x 45,000 = 13,500): the published plan already
+    # carries the lot-rounded quantity the account can take (1,200 shares,
+    # 12,905 incl. fee), so suggestion and confirm share one effective ceiling.
+    now_box = [_buy_window()]
+    now = _clock(now_box)
+    session_box = [now_box[0]]
+    qbox = {"600000": _quote("10.66", now_box[0])}
+    acct, app = _account(state_dir, now, qbox, session_box)
+    plan = next(o.plan for o in app.workbench(app.scope).opportunities if o.plan)
+    assert plan.delta_qty == 1200
+    assert plan.cash_bound == Decimal("12905.00")
+    # The same effective ceiling governs at confirm time: a client echo of the
+    # raw intent cannot raise the hold above the trial cap.
+    out = acct.submit(OrderCommand(
+        order_id=f"plan:{plan.plan_id}", side="buy",
+        security_code="600000", quantity=2000, limit_price=Decimal("10.75"),
+    ))
+    assert out.status == "filled" and out.filled_qty == 1200
+
+
+def test_confirm_re_evaluates_when_bucket_already_spent(state_dir):
+    # Control for changed capacity at confirm time: once the buy filled and
+    # its bucket is spent, a new plan reference for the same security cannot
+    # re-open above the remaining trial headroom - the live plan resolves to
+    # a smaller delta and the server binds to it.
+    now_box = [_buy_window()]
+    now = _clock(now_box)
+    session_box = [now_box[0]]
+    qbox = {"600000": _quote("10.66", now_box[0])}
+    acct, app = _account(state_dir, now, qbox, session_box)
+    plan = next(o.plan for o in app.workbench(app.scope).opportunities if o.plan)
+    acct.submit(OrderCommand(
+        order_id=f"plan:{plan.plan_id}", side="buy",
+        security_code="600000", quantity=plan.delta_qty, limit_price=plan.price_cap,
+    ))
+    # Re-resolving the same plan after the fill: the account now holds the
+    # position, so the still-open bucket is attributed and a fresh confirm of
+    # the *same* plan id binds the remaining delta (now zero -> PLAN_NOT_FOUND
+    # because no positive delta remains to execute).
+    resolved = app.paper_current_plan(plan.plan_id)
+    assert resolved is None or resolved.delta_qty <= 0

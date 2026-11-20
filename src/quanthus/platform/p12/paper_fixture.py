@@ -156,6 +156,11 @@ def build_paper_application(
         policy=paper_policy,
         clock=clock,
         clock_kind="system",
+        # Paper account shares one effective cash ceiling between the
+        # published suggestion and the confirm-time hold: the suggestion is
+        # sized under the account's trial-fraction cap so a 50% intent cannot
+        # over-commit the 13,500 trial limit.
+        sizing_trial_cap=True,
     )
     app.establish_baseline(request_id=PAPER_BASELINE_REQUEST, cash=baseline_cash)
     app.bind_configuration()

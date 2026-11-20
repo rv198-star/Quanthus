@@ -146,6 +146,7 @@ class P12DesktopApplication:
         policy: DesktopPolicyBundle,
         clock: Callable[[], datetime],
         clock_kind: str,
+        sizing_trial_cap: bool = False,
     ) -> None:
         if (context.account_id, context.mode) != (scope.account_id, scope.mode):
             raise FactError("UNAUTHORIZED_CONTEXT", "facts context and account scope differ")
@@ -156,6 +157,10 @@ class P12DesktopApplication:
         self._policy = policy
         self._clock = clock
         self._clock_kind = clock_kind
+        # When True the published suggestion's sizing is additionally bound
+        # by the account's trial-fraction cap, so the suggested quantity and
+        # the confirm-time hold share one effective cash ceiling.
+        self._sizing_trial_cap = sizing_trial_cap
 
     @property
     def scope(self) -> AccountScope:
@@ -383,6 +388,21 @@ class P12DesktopApplication:
             if execution_window_issue(self._policy.execution_profile, decisions, item.entry):
                 # No plan is published for a window the execution profile does not admit.
                 continue
+            # The suggested quantity and the confirm-time hold share one
+            # effective cash ceiling: the smaller of the decision's entry
+            # fraction and the account's trial-fraction cap, times the bucket
+            # budget.  When the trial cap binds below the strategy's intent,
+            # the published plan already carries the lot-rounded quantity the
+            # account can actually take - the order path then holds the same
+            # number instead of accepting an over-cap request.
+            trial_fraction = (
+                getattr(self._policy.funding, "trial_fraction", None)
+                if self._sizing_trial_cap
+                else None
+            )
+            effective_fraction = item.entry.fraction
+            if trial_fraction is not None:
+                effective_fraction = min(item.entry.fraction, trial_fraction)
             sizing = size_entry(
                 self._policy.risk,
                 EntrySizingInput(
@@ -394,7 +414,7 @@ class P12DesktopApplication:
                     mark_price=item.entry.mark_price,
                     price_bound=item.entry.price_bound,
                     bucket_budget=self._policy.funding.bucket_budget,
-                    fraction=item.entry.fraction,
+                    fraction=effective_fraction,
                     equity=valuation.economic_equity,
                     cash_available=MaybeDecimal.known(baseline.cash),
                     held=tuple(
@@ -1841,7 +1861,16 @@ class P12DesktopApplication:
             return None
         if now < plan.eligible_at or now > plan.expires_at:
             return None
-        return plan
+        # Re-evaluate the still-open delta against the *current* position:
+        # after a fill the account already holds the security, so the
+        # remaining executable quantity is target - current, which may now be
+        # zero.  The order path then refuses instead of reopening a spent
+        # suggestion above the live trial headroom.
+        current = snapshot.projection.quantity(plan.security_code)
+        remaining = plan.target_qty - current
+        if remaining <= 0:
+            return None
+        return dataclasses.replace(plan, delta_qty=remaining)
 
     def rebuild_matches(self, scope: AccountScope) -> bool:
         """Deterministic rebuild from baseline + events equals the stored projection."""

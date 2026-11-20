@@ -198,24 +198,24 @@ def test_conflicting_bucket_security_is_refused(tmp_path: Path) -> None:
 def test_page_reports_real_gap_as_mismatch(tmp_path: Path) -> None:
     """A partition genuinely short of the ledger is still flagged for review.
 
-    Two unattributed securities each moving cash cannot both be folded into
-    the free buckets without guessing which proceeds belong to which
-    opportunity, so the page keeps the gap flagged for manual review.  A
-    single-security fill is uniquely attributable and the upgrade sweep
-    reconciles it (see test_p12_paper_trading); the multi-security case is
-    the genuinely ambiguous layout that still reports a mismatch.
+    Admitted fills no bucket owns are listed as pending attribution rather
+    than guessing an owner: the page keeps the known buckets and reserve and
+    names the pending cash so the listed amounts still reconcile.  When the
+    account's cash cannot be explained even by listing those fills (for
+    example a correction that moved cash with no admitted fill), the
+    partition is genuinely short and reports FUNDING_LEDGER_MISMATCH.
     """
     app = _app(tmp_path)
     opening, partition = _initial(app)
     app.bind_funding(app.scope, partition)
-    # Three unattributed securities each moved cash, but only two buckets
-    # can take an attribution; the third has no unique owner, so the page
-    # reports the gap instead of guessing which two to place.
+    # Three unattributed securities each moved cash; the page names all
+    # three as pending attribution, still reconciling to the account.
     _trade(app, "B-BUY", "000001", "buy", 40, "10.00", 19)
     _trade(app, "C-BUY", "000002", "buy", 40, "10.00", 19)
     _trade(app, "D-BUY", "000003", "buy", 40, "10.00", 19)
     assert _cash(app)["account"] == opening - Decimal("1200.00")
-    assert (
-        app.funding_rules(app.scope).funding.status_reason
-        == "FUNDING_LEDGER_MISMATCH"
-    )
+    funding = app.funding_rules(app.scope).funding
+    assert funding.status_reason == "FUNDING_PENDING_ATTRIBUTION"
+    assert len(funding.pending_attributions) == 3
+
+

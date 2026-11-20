@@ -452,6 +452,12 @@ class PaperAccount:
             need = (command.limit_price * command.quantity).quantize(Decimal("0.01"))
             if self._available_cash() < need:
                 return self._reject(command, "INSUFFICIENT_CASH", quote)
+            # Fixed-bucket capacity: with no bucket able to take this security
+            # the order is refused before it opens, never filled into a gap
+            # the funding page cannot reconcile.
+            capacity = getattr(self._app, "paper_bucket_capacity_for", None)
+            if callable(capacity) and not capacity(command.security_code):
+                return self._reject(command, "FUNDING_NO_FREE_BUCKET", quote)
         else:
             if self._sellable(command.security_code, trading_day) < command.quantity:
                 reason = "SELL_NOT_ALLOWED_T1" if self._today_bought(command.security_code, trading_day) > 0 else "INSUFFICIENT_POSITION"

@@ -460,6 +460,17 @@ def funding_rules_dto(value: FundingRulesView) -> dict[str, Any]:
                 "status_reason": None
                 if funding.status_reason is None
                 else reason(funding.status_reason),
+                "pending_attributions": [
+                    {
+                        "order_id": item.order_id,
+                        "security_code": item.security_code,
+                        "cash_delta": _money(item.cash_delta),
+                        "side": item.side,
+                        "quantity": item.quantity,
+                        "price": _money_or_none(item.price),
+                    }
+                    for item in getattr(funding, "pending_attributions", ()) or ()
+                ],
             },
             "risk": {
                 "policy_ref": _ref(risk.policy_ref),

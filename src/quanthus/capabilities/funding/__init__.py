@@ -28,6 +28,7 @@ FIXED_BUCKET = "fixed_bucket"
 FUNDING_CYCLE_NOT_BOUND = "FUNDING_CYCLE_NOT_BOUND"
 BUCKET_ASSIGNMENT_CONFLICT = "BUCKET_ASSIGNMENT_CONFLICT"
 FUNDING_LEDGER_MISMATCH = "FUNDING_LEDGER_MISMATCH"
+FUNDING_PENDING_ATTRIBUTION = "FUNDING_PENDING_ATTRIBUTION"
 INSUFFICIENT_CASH = "INSUFFICIENT_CASH"
 
 
@@ -111,6 +112,17 @@ class BucketView:
 
 
 @dataclass(frozen=True)
+class PendingAttribution:
+    """One admitted fill whose cash no open bucket's security explains."""
+    order_id: str | None
+    security_code: str
+    cash_delta: Decimal
+    side: str | None = None
+    quantity: int | None = None
+    price: Decimal | None = None
+
+
+@dataclass(frozen=True)
 class FundingView:
     policy_ref: VersionRef
     mode: str
@@ -120,6 +132,7 @@ class FundingView:
     unallocated_adjustment: MaybeDecimal
     bound_account_revision: int | None
     status_reason: str | None
+    pending_attributions: tuple[PendingAttribution, ...] = ()
 
 
 def describe_funding(
@@ -130,6 +143,7 @@ def describe_funding(
     current_account_revision: int,
     pending_by_bucket: dict[str, Decimal] | None = None,
     held_by_bucket: dict[str, bool] | None = None,
+    pending_attributions: tuple[PendingAttribution, ...] = (),
 ) -> FundingView:
     """Read view of the partition plus cash each open cycle can already explain.
 
@@ -230,6 +244,7 @@ def describe_funding(
         unallocated_adjustment=known(state.unallocated_adjustment),
         bound_account_revision=state_account_revision,
         status_reason=None,
+        pending_attributions=pending_attributions,
     )
 
 
@@ -238,18 +253,68 @@ __all__ = [
     "FIXED_BUCKET",
     "FUNDING_CYCLE_NOT_BOUND",
     "FUNDING_LEDGER_MISMATCH",
+    "FUNDING_PENDING_ATTRIBUTION",
     "BucketView",
     "FixedBucketPolicy",
     "FundingState",
+    "PendingAttribution",
     "FundingView",
     "apply_late_cash_delta",
     "describe_funding",
+    "describe_partial_funding",
     "describe_unbound_funding",
     "initial_funding_state",
     "prepare_cycle",
     "settle_batch",
     "transfer_to_reserve",
 ]
+
+
+def describe_partial_funding(
+    policy: FixedBucketPolicy,
+    state: FundingState,
+    *,
+    state_account_revision: int,
+    current_account_revision: int,
+    pending_by_bucket: dict[str, Decimal] | None = None,
+    held_by_bucket: dict[str, bool] | None = None,
+    pending_attributions: tuple[PendingAttribution, ...] = (),
+) -> FundingView:
+    """Known buckets/reserve plus cash still waiting for an owning bucket.
+
+    Some admitted fills (a security bought with no free bucket) moved cash
+    the bound partition cannot attribute.  Rather than mark every amount
+    unknown, the page shows the buckets and reserve it does know and lists
+    each unattributed fill as pending, so the listed amounts plus the pending
+    delta still reconcile against account cash.  ``status_reason`` names the
+    pending-attribution state so the workbench does not claim the account
+    is fully aligned.
+    """
+    view = describe_funding(
+        policy,
+        state,
+        state_account_revision=state_account_revision,
+        current_account_revision=current_account_revision,
+        pending_by_bucket=pending_by_bucket,
+        held_by_bucket=held_by_bucket,
+        pending_attributions=pending_attributions,
+    )
+    unattributed = sum(
+        (item.cash_delta for item in pending_attributions), Decimal("0.00")
+    )
+    return FundingView(
+        policy_ref=view.policy_ref,
+        mode=view.mode,
+        funding_revision=view.funding_revision,
+        buckets=view.buckets,
+        reserve=view.reserve,
+        unallocated_adjustment=MaybeDecimal.known(
+            state.unallocated_adjustment + unattributed
+        ),
+        bound_account_revision=view.bound_account_revision,
+        status_reason=FUNDING_PENDING_ATTRIBUTION,
+        pending_attributions=pending_attributions,
+    )
 
 
 def describe_unbound_funding(policy: FixedBucketPolicy, reason_code: str) -> FundingView:

@@ -80,7 +80,9 @@
   "UNKNOWN_ORDER_EXPOSURE": "委托占用无法确定",
   "UNSUPPORTED_FACT": "这类事实暂不支持登记",
   "VALUATION_UNAVAILABLE": "缺少估值价格",
-  "WAITING_FOR_PULLBACK": "等待回落到更合适的价位"
+  "WAITING_FOR_PULLBACK": "等待回落到更合适的价位",
+  "FUNDING_NO_FREE_BUCKET": "没有可用的资金桶，需先卖出持仓或腾出一个桶",
+  "FUNDING_PENDING_ATTRIBUTION": "有成交的资金归属待核对"
  },
  "x-quanthus-labels": {
   "mode": {
@@ -1402,6 +1404,7 @@
      "buckets",
      "funding_revision",
      "mode",
+     "pending_attributions",
      "policy_ref",
      "reserve",
      "status_reason",
@@ -1460,6 +1463,12 @@
         "type": "null"
        }
       ]
+     },
+     "pending_attributions": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/PendingAttribution"
+      }
      }
     }
    },
@@ -2171,6 +2180,8 @@
      "FIXED_CYCLE_SETTLED",
      "FUNDING_CYCLE_NOT_BOUND",
      "FUNDING_LEDGER_MISMATCH",
+     "FUNDING_NO_FREE_BUCKET",
+     "FUNDING_PENDING_ATTRIBUTION",
      "HOLD_AND_ALERT",
      "IDEMPOTENCY_CONFLICT",
      "IDEMPOTENT_REPLAY",
@@ -2559,7 +2570,7 @@
      "clock",
      "clock_kind",
      "opportunities",
-    "orders",
+     "orders",
      "package",
      "publication",
      "schema_version",
@@ -2592,12 +2603,12 @@
        "$ref": "#/components/schemas/Opportunity"
       }
      },
-    "orders": {
-     "type": "array",
-     "items": {
-      "$ref": "#/components/schemas/OrderRecord"
-     }
-    },
+     "orders": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/OrderRecord"
+      }
+     },
      "package": {
       "anyOf": [
        {
@@ -2963,6 +2974,70 @@
      "order_revision": {
       "type": "integer",
       "minimum": 1
+     }
+    }
+   },
+   "PendingAttribution": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "cash_delta",
+     "order_id",
+     "price",
+     "quantity",
+     "security_code",
+     "side"
+    ],
+    "properties": {
+     "order_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "security_code": {
+      "type": "string",
+      "minLength": 1
+     },
+     "cash_delta": {
+      "$ref": "#/components/schemas/Money"
+     },
+     "side": {
+      "anyOf": [
+       {
+        "type": "string",
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "quantity": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "price": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Money"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     }
    }

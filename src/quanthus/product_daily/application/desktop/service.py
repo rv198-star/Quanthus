@@ -37,7 +37,9 @@ from quanthus.capabilities.funding import (
     FUNDING_CYCLE_NOT_BOUND,
     FUNDING_LEDGER_MISMATCH,
     FundingView,
+    PendingAttribution,
     describe_funding,
+    describe_partial_funding,
     describe_unbound_funding,
     initial_funding_state,
 )
@@ -490,10 +492,6 @@ class P12DesktopApplication:
                 if callable(accountable)
                 else persisted.cash_total
             )
-            if accountable_total != account_cash:
-                return describe_unbound_funding(
-                    self._policy.funding, FUNDING_LEDGER_MISMATCH
-                )
             pending_read = getattr(
                 self._facts, "funding_pending_by_bucket", None
             )
@@ -510,6 +508,49 @@ class P12DesktopApplication:
                 if callable(held_read)
                 else None
             )
+            if accountable_total != account_cash:
+                # A gap the partition cannot explain is listed, not hidden:
+                # fills with no owning bucket are surfaced as pending
+                # attribution so the known buckets and reserve still
+                # reconcile against the account (gap = unattributed cash).
+                unattributed_read = getattr(
+                    self._facts, "funding_unattributed_fills", None
+                )
+                unattributed = (
+                    unattributed_read(self._context)
+                    if callable(unattributed_read)
+                    else None
+                )
+                if unattributed:
+                    pending_attrs = tuple(
+                        PendingAttribution(
+                            order_id=item.get("order_id"),
+                            security_code=item["security_code"],
+                            cash_delta=item["cash_delta"],
+                            side=item.get("side"),
+                            quantity=item.get("quantity"),
+                            price=item.get("price"),
+                        )
+                        for item in unattributed
+                    )
+                    # Partial view only when the listed fills explain the
+                    # whole gap; otherwise the partition is genuinely short
+                    # and the page keeps every amount marked for review.
+                    if sum(
+                        (p.cash_delta for p in pending_attrs), Decimal("0.00")
+                    ) == (account_cash - accountable_total):
+                        return describe_partial_funding(
+                            self._policy.funding,
+                            persisted,
+                            state_account_revision=bound_revision,
+                            current_account_revision=revision,
+                            pending_by_bucket=pending,
+                            held_by_bucket=held,
+                            pending_attributions=pending_attrs,
+                        )
+                return describe_unbound_funding(
+                    self._policy.funding, FUNDING_LEDGER_MISMATCH
+                )
             return describe_funding(
                 self._policy.funding,
                 persisted,
@@ -611,6 +652,10 @@ class P12DesktopApplication:
             Decimal("0.00"),
         ).quantize(CNY_QUANTUM)
         order_pending = any(o.needs_reconciliation for o in history.orders)
+        # A fill with no owning bucket is a real reconciliation item: the
+        # workbench must not claim the account is fully aligned while the
+        # funding page lists cash awaiting attribution.
+        attribution_pending = len(getattr(funding, "pending_attributions", ()) or ())
         if occupied > 0:
             # A bounded order hold keeps a known residual even while it needs
             # reconciliation (EX08: 605 held, 18,195 still usable).
@@ -644,10 +689,14 @@ class P12DesktopApplication:
             top_concentration=concentration,
             top_concentration_security=top[1] if top else None,
             reconciliation_status=(
-                "NEEDS_RECONCILIATION" if (pending or order_pending) else "CLEAN"
+                "NEEDS_RECONCILIATION"
+                if (pending or order_pending or attribution_pending)
+                else "CLEAN"
             ),
-            pending_reconciliations=pending + sum(
-                1 for o in history.orders if o.needs_reconciliation
+            pending_reconciliations=(
+                pending
+                + sum(1 for o in history.orders if o.needs_reconciliation)
+                + attribution_pending
             ),
             ledger_digest=projection.digest,
             positions=tuple(lines),
@@ -1616,13 +1665,61 @@ class P12DesktopApplication:
         # (R2 ledger-mismatch).  Reserve an empty bucket for the security
         # before posting so the cycle floor precedes the cash event; after a
         # sell posts, settle the owning bucket once the position is flat.
+        # With no usable bucket a new security is refused *before* its fill
+        # posts - the ledger must never admit cash it cannot attribute.
         side = getattr(report, "side", None)
         if side == "buy":
-            self._auto_reserve_self_directed(getattr(report, "security_code", None))
+            security = getattr(report, "security_code", None)
+            if security is not None and not self._bucket_capacity_for(security):
+                raise FactError(
+                    "FUNDING_NO_FREE_BUCKET",
+                    f"no free bucket can take {security}; sell a held security "
+                    "or free a cycle before opening a new one",
+                )
+            self._auto_reserve_self_directed(security)
         result = self._facts.submit_report(self._context, report)
         if side == "sell":
             self._auto_settle(getattr(report, "security_code", None))
         return result
+
+    def paper_bucket_capacity_for(self, security_code: str) -> bool:
+        """Order-side probe: can a bucket take this security's next cycle.
+
+        The paper order book asks this before accepting a new-security buy so
+        the fixed-bucket account never fills cash it cannot attribute.
+        """
+        return self._bucket_capacity_for(security_code)
+
+    def _bucket_capacity_for(self, security_code: str) -> bool:
+        """Whether some bucket can take this security's next cycle.
+
+        A bucket is usable when it already serves this security, or is EMPTY,
+        or closed its last cycle while still attributed to this security (a
+        repeat trade).  With none usable the fixed-bucket policy refuses the
+        new security rather than admit a fill it cannot reconcile.
+        """
+        try:
+            state = self._facts.funding_state(self._context)
+        except FactError:
+            return False
+        if state is None:
+            return True  # the reserve path binds a fresh partition
+        funding, _ = state
+        binding = self._facts.funding_binding(self._context) or {}
+        securities = dict(binding.get("bucket_securities") or {})
+        for item in funding.buckets:
+            if item.phase in (BucketPhase.RESERVED, BucketPhase.HELD):
+                if securities.get(item.bucket_id) == security_code:
+                    return True
+                continue
+            if item.phase is BucketPhase.EMPTY:
+                return True
+            if (
+                item.phase is BucketPhase.CLOSED
+                and securities.get(item.bucket_id) == security_code
+            ):
+                return True
+        return False
 
     def _auto_reserve_self_directed(self, security_code: str | None) -> None:
         """Attribute a self-directed buy to one bucket cycle, by security.

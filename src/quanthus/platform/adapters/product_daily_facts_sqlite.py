@@ -2737,6 +2737,72 @@ class SQLiteSyntheticFactsAdapter:
                 ),
             )
 
+    def funding_unattributed_fills(
+        self, context: SyntheticContext
+    ) -> tuple[dict[str, Any], ...] | None:
+        """Fills whose cash no open bucket's attributed security can explain.
+
+        Each entry names the order, security and net ledger cash the fill
+        moved, so the funding page can list it as pending attribution instead
+        of hiding the whole partition behind an unknown balance.  Returns
+        None when no partition is bound.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            binding = self._read_funding_binding(connection, context)
+            if binding is None:
+                connection.commit()
+                return None
+            state, _rev, bindings = binding
+            securities = self._funding_securities(
+                connection, context, state, bindings
+            )
+            open_buckets = {
+                item.bucket_id
+                for item in state.buckets
+                if item.phase in (BucketPhase.RESERVED, BucketPhase.HELD)
+            }
+            owned_secs = {
+                securities.get(bid)
+                for bid in open_buckets
+                if securities.get(bid)
+            }
+            order_secs = self._order_securities(connection, context)
+            result: list[dict[str, Any]] = []
+            rows = connection.execute(
+                "SELECT event_id, event_json FROM events "
+                "WHERE account_id=? AND mode=? ORDER BY event_sequence",
+                (context.account_id, context.mode),
+            ).fetchall()
+            for row in rows:
+                event = json.loads(row["event_json"])
+                if event.get("kind") != "fill":
+                    continue
+                sec = event.get("security_code") or order_secs.get(
+                    event.get("order_id")
+                )
+                if sec is None or sec in owned_secs:
+                    continue
+                cash = connection.execute(
+                    "SELECT COALESCE(SUM(amount),0) FROM postings "
+                    "WHERE event_id=? AND account='ASSET_CASH'",
+                    (row["event_id"],),
+                ).fetchone()[0]
+                result.append(
+                    {
+                        "order_id": event.get("order_id") or event.get("fact_id"),
+                        "security_code": sec,
+                        "cash_delta": Decimal(str(cash)).quantize(
+                            Decimal("0.01")
+                        ),
+                        "side": event.get("side"),
+                        "quantity": event.get("quantity"),
+                        "price": event.get("price"),
+                    }
+                )
+            connection.commit()
+            return tuple(result)
+
     def bind_funding_state(
         self,
         context: SyntheticContext,

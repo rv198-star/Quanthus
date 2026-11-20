@@ -39,6 +39,7 @@ LOT = 100
 
 REJECT = {
     "INSUFFICIENT_CASH": "cash insufficient for the order hold",
+    "FUNDING_NO_FREE_BUCKET": "no free bucket can take a new security; sell a held security or free a cycle before opening another",
     "NON_ROUND_LOT": "quantity must be a whole 100-share lot",
     "SELL_NOT_ALLOWED_T1": "shares bought today are not sellable until T+1",
     "INSUFFICIENT_POSITION": "sellable position is insufficient",

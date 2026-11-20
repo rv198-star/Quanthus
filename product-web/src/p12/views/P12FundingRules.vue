@@ -125,6 +125,25 @@
             <div><dt>政策标识</dt><dd><code>{{ rules.funding.policy_ref.ref_id }}@{{ rules.funding.policy_ref.version }}</code></dd></div>
           </dl>
 
+          <div v-if="(rules.funding.pending_attributions || []).length" class="p12-pending-attr" data-testid="p12-pending-attr">
+            <h3>待归属成交</h3>
+            <table class="p12-table">
+              <thead>
+                <tr><th>委托</th><th>标的</th><th>方向</th><th>数量</th><th>价格</th><th>待归属现金</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in rules.funding.pending_attributions" :key="item.order_id || item.security_code">
+                  <td><code>{{ item.order_id || '—' }}</code></td>
+                  <td>{{ item.security_code }}</td>
+                  <td>{{ item.side === 'buy' ? '买入' : '卖出' }}</td>
+                  <td class="p12-num">{{ item.quantity ?? '—' }}</td>
+                  <td class="p12-num">{{ item.price === null ? '—' : money(item.price) }}</td>
+                  <td class="p12-num">{{ money(item.cash_delta) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
           <div class="p12-mode-roadmap">
             <div>
               <strong>盈亏留桶模式</strong>

@@ -198,6 +198,12 @@ class SyntheticFactService:
             self._authorize(context), bucket_id=bucket_id, event_sequence=event_sequence
         )
 
+    def funding_unattributed_fills(
+        self, context: SyntheticContext
+    ) -> tuple[dict, ...] | None:
+        """Fills whose cash no open bucket's attributed security explains."""
+        return self._port.funding_unattributed_fills(self._authorize(context))
+
     def attribute_prebinding_cycle(
         self,
         context: SyntheticContext,

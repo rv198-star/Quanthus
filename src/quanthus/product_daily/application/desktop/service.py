@@ -804,14 +804,25 @@ class P12DesktopApplication:
             action, status = "SELL", "READY"
             # Once the position is flat the exit is complete: it no longer
             # prompts a sell.  An exit plan is sized for the whole held
-            # quantity, so quantity 0 after its report marks it done.
+            # quantity, so quantity 0 after its report marks it done — but only
+            # after every sell order is terminal and fee-confirmed.  A flat
+            # position whose whole-order fee or terminal close is still pending
+            # stays a live sell task, not an ended one.
             if projection.quantity(item.security_code) == 0:
                 # The exit reported the whole position sold; no sell remains.
                 sold = any(
                     r.security_code == item.security_code and r.side == "sell"
                     for r in history.reports
                 )
-                if sold:
+                sell_orders = [
+                    o
+                    for o in history.orders
+                    if o.security_code == item.security_code and o.side == "sell"
+                ]
+                complete = bool(sell_orders) and all(
+                    o.status == "terminal" and o.settlement_ready for o in sell_orders
+                )
+                if sold and complete:
                     action, status = "NONE", "ENDED"
         elif stage is OpportunityStage.INPUT_BLOCKED:
             action, status = "PAUSED", "MISSING_INPUT"
@@ -1141,6 +1152,25 @@ class P12DesktopApplication:
             command.report_id if result.status == "POSTED" else None,
         )
 
+    @staticmethod
+    def _order_security(command: SubmitOrderEvent, existing) -> str:
+        """The order record owns the security code once the order exists.
+
+        A form returning from the records page may submit a blank code; the
+        stored order still knows its security.  A non-blank form code that
+        disagrees with the order is a field error, never a silent override.
+        """
+        form_code = command.security_code or ""
+        if existing is None:
+            return form_code
+        order_code = existing.security_code or ""
+        if form_code and order_code and form_code != order_code:
+            raise FactError(
+                "INVALID_REPORT_SHAPE",
+                f"security_code {form_code} does not match order {command.order_id} security {order_code}",
+            )
+        return order_code or form_code
+
     def submit_order_event(
         self, scope: AccountScope, command: SubmitOrderEvent
     ) -> FactOutcome:
@@ -1160,6 +1190,7 @@ class P12DesktopApplication:
 
         history = self._facts.history(self._context)
         existing = next((o for o in history.orders if o.order_id == command.order_id), None)
+        order_security = self._order_security(command, existing)
 
         if command.kind == "observation":
             observation = OrderObservation(
@@ -1181,17 +1212,13 @@ class P12DesktopApplication:
                     "INVALID_REPORT_SHAPE",
                     "first observation must declare accepted_total_qty",
                 )
-            self._auto_reserve(command.security_code)
+            self._auto_reserve(order_security)
             result = self._facts.submit_order_observation(
                 self._context,
                 observation,
                 accepted_total_qty=accepted,
                 side=existing.side if existing is not None else command.side,
-                security_code=(
-                    existing.security_code
-                    if existing is not None
-                    else command.security_code
-                ),
+                security_code=order_security,
                 price_bound=(
                     command.price_bound
                     if command.price_bound is not None
@@ -1205,7 +1232,7 @@ class P12DesktopApplication:
                     else Decimal("0.00")
                 ),
             )
-            self._auto_settle(command.security_code)
+            self._auto_settle(order_security)
             return self._outcome(
                 "observation",
                 result.receipt_id,
@@ -1230,9 +1257,9 @@ class P12DesktopApplication:
                 source_sequence=command.report_id,
                 occurred_at=command.occurred_at,
             )
-            self._auto_reserve(command.security_code)
+            self._auto_reserve(order_security)
             result = self._facts.submit_fee_assessment(self._context, fee)
-            self._auto_settle(command.security_code)
+            self._auto_settle(order_security)
             return self._outcome(
                 "fee",
                 result.receipt_id,
@@ -1267,20 +1294,19 @@ class P12DesktopApplication:
                 source_sequence=f"{command.report_id}:open",
                 order_revision=command.order_revision,
             )
-            self._auto_reserve(command.security_code)
+            self._auto_reserve(order_security)
             self._facts.submit_order_observation(
                 self._context,
                 opening,
                 accepted_total_qty=accepted,
                 side=command.side,
-                security_code=command.security_code,
+                security_code=order_security,
                 price_bound=command.price_bound,
                 estimated_fee_upper=command.fee_upper_bound or Decimal("0.00"),
             )
         report = ExecutionReport(
             report_id=command.report_id,
-            security_code=command.security_code
-            or (existing.security_code if existing is not None else ""),
+            security_code=order_security,
             side=command.side if existing is None else existing.side,
             quantity=command.quantity,
             price=command.price,
@@ -1300,7 +1326,7 @@ class P12DesktopApplication:
             ),
             order_id=command.order_id,
         )
-        self._auto_reserve(command.security_code)
+        self._auto_reserve(order_security)
         result = self._facts.submit_report(self._context, report)
         return self._outcome(
             "fill",
@@ -1410,9 +1436,11 @@ class P12DesktopApplication:
         Called after the user's fact is posted: when the order closes the
         position, the owning bucket's cycle settles inside the same store,
         idempotent by its settlement id.
+
+        A ``None`` code sweeps every open bucket whose attributed security is
+        no longer held, so a read-path ``_maintain`` repairs a bucket that an
+        earlier blank-coded submission left stuck.
         """
-        if security_code is None:
-            return
         try:
             state = self._facts.funding_state(self._context)
             if state is None:

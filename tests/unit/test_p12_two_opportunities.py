@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from quanthus.capabilities.funding import initial_funding_state
+from quanthus.capabilities.funding import BucketPhase, initial_funding_state
 from quanthus.platform.adapters.p12_synthetic_fixture import load_synthetic_fixture
 from quanthus.platform.p12.assembly import STORE_NAME, synthetic_applications
 from quanthus.product_daily.application.desktop import SubmitOrderEvent
@@ -98,6 +98,15 @@ def _settle(app, bucket, cycle, sec, settlement):
     )
 
 
+def _settled(app, bucket, cycle):
+    """A complete order flow settles its bucket on the write path, so no
+    manual settle_funding call is needed once the facts are complete."""
+    state, _ = app.funding_state(app.scope)
+    item = next(b for b in state.buckets if b.bucket_id == bucket)
+    assert item.phase is BucketPhase.CLOSED and item.cycle_id == cycle
+    return item
+
+
 def _first_win(app):
     """Reserve U1 on 600000, win 100, close the cycle."""
     _, partition = _initial(app)
@@ -107,8 +116,7 @@ def _first_win(app):
     ).accepted
     _trade(app, "A-BUY", SEC_A, "buy", 100, "10.00", 19)
     _trade(app, "A-SELL", SEC_A, "sell", 100, "11.00", 20)
-    decision = _settle(app, B1, "first-opportunity", SEC_A, "settle-first")
-    assert decision.accepted
+    _settled(app, B1, "first-opportunity")
 
 
 # ---- the audited two-opportunity flow ----------------------------------------
@@ -137,8 +145,7 @@ def test_second_opportunity_new_security(tmp_path: Path, assign_before: bool) ->
 
     _trade(app, "B-BUY", SEC_B, "buy", 100, "10.00", 21)
     _trade(app, "B-SELL", SEC_B, "sell", 100, "9.00", 23)
-    decision = _settle(app, B1, "second-opportunity", SEC_B, "settle-second")
-    assert decision.accepted
+    _settled(app, B1, "second-opportunity")
 
     reopened = _cash(_app(tmp_path))
     buckets = reopened["buckets"]
@@ -192,9 +199,10 @@ def test_settlement_replays_first_receipt(tmp_path: Path) -> None:
     app.prepare_funding_cycle(app.scope, bucket_id=B1, cycle_id="second-opportunity")
     state, _ = app.funding_state(app.scope)
     app.bind_funding(app.scope, state, bucket_securities={B1: SEC_B})
-    # Re-issuing the first settlement replays its receipt without moving cash.
+    # The first cycle already settled on the write path; re-issuing a manual
+    # settlement for the same completed cycle is refused and moves no cash.
     replay = _settle(app, B1, "first-opportunity", SEC_A, "settle-first")
-    assert replay.accepted and replay.replayed
+    assert not replay.accepted
     assert _cash(app)["account"] == Decimal("10100.00")
 
 

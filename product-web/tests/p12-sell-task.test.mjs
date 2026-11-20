@@ -48,3 +48,20 @@ test('off-price funding names the recorded fill and the bucket shortfall', () =>
   has(funding, '未接入实际成交')
   has(funding, 'p12-status-cell')
 })
+test('a fully filled sell waits for fee and terminal before it ends', () => {
+  // The task only settles once every sell order is terminal and
+  // settlement-ready; before that it stays a todo with a prefilled entry.
+  has(workbench, 'awaitingConfirmation')
+  has(workbench, 'o.settlement_ready')
+  has(workbench, "o.status === 'terminal'")
+  assert.match(workbench, /卖出已全部成交[\s\S]*还需确认整单费用并终结委托/)
+  // The prefilled confirm entries keep order id, side and security filled.
+  has(workbench, 'prefillConfirm')
+  has(workbench, 'data-testid="p12-open-fee-form"')
+  has(workbench, 'data-testid="p12-open-term-form"')
+  has(workbench, "kind: isFee ? 'fee' : 'observation'")
+  has(workbench, '确认卖出收尾')
+  // The ended sentence still exists for the truly settled state.
+  assert.match(workbench, /该机会已卖出[\s\S]*结束，无需操作/)
+})
+

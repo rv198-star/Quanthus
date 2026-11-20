@@ -119,9 +119,19 @@
             </dl>
             <p class="p12-next" data-testid="p12-sell-next">{{ sellNext }}</p>
             <div v-if="sellTask && !sellTask.settled" class="p12-form p12-sell-entry" data-testid="p12-sell-entry">
-              <h3>登记实际卖出成交</h3>
-              <p class="p12-hint">同一委托可分笔成交；登记每一笔，最后确认整单费用并终结。系统不代为下单。</p>
-              <a-button size="small" type="primary" data-testid="p12-open-sell-form" @click="prefillSell">登记卖出成交（已预填）</a-button>
+              <template v-if="sellTask.awaitingConfirmation">
+                <h3>确认卖出收尾</h3>
+                <p class="p12-hint">两笔都已成交。请按同一订单编号确认整单费用，再终结委托，资金才归回储备。系统不代为下单。</p>
+                <div class="p12-sell-confirm">
+                  <a-button size="small" type="primary" data-testid="p12-open-fee-form" @click="prefillConfirm('fee')">确认整单费用（已预填）</a-button>
+                  <a-button size="small" data-testid="p12-open-term-form" @click="prefillConfirm('terminal')">终结委托（已预填）</a-button>
+                </div>
+              </template>
+              <template v-else>
+                <h3>登记实际卖出成交</h3>
+                <p class="p12-hint">同一委托可分笔成交；登记每一笔，最后确认整单费用并终结。系统不代为下单。</p>
+                <a-button size="small" type="primary" data-testid="p12-open-sell-form" @click="prefillSell">登记卖出成交（已预填）</a-button>
+              </template>
             </div>
           </template>
           <template v-else-if="selected.plan">
@@ -281,8 +291,13 @@ export default {
       const held = position ? position.quantity : 0
       const total = accepted ? accepted.accepted_total_qty : (planned || held + filled)
       const remaining = Math.max((total || 0) - filled, 0)
-      const settled = item.status_code === 'ENDED' || (total !== null && filled >= total && !open.length)
-      return { filled, total, remaining, open, settled, planned, held }
+      // Fully filled only ends the task once every sell order is terminal and
+      // settlement-ready (fee confirmed); before that it still needs a todo.
+      const ready = orders.length > 0 && orders.every(o => o.status === 'terminal' && o.settlement_ready)
+      const allFilled = total !== null && filled >= total
+      const settled = item.status_code === 'ENDED' || (allFilled && !open.length && ready)
+      const awaitingConfirmation = allFilled && !settled
+      return { filled, total, remaining, open, settled, awaitingConfirmation, planned, held }
     },
     taskTitle () {
       const item = this.selected
@@ -311,6 +326,9 @@ export default {
       if (item.status_code === 'ENDED' || t.settled) {
         return `该机会已卖出 ${formatQuantity(t.filled || t.total || 0)} 结束，无需操作`
       }
+      if (t.awaitingConfirmation) {
+        return `卖出已全部成交（${formatQuantity(t.filled || t.total || 0)}），还需确认整单费用并终结委托`
+      }
       if (t.filled > 0) {
         const open = t.open.length
         return `已成交 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)}；同一委托待终结确认${open ? `（${open} 笔进行中）` : ''}`
@@ -338,7 +356,11 @@ export default {
       if (item.action_code === 'WAIT') return item.next_observation || reasonText(item.primary_constraint) || '继续等待'
       if (item.action_code === 'HOLD') return '继续持有，等待下一次检查'
       if (item.action_code === 'NONE' && item.stage === 'exit_plan') {
-        const qty = this.sellTask && this.sellTask.filled ? formatQuantity(this.sellTask.filled) : '全部持仓'
+        const t = this.sellTask
+        if (t && t.awaitingConfirmation) {
+          return `卖出已全部成交（${formatQuantity(t.filled || t.total || 0)}），还需确认整单费用并终结委托`
+        }
+        const qty = t && t.filled ? formatQuantity(t.filled) : '全部持仓'
         return `该机会已卖出 ${qty} 结束`
       }
       return '今天没有需要执行的操作'
@@ -507,6 +529,36 @@ export default {
         final_cumulative_fill_qty: '',
         cancelled_qty: '',
         price_bound: plan && plan.price_cap ? String(plan.price_cap) : '',
+        fee_upper_bound: '',
+        time: clock
+      }
+      this.orderError = ''
+      this.orderOutcome = null
+      const el = this.$el.querySelector('[data-testid="p12-order-form"]')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    },
+    prefillConfirm (step) {
+      // Fill in the order id, side and security so the user only confirms the
+      // fee or closes the order; the order record owns the security code.
+      const item = this.selected
+      const clock = (this.workbench?.clock || '').slice(0, 16)
+      const order = (this.sellOrders.find(o => o.status !== 'terminal') || this.sellOrders[0]) || {}
+      const filled = this.sellTask ? this.sellTask.filled : (order.known_fill_qty || 0)
+      const isFee = step === 'fee'
+      this.orderForm = {
+        report_id: newClientId('ord'),
+        kind: isFee ? 'fee' : 'observation',
+        order_id: order.order_id || '',
+        side: 'sell',
+        security_code: order.security_code || item.security_code,
+        quantity: '',
+        price: '',
+        fee: '',
+        accepted_total_qty: order.accepted_total_qty ? String(order.accepted_total_qty) : '',
+        order_status: isFee ? 'in_progress' : 'terminal',
+        final_cumulative_fill_qty: isFee ? '' : String(filled || (order.accepted_total_qty || '')),
+        cancelled_qty: isFee ? '' : '0',
+        price_bound: order.price_bound ? String(order.price_bound) : '',
         fee_upper_bound: '',
         time: clock
       }

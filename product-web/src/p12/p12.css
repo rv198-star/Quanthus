@@ -117,3 +117,4 @@
 .p12-status-cell { white-space:nowrap; }
 .p12-sell-entry { margin:0 16px 16px; padding:12px; border:1px solid #d8e4f3; border-radius:5px; background:#f6f9fd; }
 .p12-sell-entry h3 { margin:0 0 4px; font-size:13px; }
+.p12-sell-confirm { display:flex; gap:8px; flex-wrap:wrap; }

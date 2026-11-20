@@ -126,7 +126,9 @@ def _first_cycle(state: Path, assign_first: bool) -> dict:
 
 
 def _assert_first_cycle_settled(result: dict) -> None:
-    assert result["closed"].accepted
+    # The complete order flow settles B1 on the write path; a manual settle
+    # for the same completed cycle is refused and moves no cash.
+    assert not result["closed"].accepted
     reopened = result["reopened"]
     buckets = reopened["buckets"]
     assert reopened["partition"] == result["opening"] + Decimal("100.00")

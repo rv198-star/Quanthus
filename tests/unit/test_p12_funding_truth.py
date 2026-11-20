@@ -17,6 +17,7 @@ import pytest
 
 from quanthus.platform.adapters.p12_synthetic_fixture import load_synthetic_fixture
 from quanthus.platform.p12.assembly import STORE_NAME, synthetic_applications
+from quanthus.capabilities.funding import BucketPhase
 from quanthus.product_daily.application.desktop import SubmitOrderEvent
 from quanthus.product_daily.funding import SettlementRequest
 from quanthus.shared.fact_contracts import FactError
@@ -128,16 +129,24 @@ def test_successive_bucket_owners_share_one_security(tmp_path: Path) -> None:
     _assign(app, B1, SEC_A)
     _trade(app, "old-buy", SEC_A, "buy", 100, "10.00", 19)
     _trade(app, "old-sell", SEC_A, "sell", 100, "11.00", 20)
-    assert _close(app, B1, "first-id", SEC_A, "s1").accepted
+    _settled(app, B1, "first-id")
 
     _reserve(app, B2, "different-id")
     _assign(app, B2, SEC_A)
     _trade(app, "new-buy", SEC_A, "buy", 100, "10.00", 23)
     _trade(app, "new-sell", SEC_A, "sell", 100, "9.00", 24)
-    decision = _close(app, B2, "different-id", SEC_A, "s2")
-    assert decision.accepted
+    _settled(app, B2, "different-id")
     reopened = _cash(_app(tmp_path))
     assert reopened["account"] == reopened["partition"] == Decimal("10000.00")
+
+
+def _settled(app, bucket, cycle):
+    """A complete order flow settles its bucket on the write path; no manual
+    settle_funding call is needed once the facts are complete."""
+    state, _ = app.funding_state(app.scope)
+    item = next(b for b in state.buckets if b.bucket_id == bucket)
+    assert item.phase is BucketPhase.CLOSED and item.cycle_id == cycle
+    return item
 
 
 def _cash(app):
@@ -255,7 +264,7 @@ def test_legacy_settled_cycle_frees_retarget(tmp_path: Path) -> None:
     _assign(app, B1, SEC_A)
     _trade(app, "prior-buy", SEC_A, "buy", 100, "10.00", 19)
     _trade(app, "prior-sell", SEC_A, "sell", 100, "11.00", 20)
-    assert _close(app, B1, "already-live", SEC_A, "close-already-live").accepted
+    _settled(app, B1, "already-live")
     _strip_cycle_markers(tmp_path)
 
     app = _app(tmp_path)
@@ -263,7 +272,7 @@ def test_legacy_settled_cycle_frees_retarget(tmp_path: Path) -> None:
     _assign(app, B1, SEC_B)  # no raise
     _trade(app, "next-buy", SEC_B, "buy", 100, "10.00", 23)
     _trade(app, "next-sell", SEC_B, "sell", 100, "9.00", 24)
-    assert _close(app, B1, "next-cycle", SEC_B, "close-next-cycle").accepted
+    _settled(app, B1, "next-cycle")
     reopened = _cash(_app(tmp_path))
     assert reopened["account"] == reopened["partition"] == Decimal("10000.00")
 
@@ -286,12 +295,12 @@ def test_legacy_holding_settle_then_retarget(tmp_path: Path) -> None:
     assert error.value.reason_code == "FUNDING_ATTRIBUTION_UNKNOWN"
 
     _trade(app, "legacy-sell", SEC_A, "sell", 100, "11.00", 20)
-    assert _close(app, B1, "already-live", SEC_A, "close-already-live").accepted
+    _settled(app, B1, "already-live")
     _reserve(app, B1, "next-cycle")
     _assign(app, B1, SEC_B)
     _trade(app, "next-buy", SEC_B, "buy", 100, "10.00", 23)
     _trade(app, "next-sell", SEC_B, "sell", 100, "9.00", 24)
-    assert _close(app, B1, "next-cycle", SEC_B, "close-next-cycle").accepted
+    _settled(app, B1, "next-cycle")
     reopened = _cash(_app(tmp_path))
     assert reopened["account"] == reopened["partition"] == Decimal("10000.00")
 
@@ -310,7 +319,7 @@ def test_legacy_second_cycle_same_security_held(tmp_path: Path) -> None:
     _assign(app, B1, SEC_A)
     _trade(app, "c1-buy", SEC_A, "buy", 100, "10.00", 19)
     _trade(app, "c1-sell", SEC_A, "sell", 100, "11.00", 20)
-    assert _close(app, B1, "cycle-1", SEC_A, "close-cycle-1").accepted
+    _settled(app, B1, "cycle-1")
     _reserve(app, B1, "cycle-2")
     _assign(app, B1, SEC_A)
     _trade(app, "c2-buy", SEC_A, "buy", 100, "10.00", 23)
@@ -325,7 +334,7 @@ def test_legacy_second_cycle_same_security_held(tmp_path: Path) -> None:
     assert error.value.reason_code == "FUNDING_ATTRIBUTION_UNKNOWN"
 
     _trade(app, "c2-sell", SEC_A, "sell", 100, "9.00", 24)
-    assert _close(app, B1, "cycle-2", SEC_A, "close-cycle-2").accepted
+    _settled(app, B1, "cycle-2")
     reopened = _cash(_app(tmp_path))
     assert reopened["account"] == reopened["partition"] == Decimal("10000.00")
 
@@ -341,7 +350,7 @@ def test_legacy_second_cycle_same_security_unsettled(tmp_path: Path) -> None:
     _assign(app, B1, SEC_A)
     _trade(app, "c1-buy", SEC_A, "buy", 100, "10.00", 19)
     _trade(app, "c1-sell", SEC_A, "sell", 100, "11.00", 20)
-    assert _close(app, B1, "cycle-1", SEC_A, "close-cycle-1").accepted
+    _settled(app, B1, "cycle-1")
     _reserve(app, B1, "cycle-2")
     _assign(app, B1, SEC_A)
     _trade(app, "c2-buy", SEC_A, "buy", 100, "10.00", 23)
@@ -351,6 +360,6 @@ def test_legacy_second_cycle_same_security_unsettled(tmp_path: Path) -> None:
     app = _app(tmp_path)
     page = _page(app)
     assert page.status_reason != "FUNDING_LEDGER_MISMATCH"
-    assert _close(app, B1, "cycle-2", SEC_A, "close-cycle-2").accepted
+    _settled(app, B1, "cycle-2")
     reopened = _cash(_app(tmp_path))
     assert reopened["account"] == reopened["partition"] == Decimal("10000.00")

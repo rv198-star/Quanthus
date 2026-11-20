@@ -6,7 +6,7 @@
           <h1>资金与规则</h1>
           <span
             v-if="rules"
-            :class="['p12-badge', rules.scope.mode === 'synthetic' ? 'synthetic' : 'simulation']"
+            :class="['p12-badge', isRehearsal ? 'synthetic' : 'simulation']"
           >{{ accountModeBadge }}</span>
         </div>
         <p class="p12-today-conclusion">
@@ -47,8 +47,8 @@
           <p>固定桶额分配（每桶一股）、清仓盈余归入共享储备、亏损按有限储备补足、100 股整手与账本留痕</p>
         </div>
         <div class="p12-cap-item">
-          <span class="status-tag locked">{{ rules.scope.mode === 'synthetic' ? '演示 · 演练参数' : '本地预览可测算' }}</span>
-          <p>{{ rules.scope.mode === 'synthetic' ? '当前展示合成演练账户固定参数（2 桶 × ¥5,000.00，60%/60%/80% 风险阈值）' : '桶数、单桶目标额与风险比例可在下方调整并实时测算下一轮影响' }}</p>
+          <span class="status-tag locked">{{ isRehearsal ? '演示 · 演练参数' : '本地预览可测算' }}</span>
+          <p>{{ isRehearsal ? '当前展示合成演练账户固定参数（2 桶 × ¥5,000.00，60%/60%/80% 风险阈值）' : '桶数、单桶目标额与风险比例可在下方调整并实时测算下一轮影响' }}</p>
         </div>
         <div class="p12-cap-item">
           <span class="status-tag control">待开发 · 未开放写入</span>
@@ -143,8 +143,8 @@
               <h2>账户风险上限与执行口径</h2>
               <p>新买入前按成交后的预计整户权益检查，触发任一上限时限制新增买单并给出明确原因</p>
             </div>
-            <span :class="['status-tag', rules.scope.mode === 'synthetic' ? 'locked' : 'accepted']">
-              {{ rules.scope.mode === 'synthetic' ? '演示参数' : '已生效' }}
+            <span :class="['status-tag', isRehearsal ? 'locked' : 'accepted']">
+              {{ isRehearsal ? '演示参数' : '已生效' }}
             </span>
           </div>
           <dl class="p12-plan p12-num">
@@ -284,8 +284,8 @@
             <h2>系统策略与日常模拟准入进度</h2>
             <p>演练参考账户使用封闭合成配置；个人日常模拟需下表各项准入齐备后，系统才会自动生成每日盘后推荐</p>
           </div>
-          <span :class="['status-tag', rules.action_blockers.length ? 'control' : 'accepted']">
-            {{ rules.action_blockers.length ? '日常策略待准入（自主模拟可用）' : '全部规则已就绪' }}
+          <span :class="['status-tag', hasPendingAdoption ? 'control' : 'accepted']" data-testid="p12-adoption-summary-tag">
+            {{ adoptionSummaryBadge }}
           </span>
         </div>
         <div class="p12-table-wrap">
@@ -334,6 +334,7 @@ import {
   formatMoney,
   humanizeBucketId,
   humanizeMissingField,
+  isRehearsalAccount,
   label,
   moneyToCents,
   multiplyPriceQty,
@@ -371,9 +372,33 @@ export default {
     },
     accountModeBadge () {
       if (!this.rules) return ''
-      return this.rules.scope.mode === 'synthetic'
-        ? `演练参考账户 · ${this.rules.scope.account_id}（合成数据）`
+      if (this.isRehearsal) {
+        return `演练参考账户 · ${this.rules.scope.account_id}（封闭合成数据）`
+      }
+      const display = this.currentAccount?.display_name
+      return display && display !== this.rules.scope.account_id
+        ? `个人模拟盘 · ${display}（${this.rules.scope.account_id}）`
         : `个人模拟盘 · ${this.rules.scope.account_id}`
+    },
+    isRehearsal () {
+      return isRehearsalAccount(this.currentAccount, this.rules?.scope)
+    },
+    pendingSimulationCount () {
+      return (this.rules?.adoption || []).filter(
+        item => item.mode === 'simulation' && item.status !== 'adopted' && item.status !== 'configured'
+      ).length
+    },
+    hasPendingAdoption () {
+      return Boolean((this.rules?.action_blockers || []).length > 0 || this.pendingSimulationCount > 0)
+    },
+    adoptionSummaryBadge () {
+      if (this.pendingSimulationCount > 0) {
+        return `日常推荐共 ${this.pendingSimulationCount} 项待准入（盘中自主模拟可用）`
+      }
+      if ((this.rules?.action_blockers || []).length > 0) {
+        return '日常策略待准入（盘中自主模拟可用）'
+      }
+      return '全部规则已就绪'
     },
     modes () {
       return [...new Set((this.rules?.adoption || []).map(item => item.mode))]
@@ -520,10 +545,17 @@ export default {
           testid: 'p12-funding-saved-notice'
         }
       } catch (error) {
+        const isUnopenWrite = error.reasonCode === 'FUNDING_WRITE_NOT_AVAILABLE' || error.reasonCode === 'FUNDING_REBIND_NOT_OPEN'
         this.saveStatus = {
-          type: 'warning',
-          title: '未能写入生效：当前服务尚未开放个人资金参数持久化接口',
-          detail: `${reasonText(error.reasonCode)}。当前账户仍保持原生效规则（${this.baselineDraft.bucketCount} 桶 × ${formatMoney(this.baselineDraft.targetNotional)}），不会用“保存成功”提示冒充入账；你可以点击“取消修改”恢复原值，或保留上方预览供核对。`,
+          type: isUnopenWrite ? 'warning' : 'error',
+          title: isUnopenWrite
+            ? (error.reasonCode === 'FUNDING_REBIND_NOT_OPEN'
+                ? '未能写入生效：当前服务尚未开放个人资金与风控参数重绑'
+                : '未能写入生效：当前服务尚未开放个人资金参数持久化接口')
+            : `未能保存资金与风险参数：${reasonText(error.reasonCode) || '请求未通过服务端校验'}`,
+          detail: isUnopenWrite
+            ? `${reasonText(error.reasonCode)}。当前账户仍保持原生效规则（${this.baselineDraft.bucketCount} 桶 × ${formatMoney(this.baselineDraft.targetNotional)}），不会用“保存成功”提示冒充入账；你可以点击“取消修改”恢复原值，或保留上方预览供核对。`
+            : `${error.detail ? '服务端详情：' + error.detail + '。' : ''}当前账户仍保持原生效规则（${this.baselineDraft.bucketCount} 桶 × ${formatMoney(this.baselineDraft.targetNotional)}），未写入任何改动。`,
           testid: 'p12-funding-save-blocked'
         }
       } finally {

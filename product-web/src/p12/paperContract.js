@@ -21,6 +21,10 @@ export const PAPER_OPERATIONS = Object.freeze({
     method: 'GET',
     path: '/api/p12/v1/securities/{code}/identity'
   },
+  'p12.paper.account': {
+    method: 'GET',
+    path: '/api/p12/v1/accounts/{account_id}/paper'
+  },
   'p12.sim_orders.list': {
     method: 'GET',
     path: '/api/p12/v1/accounts/{account_id}/sim-orders'
@@ -41,18 +45,22 @@ export const PAPER_OPERATIONS = Object.freeze({
 
 export const PAPER_REASON_TEXTS = Object.freeze({
   INSUFFICIENT_CASH: '可用模拟资金不足，无法覆盖本次委托金额',
-  NON_ROUND_LOT: '买入数量须为 100 股（1 手）的整数倍',
+  NON_ROUND_LOT: '委托股数须为 100 股（1 手）的整数倍',
   SELL_NOT_ALLOWED_T1: 'A 股实行 T+1 交收，当日买入股数下一交易日才可卖出',
-  MARKET_CLOSED: '当前处于休市或非连续竞价时段，暂不撮合成交',
+  INSUFFICIENT_POSITION: '当前可卖持仓股数不足，无法覆盖本次卖出数量',
+  MARKET_CLOSED: '当前处于休市或非连续竞价时段（仅 09:30–11:30、13:00–14:57 连续竞价受理模拟委托）',
   SECURITY_SUSPENDED: '该股票当前停牌，无法撮合成交',
   PRICE_OUT_OF_BOUNDS: '委托价格超出当日有效涨跌停或合理价格边界',
   QUOTE_UNAVAILABLE: '暂未获取到有效实时行情快照，无法校验撮合价格',
-  BELOW_LIMIT: '当前最新价未达到你的限价条件，暂未成交',
+  BELOW_LIMIT: '当前最新价尚未达到限价条件，委托已进入挂单等待后续有效报价',
   DUPLICATE_ORDER: '同一委托编号已提交过，未重复扣款或下单',
+  INVALID_ORDER: '委托字段填写有误（请核对 6 位证券代码、整手股数与正数限价）',
+  PAPER_ACCOUNT_NOT_BOUND: '当前为封闭合成演练参考账户，不接收盘中模拟委托；请切换到个人模拟账户后操作',
   SIM_ORDER_SERVICE_UNAVAILABLE: '当前服务尚未启用盘中模拟委托接口，未生成挂单或改动账户',
   QUOTE_SERVICE_UNAVAILABLE: '当前服务尚未接通实时报价接口，暂无法查询盘中行情快照',
   INTRADAY_SERVICE_UNAVAILABLE: '当日分时接口待当前服务接通，暂不绘制模拟走势',
-  FUNDING_WRITE_NOT_AVAILABLE: '当前服务仅开放固定桶规则读取，个人资金参数保存接口待后端开放；本次仅完成本地测算预览，未改动已生效账户规则'
+  FUNDING_WRITE_NOT_AVAILABLE: '当前服务尚未开放个人资金参数持久化接口；本次仅完成本地测算预览，未改动已生效账户规则',
+  FUNDING_REBIND_NOT_OPEN: '当前服务仅开放首次固定桶分区绑定（bind）与空桶周期预约（prepare_cycle），桶数、单桶额度及风险比例的改参重绑尚未开放写入'
 })
 
 export const PAPER_LABELS = Object.freeze({
@@ -88,10 +96,12 @@ export const PAPER_LABELS = Object.freeze({
     partially_filled: '部分成交',
     filled: '全部成交',
     cancelled: '已撤单',
+    expired: '已失效（日终未成交）',
     rejected: '已拒绝'
   },
   record_source: {
     sim_matched: '模拟撮合成交',
+    sim_order: '自主模拟委托',
     user_reported: '我自主登记的成交',
     self_directed: '自主模拟委托（非系统建议）',
     system_plan: '系统盘后计划'

@@ -145,23 +145,123 @@ export function normalizeSecurityName (name) {
   return String(name).replace(/\u3000+/g, ' ').replace(/\s{2,}/g, ' ').trim()
 }
 
+export function isRehearsalAccount (accountEntry, scope, clockKind = '', packageSourceRefId = '') {
+  if (accountEntry && typeof accountEntry.synthetic === 'boolean') {
+    return accountEntry.synthetic
+  }
+  if (scope && scope.mode && scope.mode !== 'synthetic') return false
+  if (scope && /PAPER/i.test(String(scope.account_id || ''))) return false
+  if (packageSourceRefId === 'p12-paper-decisions') return false
+  if (clockKind === 'synthetic_fixed') return true
+  return Boolean(scope && scope.mode === 'synthetic')
+}
+
 export function isSyntheticItem (item, scopeMode) {
-  if (scopeMode === 'synthetic') return true
-  if (!item) return false
+  if (!item || item.selfDirected) return false
   if (String(item.opportunity_id || '').startsWith('OPP-SYN-')) return true
   if (String(item.security_name || '').startsWith('合成')) return true
   if (item.chart && item.chart.price_basis === 'unadjusted_synthetic') return true
+  if (scopeMode === true || scopeMode === 'synthetic') return true
   return false
 }
 
 export function inferExchangeLabel (securityCode, explicitExchange, synthetic = false) {
   if (synthetic) return '演练示例代号'
-  if (explicitExchange) return explicitExchange
   const code = String(securityCode || '').trim()
+  if (/^(43|83|87|92)\d{4}$/.test(code)) return '北交所'
+  if (explicitExchange) return explicitExchange
   if (/^(60|68|90)\d{4}$/.test(code)) return '上交所'
   if (/^(00|30|20)\d{4}$/.test(code)) return '深交所'
-  if (/^(43|83|87|92)\d{4}$/.test(code)) return '北交所'
   return 'A 股'
+}
+
+export function describeQuoteState (quote, marketSession = null, securityIdentity = null) {
+  if (!quote) return '暂无报价'
+  if (securityIdentity && securityIdentity.suspended) return '停牌'
+  if (quote.status === 'unavailable') return '暂无可用报价'
+  const mState = quote.market_state || (marketSession && marketSession.market_state) || ''
+  if (mState === 'pre_open') {
+    return quote.status === 'live' ? '盘前集合竞价' : '开盘前未开市（昨收参考）'
+  }
+  if (mState === 'lunch_break') {
+    return quote.status === 'halt' ? '午间休市 · 上午零成交' : '午间休市（上午最新价）'
+  }
+  if (mState === 'holiday') {
+    return '休市日（最近收盘价）'
+  }
+  if (mState === 'call_auction_close') {
+    return '收盘集合竞价（14:57–15:00）'
+  }
+  if (mState === 'closed') {
+    return quote.status === 'halt' ? '已收盘（当日零成交或停牌）' : '已收盘（当日收盘价）'
+  }
+  if (quote.status === 'live') return '盘中实时有效'
+  if (quote.status === 'stale') return '盘中报价延迟'
+  if (quote.status === 'halt') return '盘中零成交 / 停牌'
+  return label('quote_status', quote.status)
+}
+
+export function simOrderOriginLabel (ord) {
+  if (!ord) return '—'
+  if (ord.source === 'user_reported') return '我自主登记的成交'
+  if (ord.status === 'filled') return '模拟撮合成交'
+  if (ord.status === 'partially_filled') return '模拟部分成交'
+  if (ord.status === 'rejected') return '自主模拟委托 · 未受理'
+  if (ord.status === 'cancelled') return '自主模拟委托 · 已撤单'
+  if (ord.status === 'expired') return '自主模拟委托 · 日终失效'
+  return '自主模拟委托 · 待撮合'
+}
+
+export function simOrderActiveRemaining (ord) {
+  if (!ord) return 0
+  if (ord.status === 'open' || ord.status === 'partially_filled') {
+    const rem = ord.remaining_qty ?? Math.max(0, (ord.quantity || 0) - (ord.filled_qty || 0))
+    return Math.max(0, rem)
+  }
+  return 0
+}
+
+export function simOrderQtySummary (ord) {
+  if (!ord) return '—'
+  const filled = ord.filled_qty || 0
+  const total = ord.quantity || 0
+  if (ord.status === 'rejected') return '未成交（0 股）· 未进入挂单'
+  if (ord.status === 'filled') return `全部成交 ${formatQuantity(filled || total)}`
+  if (ord.status === 'cancelled') {
+    const cancelled = ord.cancelled_qty ?? Math.max(0, total - filled)
+    return `已成 ${formatQuantity(filled)} · 已撤 ${formatQuantity(cancelled)}`
+  }
+  if (ord.status === 'expired') {
+    const expired = Math.max(0, total - filled)
+    return `已成 ${formatQuantity(filled)} · 日终失效 ${formatQuantity(expired)}`
+  }
+  return `已成 ${formatQuantity(filled)} · 待成 ${formatQuantity(simOrderActiveRemaining(ord))}`
+}
+
+export function isTimestampPast (nowIso, targetIso) {
+  if (!nowIso || !targetIso) return false
+  const nowMs = Date.parse(nowIso)
+  const targetMs = Date.parse(targetIso)
+  if (Number.isNaN(nowMs) || Number.isNaN(targetMs)) return false
+  return nowMs > targetMs
+}
+
+export function checkPriceCage (limitPriceText, prevCloseText, securityCode) {
+  const limitCents = moneyToCents(limitPriceText)
+  const prevCents = moneyToCents(prevCloseText)
+  if (limitCents === null || prevCents === null || limitCents <= 0n || prevCents <= 0n) return null
+  const code = String(securityCode || '').trim()
+  let bandBps = 1000n
+  if (/^(30|68)\d{4}$/.test(code)) bandBps = 2000n
+  else if (/^(43|83|87|92)\d{4}$/.test(code)) bandBps = 3000n
+  const upCents = (prevCents * (10000n + bandBps) + 5000n) / 10000n
+  const downCents = (prevCents * (10000n - bandBps) + 5000n) / 10000n
+  return {
+    outOfBounds: limitCents > upCents || limitCents < downCents,
+    upText: centsToMoney(upCents),
+    downText: centsToMoney(downCents),
+    bandPct: `${(bandBps / 100n).toString()}%`
+  }
 }
 
 export function humanizeBucketId (bucketId) {

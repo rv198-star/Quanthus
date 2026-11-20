@@ -7,7 +7,7 @@
           <h1>模拟盘工作台</h1>
           <span
             v-if="workbench"
-            :class="['p12-badge', workbench.scope.mode === 'synthetic' ? 'synthetic' : 'simulation']"
+            :class="['p12-badge', isRehearsal ? 'synthetic' : 'simulation']"
             data-testid="p12-mode"
           >{{ accountModeBadge }}</span>
           <span v-if="marketSessionBadge" :class="['p12-session-pill', marketSessionTone]" data-testid="p12-market-session">
@@ -15,8 +15,11 @@
           </span>
         </div>
         <p class="p12-today-conclusion" data-testid="p12-today-conclusion">{{ todayConclusion }}</p>
-        <p v-if="workbench && workbench.package" class="p12-today-sub">
+        <p v-if="workbench && workbench.package && !isEmptyPaperPackage" class="p12-today-sub">
           盘后计划基准日 {{ workbench.package.market_date }}（收盘判断 → 下一交易日开盘执行） · 发布于 {{ time(workbench.package.published_at) }}
+        </p>
+        <p v-else-if="workbench && isEmptyPaperPackage" class="p12-today-sub">
+          系统日频策略尚未面向个人模拟账户签发盘后推荐（不以历史信号或行情冒充推荐）；实时行情查询、当日分时与自主模拟委托（{{ paperRuleVersion }}）正常可用
         </p>
         <p v-else-if="workbench" class="p12-today-sub">
           {{ workbench.publication.market_date }} 盘后策略计划尚未发布（预计 {{ time(workbench.publication.published_at) }}）；实时行情查询、自主模拟委托与账户核对正常可用
@@ -28,10 +31,11 @@
           class="p12-select"
           :value="accountId"
           aria-label="选择模拟账户"
+          data-testid="p12-account-select"
           @change="selectAccount($event.target.value)"
         >
           <option v-for="item in accounts" :key="item.account_id" :value="item.account_id">
-            {{ item.display_name }}（{{ item.synthetic ? '演练合成' : '个人模拟' }}）
+            {{ item.display_name }}（{{ item.synthetic ? '封闭演练' : '个人模拟' }}）
           </option>
         </select>
         <span v-if="workbench" class="as-of" data-testid="p12-clock">
@@ -56,8 +60,25 @@
         :account="workbench.account"
         :buckets="fundingBuckets"
         :account-id="accountId || ''"
+        :paper-account="paperAccount"
+        :security-names="isRehearsal ? {} : securityDirectory"
         @select-bucket="onSelectBucket"
       />
+
+      <!-- Rehearsal account isolation notice -->
+      <div v-if="isRehearsal" class="p12-banner-note" data-testid="p12-rehearsal-isolation-banner">
+        <div>
+          <strong>当前为封闭合成演练参考账户（仅用于核对固定演练剧本）</strong>
+          <p>为避免同一证券代码混出两套身份与两套时钟，本演练账户不混入真实股票看盘或盘中模拟委托。日常看盘、下模拟单与次日查账请使用个人模拟账户。</p>
+        </div>
+        <a-button
+          v-if="personalPaperAccount"
+          type="primary"
+          size="small"
+          data-testid="p12-switch-paper-account"
+          @click="switchToPersonalAccount"
+        >切换到个人模拟账户 →</a-button>
+      </div>
 
       <!-- Honest notice when daily strategy adoption is gated -->
       <div v-if="workbench.action_blockers.length" class="p12-banner-note warning" data-testid="p12-strategy-gate-banner">
@@ -74,7 +95,7 @@
             <h2>{{ label('publication_status', workbench.publication.status) }}</h2>
             <p>{{ workbench.publication.market_date }} 收盘后的系统计划将于 {{ time(workbench.publication.published_at) }} 发布。发布前系统不展示未定稿的策略推荐；你可以直接查询真实 A 股行情并进行自主模拟操作。</p>
           </div>
-          <form class="p12-lookup-inline" @submit.prevent="lookupSecurity()">
+          <form v-if="!isRehearsal" class="p12-lookup-inline" @submit.prevent="lookupSecurity()">
             <input
               v-model.trim="lookupCode"
               maxlength="6"
@@ -90,7 +111,7 @@
       <div v-else class="p12-grid">
         <!-- Left Column: Real Stock Lookup + Priority Queue -->
         <aside class="panel p12-queue" aria-label="待办和机会队列" data-testid="p12-queue">
-          <div class="p12-lookup-box">
+          <div v-if="!isRehearsal" class="p12-lookup-box">
             <form class="p12-lookup-form" @submit.prevent="lookupSecurity()">
               <input
                 v-model.trim="lookupCode"
@@ -124,7 +145,7 @@
           </div>
 
           <div v-if="!groups.length" class="p12-empty">
-            今天暂无系统候选标的；请在上方输入 6 位证券代码进行自主看盘与模拟委托。
+            {{ isRehearsal ? '当前演练账户暂无队列事项。' : '今天暂无在途持仓、未决委托或已准入系统推荐；请在上方输入或点选 6 位证券代码看盘并下模拟单。' }}
           </div>
 
           <div v-for="group in groups" :key="group.key" class="p12-queue-group">
@@ -172,9 +193,9 @@
                 <span v-else class="p12-source-pill sys">系统盘后计划标的</span>
               </div>
               <p v-if="isCurrentSynthetic" class="p12-syn-honesty">
-                说明：当前展示的是固定演练账户标的「{{ selected.security_name }}」（示例代号 {{ selected.security_code }}），其 K 线与计划仅用于账本演练，不代表真实证券行情或今日推荐。
-                <button type="button" class="p12-inline-btn" @click="lookupSecurity(selected.security_code)">
-                  单独查看真实 {{ selected.security_code }} 盘中行情 →
+                说明：当前展示的是封闭演练账户标的「{{ selected.security_name }}」（演练示例代号 {{ selected.security_code }}），其 K 线与计划仅用于账本核对演练，不代表真实证券行情或今日推荐。
+                <button v-if="personalPaperAccount" type="button" class="p12-inline-btn" @click="switchToPersonalAccount">
+                  前往个人模拟账户查看真实行情 →
                 </button>
               </p>
               <p v-else class="p12-sec-sub">
@@ -194,8 +215,8 @@
                   <span v-if="quoteChange" class="p12-quote-delta p12-num">
                     {{ quoteChange.diffText }}（{{ quoteChange.pctText }}）
                   </span>
-                  <span :class="['p12-quote-state', liveQuote.status === 'live' ? 'live' : 'muted']">
-                    {{ label('quote_status', liveQuote.status) }} · {{ label('market_state', liveQuote.market_state) }}
+                  <span :class="['p12-quote-state', liveQuote.status === 'live' ? 'live' : 'muted']" data-testid="p12-quote-state-text">
+                    {{ quoteStateDisplayText }}
                   </span>
                 </div>
                 <div class="p12-quote-ohlc p12-num">
@@ -225,9 +246,9 @@
           <div class="p12-stock-context" data-testid="p12-stock-position-bar">
             <div class="p12-stock-metrics p12-num">
               <span>本股持仓 <b>{{ qty(selectedPositionQty) }}</b></span>
-              <span>今日可卖(T+1) <b>{{ qty(selectedSellableQty) }}</b></span>
+              <span>今日可卖(T+1) <b>{{ qty(selectedSellableQty) }}</b><small v-if="selectedTodayBoughtQty > 0">（今日新买 {{ qty(selectedTodayBoughtQty) }}）</small></span>
               <span>持仓成本 <b>{{ selectedAvgCostText }}</b></span>
-              <span v-if="selectedOpenOrderCount > 0" class="p12-active-hold">进行中委托 <b>{{ selectedOpenOrderCount }} 笔</b></span>
+              <span v-if="selectedOpenOrderCount > 0" class="p12-active-hold" data-testid="p12-open-order-count">进行中委托 <b>{{ selectedOpenOrderCount }} 笔</b></span>
             </div>
             <div class="p12-stock-links">
               <router-link :to="{ path: '/p12/records', query: { ...accountRouteQuery, security: selected.security_code } }" class="p12-inline-link" data-testid="p12-jump-records">
@@ -249,7 +270,7 @@
             :prev-close="liveQuote ? liveQuote.previous_close : null"
             :synthetic="isCurrentSynthetic"
             :name="selectedDisplayName"
-            :price-cap="selected.plan ? selected.plan.price_cap : (simForm.limit_price || null)"
+            :price-cap="(selected.plan && !isSelectedPlanExpired) ? selected.plan.price_cap : (simForm.limit_price || null)"
             :cost-price="selectedCostPriceValue"
             :has-live-snapshot="Boolean(!isCurrentSynthetic && liveQuote && liveQuote.last_price)"
             :empty-text="selected.status_code === 'MISSING_INPUT' ? '行情数据未更新，暂不显示价格图' : '暂无已准入的历史日 K 线数据'"
@@ -311,7 +332,7 @@
           </div>
 
           <!-- Mode Switcher: Simulated Order vs Fact Reporting -->
-          <div v-if="!selected.selfDirected" class="p12-action-tabs" role="tablist">
+          <div v-if="!isRehearsal" class="p12-action-tabs" role="tablist">
             <button
               type="button"
               :class="['p12-action-tab', { active: activeTicketTab === 'sim' }]"
@@ -323,15 +344,43 @@
               :class="['p12-action-tab', { active: activeTicketTab === 'report' }]"
               data-testid="p12-tab-report-fill"
               @click="ticketTab = 'report'"
-            >计划与成交核对</button>
+            >{{ selected.selfDirected ? '外部成交补登' : '计划与成交核对' }}</button>
           </div>
 
           <!-- TAB A: Self-Directed / Paper Simulated Limit Order -->
-          <div v-show="activeTicketTab === 'sim'" class="p12-sim-pane" data-testid="p12-sim-pane">
+          <div v-if="!isRehearsal" v-show="activeTicketTab === 'sim'" class="p12-sim-pane" data-testid="p12-sim-pane">
             <div class="p12-sim-origin-bar">
               <span class="p12-origin-tag">自主模拟委托 · 非系统推荐</span>
               <small>规则 {{ paperRuleVersion }} · 不发送实盘指令</small>
             </div>
+
+            <!-- Simulated Order Outcome Receipt (placed at top of ticket so always visible above fold) -->
+            <div
+              v-if="simOutcome"
+              :class="['p12-outcome p12-sim-receipt-top', simOutcome.status === 'rejected' ? 'rejected' : ((simOutcome.status === 'open' || simOutcome.status === 'partially_filled' || simOutcome.status === 'cancelled') ? 'resting' : '')]"
+              data-testid="p12-sim-outcome"
+            >
+              <div class="p12-outcome-head">
+                <h3>{{ simOutcomeTitle }}</h3>
+                <button type="button" class="p12-inline-btn" aria-label="关闭委托回执" @click="simOutcome = null">收起</button>
+              </div>
+              <p v-if="simOutcome.reason_code || simOutcome.reason_text" class="p12-deviation">
+                {{ simOutcome.status === 'rejected' ? '拒绝原因：' : '回执说明：' }}{{ simOutcome.reason_code ? reason(simOutcome.reason_code) : simOutcome.reason_text }}
+              </p>
+              <dl class="p12-num">
+                <div v-if="simOutcome.order_id"><dt>委托单号</dt><dd><code>{{ simOutcome.order_id }}</code></dd></div>
+                <div><dt>委托状态</dt><dd>{{ label('sim_order_status', simOutcome.status) }}</dd></div>
+                <div v-if="simOutcome.status === 'rejected'"><dt>成交结果</dt><dd>未成交（未生成挂单）</dd></div>
+                <div v-else-if="simOutcome.status === 'cancelled'"><dt>已撤回数量</dt><dd>{{ qty(simOutcome.cancelled_qty || 0) }}</dd></div>
+                <div v-else><dt>已成交数量</dt><dd>{{ qty(simOutcome.filled_qty || 0) }}</dd></div>
+                <div v-if="simOutcome.avg_price"><dt>成交均价</dt><dd>¥{{ simOutcome.avg_price }}</dd></div>
+                <div v-if="simOutcome.matched_quote_time"><dt>触发行情时间</dt><dd>{{ timeWithSec(simOutcome.matched_quote_time) }}</dd></div>
+              </dl>
+            </div>
+
+            <p v-if="selected.plan && isSelectedPlanExpired" class="p12-precheck-warn" data-testid="p12-sim-expired-plan-warn">
+              原系统计划执行窗口已过，未自动带入过期数量与价格上限；如仍提交委托，仅代表你个人的自主模拟操作。
+            </p>
 
             <form class="p12-form p12-sim-form" data-testid="p12-sim-order-form" @submit.prevent="submitPaperOrder">
               <div class="p12-side-switch" role="group" aria-label="买卖方向">
@@ -380,7 +429,7 @@
                 <div><dt>预计委托金额</dt><dd>{{ simEstimatedAmount ? money(simEstimatedAmount) : '—' }}</dd></div>
                 <div v-if="simForm.side === 'buy'">
                   <dt>可用模拟现金</dt>
-                  <dd>{{ formatMaybe(workbench.account.cash_available_for_new).text }}</dd>
+                  <dd>{{ availablePaperCashText }}</dd>
                 </div>
                 <div v-else>
                   <dt>今日可卖 / 总持仓</dt>
@@ -389,30 +438,17 @@
                 <div><dt>模拟费用口径</dt><dd>测试免佣（0.00）</dd></div>
               </dl>
 
+              <p v-if="simSessionHint" class="p12-session-warn" data-testid="p12-sim-session-hint">{{ simSessionHint }}</p>
               <p v-if="simPrecheckHint" class="p12-precheck-warn" data-testid="p12-sim-precheck">{{ simPrecheckHint }}</p>
               <p v-if="simError" class="p12-form-error" data-testid="p12-sim-error">{{ simError }}</p>
 
               <a-button type="primary" html-type="submit" :loading="simSubmitting" data-testid="p12-sim-submit">
                 {{ simForm.side === 'buy' ? '提交模拟买入委托' : '提交模拟卖出委托' }}
               </a-button>
-              <small class="p12-hint">
-                挂单后可离开页面；服务端在连续竞价时段收到满足限价的新快照时自动撮合，休市或停牌不偷偷成交。
+              <small class="p12-hint" data-testid="p12-sim-rule-note">
+                {{ matchingPromiseHint }}
               </small>
             </form>
-
-            <!-- Simulated Order Outcome Receipt -->
-            <div v-if="simOutcome" :class="['p12-outcome', simOutcome.status === 'rejected' ? 'rejected' : '']" data-testid="p12-sim-outcome">
-              <h3>{{ simOutcomeTitle }}</h3>
-              <p v-if="simOutcome.reason_code || simOutcome.reason_text" class="p12-deviation">
-                原因：{{ simOutcome.reason_text || reason(simOutcome.reason_code) }}
-              </p>
-              <dl class="p12-num">
-                <div><dt>委托状态</dt><dd>{{ label('sim_order_status', simOutcome.status) }}</dd></div>
-                <div><dt>已成交数量</dt><dd>{{ qty(simOutcome.filled_qty || 0) }}</dd></div>
-                <div v-if="simOutcome.avg_price"><dt>成交均价</dt><dd>¥{{ simOutcome.avg_price }}</dd></div>
-                <div v-if="simOutcome.matched_quote_time"><dt>触发行情时间</dt><dd>{{ timeWithSec(simOutcome.matched_quote_time) }}</dd></div>
-              </dl>
-            </div>
 
             <!-- Active & Recent Simulated Orders List -->
             <div class="p12-sim-orders-box" data-testid="p12-sim-orders-box">
@@ -432,14 +468,15 @@
                 <li v-for="ord in displayedSimOrders" :key="ord.order_id" :data-testid="`p12-sim-ord-${ord.order_id}`">
                   <div class="p12-sim-ord-top">
                     <span>
-                      <b>{{ ord.side === 'sell' ? '卖出' : '买入' }} {{ ord.security_code }}</b>
+                      <b>{{ ord.side === 'sell' ? '卖出' : '买入' }} {{ formatSimOrderSecurity(ord) }}</b>
+                      {{ ' ' }}
                       <small class="p12-num">{{ qty(ord.quantity) }} @ ¥{{ ord.limit_price }}</small>
                     </span>
                     <span :class="['status-tag', simOrderTone(ord.status)]">{{ label('sim_order_status', ord.status) }}</span>
                   </div>
                   <div class="p12-sim-ord-meta p12-num">
-                    <span>已成 {{ qty(ord.filled_qty || 0) }}<template v-if="ord.remaining_qty"> · 剩余 {{ qty(ord.remaining_qty) }}</template></span>
-                    <span>{{ label('record_source', ord.source || 'sim_matched') }}</span>
+                    <span>{{ simQtySummary(ord) }}</span>
+                    <span>{{ simOrigin(ord) }}</span>
                   </div>
                   <p v-if="ord.reject_reason" class="p12-sim-ord-reason">拒绝原因：{{ reason(ord.reject_reason) }}</p>
                   <div v-if="ord.status === 'open' || ord.status === 'partially_filled'" class="p12-sim-ord-actions">
@@ -470,9 +507,26 @@
                 <span>失效条件</span>
                 <ul><li v-for="item in selected.plan.invalidations" :key="item">{{ item }}</li></ul>
               </div>
-              <p class="p12-next">{{ nextStepReadable }}</p>
+              <div v-if="isSelectedPlanExpired" class="p12-noop p12-expired-box" data-testid="p12-expired-plan-note">
+                <b>有效执行窗口已过 · 不再引导现在买入</b>
+                <p>该建仓计划的执行窗口已于 {{ time(selected.plan.expires_at) }} 截止。过期建议不再作为当前操作指引，请等待后续盘后重新评估。</p>
+                <details v-if="selected.plan.delta_qty > 0 && !outcome" class="p12-tech-details">
+                  <summary>仅补登窗口内已实际发生的成交事实</summary>
+                  <form class="p12-form" data-testid="p12-fill-form" @submit.prevent="submit">
+                    <h3>核对实际执行（补登历史已发生交易）</h3>
+                    <label>成交数量（股）<input v-model.trim="form.quantity" inputmode="numeric" data-testid="p12-fill-quantity" /></label>
+                    <label>成交价（元）<input v-model.trim="form.price" inputmode="decimal" data-testid="p12-fill-price" /></label>
+                    <label>确认费用（元）<input v-model.trim="form.fee" inputmode="decimal" data-testid="p12-fill-fee" /></label>
+                    <label>成交时间<input v-model="form.time" type="datetime-local" data-testid="p12-fill-time" /></label>
+                    <p v-if="formError" class="p12-form-error" data-testid="p12-form-error">{{ formError }}</p>
+                    <a-button type="primary" html-type="submit" :loading="submitting" data-testid="p12-fill-submit">保存成交</a-button>
+                  </form>
+                </details>
+              </div>
+              <template v-else>
+                <p class="p12-next">{{ nextStepReadable }}</p>
 
-              <form v-if="selected.plan.delta_qty > 0 && !outcome" class="p12-form" data-testid="p12-fill-form" @submit.prevent="submit">
+                <form v-if="selected.plan.delta_qty > 0 && !outcome" class="p12-form" data-testid="p12-fill-form" @submit.prevent="submit">
                 <h3>核对实际执行（我自主登记的成交）</h3>
                 <p class="p12-hint">登记已实际成交的结果；价格或股数与计划不一致也照实填写，账本会保留原计划并标注偏离。</p>
                 <label>成交数量（股）<input v-model.trim="form.quantity" inputmode="numeric" data-testid="p12-fill-quantity" /></label>
@@ -483,6 +537,7 @@
                 <a-button type="primary" html-type="submit" :loading="submitting" data-testid="p12-fill-submit">保存成交</a-button>
                 <small class="p12-hint">重复点击不会重复入账。</small>
               </form>
+              </template>
             </template>
 
             <template v-else-if="selected.stage === 'exit_plan' && !isUnheldExit(selected)">
@@ -626,6 +681,38 @@
             </div>
           </div>
         </aside>
+
+        <!-- Empty-Queue Welcome & Quick Lookup Desk for Fresh Personal Paper Accounts -->
+        <section v-if="!selected" class="panel p12-paper-empty-desk" data-testid="p12-paper-empty-desk">
+          <div class="p12-empty-desk-head">
+            <span class="p12-source-pill self">个人模拟盘 · 真实行情直连</span>
+            <h2>今日暂无系统盘后推荐与在途持仓，可直接查询真实 A 股看盘下单</h2>
+            <p>
+              系统日频推荐尚未对当前模拟账户签发（绝不将封闭演练计划或行情浏览冒充今日推荐）。当前可用模拟现金
+              <strong class="p12-num">{{ availablePaperCashText }}</strong>，点选下方常用标的或在左侧输入任意 6 位证券代码，即可读取实时报价快照、当天完整分钟分时，并提交模拟限价委托。
+            </p>
+          </div>
+          <div v-if="!isRehearsal" class="p12-empty-desk-cards">
+            <button
+              v-for="sc in realShortcuts"
+              :key="'desk-' + sc.code"
+              type="button"
+              class="p12-desk-stock-btn"
+              :data-testid="'p12-desk-shortcut-' + sc.code"
+              @click="lookupSecurity(sc.code)"
+            >
+              <div>
+                <b>{{ sc.hintName }}</b>
+                <span class="p12-num">{{ sc.code }}</span>
+              </div>
+              <small>{{ sc.exchange }} · 查看实时快照与分时 →</small>
+            </button>
+          </div>
+          <div class="p12-empty-desk-rules">
+            <span><b>撮合规则：</b>{{ paperRuleVersion }}（连续竞价 09:30–11:30、13:00–14:57 满足限价触发，盘口排队不建模）</span>
+            <span><b>交收与单位：</b>100 股整手校验 · A 股 T+1 次日可卖 · 当日收盘未成自动失效</span>
+          </div>
+        </section>
       </div>
     </template>
   </div>
@@ -639,6 +726,7 @@ import {
   listSimOrders,
   loadFundingRules,
   loadMarketSession,
+  loadPaperAccount,
   loadSecurityIdentity,
   loadSecurityIntraday,
   loadSecurityQuote,
@@ -650,20 +738,26 @@ import {
 } from '../client.js'
 import {
   calcQuoteChange,
+  checkPriceCage,
   compareMoney,
+  describeQuoteState,
   formatMaybe,
   formatMoney,
   formatQuantity,
   formatTime,
   humanizeMissingField,
   inferExchangeLabel,
+  isRehearsalAccount,
   isSyntheticItem,
+  isTimestampPast,
   label,
   multiplyPriceQty,
   nextDate,
   normaliseMoneyInput,
   normalizeSecurityName,
   reasonText,
+  simOrderOriginLabel,
+  simOrderQtySummary,
   timezoneSuffix
 } from '../format.js'
 import { PAPER_EXEC_RULE_VERSION, REAL_SECURITY_SHORTCUTS } from '../paperContract.js'
@@ -677,9 +771,13 @@ export default {
     workbench: null,
     fundingBuckets: [],
     marketSession: null,
+    paperAccount: null,
     simOrders: [],
     simOrdersAvailable: false,
+    simOrdersReasonCode: '',
     selectedId: null,
+    suppressSelectionReset: false,
+    securityDirectory: {},
     chainOpen: false,
     chainPinned: false,
     ticketTab: null,
@@ -720,25 +818,46 @@ export default {
     accountRouteQuery () {
       return this.accountId ? { account: this.accountId } : {}
     },
+    isRehearsal () {
+      return isRehearsalAccount(
+        this.currentAccount,
+        this.workbench?.scope,
+        this.workbench?.clock_kind || '',
+        this.workbench?.package?.source_ref?.ref_id || ''
+      )
+    },
+    isEmptyPaperPackage () {
+      return Boolean(
+        this.workbench?.package?.source_ref?.ref_id === 'p12-paper-decisions' &&
+        !(this.workbench?.opportunities || []).length
+      )
+    },
     accountModeBadge () {
       if (!this.workbench) return ''
-      if (this.workbench.scope.mode === 'synthetic') {
-        return `演练参考账户 · ${this.workbench.scope.account_id}（合成数据）`
+      if (this.isRehearsal) {
+        return `演练参考账户 · ${this.workbench.scope.account_id}（封闭合成数据）`
       }
-      return `个人模拟盘 · ${this.workbench.scope.account_id}`
+      const display = this.currentAccount?.display_name
+      return display && display !== this.workbench.scope.account_id
+        ? `个人模拟盘 · ${display}（${this.workbench.scope.account_id}）`
+        : `个人模拟盘 · ${this.workbench.scope.account_id}`
     },
     marketSessionBadge () {
+      if (this.isRehearsal) {
+        return `封闭演练时段 · ${String(this.workbench?.clock || '').slice(0, 10)}`
+      }
       if (this.marketSession && this.marketSession.market_state) {
         const st = label('market_state', this.marketSession.market_state)
         const td = this.marketSession.trading_date ? ` · 交易日 ${this.marketSession.trading_date}` : ''
         return `${st}${td}`
       }
-      if (this.workbench && this.workbench.scope.mode === 'synthetic') {
+      if (this.isRehearsal) {
         return '固定演练时段'
       }
       return ''
     },
     marketSessionTone () {
+      if (this.isRehearsal) return 'muted'
       const state = this.marketSession?.market_state
       if (state === 'trading') return 'live'
       if (state === 'lunch_break' || state === 'pre_open' || state === 'call_auction_close') return 'amber'
@@ -746,10 +865,17 @@ export default {
     },
     clockDisplay () {
       if (!this.workbench) return ''
+      if (this.isRehearsal) {
+        return `演练账本时钟 ${formatTime(this.workbench.clock)}`
+      }
       if (this.marketSession && this.marketSession.server_time) {
         return `行情时钟 ${formatTime(this.marketSession.server_time)}`
       }
       return `${label('clock_kind', this.workbench.clock_kind)} ${formatTime(this.workbench.clock)}`
+    },
+    effectiveClockIso () {
+      if (!this.isRehearsal && this.marketSession?.server_time) return this.marketSession.server_time
+      return this.workbench?.clock || ''
     },
     blockerSummary () {
       return (this.workbench?.action_blockers || []).map(humanizeMissingField).join('、')
@@ -760,10 +886,12 @@ export default {
       const list = []
       for (const pos of (this.workbench?.account?.positions || [])) {
         if (pos.quantity > 0 && !oppCodes.has(pos.security_code) && !customCodes.has(pos.security_code)) {
+          const dir = this.securityDirectory[pos.security_code]
           list.push({
             opportunity_id: `HOLD-${pos.security_code}`,
             security_code: pos.security_code,
-            security_name: pos.security_name || pos.security_code,
+            security_name: (dir && dir.name) || pos.security_name || pos.security_code,
+            exchange: (dir && dir.exchange) || '',
             stage: 'holding',
             queue_group: 'holding',
             action_code: 'HOLD',
@@ -794,10 +922,12 @@ export default {
       for (const ord of this.simOrders) {
         if ((ord.status === 'open' || ord.status === 'partially_filled') && !knownCodes.has(ord.security_code) && !seen.has(ord.security_code)) {
           seen.add(ord.security_code)
+          const dir = this.securityDirectory[ord.security_code]
           items.push({
             opportunity_id: `SIMORD-${ord.security_code}`,
             security_code: ord.security_code,
-            security_name: ord.security_name || ord.security_code,
+            security_name: (dir && dir.name) || ord.security_name || ord.security_code,
+            exchange: (dir && dir.exchange) || '',
             stage: 'waiting',
             queue_group: 'sim_open',
             action_code: ord.side === 'sell' ? 'SELL' : 'BUY',
@@ -823,12 +953,33 @@ export default {
         if (this.isUnheldExit(item)) {
           return { ...item, effective_group: 'ended' }
         }
+        if (this.isOpportunityExpired(item)) {
+          const fallbackGroup = this.heldQtyFor(item.security_code) > 0 ? 'holding' : 'ended'
+          return { ...item, effective_group: fallbackGroup }
+        }
         return { ...item, effective_group: item.queue_group }
       })
+      const oppCodeSet = new Set(rawOpps.map(i => i.security_code))
+      const openSimCodes = new Set(
+        this.simOrders
+          .filter(o => o.status === 'open' || o.status === 'partially_filled')
+          .map(o => o.security_code)
+      )
+      const normalizedCustom = this.customWatchItems
+        .filter(i => !oppCodeSet.has(i.security_code))
+        .map(i => {
+          if (this.heldQtyFor(i.security_code) > 0) {
+            return { ...i, action_code: 'HOLD', effective_group: 'holding' }
+          }
+          if (openSimCodes.has(i.security_code)) {
+            return { ...i, effective_group: 'sim_open' }
+          }
+          return { ...i, effective_group: 'self_watch' }
+        })
       const extras = [
         ...this.extraHoldingItems.map(i => ({ ...i, effective_group: 'holding' })),
         ...this.openSimOrderItems.map(i => ({ ...i, effective_group: 'sim_open' })),
-        ...this.customWatchItems.map(i => ({ ...i, effective_group: 'self_watch' }))
+        ...normalizedCustom
       ]
       return [...rawOpps, ...extras]
     },
@@ -846,12 +997,16 @@ export default {
     isCurrentSynthetic () {
       if (!this.selected) return false
       if (this.selected.selfDirected) return false
-      return isSyntheticItem(this.selected, this.workbench?.scope?.mode)
+      return isSyntheticItem(this.selected, this.isRehearsal)
+    },
+    isSelectedPlanExpired () {
+      return this.isOpportunityExpired(this.selected)
     },
     selectedDisplayName () {
       if (!this.selected) return ''
       if (!this.isCurrentSynthetic) {
-        const fromQuote = normalizeSecurityName(this.liveQuote && this.securityIdentityName)
+        const dir = this.securityDirectory[this.selected.security_code]
+        const fromQuote = normalizeSecurityName(this.securityIdentityName || (dir && dir.name))
         if (fromQuote) return fromQuote
       }
       return normalizeSecurityName(this.selected.security_name) || this.selected.security_code
@@ -862,8 +1017,12 @@ export default {
     },
     selectedExchangeLabel () {
       if (!this.selected) return ''
-      const explicit = (!this.isCurrentSynthetic && (this.securityIdentity?.exchange || this.selected.exchange)) || ''
+      const dir = this.securityDirectory[this.selected.security_code]
+      const explicit = (!this.isCurrentSynthetic && (this.securityIdentity?.exchange || (dir && dir.exchange) || this.selected.exchange)) || ''
       return inferExchangeLabel(this.selected.security_code, explicit, this.isCurrentSynthetic)
+    },
+    quoteStateDisplayText () {
+      return describeQuoteState(this.liveQuote, this.marketSession, this.securityIdentity)
     },
     quoteChange () {
       if (!this.liveQuote || !this.liveQuote.last_price || !this.liveQuote.previous_close) return null
@@ -873,7 +1032,13 @@ export default {
       if (this.quoteState && !this.quoteState.available) {
         return reasonText(this.quoteState.reasonCode) || '实时报价接口尚未启用'
       }
-      if (this.liveQuote && this.liveQuote.status === 'halt') return '该股票当前停牌或零成交'
+      if (this.liveQuote && this.liveQuote.status === 'halt') {
+        const mState = this.liveQuote.market_state || this.marketSession?.market_state || ''
+        if (mState === 'pre_open' && !(this.securityIdentity && this.securityIdentity.suspended)) {
+          return '开盘前尚未开始连续竞价（当前无成交）'
+        }
+        return '该股票当前停牌或零成交'
+      }
       return '当前暂无可用实时报价'
     },
     quoteUnavailableDetail () {
@@ -888,13 +1053,40 @@ export default {
       if (!code) return null
       return (this.workbench?.account?.positions || []).find(p => p.security_code === code) || null
     },
+    selectedPaperPosition () {
+      const code = this.selected?.security_code
+      if (!code || !this.paperAccount || !Array.isArray(this.paperAccount.positions)) return null
+      return this.paperAccount.positions.find(p => p.security_code === code) || null
+    },
     selectedPositionQty () {
+      if (this.selectedPaperPosition && typeof this.selectedPaperPosition.quantity === 'number') {
+        return this.selectedPaperPosition.quantity
+      }
       return this.selectedPosition ? this.selectedPosition.quantity : 0
     },
+    selectedTodayBoughtQty () {
+      if (this.selectedPaperPosition && typeof this.selectedPaperPosition.today_bought_qty === 'number') {
+        return this.selectedPaperPosition.today_bought_qty
+      }
+      return 0
+    },
     selectedSellableQty () {
+      if (this.selectedPaperPosition && typeof this.selectedPaperPosition.sellable_qty === 'number') {
+        return this.selectedPaperPosition.sellable_qty
+      }
       if (!this.selectedPosition) return 0
       if (typeof this.selectedPosition.sellable_quantity === 'number') return this.selectedPosition.sellable_quantity
       return this.selectedPosition.quantity
+    },
+    availablePaperCashRaw () {
+      if (this.paperAccount && this.paperAccount.cash_available !== undefined && this.paperAccount.cash_available !== null) {
+        return String(this.paperAccount.cash_available)
+      }
+      return this.workbench?.account?.cash_available_for_new?.value || null
+    },
+    availablePaperCashText () {
+      if (this.availablePaperCashRaw !== null) return formatMoney(this.availablePaperCashRaw)
+      return formatMaybe(this.workbench?.account?.cash_available_for_new).text
     },
     selectedAvgCostText () {
       if (!this.selectedPosition) return '—'
@@ -914,15 +1106,27 @@ export default {
       return this.showAllSimOrders ? this.simOrders : this.selectedStockSimOrders
     },
     selectedOpenOrderCount () {
-      const simOpen = this.selectedStockSimOrders.filter(o => o.status === 'open' || o.status === 'partially_filled').length
-      const manualOpen = (this.workbench?.orders || []).filter(o => o.security_code === this.selected?.security_code && o.status !== 'terminal').length
-      return simOpen + manualOpen
+      const allSimIds = new Set(this.simOrders.map(o => o.order_id))
+      const openIds = new Set(
+        this.selectedStockSimOrders
+          .filter(o => o.status === 'open' || o.status === 'partially_filled')
+          .map(o => o.order_id)
+      )
+      for (const o of (this.workbench?.orders || [])) {
+        if (o.security_code === this.selected?.security_code && o.status !== 'terminal' && !allSimIds.has(o.order_id)) {
+          openIds.add(o.order_id)
+        }
+      }
+      return openIds.size
     },
     todayConclusion () {
       if (!this.workbench) return ''
       const reconcileCount = this.workbench.account.pending_reconciliations || 0
       const exitCount = this.allQueueItems.filter(i => i.effective_group === 'exit').length
-      const entryCount = this.allQueueItems.filter(i => i.effective_group === 'entry' && i.applicability?.status === 'ACTIONABLE').length
+      const entryCount = this.allQueueItems.filter(
+        i => i.effective_group === 'entry' && i.applicability?.status === 'ACTIONABLE' && !this.isOpportunityExpired(i)
+      ).length
+      const expiredCount = (this.workbench.opportunities || []).filter(i => i.plan && this.isOpportunityExpired(i)).length
       const openSimCount = this.simOrders.filter(o => o.status === 'open' || o.status === 'partially_filled').length
       const parts = []
       if (reconcileCount > 0) parts.push(`${reconcileCount} 项成交记录待核对`)
@@ -930,8 +1134,17 @@ export default {
       if (entryCount > 0) parts.push(`${entryCount} 项建仓计划在可执行窗口内`)
       if (openSimCount > 0) parts.push(`${openSimCount} 笔模拟委托挂单中`)
       if (parts.length) return `今日重点：${parts.join('；')}。请先核对右侧任务并按顺序处理。`
+      if (expiredCount > 0) {
+        return `今日无可执行待办（原 ${expiredCount} 项建仓计划执行窗口已过，不再引导买入）。`
+      }
       if (this.workbench.action_blockers.length) {
         return '今日无系统推荐操作（日常策略准入待放行）；你可以自主查询真实股票并提交模拟限价委托。'
+      }
+      if (this.isEmptyPaperPackage) {
+        const posCount = (this.workbench.account?.positions || []).filter(p => p.quantity > 0).length
+        return posCount > 0
+          ? `当前持有 ${posCount} 只股票，今日暂无系统盘后推荐；可查看实时分时或提交自主模拟委托。`
+          : `今日暂无已准入的系统盘后推荐；当前可用模拟现金 ${this.availablePaperCashText}，可直接查询真实股票看盘并下模拟单。`
       }
       if (!this.workbench.package) {
         return '盘后策略计划尚未到发布时间；当前可查看已有持仓、核对历史成交或自主看盘。'
@@ -940,11 +1153,9 @@ export default {
     },
     activeTicketTab () {
       if (!this.selected) return 'sim'
-      if (this.selected.selfDirected) return 'sim'
+      if (this.isRehearsal) return 'report'
       if (this.ticketTab) return this.ticketTab
-      if (this.workbench?.scope?.mode === 'synthetic' && (this.selected.plan || (this.selected.stage === 'exit_plan' && !this.isUnheldExit(this.selected)))) {
-        return 'report'
-      }
+      if (this.selected.selfDirected) return 'sim'
       if (this.simOrdersAvailable) return 'sim'
       return 'report'
     },
@@ -954,15 +1165,30 @@ export default {
       if (!qty || !price) return null
       return multiplyPriceQty(price, qty)
     },
+    simSessionHint () {
+      const mState = (this.liveQuote && this.liveQuote.market_state) || (this.marketSession && this.marketSession.market_state) || ''
+      if (!mState || mState === 'trading') return ''
+      return `时段提示：当前处于${label('market_state', mState)}（非连续竞价时段）；模拟限价委托仅在连续竞价时段（09:30–11:30、13:00–14:57）受理，现在提交将按休市规则拒绝且不冻结资金。`
+    },
+    matchingPromiseHint () {
+      return '模拟撮合规则（p12-paper-exec-v1，非实盘）：仅在连续竞价时段（09:30–11:30、13:00–14:57）受理委托，对受理后满足限价的实时快照按最新成交价整笔撮合（不模拟盘口排队），收盘后未成交委托自动日终失效解冻。'
+    },
     simPrecheckHint () {
       const qty = /^\d+$/.test(this.simForm.quantity) ? Number.parseInt(this.simForm.quantity, 10) : null
       if (!qty) return ''
-      if (this.simForm.side === 'buy' && qty % 100 !== 0) {
-        return `预检提示：${qty} 股不是 100 股（1 手）整数倍，提交后将按整手规则被拒绝。`
+      if (qty % 100 !== 0) {
+        return `预检提示：${qty} 股不是 100 股（1 手）整数倍，提交后将按整手规则拒绝受理。`
       }
-      if (this.simForm.side === 'buy' && this.simEstimatedAmount && this.workbench?.account?.cash_available_for_new?.value) {
-        if (compareMoney(this.simEstimatedAmount, this.workbench.account.cash_available_for_new.value) === 1) {
-          return `预检提示：预计委托金额 ${formatMoney(this.simEstimatedAmount)} 超过当前可用现金 ${formatMoney(this.workbench.account.cash_available_for_new.value)}。`
+      const normPrice = normaliseMoneyInput(this.simForm.limit_price)
+      if (normPrice && this.liveQuote && this.liveQuote.previous_close && this.selected) {
+        const cage = checkPriceCage(normPrice, this.liveQuote.previous_close, this.selected.security_code)
+        if (cage && cage.outOfBounds) {
+          return `预检提示：委托限价 ¥${normPrice} 超出按昨收 ¥${this.liveQuote.previous_close} 估算的常规涨跌停区间（±${cage.bandPct}：¥${cage.downText}–¥${cage.upText}），服务端将按价格边界规则拦截。`
+        }
+      }
+      if (this.simForm.side === 'buy' && this.simEstimatedAmount && this.availablePaperCashRaw) {
+        if (compareMoney(this.simEstimatedAmount, this.availablePaperCashRaw) === 1) {
+          return `预检提示：预计委托金额 ${formatMoney(this.simEstimatedAmount)} 超过当前可用现金 ${formatMoney(this.availablePaperCashRaw)}。`
         }
       }
       if (this.simForm.side === 'sell' && qty > this.selectedSellableQty) {
@@ -973,9 +1199,10 @@ export default {
     simOutcomeTitle () {
       if (!this.simOutcome) return ''
       if (this.simOutcome.status === 'filled') return '模拟委托已撮合成交'
-      if (this.simOutcome.status === 'open') return '模拟委托已受理挂单'
+      if (this.simOutcome.status === 'open') return '委托已受理挂单 · 暂未成交'
       if (this.simOutcome.status === 'partially_filled') return '模拟委托部分成交，余量继续挂单'
-      if (this.simOutcome.status === 'rejected') return '模拟委托未通过校验（账户未变动）'
+      if (this.simOutcome.status === 'cancelled') return '委托已撤回 · 冻结余量已释放'
+      if (this.simOutcome.status === 'rejected') return '委托已拒绝 · 未成交（账户资金与持仓未变动）'
       return label('sim_order_status', this.simOutcome.status)
     },
     otherReasons () {
@@ -1041,6 +1268,7 @@ export default {
       if (!item) return '今天的任务'
       if (item.selfDirected) return '自主模拟操作单'
       if (this.isUnheldExit(item)) return '账户核对结论'
+      if (this.isOpportunityExpired(item)) return '原计划已过有效期'
       if (item.stage === 'exit_plan') return this.sellIsTomorrow ? '下一交易日计划' : '今天的任务'
       return item.plan ? '下一交易日计划' : '今天的任务'
     },
@@ -1049,6 +1277,7 @@ export default {
       if (!item) return ''
       if (item.selfDirected) return '基于实时行情自主委托，与系统推荐分开记账'
       if (this.isUnheldExit(item)) return '未持有该股，无需卖出操作'
+      if (this.isOpportunityExpired(item)) return '有效执行窗口已结束，不再引导现在下单'
       if (item.applicability) {
         if (item.applicability.status === 'NEEDS_REASSESSMENT') {
           return '本轮已有成交入账，剩余差额将在下一交易日收盘后重评'
@@ -1109,12 +1338,13 @@ export default {
       if (!item) return '—'
       if (item.selfDirected) return this.selectedPositionQty > 0 ? '自主持仓跟踪' : '自主看盘与模拟委托'
       if (this.isUnheldExit(item)) return '无需操作'
+      if (this.isOpportunityExpired(item)) return '原计划已过期'
       return label('action_code', item.action_code)
     },
     defaultChangeText () {
       if (this.selected?.selfDirected) {
         if (this.liveQuote && this.liveQuote.last_price) {
-          return `实时报价 ¥${this.liveQuote.last_price}（${label('quote_status', this.liveQuote.status)}）`
+          return `实时报价 ¥${this.liveQuote.last_price}（${this.quoteStateDisplayText}）`
         }
         return '你主动纳入看盘的标的，暂无系统盘后策略变化记录'
       }
@@ -1123,6 +1353,7 @@ export default {
     primaryConstraintTitle () {
       if (!this.selected) return '无'
       if (this.isUnheldExit(this.selected)) return '本账户未持有该股'
+      if (this.isOpportunityExpired(this.selected)) return '执行窗口已截止'
       return this.selected.primary_constraint ? reasonText(this.selected.primary_constraint) : '无额外阻断约束'
     },
     actionSentence () {
@@ -1135,6 +1366,10 @@ export default {
         return '策略已发出退出信号，但本账户此前未买入该股（持仓 0 股），今日无需任何操作。'
       }
       const plan = item.plan
+      if (this.isOpportunityExpired(item)) {
+        const winText = plan ? `（${formatTime(plan.eligible_at)} 至 ${formatTime(plan.expires_at).slice(11)}）` : ''
+        return `该计划有效执行窗口${winText}已结束，当前不再引导买入或卖出操作。`
+      }
       if (item.action_code === 'BUY' && plan) {
         if (item.applicability && item.applicability.status === 'NEEDS_REASSESSMENT') {
           return `本轮已买入 ${formatQuantity(item.applicability.current_qty)} 入账；剩余额度待下一交易日收盘后结合新余额复核`
@@ -1164,7 +1399,8 @@ export default {
     }
   },
   watch: {
-    selected () {
+    selectedId (newId, oldId) {
+      if (this.suppressSelectionReset || newId === oldId) return
       this.ticketTab = null
       this.resetForm()
       this.resetOrderForm()
@@ -1180,19 +1416,30 @@ export default {
   },
   methods: {
     async load (accountId) {
-      const [wb, rulesRes, sessionRes, simRes] = await Promise.all([
+      const [wb, rulesRes, sessionRes, paperRes, simRes] = await Promise.all([
         loadWorkbench(accountId),
         loadFundingRules(accountId).catch(() => null),
         loadMarketSession(),
+        loadPaperAccount(accountId),
         listSimOrders(accountId)
       ])
       this.workbench = wb
       this.fundingBuckets = rulesRes?.funding?.buckets || []
       this.marketSession = sessionRes.available ? sessionRes.data : null
+      this.paperAccount = paperRes.available ? paperRes.data : null
+      if (this.paperAccount && this.paperAccount.session && !this.marketSession) {
+        this.marketSession = this.paperAccount.session
+      }
       this.simOrdersAvailable = simRes.available
+      this.simOrdersReasonCode = simRes.reasonCode || ''
       this.simOrders = simRes.orders
+      if (!this.isRehearsal) {
+        await this.resolveKnownRealIdentities()
+      } else {
+        this.customWatchItems = []
+      }
       const requestedSec = this.$route.query.security
-      if (requestedSec && /^\d{6}$/.test(String(requestedSec))) {
+      if (!this.isRehearsal && requestedSec && /^\d{6}$/.test(String(requestedSec))) {
         const match = this.allQueueItems.find(i => i.security_code === String(requestedSec) && !this.isItemSynthetic(i))
         if (match) {
           this.selectedId = match.opportunity_id
@@ -1202,6 +1449,7 @@ export default {
         }
       }
       const ids = this.allQueueItems.map(item => item.opportunity_id)
+      this.suppressSelectionReset = true
       if (!ids.includes(this.selectedId)) {
         // Prefer first non-ended item if available.
         const activeFirst = this.allQueueItems.find(item => item.effective_group !== 'ended')
@@ -1211,6 +1459,64 @@ export default {
       this.resetOrderForm()
       this.resetSimForm()
       await this.syncSelectedMarketData()
+      this.$nextTick(() => { this.suppressSelectionReset = false })
+    },
+    async resolveKnownRealIdentities () {
+      const codes = new Set()
+      for (const pos of (this.workbench?.account?.positions || [])) if (pos.security_code) codes.add(pos.security_code)
+      for (const ord of this.simOrders) if (ord.security_code) codes.add(ord.security_code)
+      for (const opp of (this.workbench?.opportunities || [])) {
+        if (opp.security_code && !this.isItemSynthetic(opp)) codes.add(opp.security_code)
+      }
+      await Promise.all([...codes].map(async code => {
+        if (this.securityDirectory[code] && this.securityDirectory[code].name) return
+        const res = await loadSecurityIdentity(code)
+        if (res.available && res.data && res.data.security_name) {
+          this.$set(this.securityDirectory, code, {
+            name: normalizeSecurityName(res.data.security_name),
+            exchange: res.data.exchange || inferExchangeLabel(code, '', false)
+          })
+        }
+      }))
+    },
+    ensureSameSecuritySelected (code) {
+      if (!code) return
+      const currentIds = this.allQueueItems.map(i => i.opportunity_id)
+      if (currentIds.includes(this.selectedId)) return
+      let match = this.allQueueItems.find(i => i.security_code === code && (!this.isItemSynthetic(i) || this.isRehearsal))
+      if (!match && !this.isRehearsal) {
+        const dir = this.securityDirectory[code]
+        const shortcut = REAL_SECURITY_SHORTCUTS.find(s => s.code === code)
+        const entry = {
+          opportunity_id: `SELF-${code}`,
+          security_code: code,
+          security_name: (dir && dir.name) || (shortcut ? shortcut.hintName : `证券 ${code}`),
+          exchange: (dir && dir.exchange) || (shortcut ? shortcut.exchange : inferExchangeLabel(code, '', false)),
+          stage: 'waiting',
+          queue_group: 'self_watch',
+          action_code: 'NONE',
+          status_code: 'READY',
+          reason_codes: [],
+          primary_constraint: null,
+          changes: [],
+          explanations: [],
+          next_observation: '自主查询标的；支持读取实时报价、当日完整分钟分时与提交模拟委托',
+          chart: null,
+          cost_price: { value: null, reason_code: null },
+          plan: null,
+          applicability: null,
+          selfDirected: true,
+          quote_name: (dir && dir.name) || '',
+          quote_summary: ''
+        }
+        this.customWatchItems = [entry, ...this.customWatchItems]
+        match = entry
+      }
+      if (match) {
+        this.suppressSelectionReset = true
+        this.selectedId = match.opportunity_id
+        this.$nextTick(() => { this.suppressSelectionReset = false })
+      }
     },
     async refreshAll () {
       await this.refresh()
@@ -1247,7 +1553,14 @@ export default {
     },
     isItemSynthetic (item) {
       if (!item || item.selfDirected) return false
-      return isSyntheticItem(item, this.workbench?.scope?.mode)
+      return isSyntheticItem(item, this.isRehearsal)
+    },
+    isOpportunityExpired (item) {
+      if (!item || item.selfDirected) return false
+      if (item.status_code === 'EXPIRED' || item.applicability?.status === 'EXPIRED') return true
+      if (Array.isArray(item.reason_codes) && item.reason_codes.includes('ENTRY_WINDOW_EXPIRED')) return true
+      if (item.plan && item.plan.expires_at && isTimestampPast(this.effectiveClockIso, item.plan.expires_at)) return true
+      return false
     },
     heldQtyFor (securityCode) {
       const pos = (this.workbench?.account?.positions || []).find(p => p.security_code === securityCode)
@@ -1276,18 +1589,29 @@ export default {
       return map[key] || label('queue_group', key)
     },
     displaySecurityName (item) {
+      if (!this.isItemSynthetic(item)) {
+        const dir = this.securityDirectory[item.security_code]
+        if (dir && dir.name) return dir.name
+      }
       return normalizeSecurityName(item.quote_name || item.security_name) || item.security_code
     },
     displaySecurityBadge (item) {
       const syn = this.isItemSynthetic(item)
-      const ex = inferExchangeLabel(item.security_code, item.exchange, syn)
+      const dir = !syn ? this.securityDirectory[item.security_code] : null
+      const ex = inferExchangeLabel(item.security_code, (dir && dir.exchange) || item.exchange, syn)
       return `${ex} · ${item.security_code}`
+    },
+    formatSimOrderSecurity (ord) {
+      const dir = this.securityDirectory[ord.security_code]
+      const clean = normalizeSecurityName((dir && dir.name) || ord.security_name || '')
+      return clean && clean !== ord.security_code ? `${ord.security_code} ${clean}` : ord.security_code
     },
     queueActionLabel (item) {
       if (item.selfDirected) {
         return this.heldQtyFor(item.security_code) > 0 ? `持仓 ${this.heldQtyFor(item.security_code)} 股` : '看盘 / 下单'
       }
       if (this.isUnheldExit(item)) return '无需卖出'
+      if (this.isOpportunityExpired(item)) return '窗口已过'
       if (item.action_code === 'BUY' && item.applicability && item.applicability.delta_qty > 0) {
         return `买入 ${item.applicability.delta_qty} 股`
       }
@@ -1298,6 +1622,7 @@ export default {
     },
     actionTone (item) {
       if (this.isUnheldExit(item)) return 'muted'
+      if (this.isOpportunityExpired(item)) return 'muted'
       if (item.action_code === 'SELL') return 'sell'
       if (item.action_code === 'BUY') return 'buy'
       return 'neutral'
@@ -1305,11 +1630,13 @@ export default {
     queueStatusLabel (item) {
       if (item.selfDirected) return '自主模拟'
       if (this.isUnheldExit(item)) return '未持仓'
+      if (this.isOpportunityExpired(item)) return '已过期'
       return label('status_code', item.status_code)
     },
     queueStatusTone (item) {
       if (item.selfDirected) return 'locked'
       if (this.isUnheldExit(item)) return 'locked'
+      if (this.isOpportunityExpired(item)) return 'control'
       return this.statusTone(item.status_code)
     },
     queueBrief (item) {
@@ -1318,6 +1645,10 @@ export default {
       }
       if (this.isUnheldExit(item)) {
         return '此前未买入该股（持仓 0 股），本轮退出信号无需操作'
+      }
+      if (this.isOpportunityExpired(item)) {
+        const exp = item.plan && item.plan.expires_at ? `（${formatTime(item.plan.expires_at)} 截止）` : ''
+        return `原计划有效执行窗口已过${exp}，不再引导现在操作`
       }
       if (item.applicability && item.applicability.status === 'NEEDS_REASSESSMENT') {
         return `已买入 ${item.applicability.current_qty} 股入账，剩余股数待次日盘后复核`
@@ -1330,6 +1661,7 @@ export default {
       return '按规则持续跟踪'
     },
     async lookupSecurity (presetCode) {
+      if (this.isRehearsal) return
       const code = String(presetCode || this.lookupCode || '').trim()
       this.lookupError = ''
       if (!/^\d{6}$/.test(code)) {
@@ -1337,19 +1669,23 @@ export default {
         return
       }
       this.lookupCode = ''
-      const existing = this.customWatchItems.find(item => item.security_code === code)
+      const existing = this.allQueueItems.find(item => item.security_code === code && !this.isItemSynthetic(item))
       if (existing) {
-        this.selectedId = existing.opportunity_id
-        await this.syncSelectedMarketData()
+        if (this.selectedId === existing.opportunity_id) {
+          await this.syncSelectedMarketData()
+        } else {
+          this.selectedId = existing.opportunity_id
+        }
         return
       }
+      const dir = this.securityDirectory[code]
       const shortcut = REAL_SECURITY_SHORTCUTS.find(s => s.code === code)
       const oppId = `SELF-${code}`
       const entry = {
         opportunity_id: oppId,
         security_code: code,
-        security_name: shortcut ? shortcut.hintName : `证券 ${code}`,
-        exchange: shortcut ? shortcut.exchange : inferExchangeLabel(code, '', false),
+        security_name: (dir && dir.name) || (shortcut ? shortcut.hintName : `证券 ${code}`),
+        exchange: (dir && dir.exchange) || (shortcut ? shortcut.exchange : inferExchangeLabel(code, '', false)),
         stage: 'waiting',
         queue_group: 'self_watch',
         action_code: 'NONE',
@@ -1401,12 +1737,16 @@ export default {
         const officialName = normalizeSecurityName(quoteRes.data.security_name || idRes.data?.security_name)
         const officialEx = quoteRes.data.exchange || idRes.data?.exchange
         if (officialName) {
+          this.$set(this.securityDirectory, code, {
+            name: officialName,
+            exchange: officialEx || inferExchangeLabel(code, '', false)
+          })
           this.$set(item, 'quote_name', officialName)
           if (item.selfDirected) this.$set(item, 'security_name', officialName)
         }
         if (officialEx) this.$set(item, 'exchange', officialEx)
         if (this.liveQuote.last_price) {
-          this.$set(item, 'quote_summary', `最新报价 ¥${this.liveQuote.last_price} · ${label('quote_status', this.liveQuote.status)}`)
+          this.$set(item, 'quote_summary', `最新报价 ¥${this.liveQuote.last_price} · ${describeQuoteState(this.liveQuote, this.marketSession, this.securityIdentity)}`)
           if (!this.simForm.limit_price) {
             this.simForm.limit_price = this.liveQuote.last_price
           }
@@ -1417,12 +1757,12 @@ export default {
       }
     },
     resetSimForm () {
-      const plan = this.selected?.plan
+      const plan = (this.selected?.plan && !this.isOpportunityExpired(this.selected)) ? this.selected.plan : null
       const defaultSide = (this.selected?.stage === 'exit_plan' && !this.isUnheldExit(this.selected)) ? 'sell' : 'buy'
       this.simForm = {
         side: defaultSide,
         quantity: plan && plan.delta_qty > 0 ? String(plan.delta_qty) : (defaultSide === 'sell' && this.selectedSellableQty > 0 ? String(this.selectedSellableQty) : '100'),
-        limit_price: plan ? plan.price_cap : '',
+        limit_price: plan ? plan.price_cap : (this.liveQuote && this.liveQuote.last_price ? this.liveQuote.last_price : ''),
         order_id: newClientId('sim')
       }
       this.simError = ''
@@ -1440,26 +1780,33 @@ export default {
         this.simError = '请输入有效的委托限价（最多两位小数）'
         return
       }
+      const targetCode = this.selected.security_code
       this.simSubmitting = true
       try {
         const nowIso = this.marketSession?.server_time || this.workbench?.clock || new Date().toISOString()
         const result = await submitSimOrder(this.accountId, {
           order_id: this.simForm.order_id || newClientId('sim'),
           side: this.simForm.side,
-          security_code: this.selected.security_code,
+          security_code: targetCode,
           quantity,
           limit_price: limitPrice,
           occurred_at: nowIso
         })
-        this.simOutcome = result
         this.simForm.order_id = newClientId('sim')
-        const [wb, simRes] = await Promise.all([
+        const [wb, paperRes, simRes] = await Promise.all([
           loadWorkbench(this.accountId),
+          loadPaperAccount(this.accountId),
           listSimOrders(this.accountId)
         ])
+        this.suppressSelectionReset = true
         this.workbench = wb
+        if (paperRes.available) this.paperAccount = paperRes.data
         this.simOrdersAvailable = simRes.available
         this.simOrders = simRes.orders
+        this.ensureSameSecuritySelected(targetCode)
+        this.simOutcome = result
+        if (!this.isRehearsal) await this.resolveKnownRealIdentities()
+        this.$nextTick(() => { this.suppressSelectionReset = false })
       } catch (error) {
         this.simError = error.detail ? `${reasonText(error.reasonCode)}（${error.detail}）` : (reasonText(error.reasonCode) || '模拟委托提交失败')
       } finally {
@@ -1469,14 +1816,26 @@ export default {
     async cancelPaperOrder (orderId) {
       this.cancellingOrderId = orderId
       this.simError = ''
+      const targetCode = this.selected?.security_code
       try {
-        await cancelSimOrder(this.accountId, orderId)
-        const [wb, simRes] = await Promise.all([
+        const cancelRes = await cancelSimOrder(this.accountId, orderId)
+        const [wb, paperRes, simRes] = await Promise.all([
           loadWorkbench(this.accountId),
+          loadPaperAccount(this.accountId),
           listSimOrders(this.accountId)
         ])
+        this.suppressSelectionReset = true
         this.workbench = wb
+        if (paperRes.available) this.paperAccount = paperRes.data
         this.simOrders = simRes.orders
+        this.ensureSameSecuritySelected(targetCode)
+        this.simOutcome = {
+          order_id: orderId,
+          status: 'cancelled',
+          cancelled_qty: cancelRes?.cancelled_qty ?? 0,
+          reason_text: '未成交余量已撤回，对应冻结资金或可卖额度已释放'
+        }
+        this.$nextTick(() => { this.suppressSelectionReset = false })
       } catch (error) {
         this.simError = reasonText(error.reasonCode) || '撤单失败，请稍后刷新核对'
       } finally {
@@ -1632,10 +1991,15 @@ export default {
         base.confirmed_fee = fee
       }
       this.orderSaving = true
+      const targetCode = this.selected?.security_code
       try {
-        this.orderOutcome = await submitOrderEvent(this.accountId, base)
+        const ordOut = await submitOrderEvent(this.accountId, base)
+        this.suppressSelectionReset = true
         this.workbench = await loadWorkbench(this.accountId)
+        this.ensureSameSecuritySelected(targetCode)
         this.resetOrderForm()
+        this.orderOutcome = ordOut
+        this.$nextTick(() => { this.suppressSelectionReset = false })
       } catch (error) {
         this.orderError = reasonText(error.reasonCode) || '委托事实保存失败'
       } finally {
@@ -1654,6 +2018,7 @@ export default {
       this.submitting = true
       this.outcomeBefore = this.workbench.account.cash_total
       this.lastFee = fee
+      const targetCode = this.selected?.security_code
       try {
         const tz = timezoneSuffix(this.workbench.clock)
         const outcome = await submitFill(this.accountId, {
@@ -1664,8 +2029,12 @@ export default {
           confirmed_fee: fee,
           occurred_at: `${this.form.time}:00${tz}`
         })
+        this.suppressSelectionReset = true
         this.workbench = await loadWorkbench(this.accountId)
+        this.ensureSameSecuritySelected(targetCode)
+        this.form.reportId = newClientId('fill')
         this.outcome = outcome
+        this.$nextTick(() => { this.suppressSelectionReset = false })
       } catch (error) {
         this.formError = reasonText(error.reasonCode) || '成交保存失败，请检查输入后重试'
       } finally {
@@ -1683,7 +2052,7 @@ export default {
     },
     simOrderTone (status) {
       if (status === 'filled') return 'accepted'
-      if (status === 'rejected') return 'control'
+      if (status === 'rejected' || status === 'expired') return 'control'
       return 'locked'
     },
     timeWithSec (iso) {
@@ -1695,6 +2064,8 @@ export default {
     qty: formatQuantity,
     time: formatTime,
     reason: reasonText,
+    simOrigin: simOrderOriginLabel,
+    simQtySummary: simOrderQtySummary,
     label
   }
 }

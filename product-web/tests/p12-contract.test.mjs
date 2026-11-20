@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import { LABELS, OPERATIONS, P12_SCHEMA_DIGEST, P12_SCHEMA_VERSION, REASON_TEXTS } from '../src/p12/contract.generated.js'
@@ -7,11 +7,24 @@ import { formatMoney, formatSignedMoney, normaliseMoneyInput, ratioToPercent, fo
 import { validate } from '../src/p12/validate.js'
 
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8')
-const schema = JSON.parse(read('../../schemas/p12/v1/openapi.json'))
+function readRepoFile (relPath) {
+  const candidates = [
+    '../../' + relPath,
+    '../../../../../../artifacts/worktrees/p12-audit-69bf0f55/' + relPath,
+    '../../../../../../' + relPath
+  ]
+  for (const candidate of candidates) {
+    const url = new URL(candidate, import.meta.url)
+    if (existsSync(url)) return readFileSync(url, 'utf8')
+  }
+  throw new Error(`Cannot locate repo file: ${relPath}`)
+}
+
+const schema = JSON.parse(readRepoFile('schemas/p12/v1/openapi.json'))
 const app = read('../src/App.vue')
 const router = read('../src/router.js')
 const client = read('../src/p12/client.js')
-const server = read('../../ops/platform/web-server.mjs')
+const server = readRepoFile('ops/platform/web-server.mjs')
 const views = ['P12Workbench.vue', 'P12Records.vue', 'P12FundingRules.vue'].map(name => read(`../src/p12/views/${name}`))
 const nonChartSources = [...views, read('../src/p12/components/AccountSummary.vue'), read('../src/p12/format.js'), client, read('../src/p12/accountMixin.js')].join('\n')
 

@@ -147,7 +147,7 @@ export function normaliseIntradayPayload (raw, fallbackCode) {
     })
   }
   const asOf = container.as_of || (points.length ? points[points.length - 1].time : null)
-  const lastHm = extractHm(asOf) || (points.length ? points[points.length - 1].hm : null)
+  const lastHm = (points.length ? points[points.length - 1].hm : null) || extractHm(asOf)
   const firstHm = points.length ? points[0].hm : null
   const status = container.status || (points.length ? 'available' : 'unavailable')
   const reason = container.reason || container.reason_text || container.detail || container.reason_code || null
@@ -205,6 +205,15 @@ export async function loadSecurityIdentity (code) {
   }
 }
 
+export async function loadPaperAccount (accountId) {
+  try {
+    const data = await callPaper('p12.paper.account', { account_id: accountId })
+    return { available: true, data }
+  } catch (error) {
+    return { available: false, status: error.status, reasonCode: error.reasonCode, detail: error.detail }
+  }
+}
+
 export async function listSimOrders (accountId) {
   try {
     const data = await callPaper('p12.sim_orders.list', { account_id: accountId })
@@ -219,6 +228,9 @@ export async function submitSimOrder (accountId, order) {
   try {
     return await callPaper('p12.sim_orders.submit', { account_id: accountId }, order)
   } catch (error) {
+    if (error.reasonCode === 'ACCOUNT_NOT_ADMITTED' && /no paper account/i.test(error.detail || '')) {
+      throw new P12Error(error.status, 'PAPER_ACCOUNT_NOT_BOUND', error.detail)
+    }
     if (error.reasonCode === 'ENDPOINT_NOT_ENABLED' || error.status === 503) {
       throw new P12Error(error.status, 'SIM_ORDER_SERVICE_UNAVAILABLE', error.detail)
     }
@@ -241,8 +253,14 @@ export async function saveFundingConfig (accountId, configBody) {
   try {
     return await callPaper('p12.funding.configure', { account_id: accountId }, configBody)
   } catch (error) {
-    if (error.reasonCode === 'ENDPOINT_NOT_ENABLED' || error.status === 503) {
+    if (error.reasonCode === 'ENDPOINT_NOT_ENABLED' || error.status === 503 || error.reasonCode === 'P12_RUNTIME_NOT_CONFIGURED') {
       throw new P12Error(error.status, 'FUNDING_WRITE_NOT_AVAILABLE', error.detail)
+    }
+    if (
+      error.reasonCode === 'INVALID_REPORT_SHAPE' &&
+      /bind|prepare_cycle|parameter|re-binding|rebind/i.test(String(error.detail || ''))
+    ) {
+      throw new P12Error(error.status, 'FUNDING_REBIND_NOT_OPEN', error.detail)
     }
     throw error
   }

@@ -6,7 +6,7 @@
           <h1>委托与成交记录</h1>
           <span
             v-if="records"
-            :class="['p12-badge', records.scope.mode === 'synthetic' ? 'synthetic' : 'simulation']"
+            :class="['p12-badge', isRehearsal ? 'synthetic' : 'simulation']"
           >{{ accountModeBadge }}</span>
         </div>
         <p class="p12-today-conclusion">
@@ -178,7 +178,7 @@
                 <th>委托单号</th>
                 <th>证券</th>
                 <th>方向与限价</th>
-                <th>委托 / 已成 / 余量</th>
+                <th>委托 / 已成 / 待成余量</th>
                 <th>成交均价</th>
                 <th>来源与时间</th>
                 <th>状态与说明</th>
@@ -190,17 +190,17 @@
                 <td><code>{{ ord.order_id }}</code></td>
                 <td>{{ formatSecurityLabel(ord.security_code, ord.security_name) }}</td>
                 <td class="p12-num">{{ ord.side === 'sell' ? '卖出' : '买入' }} @ ¥{{ ord.limit_price }}</td>
-                <td class="p12-num">{{ qty(ord.quantity) }} / {{ qty(ord.filled_qty || 0) }} / {{ qty(ord.remaining_qty || 0) }}</td>
+                <td class="p12-num">{{ qty(ord.quantity) }} / {{ qty(ord.filled_qty || 0) }} / {{ qty(activeRemaining(ord)) }}</td>
                 <td class="p12-num">{{ ord.avg_price ? `¥${ord.avg_price}` : '—' }}</td>
                 <td>
-                  <span class="p12-mini-tag neutral">{{ label('record_source', ord.source || 'sim_matched') }}</span>
-                  <br /><small>{{ time(ord.occurred_at || ord.created_at || ord.matched_quote_time) }}</small>
+                  <span class="p12-mini-tag neutral">{{ simOrigin(ord) }}</span>
+                  <br /><small>{{ time(ord.accepted_at || ord.occurred_at || ord.created_at || ord.last_quote_time || ord.matched_quote_time) }}</small>
                 </td>
                 <td>
-                  <span :class="['status-tag', ord.status === 'filled' ? 'accepted' : (ord.status === 'rejected' ? 'control' : 'locked')]">
+                  <span :class="['status-tag', ord.status === 'filled' ? 'accepted' : ((ord.status === 'rejected' || ord.status === 'expired') ? 'control' : 'locked')]">
                     {{ label('sim_order_status', ord.status) }}
                   </span>
-                  <small v-if="ord.reject_reason"><br />{{ reason(ord.reject_reason) }}</small>
+                  <small v-if="ord.reject_reason"><br />拒绝原因：{{ reason(ord.reject_reason) }}</small>
                 </td>
                 <td>
                   <a-button
@@ -222,7 +222,8 @@
         <div v-if="records.package" class="panel-head">
           <div>
             <h2>原计划（含当日与历史决策包）</h2>
-            <p>最新批次 {{ records.package.market_date }} 收盘发布；历史批次一并保留，发布后永不改写</p>
+            <p v-if="isEmptyPaperPackage">个人模拟账户当前无已准入的系统盘后推荐批次；后续签发的计划与历史批次将一并留档，发布后永不改写</p>
+            <p v-else>最新批次 {{ records.package.market_date }} 收盘发布；历史批次一并保留，发布后永不改写</p>
           </div>
           <span class="status-tag locked">共 {{ allPackagesCount }} 个批次</span>
         </div>
@@ -437,13 +438,28 @@
 </template>
 <script>
 import accountMixin from '../accountMixin.js'
-import { cancelSimOrder, correctFill, listSimOrders, loadRecords, loadSecurityIdentity, newClientId } from '../client.js'
-import { formatMoney, formatQuantity, formatSignedMoney, formatTime, inferExchangeLabel, label, normaliseMoneyInput, normalizeSecurityName, reasonText } from '../format.js'
+import { cancelSimOrder, correctFill, listSimOrders, loadMarketSession, loadRecords, loadSecurityIdentity, newClientId } from '../client.js'
+import {
+  formatMoney,
+  formatQuantity,
+  formatSignedMoney,
+  formatTime,
+  inferExchangeLabel,
+  isRehearsalAccount,
+  isTimestampPast,
+  label,
+  normaliseMoneyInput,
+  normalizeSecurityName,
+  reasonText,
+  simOrderActiveRemaining,
+  simOrderOriginLabel
+} from '../format.js'
 
 export default {
   mixins: [accountMixin],
   data: () => ({
     records: null,
+    marketSession: null,
     simOrders: [],
     simOrdersAvailable: false,
     securityNames: {},
@@ -468,12 +484,28 @@ export default {
     },
     accountModeBadge () {
       if (!this.records) return ''
-      return this.records.scope.mode === 'synthetic'
-        ? `演练参考账户 · ${this.records.scope.account_id}（合成数据）`
+      if (this.isRehearsal) {
+        return `演练参考账户 · ${this.records.scope.account_id}（封闭合成数据）`
+      }
+      const display = this.currentAccount?.display_name
+      return display && display !== this.records.scope.account_id
+        ? `个人模拟盘 · ${display}（${this.records.scope.account_id}）`
         : `个人模拟盘 · ${this.records.scope.account_id}`
     },
-    isSyntheticAccount () {
-      return this.records?.scope?.mode === 'synthetic'
+    isRehearsal () {
+      return isRehearsalAccount(
+        this.currentAccount,
+        this.records?.scope,
+        '',
+        this.records?.package?.source_ref?.ref_id || ''
+      )
+    },
+    isEmptyPaperPackage () {
+      return this.records?.package?.source_ref?.ref_id === 'p12-paper-decisions' && !this.allPlanRows.length
+    },
+    effectiveNowIso () {
+      if (!this.isRehearsal && this.marketSession?.server_time) return this.marketSession.server_time
+      return this.records?.account?.as_of || ''
     },
     baselineCoverageLabel () {
       const cov = this.records?.baseline?.coverage_id
@@ -527,7 +559,7 @@ export default {
       for (const r of (this.records?.reports || [])) if (r.occurred_at) dates.add(r.occurred_at.slice(0, 10))
       for (const e of (this.records?.events || [])) if (e.recorded_at) dates.add(e.recorded_at.slice(0, 10))
       for (const s of this.simOrders) {
-        const dt = (s.occurred_at || s.created_at || '').slice(0, 10)
+        const dt = String(s.accepted_at || s.occurred_at || s.created_at || s.last_quote_time || s.matched_quote_time || '').slice(0, 10)
         if (dt) dates.add(dt)
       }
       return [...dates].sort((a, b) => b.localeCompare(a))
@@ -564,7 +596,7 @@ export default {
       return this.simOrders.filter(o => {
         if (!this.matchesKeyword([o.security_code, o.security_name, this.securityNames[o.security_code], o.order_id])) return false
         if (this.filterDate) {
-          const dt = String(o.occurred_at || o.created_at || o.matched_quote_time || '').slice(0, 10)
+          const dt = String(o.accepted_at || o.occurred_at || o.created_at || o.last_quote_time || o.matched_quote_time || '').slice(0, 10)
           if (dt && dt !== this.filterDate) return false
         }
         return true
@@ -613,23 +645,27 @@ export default {
   },
   methods: {
     async load (accountId) {
-      const [rec, simRes] = await Promise.all([
+      const [rec, simRes, sessionRes] = await Promise.all([
         loadRecords(accountId),
-        listSimOrders(accountId)
+        listSimOrders(accountId),
+        loadMarketSession()
       ])
       this.records = rec
       this.simOrdersAvailable = simRes.available
       this.simOrders = simRes.orders
-      if (rec.scope.mode !== 'synthetic') {
-        await this.resolveRealSecurityNames()
-      }
+      this.marketSession = sessionRes.available ? sessionRes.data : null
+      await this.resolveRealSecurityNames()
     },
     async resolveRealSecurityNames () {
+      const synFixtureCodes = new Set(['600000', '000002', '300001'])
       const codes = new Set()
       for (const p of this.allPlanRows) if (p.security_code) codes.add(p.security_code)
       for (const f of (this.records?.facts || [])) if (f.security_code) codes.add(f.security_code)
+      for (const r of (this.records?.reports || [])) if (r.security_code) codes.add(r.security_code)
+      for (const o of (this.records?.orders || [])) if (o.security_code) codes.add(o.security_code)
       for (const s of this.simOrders) if (s.security_code) codes.add(s.security_code)
       await Promise.all([...codes].map(async code => {
+        if (this.isRehearsal && synFixtureCodes.has(code)) return
         const res = await loadSecurityIdentity(code)
         if (res.available && res.data && res.data.security_name) {
           this.$set(this.securityNames, code, normalizeSecurityName(res.data.security_name))
@@ -649,12 +685,16 @@ export default {
     },
     formatSecurityLabel (code, explicitName) {
       if (!code) return '—'
-      if (this.isSyntheticAccount) {
-        const synMap = { '600000': '合成证券甲', '000002': '合成证券乙', '300001': '合成证券丙' }
-        const synName = synMap[code] || '演练标的'
-        return `${synName}（演练代号 ${code}）`
+      const cleanExplicit = normalizeSecurityName(explicitName || '')
+      if (cleanExplicit && cleanExplicit !== code && !cleanExplicit.startsWith('合成')) {
+        const ex = inferExchangeLabel(code, '', false)
+        return `${ex} · ${code} ${cleanExplicit}`
       }
-      const name = normalizeSecurityName(explicitName || this.securityNames[code] || '')
+      if (this.isRehearsal) {
+        const synMap = { '600000': '合成证券甲', '000002': '合成证券乙', '300001': '合成证券丙' }
+        if (synMap[code]) return `${synMap[code]}（演练示例代号 ${code}）`
+      }
+      const name = normalizeSecurityName(cleanExplicit !== code ? cleanExplicit : (this.securityNames[code] || '')) || normalizeSecurityName(this.securityNames[code] || '')
       const ex = inferExchangeLabel(code, '', false)
       return name ? `${ex} · ${code} ${name}` : `${ex} · ${code}`
     },
@@ -671,6 +711,9 @@ export default {
     },
     planStatusText (plan) {
       const liveStatus = this.planStatus(plan.plan_id)
+      if ((!liveStatus || liveStatus === 'READY') && plan.expires_at && isTimestampPast(this.effectiveNowIso, plan.expires_at)) {
+        return '窗口已过'
+      }
       if (liveStatus) return label('plan_status', liveStatus)
       return plan.isLatest ? '有效' : '历史已归档'
     },
@@ -728,6 +771,8 @@ export default {
     qty: formatQuantity,
     time: formatTime,
     reason: reasonText,
+    simOrigin: simOrderOriginLabel,
+    activeRemaining: simOrderActiveRemaining,
     label
   }
 }

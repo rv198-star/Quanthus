@@ -9,7 +9,7 @@
       <div class="p12-summary-item">
         <span>模拟现金</span>
         <b class="p12-num">{{ money(account.cash_total) }}</b>
-        <small>可买新仓 <em class="p12-num" :class="{ unknown: available.unknown }" :title="available.reason">{{ available.text }}</em> · 冻结 {{ money(account.cash_occupied) }}</small>
+        <small>可买新仓 <em class="p12-num" :class="{ unknown: availableDisplay.unknown }" :title="availableDisplay.reason">{{ availableDisplay.text }}</em> · 冻结 {{ money(occupiedCashText) }}</small>
       </div>
       <div class="p12-summary-item">
         <span>持仓市值</span>
@@ -24,7 +24,7 @@
       <div class="p12-summary-item">
         <span>最大单股占比</span>
         <b class="p12-num" :class="{ unknown: concentration.unknown }">{{ concentration.text }}</b>
-        <small>{{ account.top_concentration_security ? `最高：${account.top_concentration_security}` : '暂无持仓集中度' }}</small>
+        <small>{{ topSecurityText }}</small>
       </div>
       <div :class="['p12-summary-item', account.reconciliation_status === 'CLEAN' ? 'clean' : 'attention']" data-testid="p12-reconciliation">
         <span>账实核对</span>
@@ -78,7 +78,9 @@ export default {
   props: {
     account: { type: Object, required: true },
     buckets: { type: Array, default: () => [] },
-    accountId: { type: String, default: '' }
+    accountId: { type: String, default: '' },
+    paperAccount: { type: Object, default: null },
+    securityNames: { type: Object, default: () => ({}) }
   },
   data: () => ({
     swimlaneOpen: false,
@@ -87,9 +89,28 @@ export default {
   computed: {
     equity () { return formatMaybe(this.account.economic_equity) },
     available () { return formatMaybe(this.account.cash_available_for_new) },
+    availableDisplay () {
+      if (this.paperAccount && this.paperAccount.cash_available !== undefined && this.paperAccount.cash_available !== null) {
+        return { text: formatMoney(String(this.paperAccount.cash_available)), unknown: false, reason: '' }
+      }
+      return this.available
+    },
+    occupiedCashText () {
+      if (this.paperAccount && this.paperAccount.cash_held_open_buys && this.account.cash_occupied === '0.00') {
+        return String(this.paperAccount.cash_held_open_buys)
+      }
+      return this.account.cash_occupied
+    },
     positions () { return formatMaybe(this.account.positions_value) },
     reserve () { return formatMaybe(this.account.reserve) },
     concentration () { return formatMaybe(this.account.top_concentration, ratioToPercent) },
+    topSecurityText () {
+      const code = this.account.top_concentration_security
+      if (!code) return '暂无持仓集中度'
+      const info = this.securityNames && this.securityNames[code]
+      const name = typeof info === 'string' ? info : (info && info.name)
+      return name ? `最高：${code} ${name}` : `最高：${code}`
+    },
     accountQuery () { return this.accountId ? { account: this.accountId } : {} }
   },
   methods: {

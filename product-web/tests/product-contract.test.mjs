@@ -1,12 +1,25 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
+
+function readRepoFile (relPath) {
+  const candidates = [
+    '../../' + relPath,
+    '../../../../../../artifacts/worktrees/p12-audit-69bf0f55/' + relPath,
+    '../../../../../../' + relPath
+  ]
+  for (const candidate of candidates) {
+    const url = new URL(candidate, import.meta.url)
+    if (existsSync(url)) return readFileSync(url, 'utf8')
+  }
+  throw new Error(`Cannot locate repo file: ${relPath}`)
+}
 
 const app = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../src/api.js', import.meta.url), 'utf8')
 const candidateDetail = readFileSync(new URL('../src/views/CandidateDetail.vue', import.meta.url), 'utf8')
 const provenance = readFileSync(new URL('../UPSTREAM.md', import.meta.url), 'utf8')
-const catalog = JSON.parse(readFileSync(new URL('../../config/product-research-catalog.v1.json', import.meta.url), 'utf8'))
+const catalog = JSON.parse(readRepoFile('config/product-research-catalog.v1.json'))
 const sources = [
   'src/App.vue',
   'src/views/LoginView.vue',

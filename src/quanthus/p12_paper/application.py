@@ -612,6 +612,13 @@ class PaperAccount:
         # below their floor, while a marketable order does not overpay.
         fill_price = quote.last_price
         source_seq = f"{order.order_id}:fill:{quote.quote_time.isoformat()}"
+        # A confirm-the-plan order is submitted as ``plan:{plan_id}`` so the
+        # resulting fill links back to the published plan that authorized it.
+        suggestion_id = (
+            order.order_id.split(":", 1)[1]
+            if order.order_id.startswith("plan:")
+            else None
+        )
         report = ExecutionReport(
             report_id=f"sim-fill-{uuid.uuid4().hex[:12]}",
             security_code=order.security_code,
@@ -629,6 +636,7 @@ class PaperAccount:
             intended_quantity=order.remaining_qty,
             intended_price_cap=order.limit_price,
             order_id=order.order_id,
+            suggestion_id=suggestion_id,
         )
         # Only mark the order filled once the shared ledger actually posts the
         # fact.  A FactError (insufficient cash, unknown order, a duplicate

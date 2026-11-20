@@ -1219,6 +1219,33 @@
 
 .p12-sim-origin-bar small {
   color: var(--muted);
+
+/* Confirm-the-system-plan ticket shown above the self-directed order form. */
+.p12-plan-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 6px 14px 10px;
+  padding: 12px 14px;
+  border: 1px solid #b8d6f0;
+  border-left: 4px solid #1c5ec9;
+  border-radius: 8px;
+  background: #f0f6ff;
+}
+
+.p12-plan-confirm-body strong { color: #14448f; }
+
+.p12-plan-confirm-body p {
+  margin: 4px 0 2px;
+  color: #2b3a4a;
+  font-size: 13px;
+}
+
+.p12-plan-confirm-body small { color: var(--muted); }
+
+.p12-plan-confirm .ant-btn { flex: none; }
+
   font-size: 11px;
 }
 

@@ -1,0 +1,145 @@
+{
+  "schema_version": "quanthus.p12.synthetic-desktop-fixture.v1",
+  "fixture_id": "p12-paper-replay",
+  "version": "1.0.0",
+  "synthetic": true,
+  "mode": "synthetic",
+  "purpose": "Dedicated P12 paper-account guided replay: one flagged historical replay day issues a server-sized executable entry task plus explicit no-action and input-not-ready states, so the workbench can drive confirm-or-skip without the user typing code, price or quantity.",
+  "synthetic_clock": "2026-11-20T10:30:00+08:00",
+  "accounts": [
+    {
+      "account_id": "SYN-PAPER-A",
+      "display_name": "模拟账户",
+      "baseline_request_id": "p12-paper-baseline-v1",
+      "baseline_cash": "100000.00",
+      "as_of": "2026-11-20T00:00:00+08:00",
+      "source_id": "p12-paper-service",
+      "coverage_id": "complete-cash-only"
+    }
+  ],
+  "policy": {
+    "composition_id": "p12-paper-replay-composition",
+    "composition_version": "1.0.0",
+    "execution_profile": "close-to-next-open-v1",
+    "funding": {
+      "policy_id": "p12-paper-fixed-bucket",
+      "version": "1.0.0",
+      "mode": "fixed_bucket",
+      "unit_count": 2,
+      "bucket_budget": "45000.00",
+      "initial_reserve": "10000.00",
+      "reserve_cap": null
+    },
+    "risk": {
+      "policy_id": "p12-paper-account-risk",
+      "version": "1.0.0",
+      "stock_limit": "0.60",
+      "industry_limit": "0.60",
+      "total_limit": "0.80",
+      "lot_size": 100,
+      "commission_rate": "0.0003",
+      "minimum_commission": "5.00"
+    }
+  },
+  "adoption": [
+    {"binding_id": "A01", "mode": "synthetic", "version": "1.0.0", "digest": null, "status": "configured", "missing_fields": [], "allowed_uses": ["synthetic_acceptance"], "dependencies": [], "acceptance_ref": null},
+    {"binding_id": "A02", "mode": "synthetic", "version": "1.0.0", "digest": null, "status": "configured", "missing_fields": [], "allowed_uses": ["synthetic_acceptance"], "dependencies": [], "acceptance_ref": null},
+    {"binding_id": "A03", "mode": "synthetic", "version": "1.0.0", "digest": null, "status": "configured", "missing_fields": [], "allowed_uses": ["synthetic_acceptance"], "dependencies": [], "acceptance_ref": null},
+    {"binding_id": "A04", "mode": "synthetic", "version": "1.0.0", "digest": null, "status": "configured", "missing_fields": [], "allowed_uses": ["synthetic_acceptance"], "dependencies": [], "acceptance_ref": null},
+    {"binding_id": "A05", "mode": "synthetic", "version": "1.0.0", "digest": null, "status": "configured", "missing_fields": [], "allowed_uses": ["synthetic_acceptance"], "dependencies": [], "acceptance_ref": null},
+    {"binding_id": "A06", "mode": "synthetic", "version": "1.0.0", "digest": null, "status": "configured", "missing_fields": [], "allowed_uses": ["synthetic_acceptance"], "dependencies": [], "acceptance_ref": null},
+    {"binding_id": "A07", "mode": "synthetic", "version": "1.0.0", "digest": null, "status": "configured", "missing_fields": [], "allowed_uses": ["synthetic_acceptance"], "dependencies": [], "acceptance_ref": null}
+  ],
+  "binding_catalog": {
+    "A01": {"title": "机会与候选政策", "consumer": "日常候选与买入", "owner": "P11 / PD-01", "source_ref": "engineering-work-packages.md#A01"},
+    "A02": {"title": "账户风险政策", "consumer": "账户风险约束", "owner": "P12 / PR-01", "source_ref": "engineering-work-packages.md#A02"},
+    "A03": {"title": "资金分区政策", "consumer": "固定桶资金", "owner": "P12 / PF-01", "source_ref": "engineering-work-packages.md#A03"},
+    "A04": {"title": "日频决策包", "consumer": "今日操作建议", "owner": "P11 / PD-02", "source_ref": "engineering-work-packages.md#A04"},
+    "A05": {"title": "执行窗口政策", "consumer": "可执行时间窗", "owner": "P12 / PE-01", "source_ref": "engineering-work-packages.md#A05"},
+    "A06": {"title": "行情输入", "consumer": "实时报价与分时", "owner": "P10 / DQ-01", "source_ref": "engineering-work-packages.md#A06"},
+    "A07": {"title": "模拟撮合规则", "consumer": "模拟委托成交", "owner": "P12 / PX-01", "source_ref": "engineering-work-packages.md#A07"}
+  },
+  "decision_sets": [
+    {
+      "source_id": "p12-paper-replay",
+      "version": "1.0.0",
+      "market_date": "2026-11-19",
+      "knowledge_cutoff": "2026-11-19T15:00:00+08:00",
+      "published_at": "2026-11-19T18:30:00+08:00",
+      "next_session": "2026-11-20",
+      "decisions": [
+        {
+          "opportunity_id": "OPP-REPLAY-600000",
+          "security_code": "600000",
+          "security_name": "浦发银行",
+          "stage": "entry_plan",
+          "component": {"ref_id": "replay.trend-position-risk", "version": "1.0.0"},
+          "reason_codes": ["ENTRY_SIGNAL"],
+          "explanations": [
+            {"code": "REPLAY_ENTRY", "use": "action", "component_ref": "replay.trend-position-risk@1.0.0", "text": "【合成回放】回放日 2026-11-19 收盘评估触发买入信号：站上支撑且量能放大，建议在下一交易日窗口内建仓"},
+            {"code": "REPLAY_SIZING", "use": "explanation", "component_ref": "replay.trend-position-risk@1.0.0", "text": "数量与价格上限由服务端按账户现金、单桶预算与集中度上限解出，用户只确认或跳过"}
+          ],
+          "next_observation": "2026-11-20 收盘复核成交与仓位",
+          "chart": {
+            "price_basis": "unadjusted_synthetic",
+            "as_of": "2026-11-19T15:00:00+08:00",
+            "support": "10.30",
+            "volume_baseline": 900000,
+            "volume_baseline_window": 20,
+            "bars": [
+              {"session": "2026-11-17", "open": "10.20", "high": "10.35", "low": "10.15", "close": "10.30", "volume": 920000},
+              {"session": "2026-11-18", "open": "10.30", "high": "10.48", "low": "10.26", "close": "10.42", "volume": 1050000},
+              {"session": "2026-11-19", "open": "10.42", "high": "10.66", "low": "10.38", "close": "10.60", "volume": 1480000}
+            ]
+          },
+          "entry": {
+            "fraction": "0.5",
+            "price_bound": "10.75",
+            "mark_price": "10.60",
+            "industry_id": "REPLAY-IND-BANK",
+            "eligible_at": "2026-11-20T09:30:00+08:00",
+            "expires_at": "2026-11-20T15:00:00+08:00",
+            "window_ref": "replay-manual-window:2026-11-20",
+            "invalidations": ["开盘价高于 10.75 时不追买", "2026-11-20 收盘前未成交，本计划失效，次日重新评估", "收盘跌破支撑 10.30 时取消"]
+          }
+        }
+      ]
+    },
+    {
+      "source_id": "p12-paper-replay",
+      "version": "1.0.1",
+      "market_date": "2026-11-20",
+      "knowledge_cutoff": "2026-11-20T15:00:00+08:00",
+      "published_at": "2026-11-20T18:30:00+08:00",
+      "next_session": "2026-11-23",
+      "decisions": [
+        {
+          "opportunity_id": "OPP-REPLAY-NOOP",
+          "security_code": "000000",
+          "security_name": "回放占位",
+          "stage": "ended",
+          "component": {"ref_id": "replay.trend-position-risk", "version": "1.0.0"},
+          "reason_codes": ["NO_QUALIFIED_ENTRY"],
+          "explanations": [
+            {"code": "REPLAY_NOOP", "use": "explanation", "component_ref": "replay.trend-position-risk@1.0.0", "text": "【合成回放】本回放日已评估，无合格买点，今天无须下单；下一检查时间为 2026-11-23 收盘后"}
+          ],
+          "next_observation": "2026-11-23 收盘后重新评估",
+          "chart": null
+        },
+        {
+          "opportunity_id": "OPP-REPLAY-INPUT",
+          "security_code": "000001",
+          "security_name": "平安银行",
+          "stage": "input_blocked",
+          "component": {"ref_id": "replay.trend-position-risk", "version": "1.0.0"},
+          "reason_codes": ["STALE_MARKET_INPUT"],
+          "explanations": [
+            {"code": "REPLAY_INPUT_BLOCKED", "use": "explanation", "component_ref": "replay.trend-position-risk@1.0.0", "text": "【合成回放】该标的行情输入未就绪（行情源延迟/停牌），今日建议尚未生成"}
+          ],
+          "next_observation": "等待行情输入恢复后重新评估",
+          "chart": null
+        }
+      ]
+    }
+  ]
+}

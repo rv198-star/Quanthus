@@ -9,17 +9,22 @@ or placeholder security names.  Demo accounts stay for internal comparison.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, datetime, timezone
+from dataclasses import replace as _dc_replace
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
 from quanthus.capabilities.decision_access import MarketDecisionSet
 from quanthus.capabilities.execution import SyntheticContext
+from quanthus.capabilities.funding import FixedBucketPolicy, initial_funding_state
+from quanthus.platform.adapters.p12_synthetic_fixture import (
+    FixtureDecisionSource,
+    SyntheticDesktopFixture,
+    load_synthetic_fixture,
+)
 from quanthus.platform.adapters.product_daily_facts_sqlite import build_synthetic_fact_service
 from quanthus.product_daily.application.desktop import P12DesktopApplication
 from quanthus.product_daily.application.desktop.policy import DesktopPolicyBundle
-from dataclasses import replace as _dc_replace
-from quanthus.capabilities.funding import FixedBucketPolicy, initial_funding_state
 from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
 from quanthus.shared.fact_contracts import digest
 from quanthus.shared.values import VersionRef
@@ -72,6 +77,35 @@ class PaperDecisionSource:
         return (self._set(),)
 
 
+class PaperReplayDecisionSource:
+    """Guided replay source: a flagged historical replay day drives the workbench.
+
+    Wraps a dedicated synthetic replay fixture (``config/p12/paper-replay.v1.json``)
+    that carries several dated packages: an executable entry task, a "no action
+    needed" day and an "input not ready" day.  Like ``FixtureDecisionSource`` it
+    returns the latest package already published on the shared clock, so a fixed
+    replay ``--clock`` makes the replay set visible to the logged-in user.  The
+    source is explicitly synthetic and separately labelled; it never claims to be
+    the platform's adopted daily strategy.
+    """
+
+    def __init__(self, fixture: SyntheticDesktopFixture, clock) -> None:  # noqa: ANN001
+        self._inner = FixtureDecisionSource(fixture, clock=clock)
+
+    @classmethod
+    def from_path(cls, path: Path, clock) -> PaperReplayDecisionSource:  # noqa: ANN001
+        return cls(load_synthetic_fixture(Path(path)), clock)
+
+    def current(self, scope) -> MarketDecisionSet:  # noqa: ANN001
+        return self._inner.current(scope)
+
+    def published(self, scope) -> tuple[MarketDecisionSet, ...]:  # noqa: ANN001
+        return self._inner.published(scope)
+
+    def history(self, scope) -> tuple[MarketDecisionSet, ...]:  # noqa: ANN001
+        return self._inner.history(scope)
+
+
 def build_paper_application(
     *,
     state_dir: Path,
@@ -79,6 +113,7 @@ def build_paper_application(
     authorization: SyntheticRuntimeAuthorization,
     baseline_cash: Decimal = Decimal("100000.00"),
     now: Callable[[], datetime] | None = None,
+    decision_source=None,
 ) -> P12DesktopApplication:
     """Bind the dedicated paper account on the system clock.
 
@@ -117,7 +152,7 @@ def build_paper_application(
         ),
         context=context,
         facts=facts,
-        decisions=PaperDecisionSource(clock),
+        decisions=decision_source or PaperDecisionSource(clock),
         policy=paper_policy,
         clock=clock,
         clock_kind="system",

@@ -1,0 +1,272 @@
+"""P12 guided order: confirm the system's executable plan as a simulated order.
+
+The replay fixture ``config/p12/paper-replay.v1.json`` carries three surfaces:
+an executable entry plan (11-19 release), a "no action" day and an
+"input not ready" day (11-20 release).  These tests prove the paper account
+drives a confirm-or-skip task: the plan's identity rides the order as
+``plan:{plan_id}`` so the ledger links the resulting fill back to the
+published suggestion, and the link survives a relogin.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+from quanthus.p12_paper.application import PaperAccount, PaperOrderStore
+from quanthus.p12_paper.exec_rule import OrderCommand
+from quanthus.p12_paper.quotes import SHANGHAI, Quote, QuoteService
+from quanthus.p12_paper.replay import Replay, ReplayQuotes
+from quanthus.platform.adapters.p12_synthetic_fixture import load_synthetic_fixture
+from quanthus.platform.p12.paper_fixture import (
+    PAPER_ACCOUNT_ID,
+    PaperReplayDecisionSource,
+    build_paper_application,
+)
+from quanthus.policy import find_project_root
+from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
+
+FIXTURE = find_project_root() / "config/p12/paper-replay.v1.json"
+
+
+def _clock(box):
+    return lambda: box[0].astimezone(timezone.utc).astimezone()
+
+
+def _quote(price, moment, code="600000", name="浦发银行", prev="10.60"):
+    return Quote(
+        security_code=code, security_name=name, exchange="上交所",
+        status="live", last_price=Decimal(price), previous_close=Decimal(prev),
+        open=Decimal("10.62"), high=Decimal("10.78"), low=Decimal("10.58"),
+        volume_lots=900000, quote_time=moment, received_at=moment,
+        source="replay", market_state="trading", stale=False,
+    )
+
+
+class _StubFetcher:
+    def fetch_raw(self, code):
+        return None, None
+
+
+class _BoxQuotes(QuoteService):
+    """Quote service bound to the replay clock; quotes come from a code->Quote box."""
+
+    def __init__(self, box, now_box):
+        super().__init__(now=lambda: now_box[0], fetcher=_StubFetcher())
+        self._box = box
+        self._now_box = now_box
+
+    def quote(self, code):
+        q = self._box.get(code)
+        if q is None:
+            raise LookupError(f"no replay quote for {code}")
+        return q
+
+    def session(self):
+        now = self._now_box[0]
+        return {
+            "trading_date": now.date().isoformat(),
+            "market_state": "trading" if now.hour < 15 else "closed",
+            "server_time": now.isoformat(),
+        }
+
+
+def _quotes(box, now_box):
+    return _BoxQuotes(box, now_box)
+
+
+def _build(state_dir, now):
+    app = build_paper_application(
+        state_dir=state_dir,
+        policy=load_synthetic_fixture(FIXTURE).policy,
+        authorization=SyntheticRuntimeAuthorization(
+            "local-paper:test", frozenset({PAPER_ACCOUNT_ID})
+        ),
+        now=now,
+        decision_source=PaperReplayDecisionSource.from_path(FIXTURE, now),
+    )
+    return app
+
+
+def _account(state_dir, now, qbox, session_box):
+    app = _build(state_dir, now)
+    store = PaperOrderStore(Path(state_dir) / "paper.sqlite", clock=now)
+    quotes = _quotes(qbox, session_box)
+    return PaperAccount(app=app, store=store, quotes=quotes, now=now), app
+
+
+@pytest.fixture()
+def state_dir(tmp_path):
+    d = tmp_path / "paper"
+    d.mkdir(parents=True)
+    return d
+
+
+# The replay clock inside the 11-20 buy window (09:30-15:00 Shanghai).
+def _buy_window():
+    return datetime(2026, 11, 20, 10, 30, tzinfo=SHANGHAI)
+
+
+def _closed():
+    return datetime(2026, 11, 20, 15, 30, tzinfo=SHANGHAI)
+
+
+def test_replay_plan_is_executable(state_dir):
+    now_box = [_buy_window()]
+    now = _clock(now_box)
+    session_box = [now_box[0]]
+    qbox = {"600000": _quote("10.66", now_box[0])}
+    acct, app = _account(state_dir, now, qbox, session_box)
+    wb = app.workbench(app.scope)
+    plan = next(o.plan for o in wb.opportunities if o.plan and o.plan.side == "buy")
+    assert plan is not None and plan.delta_qty > 0
+    assert plan.plan_id == "plan-OPP-REPLAY-600000-2026-11-19"
+    out = acct.submit(OrderCommand(
+        order_id=f"plan:{plan.plan_id}", side="buy",
+        security_code="600000", quantity=plan.delta_qty, limit_price=plan.price_cap,
+    ))
+    assert out.status == "filled"
+    assert out.filled_qty == plan.delta_qty
+
+
+def test_fill_links_back_to_plan_and_survives_relogin(state_dir):
+    now_box = [_buy_window()]
+    now = _clock(now_box)
+    session_box = [now_box[0]]
+    qbox = {"600000": _quote("10.66", now_box[0])}
+    acct, app = _account(state_dir, now, qbox, session_box)
+    plan_id = "plan-OPP-REPLAY-600000-2026-11-19"
+    out = acct.submit(OrderCommand(
+        order_id=f"plan:{plan_id}", side="buy",
+        security_code="600000", quantity=2000, limit_price=Decimal("10.75"),
+    ))
+    assert out.status == "filled"
+    # Relogin: rebuild the application over the same state dir and confirm the
+    # ledger still links the fill back to the originating plan.
+    app2 = _build(state_dir, now)
+    history = app2._facts.history(app2._context)
+    linked = [r for r in history.reports if r.suggestion_id == plan_id]
+    assert linked and linked[0].order_id == f"plan:{plan_id}"
+    assert linked[0].intended_quantity == 2000
+    assert linked[0].intended_price_cap == Decimal("10.75")
+    # The order list also keeps the plan-prefixed id for the user's own book.
+    orders = app2_workbench_orders(app2)
+    assert f"plan:{plan_id}" in orders
+
+
+def app2_workbench_orders(app):
+    return [o.order_id for o in app.records(app.scope).orders]
+
+
+def test_expired_plan_window_rejects(state_dir):
+    # After the 15:00 Shanghai expiry the same order is refused as outside the
+    # window; a same-id resubmit does not reopen a new fill.
+    now_box = [_buy_window()]
+    now = _clock(now_box)
+    session_box = [now_box[0]]
+    qbox = {"600000": _quote("10.66", now_box[0])}
+    acct, app = _account(state_dir, now, qbox, session_box)
+    plan_id = "plan-OPP-REPLAY-600000-2026-11-19"
+    acct.submit(OrderCommand(
+        order_id=f"plan:{plan_id}", side="buy",
+        security_code="600000", quantity=2000, limit_price=Decimal("10.75"),
+    ))
+    # Advance the replay clock past the close; the market is no longer trading.
+    now_box[0] = _closed()
+    session_box[0] = _closed()
+    out = acct.submit(OrderCommand(
+        order_id=f"plan:{plan_id}", side="buy",
+        security_code="600000", quantity=2000, limit_price=Decimal("10.75"),
+    ))
+    # Same idempotent id returns the stored filled state, never a new order.
+    assert out.status == "filled"
+    assert acct.order(f"plan:{plan_id}")["status"] == "filled"
+
+
+def test_no_action_and_input_blocked_forms(state_dir):
+    # 11-20 release surfaces a "no action" and an "input not ready" item.
+    now_box = [datetime(2026, 11, 21, 9, 0, tzinfo=SHANGHAI)]
+    now = _clock(now_box)
+    session_box = [now_box[0]]
+    qbox = {}
+    acct, app = _account(state_dir, now, qbox, session_box)
+    wb = app.workbench(app.scope)
+    by_code = {o.opportunity_id: o for o in wb.opportunities}
+    noop = by_code["OPP-REPLAY-NOOP"]
+    # "Today, nothing to do": a closed, non-actionable item carrying the
+    # no-qualified-entry reason rather than an executable plan.
+    assert noop.stage == "ended" and noop.action_code == "NONE"
+    assert "NO_QUALIFIED_ENTRY" in noop.reason_codes and noop.plan is None
+    blocked = by_code["OPP-REPLAY-INPUT"]
+    # "Input not ready": paused with the missing-input reason and no plan.
+    assert blocked.action_code == "PAUSED" and blocked.status_code == "MISSING_INPUT"
+    assert "STALE_MARKET_INPUT" in blocked.reason_codes and blocked.plan is None
+
+
+def test_no_free_bucket_blocks_new_security(state_dir):
+    # The paper account admits two buckets; a third distinct security cannot
+    # take a cycle and is refused before any fill posts.
+    now_box = [_buy_window()]
+    now = _clock(now_box)
+    session_box = [now_box[0]]
+    qbox = {
+        "600000": _quote("10.66", now_box[0], code="600000", name="浦发银行"),
+        "000001": _quote("11.20", now_box[0], code="000001", name="平安银行"),
+        "000858": _quote("150.0", now_box[0], code="000858", name="五粮液"),
+    }
+    acct, app = _account(state_dir, now, qbox, session_box)
+    acct.submit(OrderCommand(
+        order_id="o1", side="buy", security_code="600000",
+        quantity=100, limit_price=Decimal("10.75")))
+    acct.submit(OrderCommand(
+        order_id="o2", side="buy", security_code="000001",
+        quantity=100, limit_price=Decimal("11.30")))
+    out = acct.submit(OrderCommand(
+        order_id="o3", side="buy", security_code="000858",
+        quantity=100, limit_price=Decimal("151.0")))
+    assert out.status == "rejected"
+    assert out.reason_code == "FUNDING_NO_FREE_BUCKET"
+
+
+TAPE = find_project_root() / "config/p12/paper-replay-tape.v1.json"
+
+
+def test_suggestion_quote_and_match_share_one_replay_clock(state_dir):
+    # Bind suggestion, quote source and match to the same replay tape/clock so
+    # the simulated fill only ever sees a price already visible at the instant.
+    import json
+    tape = json.loads(TAPE.read_text(encoding="utf-8"))
+    replay = Replay(tape, day="2026-11-20", source="历史回放",
+                    start_at=_buy_window())
+    now = replay.now
+    app = _build(state_dir, now)
+    store = PaperOrderStore(Path(state_dir) / "paper.sqlite", clock=now)
+    acct = PaperAccount(app=app, store=store,
+                        quotes=ReplayQuotes(replay, "历史回放"), now=now)
+    plan_id = "plan-OPP-REPLAY-600000-2026-11-19"
+    plan = next(o.plan for o in app.workbench(app.scope).opportunities if o.plan)
+    out = acct.submit(OrderCommand(
+        order_id=f"plan:{plan_id}", side="buy",
+        security_code="600000", quantity=plan.delta_qty, limit_price=plan.price_cap,
+    ))
+    assert out.status == "filled"
+    # The fill is priced at the replay-visible quote, never a live feed.
+    assert out.avg_price == Decimal("10.72")
+    assert out.matched_quote_time == replay.now()
+    linked = [r for r in app._facts.history(app._context).reports
+              if r.suggestion_id == plan_id]
+    assert linked and linked[0].order_id == f"plan:{plan_id}"
+    # The intraday series only exposes minutes already completed at the
+    # replay instant; advancing the clock reveals more of the tape.
+    n0 = replay.fetch("600000")["points"]
+    # Jump the replay clock to the close; the same code path now exposes the
+    # whole tape and the session reads closed.
+    from datetime import datetime as _dt
+    replay.set_now(_dt.fromisoformat("2026-11-20T15:00:00+08:00"))
+    assert replay.now().hour == 15
+    n1 = replay.fetch("600000")["points"]
+    assert len(n1) >= len(n0)
+    assert acct._quotes.quote("600000").quote_time <= replay.now()

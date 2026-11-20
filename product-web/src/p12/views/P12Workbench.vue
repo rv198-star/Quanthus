@@ -354,6 +354,31 @@
               <small>规则 {{ paperRuleVersion }} · 不发送实盘指令</small>
             </div>
 
+            <!-- Confirm the system's current executable plan as a simulated order.
+                 The order carries the plan's identity (order_id = plan:{plan_id})
+                 so the resulting fill links back to the published suggestion. -->
+            <div
+              v-if="confirmablePlan"
+              class="p12-plan-confirm"
+              data-testid="p12-plan-confirm"
+            >
+              <div class="p12-plan-confirm-body">
+                <strong>系统建议买入 {{ confirmablePlan.security_code }}</strong>
+                <p class="p12-num">
+                  {{ confirmablePlan.delta_qty }} 股 · 限价上限 ¥{{ confirmablePlan.price_cap }}
+                  · 窗口 {{ time(confirmablePlan.eligible_at) }}–{{ time(confirmablePlan.expires_at).slice(11) }}
+                </p>
+                <small>确认即按服务端该计划的数量与限价提交模拟委托，无需手工填单。</small>
+              </div>
+              <a-button
+                type="primary"
+                :loading="simSubmitting"
+                :disabled="planConfirmDisabled"
+                data-testid="p12-confirm-plan"
+                @click="confirmPlan"
+              >确认建议并提交模拟委托</a-button>
+            </div>
+
             <!-- Simulated Order Outcome Receipt (placed at top of ticket so always visible above fold) -->
             <div
               v-if="simOutcome"
@@ -1767,6 +1792,47 @@ export default {
       }
       this.simError = ''
       this.simOutcome = null
+    },
+    // Confirm the system's executable plan as a simulated order.  The order
+    // id is derived from the plan id so the ledger links the resulting fill
+    // back to this suggestion (plan:{plan_id}); the server re-checks the
+    // plan's quantity, price cap and execution window on submit.
+    async confirmPlan () {
+      const plan = this.confirmablePlan
+      if (!plan || this.simSubmitting) return
+      this.simError = ''
+      this.simSubmitting = true
+      const targetCode = plan.security_code
+      try {
+        const nowIso = this.marketSession?.server_time || this.workbench?.clock || new Date().toISOString()
+        const result = await submitSimOrder(this.accountId, {
+          order_id: `plan:${plan.plan_id}`,
+          side: 'buy',
+          security_code: targetCode,
+          quantity: plan.delta_qty,
+          limit_price: plan.price_cap,
+          occurred_at: nowIso
+        })
+        this.simForm.order_id = newClientId('sim')
+        const [wb, paperRes, simRes] = await Promise.all([
+          loadWorkbench(this.accountId),
+          loadPaperAccount(this.accountId),
+          listSimOrders(this.accountId)
+        ])
+        this.suppressSelectionReset = true
+        this.workbench = wb
+        if (paperRes.available) this.paperAccount = paperRes.data
+        this.simOrdersAvailable = simRes.available
+        this.simOrders = simRes.orders
+        this.ensureSameSecuritySelected(targetCode)
+        this.simOutcome = result
+        if (!this.isRehearsal) await this.resolveKnownRealIdentities()
+        this.$nextTick(() => { this.suppressSelectionReset = false })
+      } catch (error) {
+        this.simError = error.detail ? `${reasonText(error.reasonCode)}（${error.detail}）` : (reasonText(error.reasonCode) || '模拟委托提交失败')
+      } finally {
+        this.simSubmitting = false
+      }
     },
     async submitPaperOrder () {
       this.simError = ''

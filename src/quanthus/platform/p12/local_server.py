@@ -45,6 +45,11 @@ def build_local_kernel(
     state_dir: Path,
     users: dict[str, tuple[str, str]],
     clock: Callable[[], datetime] | None = None,
+    paper_replay_fixture: Path | None = None,
+    replay_tape: dict | None = None,
+    replay_day: str | None = None,
+    replay_source: str = "历史回放",
+    replay_start_at: datetime | None = None,
 ) -> PlatformKernel:
     """users maps username -> (role, password).
 
@@ -70,6 +75,26 @@ def build_local_kernel(
     from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
 
     system_clock = clock
+    replay = None
+    replay_quotes = None
+    if replay_tape is not None:
+        from quanthus.p12_paper.replay import Replay, ReplayQuotes
+
+        replay = Replay(
+            replay_tape,
+            day=replay_day,
+            source=replay_source,
+            start_at=replay_start_at,
+        )
+        system_clock = replay.now
+        replay_quotes = ReplayQuotes(replay, replay_source)
+    paper_decisions = None
+    if paper_replay_fixture is not None:
+        from quanthus.platform.p12.paper_fixture import PaperReplayDecisionSource
+
+        paper_decisions = PaperReplayDecisionSource.from_path(
+            paper_replay_fixture, system_clock
+        )
     paper_app = build_paper_application(
         state_dir=state_dir,
         policy=runtime.bindings["SYN-P12-A"].application.policy,
@@ -77,6 +102,7 @@ def build_local_kernel(
             "local-paper:v1", frozenset({PAPER_ACCOUNT_ID})
         ),
         now=system_clock,
+        decision_source=paper_decisions,
     )
     bindings = dict(runtime.bindings)
     bindings[PAPER_ACCOUNT_ID] = P12AccountBinding(
@@ -91,6 +117,8 @@ def build_local_kernel(
     paper = build_paper_service(
         state_dir=state_dir,
         applications={PAPER_ACCOUNT_ID: paper_app},
+        quotes=replay_quotes,
+        intraday=replay,
         now=system_clock,
     )
     kernel = create_platform_kernel(
@@ -157,6 +185,46 @@ def main(argv: list[str] | None = None) -> int:
             "the demo to the next market day"
         ),
     )
+    parser.add_argument(
+        "--paper-replay",
+        type=Path,
+        default=None,
+        metavar="FIXTURE",
+        help=(
+            "bind the paper account to a guided replay decision fixture "
+            "(e.g. config/p12/paper-replay.v1.json) instead of the empty source "
+            "so the workbench drives a confirm-or-skip executable task"
+        ),
+    )
+    parser.add_argument(
+        "--replay-tape",
+        type=Path,
+        default=None,
+        metavar="TAPE.json",
+        help=(
+            "serve quotes and the intraday series from a frozen replay tape "
+            "(the replay-preview capture shape) so suggestion, quote and match "
+            "share one replay clock instead of the live feed"
+        ),
+    )
+    parser.add_argument(
+        "--replay-day",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="trading day the tape replays (required with --replay-tape)",
+    )
+    parser.add_argument(
+        "--replay-source",
+        default="历史回放",
+        help="label stamped on replay quotes and the intraday series",
+    )
+    parser.add_argument(
+        "--replay-start-at",
+        type=datetime.fromisoformat,
+        default=None,
+        metavar="ISO8601",
+        help="start the replay clock at this timeline instant",
+    )
     args = parser.parse_args(argv)
     if args.host not in {"127.0.0.1", "localhost", "::1"}:
         raise SystemExit("the synthetic local server binds to loopback only")
@@ -166,10 +234,24 @@ def main(argv: list[str] | None = None) -> int:
         "p12-viewer": ("viewer", secrets.token_urlsafe(12)),
         "p12-other": ("operator", secrets.token_urlsafe(12)),
     }
+    replay_tape = None
+    if args.replay_tape is not None:
+        if not args.replay_day:
+            raise SystemExit("--replay-tape requires --replay-day YYYY-MM-DD")
+        replay_tape = json.loads(args.replay_tape.read_text(encoding="utf-8"))
     fixed_clock = (
         (lambda: datetime.fromisoformat(args.clock)) if args.clock is not None else None
     )
-    kernel = build_local_kernel(state_dir=args.state_dir, users=users, clock=fixed_clock)
+    kernel = build_local_kernel(
+        state_dir=args.state_dir,
+        users=users,
+        clock=fixed_clock,
+        paper_replay_fixture=args.paper_replay,
+        replay_tape=replay_tape,
+        replay_day=args.replay_day,
+        replay_source=args.replay_source,
+        replay_start_at=args.replay_start_at,
+    )
     credentials = args.state_dir / "local-users.json"
     credentials.write_text(
         json.dumps(

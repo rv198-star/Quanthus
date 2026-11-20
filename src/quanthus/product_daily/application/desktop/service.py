@@ -1534,7 +1534,70 @@ class P12DesktopApplication:
     # members.  The port stays inside the application layer: the caller is
     # still bound to this application's account scope.
     def paper_submit_report(self, report: ExecutionReport):
-        return self._facts.submit_report(self._context, report)
+        # A self-directed simulated buy must land inside an attributable
+        # bucket cycle the same way a plan-linked fill does, or the funding
+        # page can no longer reconcile the partition against account cash
+        # (R2 ledger-mismatch).  Reserve an empty bucket for the security
+        # before posting so the cycle floor precedes the cash event; after a
+        # sell posts, settle the owning bucket once the position is flat.
+        side = getattr(report, "side", None)
+        if side == "buy":
+            self._auto_reserve_self_directed(getattr(report, "security_code", None))
+        result = self._facts.submit_report(self._context, report)
+        if side == "sell":
+            self._auto_settle(getattr(report, "security_code", None))
+        return result
+
+    def _auto_reserve_self_directed(self, security_code: str | None) -> None:
+        """Attribute a self-directed buy to one empty bucket cycle.
+
+        Unlike ``_auto_reserve`` this does not need a published entry plan:
+        the user decided to buy, so the fill belongs to a bucket either way.
+        With no free bucket the buy stays unattributed and the funding page
+        reports the gap instead of pretending the partition reconciles.
+        """
+        if security_code is None:
+            return
+        try:
+            state = self._facts.funding_state(self._context)
+            if state is None:
+                snapshot = self._facts.snapshot(self._context)
+                if snapshot.history.baseline_quantity:
+                    return
+                self._facts.bind_funding_state(
+                    self._context,
+                    initial_funding_state(
+                        self._policy.funding, snapshot.history.baseline_cash
+                    ),
+                )
+                state = self._facts.funding_state(self._context)
+                if state is None:
+                    return
+            funding, _ = state
+            # Already attributed: a bucket is holding this security's cycle.
+            if any(
+                item.phase in (BucketPhase.RESERVED, BucketPhase.HELD)
+                for item in funding.buckets
+            ):
+                return
+            empty = next(
+                (item for item in funding.buckets if item.phase is BucketPhase.EMPTY),
+                None,
+            )
+            if empty is None:
+                return
+            cycle_id = f"paper:{security_code}:{empty.bucket_id}"
+            self._facts.prepare_funding_cycle(
+                self._context, bucket_id=empty.bucket_id, cycle_id=cycle_id
+            )
+            self._facts.bind_funding_state(
+                self._context,
+                self._facts.funding_state(self._context)[0],
+                bucket_securities={empty.bucket_id: security_code},
+            )
+        except FactError:
+            return
+
 
     def paper_submit_order_observation(
         self,

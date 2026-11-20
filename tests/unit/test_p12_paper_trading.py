@@ -162,3 +162,26 @@ def test_cross_account_same_order_id_isolation(env):
     assert outb.status == "filled"
     assert [o["order_id"] for o in b.orders()] == ["dup"]
     assert a.order("dup")["receipt_id"] != outb.receipt_id
+
+
+def test_self_directed_buy_binds_bucket_and_reconciles(env):
+    """R2: a self-directed buy lands in a bucket cycle; funding reconciles."""
+    apps, box, qbox, store, now = env
+    qbox[0] = _quote("10.80", box[0])
+    app = apps["SYN-P12-A"]
+    a = PaperAccount(app=app, store=store, quotes=_quotes(now, qbox), now=now)
+    out = a.submit(OrderCommand("buy-1", "buy", "600000", 100, Decimal("10.90")))
+    assert out.status == "filled"
+    # The buy must be attributable to a bucket cycle so the funding page can
+    # reconcile the partition against account cash (no LEDGER_MISMATCH).
+    fv = app.funding_rules(app.scope)
+    status_reason = getattr(fv, "status_reason", None)
+    assert status_reason is None or "MISMATCH" not in str(status_reason)
+    # one bucket is RESERVED into this security's cycle; cash reflects the fill
+    fs = app.funding_state(app.scope)
+    assert fs is not None and any(
+        b.cycle_id is not None and b.cycle_id.startswith("paper:600000")
+        for b in fs[0].buckets
+    )
+    view = a.account_view()
+    assert view["cash"] == "8920.00"

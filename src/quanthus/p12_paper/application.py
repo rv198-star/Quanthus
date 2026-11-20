@@ -432,8 +432,10 @@ class PaperAccount:
             return SubmitOutcome(command.order_id, "rejected", invalid, REJECT[invalid], 0, None, RULE_VERSION, None, None)
         existing = self._store.get(command.order_id, self._account_id)
         if existing is not None:
-            # Idempotent re-submit returns the stored receipt, never double-posts.
-            st = "filled" if existing.status == "filled" else ("rejected" if existing.status == "rejected" else "open")
+            # Idempotent re-submit returns the stored terminal/open state
+            # verbatim - a cancelled or expired order must not echo "open"
+            # while its row stays terminal (R2 same-id retry consistency).
+            st = existing.status
             return SubmitOutcome(
                 existing.order_id, st,
                 existing.reject_reason, REJECT.get(existing.reject_reason or "", None),

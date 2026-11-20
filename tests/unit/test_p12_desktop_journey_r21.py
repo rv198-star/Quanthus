@@ -23,7 +23,7 @@ from quanthus.platform.p12.assembly import synthetic_applications
 from quanthus.product_daily.application.desktop.views import SubmitFill, SubmitOrderEvent
 from quanthus.shared.fact_contracts import FactError
 
-from test_p12_desktop_journey_r18 import BUY_PLAN, _Clock, _sell
+from tests.unit.test_p12_desktop_journey_r18 import BUY_PLAN, _Clock, _sell
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "config/p12/synthetic-desktop.v1.json"

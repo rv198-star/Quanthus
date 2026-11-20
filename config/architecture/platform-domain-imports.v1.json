@@ -1,6 +1,6 @@
 {
   "schema_version": "quanthus.platform.domain-imports.v1",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "activation_authority": false,
   "purpose": "P12 engineering-contract v1.1 infrastructure implements application ports using typed public execution facts; no runtime execution capability admission",
   "exceptions": [
@@ -31,6 +31,15 @@
       ],
       "consumer": "P12 trusted local synthetic desktop assembly",
       "source_contract": "P12 D1 engineering-contract v1.1 section 1B (composition root wires the trusted synthetic context)"
+    },
+    {
+      "path": "p12/paper_fixture.py",
+      "module": "quanthus.capabilities.execution",
+      "names": [
+        "SyntheticContext"
+      ],
+      "consumer": "P12 dedicated paper account fixture (SYN-PAPER-A) composition root",
+      "source_contract": "P12 R1 audit repair B5; same composition-root wiring as p12/assembly.py"
     }
   ]
 }

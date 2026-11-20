@@ -93,7 +93,14 @@ def hf_private(candidate: Path, secret: Path, receipt: Path, repo: str) -> None:
     print(json.dumps(result), flush=True)
 
 
-def hf_public(root: Path, secret: Path, receipt: Path, repo: str, expected_parent: str) -> None:
+def hf_public(
+    root: Path,
+    secret: Path,
+    receipt: Path,
+    repo: str,
+    expected_parent: str,
+    revision: str = "main",
+) -> None:
     verified = verify_manifest(root)
     manifest = json.loads((root / "manifest.json").read_bytes())
     ready = json.loads((root / "READY").read_bytes())
@@ -111,12 +118,26 @@ def hf_public(root: Path, secret: Path, receipt: Path, repo: str, expected_paren
             key, value = parts[-1].split("=", 1)
             settings[key] = value
     api = importlib.import_module("huggingface_hub").HfApi(token=settings["HF_TOKEN"])
+    if revision != "main":
+        api.create_branch(
+            repo, branch=revision, repo_type="dataset", revision=expected_parent, exist_ok=True
+        )
+    if api.repo_info(repo, repo_type="dataset", revision=revision).sha != expected_parent:
+        raise RuntimeError("PUBLIC_RELEASE_PARENT_CHANGED")
+    local_paths = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
+    remote_paths = api.list_repo_files(repo, repo_type="dataset", revision=revision)
+    obsolete = sorted(set(remote_paths) - local_paths - {".gitattributes"})
     commit = api.upload_folder(
         repo_id=repo,
         repo_type="dataset",
         folder_path=str(root),
+        revision=revision,
+        delete_patterns=obsolete,
         parent_commit=expected_parent,
-        commit_message="Publish Hist-1D v1 with accepted binary ST scope",
+        commit_message="Publish accepted Hist-1D release through "
+        + json.loads((root / "contract.json").read_bytes())["scope"].get(
+            "business_through", "2019-12-31"
+        ),
     )
     api.update_repo_settings(repo, repo_type="dataset", private=False)
     if api.repo_info(repo, repo_type="dataset", revision=commit.oid).private:
@@ -125,6 +146,8 @@ def hf_public(root: Path, secret: Path, receipt: Path, repo: str, expected_paren
         "status": "PUBLIC_READY_RELEASE",
         "repo": repo,
         "revision": commit.oid,
+        "branch": revision,
+        "obsolete_paths_removed": obsolete,
         "local_verification": verified,
         "acceptance_profile": ready["profile"],
     }
@@ -302,6 +325,7 @@ def main() -> int:
     parser.add_argument("--prior-backup", type=Path)
     parser.add_argument("--publication-receipt", type=Path)
     parser.add_argument("--expected-parent")
+    parser.add_argument("--hf-revision", default="main")
     args = parser.parse_args()
     os.umask(0o077)
     if args.action == "pack":
@@ -309,7 +333,14 @@ def main() -> int:
     elif args.action == "hf-private":
         hf_private(args.candidate, args.hf_secret, args.receipt, args.repo)
     elif args.action == "hf-public":
-        hf_public(args.candidate, args.hf_secret, args.receipt, args.repo, args.expected_parent)
+        hf_public(
+            args.candidate,
+            args.hf_secret,
+            args.receipt,
+            args.repo,
+            args.expected_parent,
+            args.hf_revision,
+        )
     elif args.action == "release-delta":
         release_delta(
             args.candidate,

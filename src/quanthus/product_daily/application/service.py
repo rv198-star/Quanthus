@@ -167,6 +167,53 @@ class SyntheticFactService:
             self._authorize(context), state, bucket_securities=bucket_securities
         )
 
+    def funding_binding(
+        self, context: SyntheticContext
+    ) -> dict | None:
+        """Persisted bucket-security bindings for attribution decisions."""
+        return self._port.funding_binding(self._authorize(context))
+
+    def funding_realized_cash_by_security(
+        self,
+        context: SyntheticContext,
+        security_codes: set[str] | None = None,
+        since_sequence: int = 0,
+    ) -> dict[str, Decimal] | None:
+        """Per-security cash moved by admitted fills since a sequence floor."""
+        return self._port.funding_realized_cash_by_security(
+            self._authorize(context),
+            security_codes=security_codes,
+            since_sequence=since_sequence,
+        )
+
+    def mark_cycle_floor(
+        self,
+        context: SyntheticContext,
+        *,
+        bucket_id: str,
+        event_sequence: int,
+    ) -> None:
+        """Lower an open cycle's accountable floor to an earlier sequence."""
+        return self._port.mark_cycle_floor(
+            self._authorize(context), bucket_id=bucket_id, event_sequence=event_sequence
+        )
+
+    def attribute_prebinding_cycle(
+        self,
+        context: SyntheticContext,
+        *,
+        bucket_id: str,
+        cycle_id: str,
+        security_code: str,
+    ) -> FundingDecision:
+        """Open a cycle on an empty bucket owning a pre-binding fill."""
+        return self._port.attribute_prebinding_cycle(
+            self._authorize(context),
+            bucket_id=bucket_id,
+            cycle_id=cycle_id,
+            security_code=security_code,
+        )
+
     def funding_settlement_evidence(
         self, context: SyntheticContext, security_codes: set[str] | None = None
     ) -> CycleSettlementEvidence:

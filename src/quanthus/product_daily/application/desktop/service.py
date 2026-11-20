@@ -902,6 +902,7 @@ class P12DesktopApplication:
             for plan in package.plans:
                 if plan.delta_qty > 0:
                     self._auto_reserve(plan.security_code)
+            self._upgrade_pre_binding_fills(snapshot)
             self._auto_settle(None)
         except FactError:
             return
@@ -1434,6 +1435,81 @@ class P12DesktopApplication:
             # the unbound reason on the next read instead.
             return
 
+    def _upgrade_pre_binding_fills(self, snapshot) -> None:
+        """Attribute ledger fills that predate the funding partition.
+
+        A ledger bound *after* its first fills (the previous version opened
+        the account, posted a fill, then bound the flat baseline partition)
+        leaves those fills with no owning bucket.  The floor inside each
+        open cycle only reaches back to the binding anchor, so the cash the
+        fill moved is unaccountable and the page reports a mismatch.  When
+        the realized cash is uniquely attributable to open-position
+        securities whose count fits the empty buckets, each security claims
+        one empty bucket: the cycle floor is set to the partition's binding
+        anchor so the pre-binding cash becomes accountable inside it.  An
+        account that does not uniquely attribute keeps its facts unchanged
+        and is left for the funding page's manual-review view.
+        """
+        try:
+            state = self._facts.funding_state(self._context)
+            if state is None:
+                return
+            funding, _ = state
+            binding = self._facts.funding_binding(self._context) or {}
+            securities = dict(binding.get("bucket_securities") or {})
+            anchor = int(binding.get("initial_bound_account_revision", 0))
+            empties = [
+                item for item in funding.buckets if item.phase is BucketPhase.EMPTY
+            ]
+            if not empties:
+                return
+            # Candidate securities are the fills the partition cannot yet
+            # explain: still-held positions not already attributed to a live
+            # bucket.  Realized cash must match the still-missing account
+            # delta or another flow owns it and we do not guess.
+            open_secs = {
+                p.security_code
+                for p in snapshot.projection.positions
+                if p.quantity and p.security_code not in securities.values()
+            }
+            # Restrict to securities the ledger actually admitted fills for:
+            # a position that arrived only through a baseline or another
+            # non-fill source has no realized cash to attribute, and letting
+            # it claim a bucket would mask a different ownership question.
+            filled = self._facts.funding_realized_cash_by_security(
+                self._context, security_codes=None, since_sequence=anchor
+            ) or {}
+            open_secs &= set(filled)
+            if not open_secs:
+                return
+            account_cash = snapshot.projection.cash
+            accountable = self._facts.funding_accountable_cash(self._context)
+            if accountable is None or accountable == account_cash:
+                return
+            missing = account_cash - accountable
+            realized = self._facts.funding_realized_cash_by_security(
+                self._context, security_codes=open_secs, since_sequence=anchor
+            )
+            if not realized or len(realized) > len(empties):
+                return
+            if sum(realized.values(), Decimal("0.00")) != missing:
+                return
+            for (bucket, (sec, _cash)) in zip(empties, sorted(realized.items())):
+                cycle_id = f"paper:{sec}:{bucket.bucket_id}"
+                # One atomic upgrade: open the cycle on the empty bucket,
+                # attribute it to the security, and anchor the floor at the
+                # binding revision so the already-moved fill cash is the
+                # pending amount the open cycle explains.  This is what
+                # restores the reconcile the normal write gate requires.
+                self._facts.attribute_prebinding_cycle(
+                    self._context,
+                    bucket_id=bucket.bucket_id,
+                    cycle_id=cycle_id,
+                    security_code=sec,
+                )
+        except FactError:
+            return
+
     def _auto_settle(self, security_code: str | None) -> None:
         """Settle an open bucket cycle once the security is flat.
 
@@ -1549,12 +1625,17 @@ class P12DesktopApplication:
         return result
 
     def _auto_reserve_self_directed(self, security_code: str | None) -> None:
-        """Attribute a self-directed buy to one empty bucket cycle.
+        """Attribute a self-directed buy to one bucket cycle, by security.
 
         Unlike ``_auto_reserve`` this does not need a published entry plan:
         the user decided to buy, so the fill belongs to a bucket either way.
-        With no free bucket the buy stays unattributed and the funding page
-        reports the gap instead of pretending the partition reconciles.
+        An already-open bucket that is serving *this* security is enough;
+        another security's open bucket never blocks a new one.  The buy first
+        claims a free bucket, then falls back to a closed bucket whose cycle
+        ended while it still held this security (a repeat trade after a
+        settle).  With no usable bucket the buy stays unattributed and the
+        funding page reports the gap instead of pretending the partition
+        reconciles.
         """
         if security_code is None:
             return
@@ -1574,26 +1655,43 @@ class P12DesktopApplication:
                 if state is None:
                     return
             funding, _ = state
-            # Already attributed: a bucket is holding this security's cycle.
-            if any(
-                item.phase in (BucketPhase.RESERVED, BucketPhase.HELD)
+            # Already attributed: one open bucket is serving this security's cycle.
+            binding = self._facts.funding_binding(self._context) or {}
+            securities = dict(binding.get("bucket_securities") or {})
+            served = {
+                item.bucket_id
                 for item in funding.buckets
-            ):
+                if item.phase in (BucketPhase.RESERVED, BucketPhase.HELD)
+            }
+            if any(securities.get(bid) == security_code for bid in served):
                 return
-            empty = next(
+            candidate = next(
                 (item for item in funding.buckets if item.phase is BucketPhase.EMPTY),
                 None,
             )
-            if empty is None:
+            if candidate is None:
+                # Reuse a closed bucket that last served this same security:
+                # its cycle ended while still attributed, so a repeat trade
+                # reopens it rather than inventing a second owner.
+                candidate = next(
+                    (
+                        item
+                        for item in funding.buckets
+                        if item.phase is BucketPhase.CLOSED
+                        and securities.get(item.bucket_id) == security_code
+                    ),
+                    None,
+                )
+            if candidate is None:
                 return
-            cycle_id = f"paper:{security_code}:{empty.bucket_id}"
+            cycle_id = f"paper:{security_code}:{candidate.bucket_id}"
             self._facts.prepare_funding_cycle(
-                self._context, bucket_id=empty.bucket_id, cycle_id=cycle_id
+                self._context, bucket_id=candidate.bucket_id, cycle_id=cycle_id
             )
             self._facts.bind_funding_state(
                 self._context,
                 self._facts.funding_state(self._context)[0],
-                bucket_securities={empty.bucket_id: security_code},
+                bucket_securities={candidate.bucket_id: security_code},
             )
         except FactError:
             return

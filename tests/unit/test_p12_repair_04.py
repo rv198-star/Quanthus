@@ -196,14 +196,25 @@ def test_conflicting_bucket_security_is_refused(tmp_path: Path) -> None:
 
 
 def test_page_reports_real_gap_as_mismatch(tmp_path: Path) -> None:
-    """A partition genuinely short of the ledger is still flagged for review."""
+    """A partition genuinely short of the ledger is still flagged for review.
+
+    Two unattributed securities each moving cash cannot both be folded into
+    the free buckets without guessing which proceeds belong to which
+    opportunity, so the page keeps the gap flagged for manual review.  A
+    single-security fill is uniquely attributable and the upgrade sweep
+    reconciles it (see test_p12_paper_trading); the multi-security case is
+    the genuinely ambiguous layout that still reports a mismatch.
+    """
     app = _app(tmp_path)
     opening, partition = _initial(app)
     app.bind_funding(app.scope, partition)
-    # A buy on an unattributed security is cash the bound buckets cannot
-    # explain, so the page reports the gap instead of a silent balance.
+    # Three unattributed securities each moved cash, but only two buckets
+    # can take an attribution; the third has no unique owner, so the page
+    # reports the gap instead of guessing which two to place.
     _trade(app, "B-BUY", "000001", "buy", 40, "10.00", 19)
-    assert _cash(app)["account"] == opening - Decimal("400.00")
+    _trade(app, "C-BUY", "000002", "buy", 40, "10.00", 19)
+    _trade(app, "D-BUY", "000003", "buy", 40, "10.00", 19)
+    assert _cash(app)["account"] == opening - Decimal("1200.00")
     assert (
         app.funding_rules(app.scope).funding.status_reason
         == "FUNDING_LEDGER_MISMATCH"

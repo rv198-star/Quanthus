@@ -185,3 +185,73 @@ def test_self_directed_buy_binds_bucket_and_reconciles(env):
     )
     view = a.account_view()
     assert view["cash"] == "8920.00"
+
+
+def test_second_security_uses_free_bucket(env):
+    """R3: a second self-directed buy claims the remaining free bucket.
+
+    The first buy opens bucket-01's cycle; the second must not see that
+    bucket as 'already attributed' and stop - it claims the still-empty
+    bucket-02 so the partition reconciles across both securities.
+    """
+    apps, box, qbox, store, now = env
+    qbox[0] = _quote("10.80", box[0])
+    app = apps["SYN-P12-A"]
+    a = PaperAccount(app=app, store=store, quotes=_quotes(now, qbox), now=now)
+    a.submit(OrderCommand("b1", "buy", "600000", 100, Decimal("10.90")))
+    a.submit(OrderCommand("b2", "buy", "000001", 100, Decimal("10.90")))
+    fv = app.funding_rules(app.scope)
+    assert getattr(fv, "status_reason", None) is None
+    fs = app.funding_state(app.scope)
+    binding = {b.bucket_id: b.cycle_id for b in fs[0].buckets if b.cycle_id}
+    assert any("600000" in c for c in binding.values())
+    assert any("000001" in c for c in binding.values())
+    assert len(binding) == 2
+
+
+def test_pre_binding_fill_upgrades_into_empty_bucket(env):
+    """R3: a fill posted before attribution upgrades on read.
+
+    A partition bound flat, then a fill admitted while no bucket owns the
+    security, leaves the fill's cash unaccountable.  The maintenance sweep
+    must claim an empty bucket for the security and lower the cycle floor to
+    the binding anchor so the partition explains the account again.
+    """
+    apps, box, qbox, store, now = env
+    app = apps["SYN-P12-A"]
+    scope = app.scope
+    from quanthus.capabilities.funding import initial_funding_state
+    history = app._facts.snapshot(app._context).history
+    state = initial_funding_state(app._policy.funding, history.baseline_cash)
+    app.bind_funding(scope, state)
+    # Admit a fill + terminal order + fee without any bucket attribution,
+    # mirroring a ledger written before the attribution flow existed.
+    from quanthus.product_daily.application.desktop import SubmitOrderEvent
+    from decimal import Decimal as D
+    day = 19
+    events = (
+        ("fill", {"security_code": "600000", "side": "buy", "quantity": 100,
+                  "price": D("10.42"), "confirmed_fee": D("0.00"),
+                  "accepted_total_qty": 100, "price_bound": D("10.42")}),
+        ("observation", {"order_status": "terminal",
+                         "final_cumulative_fill_qty": 100, "cancelled_qty": 0}),
+        ("fee", {"confirmed_fee": D("0.00")}),
+    )
+    for index, (kind, fields) in enumerate(events):
+        occurred = now()
+        outcome = app.submit_order_event(
+            scope,
+            SubmitOrderEvent(f"L-{kind}-{index}", kind, "L-ORDER", occurred, **fields),
+        )
+        assert outcome.status == "POSTED", (kind, outcome.status)
+    # The admitted fill is the account's only security, so the upgrade path
+    # can uniquely attribute it to a free bucket: a page read reconciles the
+    # partition instead of leaving the cash flagged as an unexplained gap.
+    app.workbench(scope)
+    fv2 = app.funding_rules(scope)
+    assert getattr(fv2, "status_reason", None) is None
+    fs = app.funding_state(scope)
+    assert any(
+        b.cycle_id is not None and "600000" in b.cycle_id
+        for b in fs[0].buckets
+    )

@@ -2571,6 +2571,172 @@ class SQLiteSyntheticFactsAdapter:
             connection.commit()
             return pending
 
+    def funding_binding(
+        self, context: SyntheticContext
+    ) -> dict[str, Any] | None:
+        """The persisted bindings map (bucket securities, cycles, anchors).
+
+        Read-only view used by the desktop to decide whether a security is
+        already served by a live bucket before opening a new one.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            row = connection.execute(
+                "SELECT bindings_json FROM funding_states "
+                "WHERE account_id=? AND mode=?",
+                (context.account_id, context.mode),
+            ).fetchone()
+            connection.commit()
+            return json.loads(row["bindings_json"] or "{}") if row is not None else None
+
+    def funding_realized_cash_by_security(
+        self,
+        context: SyntheticContext,
+        security_codes: set[str] | None = None,
+        since_sequence: int = 0,
+    ) -> dict[str, Decimal] | None:
+        """security_code -> net ledger cash moved by its fills.
+
+        Used to attribute fills that were posted before the funding
+        partition was bound: each still-held position's realized cash is
+        what an upgraded bucket must explain.  Returns None when no
+        partition is bound (nothing to upgrade against).
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            binding = self._read_funding_binding(connection, context)
+            if binding is None:
+                connection.commit()
+                return None
+            moved = self._cash_events_after(connection, context, since_sequence)
+            if security_codes is not None:
+                moved = {k: v for k, v in moved.items() if k in security_codes}
+            connection.commit()
+            return moved
+
+    def mark_cycle_floor(
+        self,
+        context: SyntheticContext,
+        *,
+        bucket_id: str,
+        event_sequence: int,
+    ) -> None:
+        """Lower an open cycle's accountable floor to an earlier sequence.
+
+        The upgrade path uses this once a pre-binding fill is uniquely
+        attributed to the bucket: the cycle then explains cash the ledger
+        moved before the partition existed.  The floor is recorded inside
+        bindings so a later settlement still advances past it.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            binding_row = self._read_funding_binding(connection, context)
+            if binding_row is None:
+                connection.rollback()
+                raise FactError("FUNDING_NOT_BOUND", "no funding partition is bound")
+            state, bound_rev, bindings = binding_row
+            bindings = self._bindings_mark_cycle(bucket_id, event_sequence, bindings)
+            self._write_funding_state(
+                connection, context, state, bound_rev, bindings
+            )
+            connection.commit()
+
+    def attribute_prebinding_cycle(
+        self,
+        context: SyntheticContext,
+        *,
+        bucket_id: str,
+        cycle_id: str,
+        security_code: str,
+    ) -> FundingDecision:
+        """Open a cycle on an empty bucket already owning a pre-binding fill.
+
+        The ledger bound the flat baseline partition, then an older version
+        posted a fill, so that fill's cash has no owning bucket.  This opens
+        ``cycle_id`` on the empty bucket, attributes it to ``security_code``
+        and anchors the cycle floor at the partition's binding revision so
+        the cash the fill already moved becomes accountable inside the
+        bucket.  It is the one path allowed to run while the partition is
+        still mismatched, because completing it is what restores the
+        reconcile the normal write gate requires.  Used only by the
+        desktop's pre-binding upgrade sweep once the cash is uniquely
+        attributable; it never invents attribution for an ambiguous account.
+        """
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            binding_row = self._read_funding_binding(connection, context)
+            if binding_row is None:
+                connection.rollback()
+                raise FactError("FUNDING_NOT_BOUND", "no funding partition is bound")
+            state, bound_rev, bindings = binding_row
+            anchor_rev = self._binding_anchor(bound_rev, bindings)
+            floor_seq = self._bound_event_sequence(connection, context, anchor_rev)
+            item = next(
+                (b for b in state.buckets if b.bucket_id == bucket_id), None
+            )
+            if item is None:
+                connection.rollback()
+                raise FactError("BUCKET_NOT_FOUND", f"no bucket {bucket_id}")
+            if item.phase is not BucketPhase.EMPTY:
+                connection.rollback()
+                raise FactError(
+                    "FUNDING_CYCLE_NOT_BOUND",
+                    f"bucket {bucket_id} is not empty; cannot upgrade",
+                )
+            # No top-up from reserve: the bucket keeps its settled cash and
+            # the floor reaches back so the already-moved fill cash is the
+            # pending amount the open cycle explains.
+            next_bucket = replace(
+                item,
+                phase=BucketPhase.RESERVED,
+                cycle_id=cycle_id,
+                locked_cycle_budget=item.cash,
+            )
+            new_state = replace(
+                state,
+                buckets=tuple(
+                    sorted(
+                        (
+                            next_bucket if b.bucket_id == bucket_id else b
+                            for b in state.buckets
+                        ),
+                        key=lambda b: b.bucket_id,
+                    )
+                ),
+            )
+            new_bindings = dict(bindings)
+            securities = dict(new_bindings.get("bucket_securities") or {})
+            cycles = dict(new_bindings.get("bucket_security_cycles") or {})
+            securities[bucket_id] = security_code
+            cycles[bucket_id] = cycle_id
+            new_bindings["bucket_securities"] = securities
+            new_bindings["bucket_security_cycles"] = cycles
+            new_bindings = self._bindings_mark_cycle(
+                bucket_id, floor_seq, new_bindings
+            )
+            write_rev = self._bound_account_revision(connection, context)
+            self._write_funding_state(
+                connection, context, new_state, write_rev, new_bindings
+            )
+            connection.commit()
+            return FundingDecision(
+                operation="attribute_prebinding_cycle",
+                accepted=True,
+                replayed=False,
+                state=new_state,
+                reason_codes=(ReasonCode.CYCLE_PREPARED,),
+                ledger_entries=(),
+                details_json="{}",
+                result_digest=digest(
+                    {
+                        "operation": "attribute_prebinding_cycle",
+                        "bucket_id": bucket_id,
+                        "cycle_id": cycle_id,
+                        "security_code": security_code,
+                    }
+                ),
+            )
+
     def bind_funding_state(
         self,
         context: SyntheticContext,

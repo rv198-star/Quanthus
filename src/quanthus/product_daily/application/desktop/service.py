@@ -1820,6 +1820,29 @@ class P12DesktopApplication:
     def paper_history(self):
         return self._facts.history(self._context)
 
+    def paper_current_plan(self, plan_id: str):
+        """The account's currently effective published plan for ``plan_id``.
+
+        Read at order-acceptance time so a confirm-the-suggestion order is
+        bound to the live plan's server-side quantity, price cap and window,
+        not to values the client echoed back.  Returns ``None`` when the
+        package is not yet visible, the plan is absent, or its execution
+        window has already closed - the order path then refuses rather than
+        fill against a stale suggestion.
+        """
+        decisions = self._current_decisions()
+        now = self._now()
+        if not self._visible(decisions, now):
+            return None
+        snapshot = self._facts.snapshot(self._context)
+        package = self._publish(decisions, snapshot.history)
+        plan = next((p for p in package.plans if p.plan_id == plan_id), None)
+        if plan is None or plan.delta_qty <= 0:
+            return None
+        if now < plan.eligible_at or now > plan.expires_at:
+            return None
+        return plan
+
     def rebuild_matches(self, scope: AccountScope) -> bool:
         """Deterministic rebuild from baseline + events equals the stored projection."""
 

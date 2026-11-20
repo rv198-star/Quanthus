@@ -50,6 +50,8 @@ REJECT = {
     "BELOW_LIMIT": "last price does not satisfy the limit; order rests",
     "DUPLICATE_ORDER": "duplicate order id",
     "INVALID_ORDER": "order field is invalid",
+    "PLAN_NOT_FOUND": "the referenced plan is not currently effective",
+    "ORDER_CONTEXT_MISMATCH": "the order disagrees with the plan's side or security",
 }
 
 ORDER_STATUS = {

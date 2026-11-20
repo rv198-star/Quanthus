@@ -445,6 +445,32 @@ class PaperAccount:
 
         session = self._quotes.session()
         trading_day = datetime.fromisoformat(session["trading_date"]).date()
+
+        # --- plan-confirm admission ------------------------------------------------
+        # An order id of ``plan:{plan_id}`` is a confirm-the-suggestion order:
+        # bind it to the account's currently effective published plan and take
+        # the server-side quantity / price cap / window as authoritative, then
+        # run the same funding checks.  A plan that is no longer visible, has
+        # closed its window, or disagrees with the submitted side/security is
+        # refused before any cash is committed.
+        plan = None
+        if command.order_id.startswith("plan:"):
+            plan_id = command.order_id.split(":", 1)[1]
+            resolver = getattr(self._app, "paper_current_plan", None)
+            plan = resolver(plan_id) if callable(resolver) else None
+            if plan is None:
+                return self._reject(command, "PLAN_NOT_FOUND", None)
+            if plan.side != command.side or plan.security_code != command.security_code:
+                return self._reject(command, "ORDER_CONTEXT_MISMATCH", None)
+            # Authoritative parameters come from the live plan, not the client.
+            command = OrderCommand(
+                order_id=command.order_id,
+                side=command.side,
+                security_code=command.security_code,
+                quantity=plan.delta_qty,
+                limit_price=plan.price_cap,
+            )
+
         quote = self._quotes.quote(command.security_code)
 
         # --- acceptance checks -------------------------------------------------

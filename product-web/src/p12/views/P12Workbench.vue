@@ -1027,6 +1027,24 @@ export default {
     isSelectedPlanExpired () {
       return this.isOpportunityExpired(this.selected)
     },
+    // The system's currently executable buy plan on the selected opportunity,
+    // only while it is still inside its execution window.  Drives the
+    // confirm-this-suggestion ticket; self-directed / expired items hide it.
+    confirmablePlan () {
+      const sel = this.selected
+      if (!sel || sel.selfDirected || this.isRehearsal) return null
+      const plan = sel.plan
+      if (!plan || plan.side !== 'buy' || this.isSelectedPlanExpired) return null
+      if (!(plan.delta_qty > 0)) return null
+      const actionable = (sel.action_code === 'BUY' && sel.status_code === 'READY') ||
+        (sel.applicability && sel.applicability.status === 'ACTIONABLE')
+      if (!actionable) return null
+      return { ...plan, security_code: sel.security_code }
+    },
+    planConfirmDisabled () {
+      const session = this.marketSession
+      return !!(session && session.market_state && session.market_state !== 'trading')
+    },
     selectedDisplayName () {
       if (!this.selected) return ''
       if (!this.isCurrentSynthetic) {

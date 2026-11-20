@@ -196,10 +196,11 @@ def test_no_action_and_input_blocked_forms(state_dir):
     wb = app.workbench(app.scope)
     by_code = {o.opportunity_id: o for o in wb.opportunities}
     noop = by_code["OPP-REPLAY-NOOP"]
-    # "Today, nothing to do": a closed, non-actionable item carrying the
-    # no-qualified-entry reason rather than an executable plan.
+    # "Today, nothing to do": a closed, non-actionable item.  The ended stage
+    # and NONE action already read as "今天无操作"; the explanation and
+    # next_observation carry the "无合格买点 / 下一检查时间" detail.
     assert noop.stage == "ended" and noop.action_code == "NONE"
-    assert "NO_QUALIFIED_ENTRY" in noop.reason_codes and noop.plan is None
+    assert noop.plan is None and noop.status_code == "ENDED"
     blocked = by_code["OPP-REPLAY-INPUT"]
     # "Input not ready": paused with the missing-input reason and no plan.
     assert blocked.action_code == "PAUSED" and blocked.status_code == "MISSING_INPUT"
@@ -270,3 +271,49 @@ def test_suggestion_quote_and_match_share_one_replay_clock(state_dir):
     n1 = replay.fetch("600000")["points"]
     assert len(n1) >= len(n0)
     assert acct._quotes.quote("600000").quote_time <= replay.now()
+
+
+def test_expired_plan_never_submitted_is_refused(state_dir):
+    # A normal plan confirm submitted *after* its window closed is refused on
+    # admission: the live plan is no longer effective, so the server answers
+    # PLAN_NOT_FOUND before any cash is committed.  Distinct from the
+    # idempotent filled-order retry, which keeps its stored terminal state.
+    now_box = [_buy_window()]
+    now = _clock(now_box)
+    session_box = [now_box[0]]
+    qbox = {"600000": _quote("10.66", now_box[0])}
+    acct, app = _account(state_dir, now, qbox, session_box)
+    # Advance past the 15:00 close; the plan's window has expired.
+    now_box[0] = _closed()
+    session_box[0] = _closed()
+    plan_id = "plan-OPP-REPLAY-600000-2026-11-19"
+    out = acct.submit(OrderCommand(
+        order_id=f"plan:{plan_id}", side="buy",
+        security_code="600000", quantity=2000, limit_price=Decimal("10.75"),
+    ))
+    assert out.status == "rejected"
+    assert out.reason_code == "PLAN_NOT_FOUND"
+    # Nothing was posted: the ledger holds no fill and the order is terminal.
+    assert app._facts.history(app._context).reports == ()
+    assert acct.order(f"plan:{plan_id}")["status"] == "rejected"
+
+
+def test_plan_confirm_uses_server_qty_and_cap_not_client(state_dir):
+    # The server-side plan governs: a confirm order that echoes a different
+    # quantity or cap is still bound to the live plan's authoritative values.
+    now_box = [_buy_window()]
+    now = _clock(now_box)
+    session_box = [now_box[0]]
+    qbox = {"600000": _quote("10.66", now_box[0])}
+    acct, app = _account(state_dir, now, qbox, session_box)
+    plan = next(o.plan for o in app.workbench(app.scope).opportunities if o.plan)
+    # Client asks for 100 @ 9.99; the live plan governs at 2000 @ 10.75.
+    out = acct.submit(OrderCommand(
+        order_id=f"plan:{plan.plan_id}", side="buy",
+        security_code="600000", quantity=100, limit_price=Decimal("9.99"),
+    ))
+    assert out.status == "filled" and out.filled_qty == plan.delta_qty
+    linked = [r for r in app._facts.history(app._context).reports
+              if r.suggestion_id == plan.plan_id]
+    assert linked[0].intended_quantity == plan.delta_qty
+    assert linked[0].intended_price_cap == plan.price_cap

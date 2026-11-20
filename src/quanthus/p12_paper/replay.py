@@ -49,24 +49,46 @@ class Replay:
         }
         close = datetime.fromisoformat(day + "T15:00:00+08:00")
         self._timeline = sorted({close, *(t for times in self._times.values() for t in times)})
-        self._index = self._timeline.index(start_at) if start_at is not None else 0
+        self._override: datetime | None = None
         self._lock = Lock()
+        if start_at is None:
+            self._index = 0
+        elif start_at > self._timeline[-1]:
+            self._index = len(self._timeline) - 1
+            self._override = start_at
+        else:
+            self._index = self._timeline.index(start_at)
 
     def now(self) -> datetime:
+        # An override carries the clock past the tape's last tick (e.g. into
+        # the next session for the "nothing today / input not ready" day or a
+        # fully-expired plan), while quotes still read only tape-visible data.
+        if self._override is not None:
+            return self._override
         return self._timeline[self._index]
 
     def clock(self, advance: bool) -> dict[str, Any]:
         with self._lock:
             if advance and self._index < len(self._timeline) - 1:
                 self._index += 1
+                self._override = None
             return {
                 "time": self.now().isoformat(),
                 "finished": self._index == len(self._timeline) - 1,
             }
 
     def set_now(self, instant: datetime) -> None:
-        """Jump the replay clock to a timeline instant (or the latest <= it)."""
+        """Jump the replay clock to a timeline instant (or the latest <= it).
+
+        An instant beyond the tape's close is held as an override: the shared
+        clock keeps moving (so a published next-day package or an expired
+        window reads correctly) while quotes keep serving the last tape tick.
+        """
         with self._lock:
+            if instant > self._timeline[-1]:
+                self._override = instant
+                return
+            self._override = None
             idx = bisect_right(self._timeline, instant) - 1
             self._index = max(0, min(idx, len(self._timeline) - 1))
 

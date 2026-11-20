@@ -13,14 +13,14 @@ Vue.use(VueRouter)
 export default new VueRouter({
   mode: 'history',
   routes: [
-    { path: '/', redirect: '/research' },
+    { path: '/', redirect: '/p12' },
+    { path: '/p12', component: P12Workbench, meta: { title: '工作台', area: 'p12' } },
+    { path: '/p12/records', component: P12Records, meta: { title: '委托与成交记录', area: 'p12' } },
+    { path: '/p12/funding', component: P12FundingRules, meta: { title: '资金与规则', area: 'p12' } },
     { path: '/research', component: ResearchOverview, meta: { title: 'A 股研究' } },
     { path: '/candidates', component: StrategyLibrary, meta: { title: '候选验证' } },
     { path: '/candidates/:strategyId', component: CandidateDetail, meta: { title: '候选详情' } },
     { path: '/attribution', component: AttributionCenter, meta: { title: '归因分析' } },
-    { path: '/p12', component: P12Workbench, meta: { title: '工作台', area: 'p12' } },
-    { path: '/p12/records', component: P12Records, meta: { title: '记录', area: 'p12' } },
-    { path: '/p12/funding', component: P12FundingRules, meta: { title: '资金与规则', area: 'p12' } },
-    { path: '*', redirect: '/research' }
+    { path: '*', redirect: '/p12' }
   ]
 })

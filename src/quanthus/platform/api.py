@@ -674,6 +674,12 @@ class PlatformHttpApp:
             self._p12_submit_order_event,
         )
         self._add(
+            "p12.funding.configure",
+            "/api/p12/v1/accounts/<account_id>/funding-rules",
+            "POST",
+            self._p12_funding_configure,
+        )
+        self._add(
             "p12.paper.session",
             "/api/p12/v1/market/session",
             "GET",
@@ -796,6 +802,19 @@ class PlatformHttpApp:
     ) -> HttpResponse:
         principal = _principal(self._identity, observed_request, "p12:report")
         status, payload = self._p12.submit_order_event(
+            principal,
+            params["account_id"],
+            observed_request.json_object(),
+            observed_request.request_id,
+            observed_request.query_string,
+        )
+        return _json_response(payload, status)
+
+    def _p12_funding_configure(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:report")
+        status, payload = self._p12.funding_configure(
             principal,
             params["account_id"],
             observed_request.json_object(),

@@ -13,7 +13,9 @@ export default {
       const remembered = sessionStorage.getItem(STORAGE_KEY)
       const requested = this.$route.query.account
       const ids = this.accounts.map(item => item.account_id)
-      this.accountId = [requested, remembered, ids[0]].find(id => id && ids.includes(id)) || null
+      // Prefer a non-synthetic personal paper account by default when available.
+      const simDefault = this.accounts.find(item => !item.synthetic || item.mode === 'simulation')?.account_id
+      this.accountId = [requested, remembered, simDefault, ids[0]].find(id => id && ids.includes(id)) || null
       if (this.accountId) await this.refresh()
       else this.loadError = { reasonCode: 'ACCOUNT_NOT_ADMITTED', text: '当前用户没有可用的账户' }
     } catch (error) {

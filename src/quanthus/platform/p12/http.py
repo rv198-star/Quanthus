@@ -267,6 +267,50 @@ class P12Endpoints:
             return self._paper.cancel(account_id, order_id)  # type: ignore[union-attr]
         return self._run(request_id, call) if self._paper is not None else self._paper_run(request_id, lambda svc: svc.cancel(account_id, order_id))
 
+    def funding_configure(
+        self,
+        principal: AuthenticatedPrincipal,
+        account_id: str,
+        body: dict[str, Any],
+        request_id: str,
+        query_string: str = "",
+    ) -> Result:
+        """Persist a fixed-bucket funding cycle for the account.
+
+        The adopted contract for this slice keeps the bound partition itself
+        immutable once set; a write either binds the account's first
+        partition (empty baseline) or reserves the next cycle on an existing
+        empty bucket.  Changing bucket budgets/risk ratios is a policy
+        re-bind reserved for the planning thread, so an out-of-contract body
+        is refused with a named reason instead of a silent no-op.
+        """
+        def call(runtime: P12Runtime) -> dict[str, Any]:
+            from quanthus.shared.fact_contracts import FactError
+            binding = runtime.binding_for(principal, account_id)
+            self._scope_query(binding, query_string)
+            app = binding.application
+            action = str(body.get("action") or "")
+            if action == "bind":
+                from quanthus.capabilities.funding import initial_funding_state
+                state = initial_funding_state(
+                    app._policy.funding,
+                    app._facts.history(app._context).baseline_cash,
+                )
+                bound = app.bind_funding(app.scope, state, body.get("bucket_securities"))
+                return {"action": "bind", "funding": _transport().funding_rules_dto(app.funding_rules(app.scope))["funding"], "revision": bound.revision}
+            if action == "prepare_cycle":
+                decision = app.prepare_funding_cycle(
+                    app.scope,
+                    bucket_id=str(body["bucket_id"]),
+                    cycle_id=str(body["cycle_id"]),
+                )
+                return {"action": "prepare_cycle", "status": str(decision.status) if hasattr(decision, "status") else "ok"}
+            raise FactError(
+                "INVALID_REPORT_SHAPE",
+                "funding write admits action bind | prepare_cycle; parameter re-binding is held for planning",
+            )
+        return self._run(request_id, call)
+
     def submit_order_event(
         self,
         principal: AuthenticatedPrincipal,

@@ -84,7 +84,7 @@
         </section>
 
         <aside v-if="selected" class="panel p12-task" data-testid="p12-task">
-          <div class="panel-head"><div><h2>{{ selected.plan ? '下一交易日计划' : '今天的任务' }}</h2><p v-if="selected.applicability">{{ label('applicability_status', selected.applicability.status) }}</p></div></div>
+          <div class="panel-head"><div><h2>{{ taskTitle }}</h2><p v-if="selected.applicability">{{ label('applicability_status', selected.applicability.status) }}</p></div></div>
           <template v-if="selected.plan && selected.plan.side === 'buy'">
             <dl class="p12-plan" data-testid="p12-plan">
               <div><dt>当前持有</dt><dd>{{ qty(selected.applicability.current_qty) }}</dd></div>
@@ -115,7 +115,7 @@
               <div><dt>卖出数量</dt><dd>{{ sellTask ? qty(sellTask.total) : '—' }}</dd></div>
               <div><dt>已成交</dt><dd data-testid="p12-sell-filled">{{ sellTask ? qty(sellTask.filled) : '0 股' }}</dd></div>
               <div><dt>剩余待成交</dt><dd data-testid="p12-sell-remaining">{{ sellTask ? qty(sellTask.remaining) : '—' }}</dd></div>
-              <div><dt>执行窗口</dt><dd>次一交易日 09:30–15:00</dd></div>
+              <div v-if="!(sellTask && sellTask.settled)"><dt>执行窗口</dt><dd>{{ sellWindowText }}</dd></div>
             </dl>
             <p class="p12-next" data-testid="p12-sell-next">{{ sellNext }}</p>
             <div v-if="sellTask && !sellTask.settled" class="p12-form p12-sell-entry" data-testid="p12-sell-entry">
@@ -231,7 +231,7 @@ import AccountSummary from '../components/AccountSummary.vue'
 import PriceChart from '../components/PriceChart.vue'
 import accountMixin from '../accountMixin.js'
 import { loadWorkbench, newClientId, submitFill, submitOrderEvent } from '../client.js'
-import { formatMaybe, formatMoney, formatQuantity, formatTime, label, normaliseMoneyInput, reasonText, timezoneSuffix } from '../format.js'
+import { formatMaybe, formatMoney, formatQuantity, formatTime, label, nextDate, normaliseMoneyInput, reasonText, timezoneSuffix } from '../format.js'
 
 const GROUPS = ['reconcile', 'exit', 'entry', 'holding', 'unassigned', 'watch', 'ended']
 
@@ -284,19 +284,40 @@ export default {
       const settled = item.status_code === 'ENDED' || (total !== null && filled >= total && !open.length)
       return { filled, total, remaining, open, settled, planned, held }
     },
+    taskTitle () {
+      const item = this.selected
+      if (!item) return '今天的任务'
+      if (item.stage === 'exit_plan') return this.sellIsTomorrow ? '下一交易日计划' : '今天的任务'
+      return item.plan ? '下一交易日计划' : '今天的任务'
+    },
+    // true when the clock sits on the package's market_date evening: the sell
+    // is planned for the next trading day; a later clock date means the window.
+    sellIsTomorrow () {
+      const clock = (this.workbench?.clock || '').slice(0, 10)
+      const md = this.workbench?.package?.market_date || this.workbench?.publication?.market_date || ''
+      return !!clock && !!md && clock <= md
+    },
+    sellWindowText () {
+      if (this.sellTask && this.sellTask.settled) return ''
+      const md = this.workbench?.package?.market_date || this.workbench?.publication?.market_date || ''
+      if (this.sellIsTomorrow) return `次日（${nextDate(md)}）09:30–15:00`
+      const today = (this.workbench?.clock || '').slice(0, 10)
+      return `今天（${today.slice(5)}）09:30–15:00`
+    },
     sellNext () {
       const item = this.selected
       if (!item || item.stage !== 'exit_plan') return ''
       const t = this.sellTask || { filled: 0, remaining: null, settled: false, open: [], total: null }
       if (item.status_code === 'ENDED' || t.settled) {
-        const when = this.workbench?.publication?.market_date || ''
-        return `该机会已于 ${when} 卖出 ${formatQuantity(t.filled || t.total || 0)} 结束，无需操作`
+        return `该机会已卖出 ${formatQuantity(t.filled || t.total || 0)} 结束，无需操作`
       }
       if (t.filled > 0) {
         const open = t.open.length
         return `已成交 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)}；同一委托待终结确认${open ? `（${open} 笔进行中）` : ''}`
       }
-      return `今天任务：卖出 ${formatQuantity(t.total || 0)}，在交易窗口内登记实际成交`
+      return this.sellIsTomorrow
+        ? `下一交易日计划：卖出 ${formatQuantity(t.total || 0)}，在交易窗口内登记实际成交`
+        : `今天任务：卖出 ${formatQuantity(t.total || 0)}，在交易窗口内登记实际成交`
     },
     actionSentence () {
       const item = this.selected
@@ -308,7 +329,8 @@ export default {
         const t = this.sellTask || { filled: 0, remaining: Math.abs(item.applicability ? item.applicability.delta_qty : 0) }
         if (t.filled > 0) return `已卖出 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)} 待成交并在同委托终结`
         const qty = t.remaining || Math.abs((item.applicability && item.applicability.delta_qty) || 0)
-        const when = item.applicability && item.applicability.status === 'SCHEDULED' ? '次日开盘后' : '今天'
+        const md = this.workbench?.package?.market_date || this.workbench?.publication?.market_date || ''
+        const when = this.sellIsTomorrow ? `次日（${nextDate(md)}）开盘后` : '今天'
         return `${when}卖出 ${formatQuantity(qty)}，在交易窗口内登记实际成交`
       }
       if (item.action_code === 'REVIEW' && item.applicability) return label('next_step', item.applicability.next_step)
@@ -317,8 +339,7 @@ export default {
       if (item.action_code === 'HOLD') return '继续持有，等待下一次检查'
       if (item.action_code === 'NONE' && item.stage === 'exit_plan') {
         const qty = this.sellTask && this.sellTask.filled ? formatQuantity(this.sellTask.filled) : '全部持仓'
-        const when = this.workbench?.publication?.market_date || ''
-        return `该机会已于 ${when} 卖出 ${qty} 结束`
+        return `该机会已卖出 ${qty} 结束`
       }
       return '今天没有需要执行的操作'
     }

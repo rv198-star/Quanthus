@@ -91,7 +91,9 @@
 .p12-outcome { margin:0 16px 16px; padding:12px; border:1px solid #cfe3d8; border-radius:5px; background:var(--green-soft); font-size:12px; }
 .p12-outcome h3 { margin:0 0 6px; color:var(--green); font-size:14px; }
 .p12-deviation { margin:8px 0; color:var(--amber); font-weight:650; }
-.p12-section { margin-bottom:14px; }
+.p12-section { margin-bottom:14px; min-width:0; overflow:hidden; }
+.p12-section .p12-table-wrap { overflow-x:auto; }
+.p12-section .p12-table-wrap .p12-table { min-width:980px; }
 .p12-table { width:100%; border-collapse:collapse; font-size:12px; }
 .p12-table th { padding:8px 16px; border-bottom:1px solid var(--line); color:#8490a2; font-size:10px; font-weight:700; text-align:left; }
 .p12-table td { padding:9px 16px; border-bottom:1px solid #edf0f4; vertical-align:top; }
@@ -112,5 +114,6 @@
 .p12-unpublished p { margin:0; color:var(--muted); font-size:13px; }
 .p12-history { margin:6px 0 0; color:#8490a2; font-size:11px; }
 .p12-flag { display:inline-block; margin-left:4px; padding:0 5px; border-radius:3px; background:#fdf0d8; color:#9a6a00; font-size:10px; font-weight:700; }
+.p12-status-cell { white-space:nowrap; }
 .p12-sell-entry { margin:0 16px 16px; padding:12px; border:1px solid #d8e4f3; border-radius:5px; background:#f6f9fd; }
 .p12-sell-entry h3 { margin:0 0 4px; font-size:13px; }

@@ -4,35 +4,47 @@ import test from 'node:test'
 
 const workbench = readFileSync(new URL('../src/p12/views/P12Workbench.vue', import.meta.url), 'utf8')
 const funding = readFileSync(new URL('../src/p12/views/P12FundingRules.vue', import.meta.url), 'utf8')
+const fmt = readFileSync(new URL('../src/p12/format.js', import.meta.url), 'utf8')
+const has = (src, s) => assert.ok(src.includes(s), 'missing: ' + s)
 
 test('sell opportunities read consistent direction, quantity and timing', () => {
-  // A SELL action is named, not left to the generic "no operation" fallback.
-  assert.match(workbench, /action_code === 'SELL'/)
-  assert.match(workbench, /卖出 \$\{formatQuantity/)
-  // The sell task card shows held / filled / remaining / window.
-  for (const t of ['当前持有', '卖出数量', '已成交', '剩余待成交', '执行窗口']) assert.ok(workbench.includes(t), t)
-  assert.ok(workbench.includes('data-testid="p12-sell-plan"'))
-  // In-window the task offers a prefilled sell registration entry.
-  assert.ok(workbench.includes('data-testid="p12-open-sell-form"'))
-  assert.match(workbench, /side: 'sell'/)
-  // After the first fill the sentence names filled/remaining and the open terminal.
-  assert.match(workbench, /已卖出.*剩余.*待成交并在同委托终结/)
+  has(workbench, "action_code === 'SELL'")
+  assert.match(workbench, /卖出 [\s\S]*formatQuantity/)
+  for (const t of ['当前持有', '卖出数量', '已成交', '剩余待成交', '执行窗口']) has(workbench, t)
+  has(workbench, 'data-testid="p12-sell-plan"')
+  has(workbench, 'data-testid="p12-open-sell-form"')
+  has(workbench, "side: 'sell'")
+  assert.match(workbench, /已卖出[\s\S]*剩余[\s\S]*待成交并在同委托终结/)
 })
 
 test('closed exit shows history not a live ask', () => {
-  // Ended exit keeps the trigger reason as history, filtered out of "同时".
-  assert.match(workbench, /status_code === 'ENDED'/)
-  assert.match(workbench, /历史原因：/)
-  assert.match(workbench, /该机会已于 .*卖出.*结束/)
-  // The noop pane no longer says "无需操作" for an ended exit.
-  assert.ok(workbench.includes('data-testid="p12-ended-note"'))
+  has(workbench, "status_code === 'ENDED'")
+  has(workbench, '历史原因：')
+  assert.match(workbench, /该机会已卖出[\s\S]*结束/)
+  has(workbench, 'data-testid="p12-ended-note"')
+})
+
+test('sell timing wording follows clock vs package market_date', () => {
+  has(workbench, 'sellIsTomorrow')
+  has(workbench, 'nextDate(md)')
+  assert.match(workbench, /开盘后[\s\S]*卖出/)
+  has(workbench, '09:30–15:00')
+  has(workbench, 'today.slice(5)')
+  has(workbench, '下一交易日计划：卖出')
+  assert.ok(!/该机会已于/.test(workbench), 'ended sentence must not use market_date')
+  has(workbench, 'v-if="!(sellTask && sellTask.settled)"')
+  has(workbench, 'taskTitle')
+  has(fmt, 'nextDate')
 })
 
 test('off-price funding names the recorded fill and the bucket shortfall', () => {
-  assert.match(funding, /INSUFFICIENT_CASH/)
-  assert.match(funding, /成交已入账·桶内欠资/)
-  assert.match(funding, /该笔成交已记入账户账本/)
-  assert.ok(funding.includes('data-testid="p12-underfunded-flag"'))
-  // Non-overspent unknown cash keeps the original wording.
-  assert.match(funding, /未接入实际成交/)
+  has(funding, 'INSUFFICIENT_CASH')
+  has(funding, '欠资已入账')
+  has(funding, '该笔成交已记入账户账本')
+  has(funding, 'data-testid="p12-underfunded-flag"')
+  has(funding, 'bucket.target_notional')
+  has(funding, '桶预算的欠资')
+  assert.ok(!/缺口是 5,000/.test(funding), 'hint must not hard-code 5,000')
+  has(funding, '未接入实际成交')
+  has(funding, 'p12-status-cell')
 })

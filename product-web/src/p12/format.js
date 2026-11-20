@@ -53,6 +53,16 @@ export function formatTime (iso) {
   return iso.slice(0, 16).replace('T', ' ')
 }
 
+// Next calendar day, MM-DD, for an evening package whose sell runs the next
+// trading day. Date-only; weekend/holiday handling stays with the market data.
+export function nextDate (ymd) {
+  if (!ymd) return ''
+  const d = new Date(`${ymd}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return ''
+  d.setDate(d.getDate() + 1)
+  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function timezoneSuffix (iso) {
   const match = /([+-]\d{2}:\d{2}|Z)$/.exec(iso || '')
   return match ? match[1] : '+08:00'

@@ -39,6 +39,19 @@
       "note": "Use cases depend on capability public entries and their own ports. quanthus.expert_strategy is admitted only for the pre-existing R11 expert_entry bridge; moving that read behind capabilities.decision_access is recorded debt."
     },
     {
+      "id": "p12_paper",
+      "package": "quanthus.p12_paper",
+      "path": "src/quanthus/p12_paper",
+      "may_import": [
+        "quanthus.shared",
+        "quanthus.capabilities",
+        "quanthus.product_daily.application",
+        "quanthus.p12_paper",
+        "quanthus.capabilities.decision_access"
+      ],
+      "note": "Paper-trading slice: real quotes, the versioned matching rule and the persistent simulated order book. It reaches the account ledger only through the application paper_* port, never private members."
+    },
+    {
       "id": "p12_entry_adapters",
       "package": "quanthus.platform.p12",
       "path": "src/quanthus/platform/p12",
@@ -47,9 +60,12 @@
         "quanthus.product_daily.application",
         "quanthus.shared",
         "quanthus.policy",
-        "quanthus.capabilities.execution"
+        "quanthus.capabilities.execution",
+        "quanthus.capabilities.funding",
+        "quanthus.p12_paper",
+        "quanthus.capabilities.decision_access"
       ],
-      "note": "HTTP/CLI/assembly translate the contract; capabilities.execution is admitted only for the trusted assembly context (see platform-domain-imports exception)."
+      "note": "HTTP/CLI/assembly translate the contract; capabilities.execution is admitted only for the trusted assembly context (see platform-domain-imports exception). p12_paper and capabilities.funding are admitted for the paper-trading assembly and the funding write path (R1)."
     }
   ],
   "forbidden_in_core": [

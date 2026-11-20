@@ -159,6 +159,10 @@ class P12DesktopApplication:
     def scope(self) -> AccountScope:
         return self._scope
 
+    @property
+    def policy(self) -> DesktopPolicyBundle:
+        return self._policy
+
     def _require(self, scope: AccountScope) -> None:
         if scope != self._scope:
             raise FactError("UNAUTHORIZED_CONTEXT", "requested account scope is not bound here")
@@ -1523,6 +1527,40 @@ class P12DesktopApplication:
             quantity_delta=quantity_delta,
             current_fact_revision=fact_revision,
         )
+
+    # ---- paper-account fact port ---------------------------------------------------
+    # A simulated order flow posts its own fills and order observations into
+    # the same ledger through this narrow port instead of reaching private
+    # members.  The port stays inside the application layer: the caller is
+    # still bound to this application's account scope.
+    def paper_submit_report(self, report: ExecutionReport):
+        return self._facts.submit_report(self._context, report)
+
+    def paper_submit_order_observation(
+        self,
+        observation,
+        *,
+        accepted_total_qty: int,
+        side: str,
+        security_code: str,
+        price_bound,
+        estimated_fee_upper,
+    ):
+        return self._facts.submit_order_observation(
+            self._context,
+            observation,
+            accepted_total_qty=accepted_total_qty,
+            side=side,
+            security_code=security_code,
+            price_bound=price_bound,
+            estimated_fee_upper=estimated_fee_upper,
+        )
+
+    def paper_projection(self):
+        return self._facts.projection(self._context)
+
+    def paper_history(self):
+        return self._facts.history(self._context)
 
     def rebuild_matches(self, scope: AccountScope) -> bool:
         """Deterministic rebuild from baseline + events equals the stored projection."""

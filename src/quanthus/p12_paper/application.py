@@ -49,6 +49,7 @@ def _utcnow() -> datetime:
 
 @dataclass(frozen=True)
 class PaperOrder:
+    account_id: str
     order_id: str
     side: str
     security_code: str
@@ -71,6 +72,7 @@ class PaperOrder:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "account_id": self.account_id,
             "order_id": self.order_id,
             "side": self.side,
             "security_code": self.security_code,
@@ -126,6 +128,23 @@ class PaperOrderStore:
         self._clock = clock or _utcnow
         self._init()
 
+    def _migrate(self, c: sqlite3.Connection) -> None:
+        """Backfill ``account_id`` on rows written before the column existed.
+
+        Early R0 stores kept every account's orders in one table without a
+        discriminator; those rows are reassigned to ``SYN-P12-A`` (the only
+        account that could have written them) so the shared table stays
+        readable while newer writes carry their own account.
+        """
+        cols = {row[1] for row in c.execute("PRAGMA table_info(sim_orders)")}
+        if "account_id" in cols:
+            return
+        c.execute("ALTER TABLE sim_orders ADD COLUMN account_id TEXT NOT NULL DEFAULT 'SYN-P12-A'")
+
+    def _migrate_legacy(self) -> None:
+        # kept for clarity; migration runs inside _init via _migrate
+        return
+
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(self._path, isolation_level=None)
@@ -141,6 +160,7 @@ class PaperOrderStore:
             c.execute(
                 """
                 CREATE TABLE IF NOT EXISTS sim_orders(
+                  account_id TEXT NOT NULL,
                   order_id TEXT PRIMARY KEY,
                   side TEXT NOT NULL,
                   security_code TEXT NOT NULL,
@@ -162,6 +182,8 @@ class PaperOrderStore:
                 """
             )
             c.execute("CREATE INDEX IF NOT EXISTS sim_orders_status ON sim_orders(status)")
+            c.execute("CREATE INDEX IF NOT EXISTS sim_orders_account ON sim_orders(account_id, status)")
+            self._migrate(c)
 
     def get(self, order_id: str) -> PaperOrder | None:
         with self._connect() as c:
@@ -172,10 +194,10 @@ class PaperOrderStore:
 
     def insert(self, order: PaperOrder, *, fill_source_seq: str | None = None) -> None:
         vals = list(self._vals(order))
-        vals[15] = fill_source_seq
+        vals[16] = fill_source_seq
         with self._connect() as c:
             c.execute(
-                "INSERT INTO sim_orders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO sim_orders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 tuple(vals),
             )
 
@@ -192,23 +214,25 @@ class PaperOrderStore:
                 ),
             )
 
-    def list_orders(self, *, statuses: tuple[str, ...] | None = None) -> list[PaperOrder]:
-        sql = "SELECT * FROM sim_orders"
-        args: tuple[Any, ...] = ()
+    def list_orders(
+        self, account_id: str, *, statuses: tuple[str, ...] | None = None
+    ) -> list[PaperOrder]:
+        sql = "SELECT * FROM sim_orders WHERE account_id=?"
+        args: list[Any] = [account_id]
         if statuses:
-            sql += " WHERE status IN (" + ",".join("?" * len(statuses)) + ")"
-            args = statuses
+            sql += " AND status IN (" + ",".join("?" * len(statuses)) + ")"
+            args += list(statuses)
         sql += " ORDER BY accepted_at"
         with self._connect() as c:
             rows = c.execute(sql, args).fetchall()
         return [self._row(r) for r in rows]
 
-    def open_for(self, security_code: str | None = None) -> list[PaperOrder]:
-        sql = "SELECT * FROM sim_orders WHERE status='open'"
-        args: tuple[Any, ...] = ()
+    def open_for(self, account_id: str, security_code: str | None = None) -> list[PaperOrder]:
+        sql = "SELECT * FROM sim_orders WHERE account_id=? AND status='open'"
+        args: list[Any] = [account_id]
         if security_code:
             sql += " AND security_code=?"
-            args = (security_code,)
+            args.append(security_code)
         with self._connect() as c:
             rows = c.execute(sql, args).fetchall()
         return [self._row(r) for r in rows]
@@ -223,6 +247,7 @@ class PaperOrderStore:
     @staticmethod
     def _row(r: sqlite3.Row) -> PaperOrder:
         return PaperOrder(
+            account_id=r["account_id"],
             order_id=r["order_id"], side=r["side"], security_code=r["security_code"],
             security_name=r["security_name"], quantity=int(r["quantity"]),
             limit_price=Decimal(r["limit_price"]), filled_qty=int(r["filled_qty"]),
@@ -236,7 +261,8 @@ class PaperOrderStore:
     @staticmethod
     def _vals(o: PaperOrder) -> tuple[Any, ...]:
         return (
-            o.order_id, o.side, o.security_code, o.security_name, o.quantity,
+            o.account_id, o.order_id, o.side, o.security_code, o.security_name,
+            o.quantity,
             format(o.limit_price, "f"), o.filled_qty, o.status, o.rule_version,
             o.accepted_at.isoformat(),
             None if o.last_quote_time is None else o.last_quote_time.isoformat(),
@@ -260,10 +286,11 @@ class PaperAccount:
         self._store = store
         self._quotes = quotes
         self._now = now or _utcnow
+        self._account_id = app.scope.account_id
 
     # ---- queries ---------------------------------------------------------------
     def orders(self) -> list[dict[str, Any]]:
-        return [o.to_dict() for o in self._store.list_orders()]
+        return [o.to_dict() for o in self._store.list_orders(self._account_id)]
 
     def order(self, order_id: str) -> dict[str, Any] | None:
         o = self._store.get(order_id)
@@ -280,7 +307,7 @@ class PaperAccount:
             today = self._today_bought(item.security_code, trading_day)
             reserved = sum(
                 o.remaining_qty
-                for o in self._store.open_for(item.security_code)
+                for o in self._store.open_for(self._account_id, item.security_code)
                 if o.side == "sell"
             )
             positions.append({
@@ -299,17 +326,17 @@ class PaperAccount:
         }
 
     def _projection(self):
-        return self._app._facts.projection(self._app._context)
+        return self._app.paper_projection()
 
     def _history(self):
-        return self._app._facts.history(self._app._context)
+        return self._app.paper_history()
 
     def _cash(self) -> Decimal:
         return self._projection().cash
 
     def _open_buy_hold(self) -> Decimal:
         total = Decimal("0.00")
-        for o in self._store.open_for():
+        for o in self._store.open_for(self._account_id):
             if o.side == "buy":
                 total += (o.limit_price * o.remaining_qty).quantize(Decimal("0.01"))
         return total
@@ -341,7 +368,7 @@ class PaperAccount:
         today = self._today_bought(code, trading_day)
         held_sellable = max(0, held - today)
         reserved = sum(
-            o.remaining_qty for o in self._store.open_for(code) if o.side == "sell"
+            o.remaining_qty for o in self._store.open_for(self._account_id, code) if o.side == "sell"
         )
         return max(0, held_sellable - reserved)
 
@@ -378,7 +405,26 @@ class PaperAccount:
                 reason = "SELL_NOT_ALLOWED_T1" if self._today_bought(command.security_code, trading_day) > 0 else "INSUFFICIENT_POSITION"
                 return self._reject(command, reason, quote)
 
+        # Daily price band: a limit outside the security's ±band is refused
+        # up front instead of resting forever or filling at an impossible price.
+        band = self._price_band(command.security_code, quote)
+        if band is not None:
+            lo, hi = band
+            if not (lo <= command.limit_price <= hi):
+                return self._reject(command, "PRICE_OUT_OF_BOUNDS", quote)
+
+        # Supported-session admission: a resting limit order is only accepted
+        # inside continuous auction.  Orders submitted after close are refused
+        # with MARKET_CLOSED rather than parked into the next session.
+        if session["market_state"] != "trading":
+            return self._reject(command, "MARKET_CLOSED", quote)
+        if quote.status == "halt":
+            return self._reject(command, "SECURITY_SUSPENDED", quote)
+        if quote.status == "unavailable":
+            return self._reject(command, "QUOTE_UNAVAILABLE", quote)
+
         order = PaperOrder(
+            account_id=self._account_id,
             order_id=command.order_id, side=command.side,
             security_code=command.security_code,
             security_name=quote.security_name if quote.security_name != command.security_code else command.security_code,
@@ -407,6 +453,7 @@ class PaperAccount:
 
     def _reject(self, command: OrderCommand, reason: str, quote: Quote | None) -> SubmitOutcome:
         order = PaperOrder(
+            account_id=self._account_id,
             order_id=command.order_id, side=command.side,
             security_code=command.security_code,
             security_name=(quote.security_name if quote else command.security_code),
@@ -439,8 +486,7 @@ class PaperAccount:
             order_revision=1,
         )
         try:
-            result = self._app._facts.submit_order_observation(
-                self._app._context,
+            result = self._app.paper_submit_order_observation(
                 observation,
                 accepted_total_qty=order.quantity,
                 side=order.side,
@@ -473,8 +519,7 @@ class PaperAccount:
             order_revision=2,
         )
         try:
-            self._app._facts.submit_order_observation(
-                self._app._context,
+            self._app.paper_submit_order_observation(
                 observation,
                 accepted_total_qty=order.quantity,
                 side=order.side,
@@ -503,8 +548,10 @@ class PaperAccount:
         )
         if not marketable:
             return None
-        # Fill at the order's limit price (whole fill, no queue model).
-        fill_price = order.limit_price
+        # Fill at the observed last price, which the limit already bounds:
+        # the buyer never pays above their cap and the seller never fills
+        # below their floor, while a marketable order does not overpay.
+        fill_price = quote.last_price
         source_seq = f"{order.order_id}:fill:{quote.quote_time.isoformat()}"
         report = ExecutionReport(
             report_id=f"sim-fill-{uuid.uuid4().hex[:12]}",
@@ -529,7 +576,7 @@ class PaperAccount:
         # non-posted result leaves the order open so a retry still completes
         # it - the reservation is never released before the fill is proven.
         try:
-            result = self._app._facts.submit_report(self._app._context, report)
+            result = self._app.paper_submit_report(report)
         except FactError:
             self._store.update(order)
             return None
@@ -548,6 +595,54 @@ class PaperAccount:
             fill_price, order.rule_version, quote.quote_time, result.receipt_id,
         )
 
+    @staticmethod
+    def _price_band(
+        security_code: str, quote: Quote | None
+    ) -> tuple[Decimal, Decimal] | None:
+        """Daily ±price band for the security from its previous close.
+
+        Main-board A-shares (60xxxx/00xxxx) trade inside ±10%; STAR (68xxxx)
+        and ChiNext (30xxxx) inside ±20%; BSE (4xxxxx/8xxxxx/920xxx) ±30%.
+        ST/*ST names carry ±5% on main board but the name flag is not part of
+        the quote contract here, so the base band is used and the audit note
+        records the limitation.  Returns None when previous_close is missing.
+        """
+        if quote is None or quote.previous_close is None or quote.previous_close <= 0:
+            return None
+        if security_code.startswith(("68", "30")):
+            pct = Decimal("0.20")
+        elif security_code.startswith(("4", "8", "920")):
+            pct = Decimal("0.30")
+        else:
+            pct = Decimal("0.10")
+        base = quote.previous_close
+        lo = (base * (Decimal("1") - pct)).quantize(Decimal("0.01"))
+        hi = (base * (Decimal("1") + pct)).quantize(Decimal("0.01"))
+        return lo, hi
+
+    def _expire_stale_orders(self, session: dict[str, Any]) -> int:
+        """Day-close open orders accepted before the current trading day.
+
+        A resting limit order is a same-day order: it does not carry into the
+        next session.  Runs on every poll (read path and the background
+        matcher), so an unfilled order placed before the close is released
+        even when nobody opens the page.
+        """
+        trading_day = datetime.fromisoformat(session["trading_date"]).date()
+        day_done = session["market_state"] in ("call_auction_close", "closed", "holiday")
+        n = 0
+        for order in self._store.open_for(self._account_id):
+            accepted_day = order.accepted_at.astimezone(SHANGHAI).date()
+            # Cross-day orders always expire; same-day orders expire once the
+            # continuous session has finished (lunch break keeps them resting).
+            if accepted_day >= trading_day and not day_done:
+                continue
+            object.__setattr__(order, "status", "expired")
+            self._store.update(order)
+            self._observe_terminal(order, filled=order.filled_qty, cancelled=order.remaining_qty)
+            n += 1
+        return n
+
     def poll(self) -> dict[str, Any]:
         """Re-quote every open order and fill any that became marketable.
 
@@ -555,9 +650,10 @@ class PaperAccount:
         tick; a snapshot never double-fills because fills persist.
         """
         session = self._quotes.session()
+        self._expire_stale_orders(session)
         results: list[dict[str, Any]] = []
         if session["market_state"] == "trading":
-            for order in self._store.open_for():
+            for order in self._store.open_for(self._account_id):
                 quote = self._quotes.quote(order.security_code)
                 outcome = self._try_fill(order, quote, session)
                 if outcome is not None:
@@ -583,7 +679,7 @@ class PaperAccount:
         if session["market_state"] in ("trading", "lunch_break", "call_auction_close"):
             return 0
         n = 0
-        for order in self._store.open_for():
+        for order in self._store.open_for(self._account_id):
             object.__setattr__(order, "status", "expired")
             self._store.update(order)
             self._observe_terminal(order, filled=order.filled_qty, cancelled=order.remaining_qty)

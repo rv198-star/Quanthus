@@ -22,6 +22,7 @@ from wsgiref.simple_server import make_server
 
 from quanthus.platform.composition import PlatformKernel, create_platform_kernel
 from quanthus.platform.p12.assembly import build_synthetic_runtime
+from quanthus.platform.p12.http import P12AccountBinding
 from quanthus.platform.persistence import InMemoryPlatformStore
 from quanthus.policy import find_project_root
 
@@ -45,7 +46,12 @@ def build_local_kernel(
     users: dict[str, tuple[str, str]],
     clock: Callable[[], datetime] | None = None,
 ) -> PlatformKernel:
-    """users maps username -> (role, password); SYN-P12-A goes to every user but p12-other."""
+    """users maps username -> (role, password).
+
+    The dedicated ``SYN-PAPER-A`` paper account is bound for every local user
+    and owns the simulated order flow; the sealed ``SYN-P12-*`` demo accounts
+    stay readable for internal comparison but take no orders.
+    """
 
     account_users = {
         "SYN-P12-A": frozenset(name for name in users if name != "p12-other"),
@@ -54,15 +60,38 @@ def build_local_kernel(
     runtime = build_synthetic_runtime(
         state_dir=state_dir, account_users=account_users, clock=clock
     )
+    # Dedicated paper account on the system clock, empty decision source and
+    # its own fact store - the demo synthetic clock and plans never reach it.
     from quanthus.platform.p12.paper import build_paper_service
+    from quanthus.platform.p12.paper_fixture import (
+        PAPER_ACCOUNT_ID,
+        build_paper_application,
+    )
+    from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
+
+    system_clock = clock
+    paper_app = build_paper_application(
+        state_dir=state_dir,
+        policy=runtime.bindings["SYN-P12-A"].application.policy,
+        authorization=SyntheticRuntimeAuthorization(
+            "local-paper:v1", frozenset({PAPER_ACCOUNT_ID})
+        ),
+        now=system_clock,
+    )
+    bindings = dict(runtime.bindings)
+    bindings[PAPER_ACCOUNT_ID] = P12AccountBinding(
+        application=paper_app,
+        display_name="模拟账户",
+        allowed_usernames=frozenset(users),
+        synthetic=False,
+    )
+    from quanthus.platform.p12.http import P12Runtime
+    runtime = P12Runtime(runtime_ref=runtime.runtime_ref, bindings=bindings)
 
     paper = build_paper_service(
         state_dir=state_dir,
-        applications={
-            account_id: binding.application
-            for account_id, binding in runtime.bindings.items()
-        },
-        now=clock,
+        applications={PAPER_ACCOUNT_ID: paper_app},
+        now=system_clock,
     )
     kernel = create_platform_kernel(
         store=InMemoryPlatformStore(),

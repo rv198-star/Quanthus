@@ -9,6 +9,7 @@ trusted local assembly, never by the production kernel path.
 from __future__ import annotations
 
 from collections.abc import Callable
+import threading
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -35,10 +36,38 @@ class PaperService:
         quotes: QuoteService,
         intraday: IntradaySeries,
         accounts: dict[str, PaperAccount],
+        match_interval: float = 5.0,
     ) -> None:
         self._quotes = quotes
         self._intraday = intraday
         self._accounts = accounts
+        self._match_interval = match_interval
+        self._stop = threading.Event()
+        self._matcher: threading.Thread | None = None
+
+    # ---- background matching ------------------------------------------------------
+    def start(self) -> None:
+        """Start the always-on matcher so resting orders fill without a page open."""
+        if self._matcher is not None:
+            return
+        self._stop.clear()
+        self._matcher = threading.Thread(
+            target=self._match_loop, name="p12-paper-matcher", daemon=True
+        )
+        self._matcher.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._matcher is not None:
+            self._matcher.join(timeout=5)
+            self._matcher = None
+
+    def _match_loop(self) -> None:
+        while not self._stop.wait(self._match_interval):
+            try:
+                self.tick()
+            except Exception:  # noqa: BLE001 - a tick failure must not kill the matcher
+                continue
 
     # ---- market reads ------------------------------------------------------------
     def session(self) -> dict[str, Any]:
@@ -123,4 +152,6 @@ def build_paper_service(
         account_id: PaperAccount(app=app, store=store, quotes=quotes, now=clock)
         for account_id, app in applications.items()
     }
-    return PaperService(quotes=quotes, intraday=intraday, accounts=accounts)
+    service = PaperService(quotes=quotes, intraday=intraday, accounts=accounts)
+    service.start()
+    return service

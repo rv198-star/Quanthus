@@ -69,6 +69,7 @@ the P6 critical path.
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
+| P10-DATA-BASE26-FREQ-001 | Build separate daily / native-5m ODS and DWD Base 2.6 products | P10-DATA-000; #600; Hist #602; main integration #603 | [#615](https://github.com/rv198-star/Quanthus/issues/615); [input acceptance and four-product build plan](p10-base26-frequency-build.md); current inputs verified through 2026-11-10, construction planned for the 2026-11-30 cutoff |
 | P10-DATA-OPS-016 | Integrate the CN02 acquisition/container operational stack | P10-DATA-000 | [#537](https://github.com/rv198-star/Quanthus/issues/537); [source integration](p10-container-main-integration.md); release activation and full Weekly acceptance remain separate |
 | P10-DATA-SUPPLY-000 | Update the upstream reference and qualify supplementary sources | P10-DATA-000 | [#581](https://github.com/rv198-star/Quanthus/issues/581); [runtime lineage and bounded screening](p10-source-supply-20261029.md); #582–#585 track capability-specific remaining gates |
 | P10-DATA-SUPPLY-001 | Establish CN02 lineage and the updated upstream baseline | P10-DATA-SUPPLY-000 | [#582](https://github.com/rv198-star/Quanthus/issues/582); ready; bounded evidence in the supply work item |

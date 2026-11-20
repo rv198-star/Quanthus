@@ -121,9 +121,9 @@
             <div v-if="sellTask && !sellTask.settled" class="p12-form p12-sell-entry" data-testid="p12-sell-entry">
               <template v-if="sellTask.awaitingConfirmation">
                 <h3>确认卖出收尾</h3>
-                <p class="p12-hint">两笔都已成交。请按同一订单编号确认整单费用，再终结委托，资金才归回储备。系统不代为下单。</p>
+                <p class="p12-hint">两笔都已成交。{{ sellTask.feeConfirmed ? '整单费用已确认，请按同一订单编号终结委托，资金才归回储备。' : '请按同一订单编号确认整单费用，再终结委托，资金才归回储备。' }}系统不代为下单。</p>
                 <div class="p12-sell-confirm">
-                  <a-button size="small" type="primary" data-testid="p12-open-fee-form" @click="prefillConfirm('fee')">确认整单费用（已预填）</a-button>
+                  <a-button v-if="!sellTask.feeConfirmed" size="small" type="primary" data-testid="p12-open-fee-form" @click="prefillConfirm('fee')">确认整单费用（已预填）</a-button>
                   <a-button size="small" data-testid="p12-open-term-form" @click="prefillConfirm('terminal')">终结委托（已预填）</a-button>
                 </div>
               </template>
@@ -297,7 +297,11 @@ export default {
       const allFilled = total !== null && filled >= total
       const settled = item.status_code === 'ENDED' || (allFilled && !open.length && ready)
       const awaitingConfirmation = allFilled && !settled
-      return { filled, total, remaining, open, settled, awaitingConfirmation, planned, held }
+      // Money stays a decimal string end to end; "0.00" is the unfilled value.
+      const feeTotals = orders.map(o => o.fee_confirmed_total).filter(v => v && v !== '0.00')
+      const feeConfirmed = orders.length > 0 && feeTotals.length === orders.length
+      const feeTotal = feeTotals.length === 1 ? feeTotals[0] : feeTotals.join(' + ')
+      return { filled, total, remaining, open, settled, awaitingConfirmation, feeConfirmed, feeTotal, planned, held }
     },
     taskTitle () {
       const item = this.selected
@@ -327,6 +331,9 @@ export default {
         return `该机会已卖出 ${formatQuantity(t.filled || t.total || 0)} 结束，无需操作`
       }
       if (t.awaitingConfirmation) {
+        if (t.feeConfirmed) {
+          return `卖出已全部成交（${formatQuantity(t.filled || t.total || 0)}），整单费用 ${formatMoney(t.feeTotal)} 已确认，还需终结委托`
+        }
         return `卖出已全部成交（${formatQuantity(t.filled || t.total || 0)}），还需确认整单费用并终结委托`
       }
       if (t.filled > 0) {
@@ -345,6 +352,11 @@ export default {
       if (item.action_code === 'BUY' && plan) return `${formatTime(plan.eligible_at).slice(0, 10)} 开盘后买入 ${formatQuantity(item.applicability.delta_qty)}，成交价不高于 ${plan.price_cap}`
       if (item.action_code === 'SELL') {
         const t = this.sellTask || { filled: 0, remaining: Math.abs(item.applicability ? item.applicability.delta_qty : 0) }
+        if (t.filled > 0 && !t.remaining) {
+          return t.feeConfirmed
+            ? `已卖出 ${formatQuantity(t.filled)}，待终结委托`
+            : `已卖出 ${formatQuantity(t.filled)}，待确认费用并终结委托`
+        }
         if (t.filled > 0) return `已卖出 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)} 待成交并在同委托终结`
         const qty = t.remaining || Math.abs((item.applicability && item.applicability.delta_qty) || 0)
         const md = this.workbench?.package?.market_date || this.workbench?.publication?.market_date || ''
@@ -358,6 +370,9 @@ export default {
       if (item.action_code === 'NONE' && item.stage === 'exit_plan') {
         const t = this.sellTask
         if (t && t.awaitingConfirmation) {
+          if (t.feeConfirmed) {
+            return `卖出已全部成交（${formatQuantity(t.filled || t.total || 0)}），整单费用 ${formatMoney(t.feeTotal)} 已确认，还需终结委托`
+          }
           return `卖出已全部成交（${formatQuantity(t.filled || t.total || 0)}），还需确认整单费用并终结委托`
         }
         const qty = t && t.filled ? formatQuantity(t.filled) : '全部持仓'

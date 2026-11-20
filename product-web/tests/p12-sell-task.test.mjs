@@ -65,3 +65,16 @@ test('a fully filled sell waits for fee and terminal before it ends', () => {
   assert.match(workbench, /该机会已卖出[\s\S]*结束，无需操作/)
 })
 
+
+test('a fee-confirmed sell only asks for the terminal close', () => {
+  // feeConfirmed derives from the orders' fee_confirmed_total; once set the
+  // copy names the confirmed fee and only the terminal button remains.
+  has(workbench, 'fee_confirmed_total')
+  has(workbench, 'feeConfirmed')
+  assert.match(workbench, /整单费用[\s\S]*formatMoney\(t\.feeTotal\)[\s\S]*已确认，还需终结委托/)
+  has(workbench, 'v-if="!sellTask.feeConfirmed"')
+  // Remaining zero no longer says "剩余 0 股 待成交并在同委托终结".
+  assert.match(workbench, /t\.filled > 0 && !t\.remaining/)
+  assert.match(workbench, /待确认费用并终结委托/)
+  assert.match(workbench, /已卖出[\s\S]*待终结委托/)
+})

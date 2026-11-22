@@ -8,7 +8,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +89,18 @@ _EMPTY_EVIDENCE = CycleSettlementEvidence(
     fees_known=True,
     conflicts_clear=True,
 )
+
+
+def _optional_decimal(value: object) -> Decimal | None:
+    if value is None or isinstance(value, bool) or value == "":
+        return None
+    if isinstance(value, Decimal):
+        return value if value.is_finite() else None
+    try:
+        parsed = Decimal(str(value))
+    except InvalidOperation:
+        return None
+    return parsed if parsed.is_finite() else None
 
 
 class SQLiteSyntheticFactsAdapter:
@@ -2797,7 +2809,7 @@ class SQLiteSyntheticFactsAdapter:
                         ),
                         "side": event.get("side"),
                         "quantity": event.get("quantity"),
-                        "price": event.get("price"),
+                        "price": _optional_decimal(event.get("price")),
                     }
                 )
             connection.commit()

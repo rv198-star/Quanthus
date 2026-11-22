@@ -219,3 +219,135 @@ def test_page_reports_real_gap_as_mismatch(tmp_path: Path) -> None:
     assert len(funding.pending_attributions) == 3
 
 
+def test_pending_attributions_serialize_through_funding_rules_dto_and_http(
+    tmp_path: Path,
+) -> None:
+    """Pending attributions convert price to Decimal so DTO & HTTP GET return 200."""
+    import io
+    import json
+
+    from quanthus.platform.composition import create_platform_kernel
+    from quanthus.platform.p12.http import P12AccountBinding, P12Runtime
+    from quanthus.platform.p12.local_server import LocalMfaDisabledCipher
+    from quanthus.platform.p12.transport import funding_rules_dto
+    from quanthus.platform.persistence import InMemoryPlatformStore
+
+    app = _app(tmp_path)
+    opening, partition = _initial(app)
+    app.bind_funding(app.scope, partition)
+    _trade(app, "B-BUY", "000001", "buy", 40, "10.22", 19)
+    _trade(app, "C-BUY", "000002", "buy", 40, "10.00", 19)
+    _trade(app, "D-BUY", "000003", "buy", 40, "10.50", 19)
+    assert _cash(app)["account"] == opening - Decimal("1228.80")
+
+    dto = funding_rules_dto(app.funding_rules(app.scope))
+    pending = dto["funding"]["pending_attributions"]
+    assert dto["funding"]["status_reason"] == "FUNDING_PENDING_ATTRIBUTION"
+    assert [(p["security_code"], p["price"], p["cash_delta"]) for p in pending] == [
+        ("000001", "10.22", "-408.80"),
+        ("000002", "10.00", "-400.00"),
+        ("000003", "10.50", "-420.00"),
+    ]
+
+    runtime = P12Runtime(
+        runtime_ref="test-p12-r4:v1",
+        bindings={
+            ACCOUNT: P12AccountBinding(
+                application=app,
+                display_name="Test Account",
+                allowed_usernames=frozenset({"p12-tester"}),
+                synthetic=True,
+            )
+        },
+    )
+    kernel = create_platform_kernel(
+        store=InMemoryPlatformStore(),
+        cipher=LocalMfaDisabledCipher(),
+        p12_runtime=runtime,
+    )
+    kernel.migrate()
+    kernel.identity.create_user(username="p12-tester", password="test-pass-123", role="operator")
+
+    def wsgi_call(
+        method: str,
+        path: str,
+        body: dict | None = None,
+        token: str | None = None,
+    ) -> tuple[int, dict]:
+        raw = json.dumps(body).encode("utf-8") if body is not None else b""
+        environ = {
+            "REQUEST_METHOD": method,
+            "PATH_INFO": path,
+            "QUERY_STRING": "",
+            "CONTENT_LENGTH": str(len(raw)),
+            "CONTENT_TYPE": "application/json",
+            "wsgi.input": io.BytesIO(raw),
+        }
+        if token:
+            environ["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+        captured: dict[str, int] = {}
+
+        def start_response(status: str, _headers: list[tuple[str, str]]) -> None:
+            captured["status"] = int(status.split(" ", 1)[0])
+
+        payload = b"".join(kernel.app(environ, start_response)).decode("utf-8")
+        return captured["status"], json.loads(payload)
+
+    login_status, login_body = wsgi_call(
+        "POST",
+        "/api/platform/v1/auth/login",
+        {"username": "p12-tester", "password": "test-pass-123"},
+    )
+    assert login_status == 200
+    status, payload = wsgi_call(
+        "GET",
+        f"/api/p12/v1/accounts/{ACCOUNT}/funding-rules",
+        token=login_body["token"],
+    )
+    assert status == 200
+    assert payload["funding"]["status_reason"] == "FUNDING_PENDING_ATTRIBUTION"
+    assert [
+        (p["order_id"], p["security_code"], p["price"], p["cash_delta"])
+        for p in payload["funding"]["pending_attributions"]
+    ] == [
+        ("B-BUY", "000001", "10.22", "-408.80"),
+        ("C-BUY", "000002", "10.00", "-400.00"),
+        ("D-BUY", "000003", "10.50", "-420.00"),
+    ]
+
+
+def test_pending_attribution_service_defensively_coerces_price(tmp_path: Path) -> None:
+    """Service converts string prices and turns empty/invalid values into None."""
+    from quanthus.platform.p12.transport import funding_rules_dto
+
+    app = _app(tmp_path)
+    _, partition = _initial(app)
+    app.bind_funding(app.scope, partition)
+    _trade(app, "B-BUY", "000001", "buy", 40, "10.22", 19)
+    _trade(app, "C-BUY", "000002", "buy", 40, "10.00", 19)
+    _trade(app, "D-BUY", "000003", "buy", 40, "10.50", 19)
+
+    original = app._facts.funding_unattributed_fills
+
+    def raw_string_and_bad_prices(context):
+        items = list(original(context))
+        items[0] = {**items[0], "price": "10.22"}
+        items[1] = {**items[1], "price": ""}
+        items[2] = {**items[2], "price": "NaN"}
+        return tuple(items)
+
+    app._facts.funding_unattributed_fills = raw_string_and_bad_prices
+    view = app.funding_rules(app.scope)
+    assert [p.price for p in view.funding.pending_attributions] == [
+        Decimal("10.22"),
+        None,
+        None,
+    ]
+    dto = funding_rules_dto(view)
+    assert [p["price"] for p in dto["funding"]["pending_attributions"]] == [
+        "10.22",
+        None,
+        None,
+    ]
+
+

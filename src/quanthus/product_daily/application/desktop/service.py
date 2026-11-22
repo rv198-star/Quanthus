@@ -13,7 +13,7 @@ import json
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from quanthus.capabilities.accounting import AccountProjection, Position, value_account
 from quanthus.capabilities.decision_access import (
@@ -131,6 +131,18 @@ def _marks(decisions: MarketDecisionSet) -> dict[str, Decimal]:
 
 def _valuation_ref(decisions: MarketDecisionSet) -> str:
     return f"{decisions.source_ref.ref_id}@{decisions.market_date.isoformat()}:close"
+
+
+def _optional_decimal(value: object) -> Decimal | None:
+    if value is None or isinstance(value, bool) or value == "":
+        return None
+    if isinstance(value, Decimal):
+        return value if value.is_finite() else None
+    try:
+        parsed = Decimal(str(value))
+    except InvalidOperation:
+        return None
+    return parsed if parsed.is_finite() else None
 
 
 class P12DesktopApplication:
@@ -549,7 +561,7 @@ class P12DesktopApplication:
                             cash_delta=item["cash_delta"],
                             side=item.get("side"),
                             quantity=item.get("quantity"),
-                            price=item.get("price"),
+                            price=_optional_decimal(item.get("price")),
                         )
                         for item in unattributed
                     )

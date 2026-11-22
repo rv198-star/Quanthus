@@ -255,3 +255,82 @@ def test_pre_binding_fill_upgrades_into_empty_bucket(env):
         b.cycle_id is not None and "600000" in b.cycle_id
         for b in fs[0].buckets
     )
+
+
+def test_paper_application_reopens_across_calendar_days(tmp_path):
+    """Reopening SYN-PAPER-A on a later day stays append-only and keeps baseline."""
+    from quanthus.platform.adapters.p12_synthetic_fixture import load_synthetic_fixture
+    from quanthus.platform.p12.paper_fixture import (
+        PAPER_ACCOUNT_ID,
+        build_paper_application,
+    )
+    from quanthus.policy import find_project_root
+    from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
+
+    fixture = load_synthetic_fixture(find_project_root() / "config/p12/synthetic-desktop.v1.json")
+    auth = SyntheticRuntimeAuthorization(
+        "local-paper:test", frozenset({PAPER_ACCOUNT_ID})
+    )
+    day1 = datetime(2026, 11, 20, 19, 47, 30, tzinfo=timezone.utc)
+    day2 = datetime(2026, 11, 23, 1, 50, 0, tzinfo=timezone.utc)
+    build_paper_application(
+        state_dir=tmp_path,
+        policy=fixture.policy,
+        authorization=auth,
+        now=lambda: day1,
+    )
+    reopened = build_paper_application(
+        state_dir=tmp_path,
+        policy=fixture.policy,
+        authorization=auth,
+        now=lambda: day2,
+    )
+    wb = reopened.workbench(reopened.scope)
+    assert wb.package.market_date.isoformat() == "2026-11-23"
+    assert wb.account.cash_total == Decimal("100000.00")
+
+
+def test_paper_application_reopen_still_rejects_tampered_digest(tmp_path):
+    """Retaining prior dates never relaxes stored package digest verification."""
+    import json
+    import sqlite3
+
+    from quanthus.platform.adapters.p12_synthetic_fixture import load_synthetic_fixture
+    from quanthus.platform.p12.paper_fixture import (
+        PAPER_ACCOUNT_ID,
+        PAPER_FACTS_STORE,
+        build_paper_application,
+    )
+    from quanthus.policy import find_project_root
+    from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
+    from quanthus.shared.fact_contracts import FactError
+
+    fixture = load_synthetic_fixture(find_project_root() / "config/p12/synthetic-desktop.v1.json")
+    auth = SyntheticRuntimeAuthorization(
+        "local-paper:test", frozenset({PAPER_ACCOUNT_ID})
+    )
+    day1 = datetime(2026, 11, 20, 19, 47, 30, tzinfo=timezone.utc)
+    day2 = datetime(2026, 11, 23, 1, 50, 0, tzinfo=timezone.utc)
+    build_paper_application(
+        state_dir=tmp_path,
+        policy=fixture.policy,
+        authorization=auth,
+        now=lambda: day1,
+    )
+    with sqlite3.connect(tmp_path / PAPER_FACTS_STORE) as db:
+        row = db.execute("SELECT binding_json FROM configuration_bindings").fetchone()
+        binding = json.loads(row[0])
+        binding["decision_source"]["package_digests"]["2026-11-20"] = "sha256:tampered"
+        db.execute(
+            "UPDATE configuration_bindings SET binding_json = ?",
+            (json.dumps(binding),),
+        )
+        db.commit()
+
+    with pytest.raises(FactError, match="CONFIGURATION_BINDING_MISMATCH"):
+        build_paper_application(
+            state_dir=tmp_path,
+            policy=fixture.policy,
+            authorization=auth,
+            now=lambda: day2,
+        )

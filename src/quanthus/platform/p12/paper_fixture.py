@@ -8,9 +8,9 @@ or placeholder security names.  Demo accounts stay for internal comparison.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import replace as _dc_replace
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -42,16 +42,29 @@ class PaperDecisionSource:
     """An always-empty decision package: the paper account has no system plan.
 
     It returns a validated empty ``MarketDecisionSet`` so the desktop binds
-    and serves pages without surfacing any written-off demo plan.
+    and serves pages without surfacing any written-off demo plan.  Earlier
+    bound dates stay in ``history()`` so reopening an existing paper store on
+    a later calendar day remains strictly append-only under configuration
+    binding verification.
     """
 
-    def __init__(self, now: Callable[[], datetime]) -> None:
+    def __init__(
+        self,
+        now: Callable[[], datetime],
+        *,
+        prior_dates: Iterable[date] = (),
+    ) -> None:
         self._now = now
+        self._prior_dates = tuple(sorted(set(prior_dates)))
+        self._cache: dict[date, MarketDecisionSet] = {}
 
-    def _set(self) -> MarketDecisionSet:
-        today = self._now().date()
+    def _set(self, market_date: date | None = None) -> MarketDecisionSet:
+        today = market_date or self._now().date()
+        cached = self._cache.get(today)
+        if cached is not None:
+            return cached
         cutoff = datetime(today.year, today.month, today.day, 0, 0, tzinfo=timezone.utc)
-        return MarketDecisionSet(
+        decision_set = MarketDecisionSet(
             source_ref=VersionRef(
                 "p12-paper-decisions", "v1", digest({"ref": "p12-paper-decisions", "v": 1})
             ),
@@ -66,15 +79,42 @@ class PaperDecisionSource:
             next_session=today.fromordinal(today.toordinal() + 1),
             decisions=(),
         )
+        self._cache[today] = decision_set
+        return decision_set
+
+    def _history_dates(self) -> tuple[date, ...]:
+        today = self._now().date()
+        return tuple(sorted({*(d for d in self._prior_dates if d <= today), today}))
 
     def current(self, scope) -> MarketDecisionSet:  # noqa: ANN001
         return self._set()
 
     def published(self, scope) -> tuple[MarketDecisionSet, ...]:  # noqa: ANN001
-        return (self._set(),)
+        return tuple(self._set(day) for day in self._history_dates())
 
     def history(self, scope) -> tuple[MarketDecisionSet, ...]:  # noqa: ANN001
-        return (self._set(),)
+        return tuple(self._set(day) for day in self._history_dates())
+
+
+def _bound_empty_paper_dates(existing) -> tuple[date, ...]:  # noqa: ANN001
+    """Extract previously bound market dates for the empty paper source."""
+    if existing is None:
+        return ()
+    source = existing.binding.get("decision_source", {})
+    if source.get("ref_id") != "p12-paper-decisions" or source.get("version") != "v1":
+        return ()
+    digests = source.get("package_digests")
+    if not isinstance(digests, dict):
+        return ()
+    dates: list[date] = []
+    for raw_day in digests:
+        if not isinstance(raw_day, str):
+            continue
+        try:
+            dates.append(date.fromisoformat(raw_day))
+        except ValueError:
+            continue
+    return tuple(sorted(set(dates)))
 
 
 class PaperReplayDecisionSource:
@@ -146,13 +186,18 @@ def build_paper_application(
         trial_fraction=policy.funding.trial_fraction,
     )
     paper_policy = _dc_replace(policy, funding=paper_funding)
+    if decision_source is None:
+        prior_dates = _bound_empty_paper_dates(facts.configuration_binding(context))
+        resolved_decisions = PaperDecisionSource(clock, prior_dates=prior_dates)
+    else:
+        resolved_decisions = decision_source
     app = P12DesktopApplication(
         scope=__import__("quanthus.shared.values", fromlist=["AccountScope"]).AccountScope(
             PAPER_ACCOUNT_ID, "synthetic"
         ),
         context=context,
         facts=facts,
-        decisions=decision_source or PaperDecisionSource(clock),
+        decisions=resolved_decisions,
         policy=paper_policy,
         clock=clock,
         clock_kind="system",

@@ -1,0 +1,31 @@
+{
+  "schema": "quanthus.p10.sidecar-consumer-resource-policy.v1",
+  "status": "CANDIDATE_BUDGET_NOT_CONSUMER_ACTIVATION",
+  "work_item": "P10-DATA-P12-DAILY-001",
+  "governing_adr": "docs/architecture/adr-0016-value-proportional-warehouse-quality.md",
+  "purpose_id": "P11-R11-FORWARD-DAY1-20261124",
+  "real_product": "P10 sidecar metadata for one prebound P11 day1 delivery; source payload bytes excluded",
+  "risk": "unbounded metadata parse/store/list cost can exhaust the named intake budget; does not require a warehouse-wide member-count threshold",
+  "cost_boundary": "check supplied caps on metadata counts, path bytes, serialized record/envelope bytes, enumerated event-dir files, committed store bytes and events; no market payload reads/rehash",
+  "resource_limits": {
+    "policy_id": "p11-day1-sidecar-metadata-bounds-20261124-v1",
+    "max_members": null,
+    "max_evidence": null,
+    "max_record_bytes": 262144,
+    "max_events": null,
+    "max_files": null,
+    "max_store_bytes": 262144,
+    "max_path_bytes": null
+  },
+  "configuration_scope": "example for explicit dedicated one-purpose/day1 metadata root; not a shared multi-day warehouse store policy",
+  "unknown_bounds": "counts/path limits pending exact consumer closure. Null stays explicitly unconfigured in Assessment.boundary_notes; no implicit1000 limit",
+  "outer_consumer_budget": {
+    "wall_seconds": 900,
+    "requests": 8,
+    "total_metadata_bytes": 262144,
+    "owner": "P11 actual intake; code above caps only the sidecar component, other metadata shares the same outer total. It does not enforce network/time or claim the complete delivery fits."
+  },
+  "final_binding": "member/evidence/path counts and actual sidecar byte share frozen by consumer config; policy remains nonactivated until source/M0/channel/pool closure",
+  "source_qualification": "SOURCE_OBSERVED remains SOURCE_QUALIFICATION_UNBOUND in current isolated library, including plausible-looking URIs; real adapter not implemented",
+  "production_change": false
+}

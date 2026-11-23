@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
@@ -11,14 +12,180 @@ from quanthus.p10_daily_sidecar import (
     SCHEMA,
     ConsumerConfig,
     InputVerification,
+    ResourceLimits,
     SidecarError,
     SidecarStore,
     assess,
+    canonical,
     input_identity,
     inventory_digest,
     record_id,
     select_as_of,
 )
+
+
+def test_audit_source_fixture_never_receives_source_observed_review():
+    record, cfg, receipt = specimen(grade="SOURCE_OBSERVED")
+    assert assess(record, cfg, receipt).disposition != "CLOCKS_COMPLETE_FOR_CONSUMER_REVIEW"
+
+
+def test_audit_corrupt_committed_parent_prevents_append(tmp_path):
+    old, cfg, receipt = specimen()
+    store = SidecarStore(tmp_path / "audit-parent", cfg, protected_roots=[])
+    store.append(old, receipt)
+    old["publication"]["publisher"] = ""
+    seal(old)
+    path = next((store.root / "records").glob("*.json"))
+    stored = json.loads(path.read_bytes())
+    if "record" in stored:
+        stored["record"] = old
+    else:
+        stored = old
+    path.unlink()
+    path.with_name(f"00000001-{old['record_id'][7:]}.json").write_bytes(canonical(stored))
+    new = withdraw(old)
+    new["publication"]["publisher"] = "fixture-publisher"
+    seal(new)
+    with pytest.raises(SidecarError):
+        store.append(new, verification(new, cfg))
+    assert len(list((store.root / "records").glob("*.json"))) == 1
+
+
+def test_audit_withdrawal_cannot_replace_payload_members(tmp_path):
+    old, cfg, receipt = specimen()
+    changed = withdraw(old)
+    changed["members"][0]["sha256"] = sha("9")
+    changed["publication"]["covered_inventory_sha256"] = inventory_digest(changed["members"])
+    seal(changed)
+    store = SidecarStore(tmp_path / "audit-withdrawal", cfg, protected_roots=[])
+    store.append(old, receipt)
+    with pytest.raises(SidecarError, match="WITHDRAWAL_INVENTORY_MISMATCH"):
+        store.append(changed, verification(changed, cfg))
+
+
+def test_observed_looking_uri_does_not_replace_source_qualification():
+    record, cfg, _ = specimen(grade="SOURCE_OBSERVED")
+    for ref in record["source"].values():
+        ref["uri"] = "cn02:/qualified-looking/" + ref["uri"].split(":")[-1]
+    for proof in record["evidence"]:
+        proof["uri"] = "cn02:/qualified-looking/" + proof["id"]
+    seal(record)
+    receipt = replace(verification(record, cfg), uri="cn02:/qualified-looking/verified")
+    result = assess(record, cfg, receipt)
+    assert result.disposition == "INPUT_OR_CLOCK_BLOCKED"
+    assert "SOURCE_QUALIFICATION_UNBOUND" in result.blockers
+
+
+@pytest.mark.parametrize(
+    "field", ["sha256", "path", "size_bytes", "source_version", "available_at", "state"]
+)
+def test_whole_version_withdrawal_preserves_exact_original_members(field):
+    old, cfg, _ = specimen()
+    new = withdraw(old)
+    member = new["members"][0]
+    values = {
+        "sha256": sha("9"),
+        "path": "different.parquet",
+        "size_bytes": 11,
+        "source_version": "changed",
+        "available_at": clock("19:02:00", "consumer_channel_visible", "members-visible"),
+        "state": "WITHDRAWN",
+    }
+    member[field] = values[field]
+    if field == "state":
+        member["unavailable_reason"] = "claimed-partial-withdrawal"
+    new["publication"]["covered_inventory_sha256"] = inventory_digest(new["members"])
+    seal(new)
+    with pytest.raises(SidecarError, match="WITHDRAWAL_INVENTORY_MISMATCH"):
+        assess(new, cfg, verification(new, cfg), previous=old)
+
+
+def test_persisted_receipt_is_rechecked_before_another_append(tmp_path):
+    old, cfg, receipt = specimen()
+    store = SidecarStore(tmp_path / "receipt", cfg, protected_roots=[])
+    store.append(old, receipt)
+    path = next((store.root / "records").glob("*.json"))
+    stored = json.loads(path.read_bytes())
+    assert stored["verification"]["input_identity"] == receipt.input_identity
+    stored["verification"]["sha256"] = sha("9")
+    path.write_bytes(canonical(stored))
+    with pytest.raises(SidecarError, match="VERIFICATION_EVIDENCE_MISMATCH"):
+        store.append(withdraw(old), receipt)
+    assert len(list((store.root / "records").glob("*.json"))) == 1
+
+
+@pytest.mark.parametrize(
+    "field,value,reason",
+    [
+        ("max_evidence", 4, "MAX_EVIDENCE_EXCEEDED"),
+        ("max_path_bytes", 4, "MAX_PATH_BYTES_EXCEEDED"),
+        ("max_record_bytes", 100, "MAX_RECORD_BYTES_EXCEEDED"),
+    ],
+)
+def test_injected_consumer_limits_bound_metadata_admission(field, value, reason):
+    cfg = replace(config(), resource_limits=ResourceLimits("bounded-test-v1", **{field: value}))
+    record, _, receipt = specimen(cfg)
+    with pytest.raises(SidecarError, match=reason):
+        assess(record, cfg, receipt)
+    assert ConsumerConfig.from_dict(cfg.to_dict()) == cfg
+
+
+def test_member_limit_is_consumer_specific_without_a_global_thousand_cap():
+    large = replace(
+        config(),
+        requirements=config().requirements + tuple((f"optional-{i}", False) for i in range(1000)),
+    )
+    record, cfg, receipt = specimen(large)
+    result = assess(record, cfg, receipt)
+    assert result.disposition == "TEST_ONLY"
+    assert "UNCONFIGURED_RESOURCE_BOUND:max_members" in result.boundary_notes
+    with pytest.raises(SidecarError, match="MAX_MEMBERS_EXCEEDED"):
+        replace(large, resource_limits=ResourceLimits("specific-two-member-use-v1", max_members=2))
+
+
+@pytest.mark.parametrize(
+    "field,reason", [("max_events", "MAX_EVENTS_EXCEEDED"), ("max_files", "MAX_FILES_EXCEEDED")]
+)
+def test_consumer_event_and_file_cap_preserves_retry_and_rejects_new_append(
+    tmp_path, field, reason
+):
+    cfg = replace(config(), resource_limits=ResourceLimits("single-event-test-v1", **{field: 1}))
+    old, _, receipt = specimen(cfg)
+    store = SidecarStore(tmp_path / field, cfg, protected_roots=[])
+    assert store.append(old, receipt)
+    assert not store.append(old, receipt)
+    with pytest.raises(SidecarError, match=reason):
+        store.append(withdraw(old), receipt)
+    assert store.read() == [old]
+
+
+def test_store_bytes_budget_does_not_change_payload_size_policy(tmp_path):
+    cfg = replace(
+        config(), resource_limits=ResourceLimits("small-metadata-store-test-v1", max_store_bytes=1)
+    )
+    record, _, receipt = specimen(cfg)
+    record["members"][0]["size_bytes"] = 10**12
+    record["publication"]["covered_inventory_sha256"] = inventory_digest(record["members"])
+    seal(record)
+    receipt = verification(record, cfg)
+    assert not assess(record, cfg, receipt).blockers
+    store = SidecarStore(tmp_path / "tiny-budget", cfg, protected_roots=[])
+    with pytest.raises(SidecarError, match="MAX_STORE_BYTES_EXCEEDED"):
+        store.append(record, receipt)
+    assert not list((store.root / "records").glob("*.json"))
+
+
+def test_record_file_is_size_checked_before_reading_or_parsing(tmp_path):
+    cfg = replace(
+        config(), resource_limits=ResourceLimits("file-read-budget-test-v1", max_record_bytes=20000)
+    )
+    record, _, receipt = specimen(cfg)
+    store = SidecarStore(tmp_path / "read-limit", cfg, protected_roots=[])
+    store.append(record, receipt)
+    path = next((store.root / "records").glob("*.json"))
+    path.write_bytes(b" " * 20001)
+    with pytest.raises(SidecarError, match="MAX_RECORD_BYTES_EXCEEDED"):
+        store.read()
 
 
 def sha(letter):
@@ -63,7 +230,7 @@ def verification(record, cfg):
     )
 
 
-def specimen(cfg=None, *, grade="SOURCE_OBSERVED"):
+def specimen(cfg=None, *, grade="SYNTHETIC"):
     cfg = cfg or config()
     members = [
         {
@@ -186,7 +353,7 @@ def select(records, cfg, receipts, cutoff="2026-11-24T22:30:00+08:00"):
 def test_complete_metadata_is_for_consumer_review_only():
     record, cfg, receipt = specimen()
     result = assess(record, cfg, receipt)
-    assert result.disposition == "CLOCKS_COMPLETE_FOR_CONSUMER_REVIEW"
+    assert result.disposition == "TEST_ONLY"
     assert not result.blockers
     assert record["consumer_receipt"] is None
     assert ConsumerConfig.from_dict(cfg.to_dict()) == cfg
@@ -310,7 +477,7 @@ def test_non_source_batch_proof_cannot_skip_a_member():
 
 
 def test_synthetic_proof_cannot_be_promoted():
-    record, cfg, receipt = specimen()
+    record, cfg, receipt = specimen(grade="SOURCE_OBSERVED")
     record["evidence"][3]["kind"] = "SYNTHETIC_FIXTURE"
     seal(record)
     with pytest.raises(SidecarError, match="SYNTHETIC_EVIDENCE_NOT_REAL"):
@@ -498,7 +665,7 @@ def test_no_payload_reads_are_needed_for_same_identity_verification(tmp_path, mo
     monkeypatch.setattr(Path, "read_bytes", guarded)
     store = SidecarStore(tmp_path / "metadata", cfg, protected_roots=[protected])
     assert store.append(record, receipt)
-    assert assess(record, cfg, receipt).disposition == "CLOCKS_COMPLETE_FOR_CONSUMER_REVIEW"
+    assert assess(record, cfg, receipt).disposition == "TEST_ONLY"
 
 
 def test_known_late_publication_with_unknown_visibility_cannot_revoke_past_snapshot():
@@ -519,7 +686,7 @@ def test_source_after_observation_close_can_meet_explicit_evening_deadline():
 
 
 def test_historical_close_cutoff_is_not_rolled_forward():
-    record, cfg, _ = specimen()
+    record, cfg, _ = specimen(grade="HISTORICAL_METADATA_ONLY")
     record["binding"]["decision_cutoff"] = "2026-11-24T15:00:00+08:00"
     seal(record)
     result = assess(record, cfg, verification(record, cfg))

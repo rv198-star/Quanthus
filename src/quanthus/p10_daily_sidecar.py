@@ -14,7 +14,7 @@ import re
 import tempfile
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -22,7 +22,9 @@ from zoneinfo import ZoneInfo
 
 SCHEMA = "quanthus.p10.daily-consumer-sidecar.v1"
 CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v1"
-RUNTIME_VERSION = "p10-daily-consumer-sidecar-runtime-v1"
+BOUNDED_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v1.1"
+RUNTIME_VERSION = "p10-daily-consumer-sidecar-runtime-v1.1"
+STORE_SCHEMA = "quanthus.p10.sidecar-verified-event-envelope.v1"
 _SHA = re.compile(r"sha256:[0-9a-f]{64}")
 _REVISION = re.compile(r"[0-9a-f]{40}")
 
@@ -98,6 +100,34 @@ def _path(value: Any) -> str:
 
 
 @dataclass(frozen=True)
+class ResourceLimits:
+    """Versioned consumer metadata budgets, never a warehouse-wide member threshold."""
+
+    policy_id: str
+    max_members: int | None = None
+    max_evidence: int | None = None
+    max_record_bytes: int | None = None
+    max_events: int | None = None
+    max_files: int | None = None
+    max_store_bytes: int | None = None
+    max_path_bytes: int | None = None
+
+    def __post_init__(self) -> None:
+        _text(self.policy_id, "RESOURCE_POLICY_REQUIRED")
+        for name, value in asdict(self).items():
+            if name != "policy_id" and value is not None:
+                _require(type(value) is int and value > 0, "INVALID_RESOURCE_LIMIT")
+
+    def check(self, name: str, amount: int) -> None:
+        limit = getattr(self, name)
+        _require(limit is None or amount <= limit, name.upper() + "_EXCEEDED")
+
+    @classmethod
+    def from_dict(cls, raw: Any) -> ResourceLimits:
+        return cls(**_object(raw, set(cls.__dataclass_fields__), "INVALID_RESOURCE_LIMITS"))
+
+
+@dataclass(frozen=True)
 class ConsumerConfig:
     """Versioned consumer requirements; a null field/pool binding stays blocked."""
 
@@ -109,6 +139,7 @@ class ConsumerConfig:
     policy_sha256: str
     code_revision: str
     requirements: tuple[tuple[str, bool], ...]
+    resource_limits: ResourceLimits | None = None
 
     def __post_init__(self) -> None:
         for value in (self.config_id, self.consumer_id, self.purpose_id):
@@ -133,10 +164,13 @@ class ConsumerConfig:
             ids.append(name)
         _require(len(ids) == len(set(ids)), "DUPLICATE_REQUIREMENT")
         _require(any(required for _, required in self.requirements), "HARD_REQUIREMENT_REQUIRED")
+        if self.resource_limits is not None:
+            _require(isinstance(self.resource_limits, ResourceLimits), "INVALID_RESOURCE_LIMITS")
+            self.resource_limits.check("max_members", len(self.requirements))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema": CONFIG_SCHEMA,
+        result: dict[str, Any] = {
+            "schema": BOUNDED_CONFIG_SCHEMA if self.resource_limits else CONFIG_SCHEMA,
             "config_id": self.config_id,
             "consumer_id": self.consumer_id,
             "purpose_id": self.purpose_id,
@@ -148,9 +182,13 @@ class ConsumerConfig:
                 {"id": name, "required": required} for name, required in sorted(self.requirements)
             ],
         }
+        if self.resource_limits:
+            result["resource_limits"] = asdict(self.resource_limits)
+        return result
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> ConsumerConfig:
+        bounded = raw.get("schema") == BOUNDED_CONFIG_SCHEMA
         obj = _object(
             raw,
             {
@@ -163,11 +201,13 @@ class ConsumerConfig:
                 "policy_sha256",
                 "code_revision",
                 "requirements",
-            },
+            }
+            | ({"resource_limits"} if bounded else set()),
             "INVALID_CONSUMER_CONFIG",
         )
         _require(
-            obj["schema"] == CONFIG_SCHEMA and isinstance(obj["requirements"], list),
+            obj["schema"] in {CONFIG_SCHEMA, BOUNDED_CONFIG_SCHEMA}
+            and isinstance(obj["requirements"], list),
             "INVALID_CONSUMER_CONFIG",
         )
         requirements = []
@@ -183,6 +223,7 @@ class ConsumerConfig:
             obj["policy_sha256"],
             obj["code_revision"],
             tuple(requirements),
+            ResourceLimits.from_dict(obj["resource_limits"]) if bounded else None,
         )
 
     @property
@@ -267,12 +308,17 @@ class InputVerification:
             "semantic": "validation_complete",
         }
 
+    @classmethod
+    def from_dict(cls, raw: Any) -> InputVerification:
+        return cls(**_object(raw, set(cls.__dataclass_fields__), "INVALID_STORED_VERIFICATION"))
+
 
 @dataclass(frozen=True)
 class Assessment:
     disposition: str
     blockers: tuple[str, ...]
     member_blockers: tuple[tuple[str, tuple[str, ...]], ...]
+    boundary_notes: tuple[str, ...] = ()
 
 
 _TOP = {
@@ -331,7 +377,11 @@ def assess(
     previous: Mapping[str, Any] | None = None,
 ) -> Assessment:
     """Validate metadata only. Complete source evidence still requires consumer qualification."""
-    record = _object(_strict_json(canonical(dict(value))), _TOP, "INVALID_RECORD_SCHEMA")
+    raw = canonical(dict(value))
+    limits = config.resource_limits
+    if limits:
+        limits.check("max_record_bytes", len(raw))
+    record = _object(_strict_json(raw), _TOP, "INVALID_RECORD_SCHEMA")
     _require(record["schema"] == SCHEMA, "UNSUPPORTED_SCHEMA")
     _require(record["record_id"] == record_id(record), "RECORD_ID_MISMATCH")
     grade = record["evidence_grade"]
@@ -369,6 +419,8 @@ def assess(
         _sha(ref["sha256"])
     members = record["members"]
     _require(isinstance(members, list), "MEMBERS_REQUIRED")
+    if limits:
+        limits.check("max_members", len(members))
     required = dict(config.requirements)
     found = []
     paths = []
@@ -377,6 +429,8 @@ def assess(
         name = _text(m["id"], "MEMBER_ID_REQUIRED")
         found.append(name)
         paths.append(_path(m["path"]))
+        if limits:
+            limits.check("max_path_bytes", len(m["path"].encode("utf-8")))
         _require(
             name in required and type(m["required"]) is bool and required[name] == m["required"],
             "MEMBER_REQUIREMENT_CHANGED",
@@ -396,6 +450,8 @@ def assess(
     )
     proofs = record["evidence"]
     _require(isinstance(proofs, list), "EVIDENCE_REQUIRED")
+    if limits:
+        limits.check("max_evidence", len(proofs))
     evidence: dict[str, dict[str, Any]] = {}
     for item in proofs:
         proof = _object(item, _EVIDENCE, "INVALID_EVIDENCE")
@@ -465,6 +521,17 @@ def assess(
     published = clock(pub["published_at"], "publication_commit", all_ids)
     visible_event = clock(pub["visible_at"], "consumer_channel_visible", all_ids)
     blockers: set[str] = set()
+    if grade == "SOURCE_OBSERVED":
+        # No real source/M0/publisher loader is implemented by this isolated library.
+        # URI spelling or a caller-supplied kind cannot open this integration gate.
+        blockers.add("SOURCE_QUALIFICATION_UNBOUND")
+        refs = [
+            verification.uri,
+            *(source[r]["uri"] for r in ("descriptor", "manifest")),
+            *(p["uri"] for p in proofs),
+        ]
+        if any(uri.lower().startswith(("fixture:", "synthetic:", "test:")) for uri in refs):
+            blockers.add("NON_OBSERVED_REFERENCE")
     if not config.binding_complete:
         blockers.add("CONSUMER_CLOSURE_PENDING")
     if not pub["publisher"] or not pub["channel"] or published is None:
@@ -556,6 +623,12 @@ def assess(
                 and binding["delivery_id"] == previous["binding"]["delivery_id"],
                 "WITHDRAWAL_TARGET_MISMATCH",
             )
+            _require(
+                canonical(members) == canonical(previous["members"])
+                and pub["covered_inventory_sha256"]
+                == previous["publication"]["covered_inventory_sha256"],
+                "WITHDRAWAL_INVENTORY_MISMATCH",
+            )
             blockers.add("WITHDRAWN_VERSION")
         old_clock = previous["publication"]["published_at"]
         if published and old_clock is not None:
@@ -565,7 +638,17 @@ def assess(
     disposition = "INPUT_OR_CLOCK_BLOCKED" if blockers else "CLOCKS_COMPLETE_FOR_CONSUMER_REVIEW"
     if grade == "SYNTHETIC":
         disposition = "TEST_ONLY"
-    return Assessment(disposition, tuple(sorted(blockers)), tuple(member_blockers))
+    unknown_limits = tuple(
+        name
+        for name in ResourceLimits.__dataclass_fields__
+        if name != "policy_id" and (limits is None or getattr(limits, name) is None)
+    )
+    return Assessment(
+        disposition,
+        tuple(sorted(blockers)),
+        tuple(member_blockers),
+        tuple("UNCONFIGURED_RESOURCE_BOUND:" + name for name in unknown_limits),
+    )
 
 
 @dataclass(frozen=True)
@@ -584,6 +667,8 @@ def select_as_of(
     cutoff: str,
 ) -> Selection:
     """Use actual event visibility and every member clock, never file mtime or append order."""
+    if config.resource_limits:
+        config.resource_limits.check("max_events", len(records))
     at = _instant(cutoff)
     try:
         date.fromisoformat(market_date)
@@ -724,7 +809,15 @@ class SidecarStore:
 
     def _read(self) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
-        for path in sorted((self.root / "records").iterdir()):
+        limits = self.config.resource_limits
+        paths = []
+        total_bytes = 0
+        for path in (self.root / "records").iterdir():
+            paths.append(path)
+            if limits:
+                limits.check("max_files", len(paths))
+        heads: dict[str, Mapping[str, Any]] = {}
+        for path in sorted(paths):
             _require(not path.is_symlink(), "STORE_SYMLINK")
             if path.name.startswith(".pending-"):
                 continue
@@ -734,12 +827,29 @@ class SidecarStore:
                 "UNEXPECTED_EVENT_FILE",
             )
             _require(path.name.startswith(f"{len(records) + 1:08d}-"), "EVENT_SEQUENCE_GAP")
-            record = _strict_json(path.read_bytes())
+            size = path.stat().st_size
+            total_bytes += size
+            if limits:
+                limits.check("max_record_bytes", size)
+                limits.check("max_store_bytes", total_bytes)
+                limits.check("max_events", len(records) + 1)
+            envelope = _object(
+                _strict_json(path.read_bytes()),
+                {"schema", "record", "verification"},
+                "STORED_VERIFICATION_RECEIPT_REQUIRED",
+            )
+            _require(envelope["schema"] == STORE_SCHEMA, "UNSUPPORTED_STORE_SCHEMA")
+            record = _object(envelope["record"], _TOP, "INVALID_RECORD_SCHEMA")
             _require(
                 record.get("record_id") == record_id(record)
                 and path.name.endswith(record["record_id"][7:] + ".json"),
                 "STORED_EVENT_ID_MISMATCH",
             )
+            receipt = InputVerification.from_dict(envelope["verification"])
+            binding = _object(record["binding"], _BINDING, "INVALID_BINDING")
+            day = _text(binding["market_date"], "INVALID_MARKET_DATE")
+            assess(record, self.config, receipt, previous=heads.get(day))
+            heads[day] = record
             records.append(record)
         return records
 
@@ -785,5 +895,23 @@ class SidecarStore:
             )
             assess(record, self.config, verification, previous=previous)
             name = f"{len(records) + 1:08d}-{record['record_id'][7:]}.json"
-            self._write_once(self.root / "records" / name, canonical(dict(record)))
+            raw = canonical(
+                {
+                    "schema": STORE_SCHEMA,
+                    "record": dict(record),
+                    "verification": asdict(verification),
+                }
+            )
+            limits = self.config.resource_limits
+            if limits:
+                limits.check("max_events", len(records) + 1)
+                limits.check("max_files", len(list((self.root / "records").iterdir())) + 1)
+                limits.check("max_record_bytes", len(raw))
+                used = sum(
+                    p.stat().st_size
+                    for p in (self.root / "records").iterdir()
+                    if not p.name.startswith(".pending-")
+                )
+                limits.check("max_store_bytes", used + len(raw))
+            self._write_once(self.root / "records" / name, raw)
             return True

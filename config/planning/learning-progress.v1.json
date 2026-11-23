@@ -15186,6 +15186,41 @@
       "reviewed_modules": [
         "DATA"
       ]
+    },
+    {
+      "id": "CP-P10-726-AUDIT-REPAIR-003",
+      "recorded_at": "2026-11-23T20:46:49.681773+00:00",
+      "actor": "P10 Owner after P11 independent f32 CHANGES_REQUIRED",
+      "work_item": "P10-DATA-P12-DAILY-001",
+      "outcome": "no_module_change",
+      "summary": "One narrow metadata repair: synthetic/source qualification gate, atomically persisted verification and full committed-chain validation, whole-version withdrawal identity and injected consumer resource bounds. Real source adapter remains closed.",
+      "evidence": [
+        {
+          "id": "REPAIR-FOCUSED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-sidecar-audit-repair-003/FOCUSED-REPAIR-003.json",
+          "sha256": "0ee63bf9e75419073f3b1f2bfeddd27b9f2b6df30df65ff077335ea441c3db91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "3 fail-first defects at f32; 66 focused cases after fix (original47 with corrected synthetic-grade assertions); changed-file lint/type. Not source/node/consumer admission."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "No DATA facet or source/consumer qualification changes. Prior f32 evidence and independent rejection retained; repaired engineering candidate awaits P11 rereview.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-P12-DAILY-001",
+          "number": 726,
+          "title": "[P10-DATA-P12-DAILY-001] 固定日线供给的发布、可见时点与修订撤回合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T20:34:42Z",
+          "body_sha256": "0a3fba23c3e36bf6f206d912995fe25b0c230c9529613b6770feedacca1c5f94"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
     }
   ],
   "history_imports": [

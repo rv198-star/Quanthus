@@ -1,0 +1,47 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "P10-DAILY-SIDECAR-AUDIT-REPAIR-003",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "repair",
+  "family": "p10-daily-consumer-sidecar",
+  "work_item": "P10-DATA-P12-DAILY-001",
+  "modules": [
+    "DATA"
+  ],
+  "question": "Can the fixed f32 metadata defects be closed with fail-first probes, persisted receipt/chain validation and consumer-scoped resource budgets while observed-source integration stays gated?",
+  "consumer": "P11 #700 independent review and P12 #719 input adapter",
+  "scope": "One narrow review repair on f32: grade/fixture boundary, full predecessor validation, exact whole-version withdrawal, injectable resource budgets; no source adapter/publisher deployment or market rows.",
+  "deliverable": "p10_daily_sidecar.py and focused tests, budget contract and version notes; fixed repair commit, actual local checks, limited standard-channel node status and P11 handoff.",
+  "decision_if_pass": "Submit narrow engineering candidate for independent review; bind final source-observed consumer closure after M2/pool gates.",
+  "decision_if_fail": "Retain failures and fixed checkpoint; stop affected feature and give exact next repair without enlarging scope.",
+  "acceptance": [
+    "Strict schema/config/source identity and exact member coverage",
+    "Explicit source/publication/channel/consumer responsibility, unknown never filled with now",
+    "Append-only crash-safe idempotent events and conservative as-of withdrawal/revision selection",
+    "Focused adversarial tests, lint/type/maintenance checks; exact closure make check and node status reported honestly"
+  ],
+  "stop_conditions": [
+    "One audit-driven repair tranche, code budget <=1 hour; scoped deviations retained",
+    "No market rows, endpoints, procurement, production or system changes",
+    "Only after key regressions pass attempt bounded Nexus/GitHub node verification; no SSH fallback"
+  ],
+  "memory_sha256": "7ea37a64fd1c9719615de95c9ef7c87a14730a3c0cfc0aa5961bba48188def8f",
+  "prior_reviews": [],
+  "budget": {
+    "wall_seconds": 3600,
+    "network_requests": 20,
+    "max_new_bytes": 1048576,
+    "accounting_owner": "P10; local test logs separate, zero market endpoint/data requests"
+  },
+  "cumulative_cost_review": "Continue accepted inventory/spec work and its 23 specimen checks; prior data spend 0, model/active cost unknown_not_zero. This tranche is engineering, no renewed market experiment.",
+  "runtime_authority_boundary": "Owner/P11 authorized #726 isolated metadata engineering in current message; no source data reads or deployed publisher.",
+  "base_revision": "f32e2c1c307da30763a78786c28517d1e3ba4afd",
+  "code_paths": [
+    "src/quanthus/p10_daily_sidecar.py",
+    "tests/unit/test_p10_daily_sidecar.py"
+  ],
+  "write_boundary": "explicit fresh/disjoint isolated metadata store only; no existing source/root/CURRENT writes",
+  "spec_baseline_sha256": "b072a68abf79167d052511e79817bb6eca58e0a123be31698c2fe24f3d77716f",
+  "audit_findings_sha256": "54272c4b5259b32929de5eb477703900577b998f4a85ce5d7a76039f3fcd7e78"
+}

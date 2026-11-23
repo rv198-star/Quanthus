@@ -7,7 +7,7 @@
 | Design status | approved for the bounded metadata scope accepted by P11 |
 | Delivery gate | open; isolated candidate, independent review and consumer binding pending |
 | Baseline | origin/main b995967655cb7ed2265f6eca1a1e2c27fb84f3e3 |
-| Runtime | p10-daily-consumer-sidecar-runtime-v1, src/quanthus/p10_daily_sidecar.py |
+| Runtime | p10-daily-consumer-sidecar-runtime-v1.1, src/quanthus/p10_daily_sidecar.py |
 | Tests | tests/unit/test_p10_daily_sidecar.py |
 | Request | [finite engineering request](../../config/pipelines/p10-daily-sidecar-engineering.v1.json) |
 
@@ -38,7 +38,12 @@ receipt reuse. The module reads no source files and performs no warehouse rehash
 upstream verifier owns its receipt truth; this module checks identity/coverage and clock
 conformance, not signatures or source acquisition. Final consumer admission stays P11/P12.
 
-assess returns CLOCKS_COMPLETE_FOR_CONSUMER_REVIEW, INPUT_OR_CLOCK_BLOCKED, or TEST_ONLY.
+The isolated library currently returns INPUT_OR_CLOCK_BLOCKED or TEST_ONLY. The
+CLOCKS_COMPLETE_FOR_CONSUMER_REVIEW state is reserved for a future qualified-source adapter;
+it is not emitted by this version. All SOURCE_OBSERVED records carry
+SOURCE_QUALIFICATION_UNBOUND, even if caller-supplied URI/kind/identity strings look valid.
+Fixture/synthetic references add NON_OBSERVED_REFERENCE; a source grade with a synthetic
+proof kind is rejected. Synthetic fixtures return TEST_ONLY; historical metadata stays blocked.
 Missing hard members stop the dependent use; optional member defects remain explicit in the
 member result. The module neither changes holdings nor creates sell instructions.
 
@@ -119,3 +124,47 @@ qualify new data or change research quality/value/admission. The finite request 
 found no related DATA conclusions. Old research and #701 remain parked; #727 still waits for
 pool/fields/window. Remaining: independent code review, final field/pool binding, real timing
 evidence, isolated node acceptance and any separately authorized adapter deployment.
+
+## f32 independent audit repair
+
+P11 returned CHANGES_REQUIRED for f32e2c1c307da30763a78786c28517d1e3ba4afd. Its old Git/tree,
+PR evidence and audit SHA256SUMS ebb8d2e67430f1226733a5c95498541d9bdcc0b8a02ae627e1595caafe102ba0
+remain retained. The [bounded repair request](../../config/pipelines/p10-daily-sidecar-audit-repair.v1.json)
+permits one narrow engineering repair; the separate M2v3/session increment stays on its own
+branch/version. Three fail-first probes reproduce fixture promotion, corrupt predecessor
+append and payload-changing withdrawal at the exact f32 code before fixes.
+
+The current library has no real M0/source/publisher qualification loader. Caller-declared
+proofs are metadata to validate, not source authority. Consequently observed records remain
+blocked until a separately qualified adapter exists; changing a fixture URI to a cn02 URI
+does not open that gate. Test helpers now default to SYNTHETIC; the original 47 cases remain
+in the focused set with sample-grade expectations corrected.
+
+Each committed file now has the explicit sidecar-verified-event-envelope.v1 schema containing
+the original wire record and caller-supplied InputVerification. Both are committed atomically
+by the same fsync/exclusive-link protocol. Every read and append revalidates stored receipts,
+complete schema/evidence/causality and chain semantics before accepting a successor. No prior
+receipt is reconstructed from an edited record. Old bare-event store files fail explicitly;
+this undeployed engineering version requires a fresh dedicated root. It does not migrate or
+rewrite old events, actual descriptors, data or clocks.
+
+WITHDRAW means whole-version withdrawal: descriptor/manifest/binding and the entire original
+member inventory, source version/hash/size/state and clocks remain identical. Only withdrawal
+event/publication/reason/link fields change. Partial withdrawals need their own versioned
+contract; this version rejects member substitutions or implicit partial closure.
+
+ResourceLimits is optional, versioned and included in consumer identity. Supplied member,
+evidence, path-byte, record/envelope-byte, event, enumerated-file and committed-store-byte
+caps are enforced, including before stored-file reads. An exact retry at an event cap stays
+idempotent. Missing caps remain explicit UNCONFIGURED_RESOURCE_BOUND notes; there is no
+default 1000-member gate. The real product/risk/cost and a nonactivated day1 example are in
+the [consumer resource budget](../../config/pipelines/p10-daily-sidecar-budgets.v1.json).
+Its 256KiB sidecar bound belongs only to the named day1 intake; P11 still owns the shared
+15-minute/8-request/256KiB total and must budget other descriptor/manifest metadata as well.
+The final member/evidence/path counts wait for actual consumer closure. Warehouse payload
+sizes and unrelated qualified products are unaffected, following ADR0016.
+
+Independent source/publisher loading, P11/P12 actual receipts and consumer qualification,
+node acceptance and any production deployment remain the next scoped integration steps.
+Focused repair probes and full exact-closure check receipts are retained externally under
+quanthus-p10-sidecar-audit-repair-003; no market-row read or new source endpoint is involved.

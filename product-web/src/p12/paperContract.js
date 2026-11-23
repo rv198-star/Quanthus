@@ -17,6 +17,10 @@ export const PAPER_OPERATIONS = Object.freeze({
     method: 'GET',
     path: '/api/p12/v1/securities/{code}/intraday'
   },
+  'p12.securities.daily_kline': {
+    method: 'GET',
+    path: '/api/p12/v1/securities/{code}/daily-kline'
+  },
   'p12.securities.identity': {
     method: 'GET',
     path: '/api/p12/v1/securities/{code}/identity'
@@ -59,6 +63,7 @@ export const PAPER_REASON_TEXTS = Object.freeze({
   SIM_ORDER_SERVICE_UNAVAILABLE: '当前服务尚未启用盘中模拟委托接口，未生成挂单或改动账户',
   QUOTE_SERVICE_UNAVAILABLE: '当前服务尚未接通实时报价接口，暂无法查询盘中行情快照',
   INTRADAY_SERVICE_UNAVAILABLE: '当日分时接口待当前服务接通，暂不绘制模拟走势',
+  DAILY_KLINE_SERVICE_UNAVAILABLE: '看盘参考日 K 线接口待当前服务接通，暂不绘制日线图',
   FUNDING_WRITE_NOT_AVAILABLE: '当前服务尚未开放个人资金参数持久化接口；本次仅完成本地测算预览，未改动已生效账户规则',
   FUNDING_REBIND_NOT_OPEN: '当前服务仅开放首次固定桶分区绑定（bind）与空桶周期预约（prepare_cycle），桶数、单桶额度及风险比例的改参重绑尚未开放写入'
 })
@@ -83,6 +88,7 @@ export const PAPER_LABELS = Object.freeze({
     tencent: '腾讯实时行情',
     tencent_m1: '腾讯当日分钟行情',
     'tencent-m1': '腾讯当日分钟行情',
+    'tencent-qfq-day': '腾讯前复权日线（看盘参考，非策略准入）',
     sina: '新浪实时行情',
     astock: 'astock 行情适配器',
     'astock-tencent': 'astock · 腾讯行情',

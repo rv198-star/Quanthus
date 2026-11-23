@@ -2,7 +2,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { extractHm, normaliseIntradayPayload } from '../src/p12/client.js'
+import {
+  computeDailyRange,
+  computeIntradayRange,
+  partitionChartLevels,
+  resolveResetLimitPrice
+} from '../src/p12/chartRange.js'
+import { extractHm, normaliseDailyKlinePayload, normaliseIntradayPayload } from '../src/p12/client.js'
 import {
   calcQuoteChange,
   centsToMoney,
@@ -159,4 +165,85 @@ test('unheld exit plan guard, terminal-before-fee copy, prior_packages and hones
   assert.ok(funding.includes('pendingSimulationCount'))
   assert.ok(funding.includes('FUNDING_REBIND_NOT_OPEN'))
   assert.ok(funding.includes('沿原规则结算'))
+})
+
+test('#717: switching stock never carries stale limit_price and intraday/daily Y-axis ignores off-range levels', () => {
+  // 1. Stale liveQuote from previous security must never prefill the new security's limit_price
+  assert.equal(
+    resolveResetLimitPrice({
+      plan: null,
+      liveQuote: { security_code: '603087', last_price: '61.87' },
+      securityCode: '002517'
+    }),
+    ''
+  )
+  assert.equal(
+    resolveResetLimitPrice({
+      plan: null,
+      liveQuote: { security_code: '002517', last_price: '13.62' },
+      securityCode: '002517'
+    }),
+    '13.62'
+  )
+  assert.equal(
+    resolveResetLimitPrice({
+      plan: { price_cap: '10.75' },
+      liveQuote: null,
+      securityCode: '600000'
+    }),
+    '10.75'
+  )
+  // selectedId watcher clears market data BEFORE resetSimForm so old quote cannot leak
+  const watchMatch = /selectedId\s*\(newId,\s*oldId\)\s*\{([\s\S]*?)\}/.exec(workbench)
+  assert.ok(watchMatch, 'selectedId watcher missing')
+  const watchBody = watchMatch[1]
+  assert.ok(
+    watchBody.indexOf('clearSelectedMarketData()') >= 0 &&
+    watchBody.indexOf('clearSelectedMarketData()') < watchBody.indexOf('resetSimForm()'),
+    'clearSelectedMarketData must run before resetSimForm'
+  )
+
+  // 2. Intraday Y-axis is determined solely by intraday points + prevClose, never stretched by far limit_price
+  const pts = [
+    { hm: '09:30', price: '13.60' },
+    { hm: '09:31', price: '13.72' },
+    { hm: '09:32', price: '13.55' }
+  ]
+  const range = computeIntradayRange(pts, '13.62')
+  assert.ok(range.min > 13.0 && range.max < 14.2, `unexpected stretched range: ${JSON.stringify(range)}`)
+  const part = partitionChartLevels([
+    { key: 'cap', label: '限价/上限', text: '61.87', value: 61.87 },
+    { key: 'cost', label: '持仓成本', text: '13.62', value: 13.62 }
+  ], range)
+  assert.deepEqual(part.visible.map(l => l.key), ['cost'])
+  assert.deepEqual(part.offRange.map(l => [l.key, l.direction]), [['cap', 'above']])
+
+  // 3. Daily Y-axis also stays bounded by daily bars even if user enters a far limit_price
+  const dailyRange = computeDailyRange([
+    { session: '2026-11-20', open: '60.50', high: '61.20', low: '59.80', close: '60.10', volume: 25000 },
+    { session: '2026-11-23', open: '60.22', high: '62.07', low: '59.98', close: '61.87', volume: 36163 }
+  ])
+  assert.ok(dailyRange.min > 58 && dailyRange.max < 64)
+  const dailyPart = partitionChartLevels([
+    { key: 'cap', label: '价格上限', text: '10.00', value: 10.0 }
+  ], dailyRange)
+  assert.equal(dailyPart.visible.length, 0)
+  assert.equal(dailyPart.offRange[0].direction, 'below')
+
+  // 4. Daily kline contract, normaliser, source label & paper-holding UX
+  assert.equal(PAPER_OPERATIONS['p12.securities.daily_kline'].path, '/api/p12/v1/securities/{code}/daily-kline')
+  const kline = normaliseDailyKlinePayload({
+    security_code: '603087',
+    source: 'tencent-qfq-day',
+    basis: 'qfq',
+    status: 'live',
+    as_of: '2026-11-23T14:00:00+08:00',
+    bars: [{ session: '2026-11-23', open: '60.22', high: '62.07', low: '59.98', close: '61.87', volume: 36163 }]
+  })
+  assert.equal(kline.status, 'live')
+  assert.equal(kline.bars.length, 1)
+  assert.equal(kline.bars[0].close, '61.87')
+  assert.ok(chart.includes('腾讯前复权日线（看盘参考，非策略准入）'))
+  assert.ok(workbench.includes('paper-holding:'))
+  assert.ok(workbench.includes('自主持仓 · 非系统建议'))
 })

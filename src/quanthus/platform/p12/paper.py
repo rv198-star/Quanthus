@@ -8,8 +8,8 @@ trusted local assembly, never by the production kernel path.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import threading
+from collections.abc import Callable
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -17,7 +17,7 @@ from typing import Any
 
 from quanthus.p12_paper.application import PaperAccount, PaperOrderStore
 from quanthus.p12_paper.exec_rule import OrderCommand
-from quanthus.p12_paper.quotes import IntradaySeries, QuoteService
+from quanthus.p12_paper.quotes import DailyKlineSeries, IntradaySeries, QuoteService
 from quanthus.shared.fact_contracts import FactError
 
 PAPER_STORE_NAME = "p12-paper.sqlite"
@@ -36,10 +36,12 @@ class PaperService:
         quotes: QuoteService,
         intraday: IntradaySeries,
         accounts: dict[str, PaperAccount],
+        daily_kline: Any | None = None,
         match_interval: float = 5.0,
     ) -> None:
         self._quotes = quotes
         self._intraday = intraday
+        self._daily_kline = daily_kline
         self._accounts = accounts
         self._match_interval = match_interval
         self._stop = threading.Event()
@@ -89,6 +91,24 @@ class PaperService:
     def intraday(self, code: str) -> dict[str, Any]:
         return self._intraday.fetch(code)
 
+    def daily_kline(self, code: str) -> dict[str, Any]:
+        if self._daily_kline is None:
+            return {
+                "security_code": code,
+                "source": "tencent-qfq-day",
+                "basis": "qfq",
+                "price_basis": "tencent_qfq_reference",
+                "disclaimer": "看盘参考日线（腾讯前复权，非策略准入数据）",
+                "as_of": _utcnow().isoformat(),
+                "status": "unavailable",
+                "reason": "daily kline source not configured",
+                "bars": [],
+                "contract_version": "p12-paper-daily-kline-v1",
+            }
+        if hasattr(self._daily_kline, "fetch_daily_kline"):
+            return self._daily_kline.fetch_daily_kline(code)
+        return self._daily_kline.fetch(code)
+
     # ---- simulated order flow ------------------------------------------------------
     def _account(self, account_id: str) -> PaperAccount:
         account = self._accounts.get(account_id)
@@ -135,6 +155,7 @@ def build_paper_service(
     applications: dict[str, Any],
     quotes: QuoteService | None = None,
     intraday: IntradaySeries | None = None,
+    daily_kline: Any | None = None,
     now: Callable[[], datetime] | None = None,
 ) -> PaperService:
     """Assemble the paper service over the bound desktop applications.
@@ -147,11 +168,15 @@ def build_paper_service(
     clock = now or _utcnow
     quotes = quotes or QuoteService(now=clock)
     intraday = intraday or IntradaySeries()
+    if daily_kline is None:
+        daily_kline = intraday if hasattr(intraday, "fetch_daily_kline") else DailyKlineSeries()
     store = PaperOrderStore(Path(state_dir) / PAPER_STORE_NAME, clock=clock)
     accounts = {
         account_id: PaperAccount(app=app, store=store, quotes=quotes, now=clock)
         for account_id, app in applications.items()
     }
-    service = PaperService(quotes=quotes, intraday=intraday, accounts=accounts)
+    service = PaperService(
+        quotes=quotes, intraday=intraday, daily_kline=daily_kline, accounts=accounts
+    )
     service.start()
     return service

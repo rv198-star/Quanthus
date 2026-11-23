@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -145,6 +145,14 @@ def _optional_decimal(value: object) -> Decimal | None:
     return parsed if parsed.is_finite() else None
 
 
+def _humanize_bucket_id(bucket_id: str) -> str:
+    if bucket_id.lower().startswith("bucket-"):
+        suffix = bucket_id.split("-", 1)[1].lstrip("0") or "0"
+        if suffix.isdigit():
+            return f"{suffix} 号资金桶"
+    return bucket_id
+
+
 class P12DesktopApplication:
     """Use-case facade bound to exactly one trusted account scope."""
 
@@ -159,6 +167,8 @@ class P12DesktopApplication:
         clock: Callable[[], datetime],
         clock_kind: str,
         sizing_trial_cap: bool = False,
+        live_marks: Callable[[Iterable[str]], Mapping[str, Decimal]] | None = None,
+        live_valuation_ref: str = "paper-live-quote",
     ) -> None:
         if (context.account_id, context.mode) != (scope.account_id, scope.mode):
             raise FactError("UNAUTHORIZED_CONTEXT", "facts context and account scope differ")
@@ -173,6 +183,8 @@ class P12DesktopApplication:
         # by the account's trial-fraction cap, so the suggested quantity and
         # the confirm-time hold share one effective cash ceiling.
         self._sizing_trial_cap = sizing_trial_cap
+        self._live_marks = live_marks
+        self._live_valuation_ref = live_valuation_ref
 
     @property
     def scope(self) -> AccountScope:
@@ -643,10 +655,35 @@ class P12DesktopApplication:
             principal[history.baseline_security_code] = MaybeDecimal.unknown(
                 "BASELINE_COVERAGE_UNKNOWN"
             )
+        marks = dict(_marks(market)) if market else {}
+        valuation_ref = _valuation_ref(market) if market else None
+        missing_codes = [
+            pos.security_code
+            for pos in projection.positions
+            if pos.quantity > 0 and pos.security_code not in marks
+        ]
+        if missing_codes and self._live_marks is not None:
+            try:
+                extra = self._live_marks(missing_codes) or {}
+            except Exception:  # noqa: BLE001 - fail closed to VALUATION_UNAVAILABLE
+                extra = {}
+            used_live = False
+            for code in missing_codes:
+                price = _optional_decimal(extra.get(code))
+                if price is not None and price > 0:
+                    marks[code] = price
+                    used_live = True
+            if used_live:
+                live_ref = (
+                    f"{self._live_valuation_ref}@{now.isoformat(timespec='seconds')}"
+                )
+                valuation_ref = (
+                    f"{valuation_ref}+{live_ref}" if valuation_ref is not None else live_ref
+                )
         valuation = value_account(
             projection,
-            marks=_marks(market) if market else {},
-            valuation_ref=_valuation_ref(market) if market else None,
+            marks=marks,
+            valuation_ref=valuation_ref,
             cost_principal=principal,
         )
         names = {item.security_code: item.security_name for item in (market or decisions).decisions}
@@ -1000,8 +1037,42 @@ class P12DesktopApplication:
             for item in (decisions.decisions if visible else ())
         ]
         known = {item.security_code for item in decisions.decisions}
+        active_buckets = self._active_bucket_by_security(funding)
+        pending_attr_secs = {
+            item.security_code
+            for item in (getattr(funding, "pending_attributions", ()) or ())
+        }
+        reconcile_secs = self._reconciliation_securities(history)
         for line in account.positions if visible else ():
             if line.security_code in known:
+                continue
+            bucket_id = active_buckets.get(line.security_code)
+            if (
+                bucket_id is not None
+                and line.security_code not in pending_attr_secs
+                and line.security_code not in reconcile_secs
+            ):
+                bucket_label = _humanize_bucket_id(bucket_id)
+                items.append(
+                    OpportunityView(
+                        opportunity_id=f"paper-holding:{line.security_code}",
+                        security_code=line.security_code,
+                        security_name=line.security_name or line.security_code,
+                        stage=OpportunityStage.HOLDING.value,
+                        queue_group="holding",
+                        action_code="HOLD",
+                        status_code="READY",
+                        reason_codes=(),
+                        primary_constraint=None,
+                        changes=(),
+                        explanations=(),
+                        next_observation=f"自主模拟持仓，已归入 {bucket_label}，继续持有",
+                        chart=None,
+                        cost_price=line.average_cost,
+                        plan=None,
+                        applicability=None,
+                    )
+                )
                 continue
             items.append(
                 OpportunityView(
@@ -1035,6 +1106,50 @@ class P12DesktopApplication:
             orders=history.orders,
             action_blockers=blockers,
         )
+
+    def _active_bucket_by_security(self, funding: FundingView) -> dict[str, str]:
+        """Map security_code -> active bucket_id for clean bound buckets only."""
+        if funding.status_reason in (
+            FUNDING_LEDGER_MISMATCH,
+            BUCKET_ASSIGNMENT_CONFLICT,
+            FUNDING_CYCLE_NOT_BOUND,
+        ):
+            return {}
+        read_binding = getattr(self._facts, "funding_binding", None)
+        if not callable(read_binding):
+            return {}
+        binding = read_binding(self._context) or {}
+        bucket_securities = dict(binding.get("bucket_securities") or {})
+        if not bucket_securities:
+            return {}
+        result: dict[str, str] = {}
+        for bucket in funding.buckets:
+            if str(bucket.phase).lower() not in ("reserved", "held"):
+                continue
+            if not bucket.cycle_id:
+                continue
+            sec = bucket_securities.get(bucket.bucket_id)
+            if sec:
+                result[sec] = bucket.bucket_id
+        return result
+
+    @staticmethod
+    def _reconciliation_securities(history: FactHistory) -> set[str]:
+        """Securities currently carrying a reconciliation conflict or warning."""
+        flagged: set[str] = set()
+        fact_sec = {f.fact_id: f.security_code for f in history.facts}
+        for report in history.reports:
+            if report.status == "NEEDS_RECONCILIATION" or report.conflicts:
+                flagged.add(report.security_code)
+        for corr in history.corrections:
+            if corr.status == "NEEDS_RECONCILIATION":
+                sec = fact_sec.get(corr.fact_id)
+                if sec:
+                    flagged.add(sec)
+        for order in history.orders:
+            if order.needs_reconciliation:
+                flagged.add(order.security_code)
+        return flagged
 
     def records(self, scope: AccountScope) -> RecordsView:
         self._require(scope)

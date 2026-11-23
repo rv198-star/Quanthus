@@ -704,6 +704,12 @@ class PlatformHttpApp:
             self._p12_paper_intraday,
         )
         self._add(
+            "p12.paper.kline",
+            "/api/p12/v1/securities/<code>/daily-kline",
+            "GET",
+            self._p12_paper_daily_kline,
+        )
+        self._add(
             "p12.paper.account",
             "/api/p12/v1/accounts/<account_id>/paper",
             "GET",
@@ -853,6 +859,15 @@ class PlatformHttpApp:
     ) -> HttpResponse:
         principal = _principal(self._identity, observed_request, "p12:read")
         status, payload = self._p12.paper_intraday(
+            principal, params["code"], observed_request.request_id
+        )
+        return _json_response(payload, status)
+
+    def _p12_paper_daily_kline(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:read")
+        status, payload = self._p12.paper_daily_kline(
             principal, params["code"], observed_request.request_id
         )
         return _json_response(payload, status)

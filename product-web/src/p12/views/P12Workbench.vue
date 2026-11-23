@@ -171,7 +171,8 @@
               <p class="p12-queue-brief">{{ queueBrief(item) }}</p>
               <div class="p12-queue-tags">
                 <span :class="['status-tag', queueStatusTone(item)]">{{ queueStatusLabel(item) }}</span>
-                <span v-if="item.selfDirected" class="p12-mini-tag neutral">自主看盘 · 非系统建议</span>
+                <span v-if="item.paperHolding" class="p12-mini-tag neutral">自主持仓 · 非系统建议</span>
+                <span v-else-if="item.selfDirected" class="p12-mini-tag neutral">自主看盘 · 非系统建议</span>
                 <span v-else-if="isItemSynthetic(item)" class="p12-mini-tag amber">演练数据</span>
               </div>
             </button>
@@ -188,7 +189,8 @@
                 <span class="p12-sec-code p12-num">{{ selected.security_code }}</span>
                 <span :class="['p12-exchange-tag', { synthetic: isCurrentSynthetic }]">{{ selectedExchangeLabel }}</span>
                 <span :class="['status-tag', queueStatusTone(selected)]">{{ queueStatusLabel(selected) }}</span>
-                <span v-if="selected.selfDirected" class="p12-source-pill self">自主看盘 · 非系统建议</span>
+                <span v-if="selected.paperHolding" class="p12-source-pill self">自主持仓 · 非系统建议</span>
+                <span v-else-if="selected.selfDirected" class="p12-source-pill self">自主看盘 · 非系统建议</span>
                 <span v-else-if="isCurrentSynthetic" class="p12-source-pill syn">演练合成用例 · 非真实股价</span>
                 <span v-else class="p12-source-pill sys">系统盘后计划标的</span>
               </div>
@@ -199,7 +201,8 @@
                 </button>
               </p>
               <p v-else class="p12-sec-sub">
-                <template v-if="selected.selfDirected">由你主动查询的真实 A 股标的；所有委托均记为个人自主模拟操作，不代表策略推荐。</template>
+                <template v-if="selected.paperHolding">当前持仓 · {{ selected.next_observation || '自主模拟持仓，非系统盘后策略推荐；可在右侧跟踪走势或发起模拟卖出。' }}</template>
+                <template v-else-if="selected.selfDirected">由你主动查询的真实 A 股标的；所有委托均记为个人自主模拟操作，不代表策略推荐。</template>
                 <template v-else>{{ label('stage', selected.stage) }} · 跟踪编号 {{ selected.opportunity_id }}</template>
               </p>
             </div>
@@ -263,17 +266,19 @@
           <!-- Dual Intraday / Historical Daily Chart -->
           <PriceChart
             :security-key="selected.opportunity_id"
-            :chart="selected.chart"
+            :chart="effectiveDailyChart"
             :intraday="isCurrentSynthetic ? null : currentIntraday"
             :intraday-state="intradayState"
             :intraday-loading="quoteLoading"
+            :daily-loading="quoteLoading"
+            :daily-state="dailyKlineState"
             :prev-close="liveQuote ? liveQuote.previous_close : null"
             :synthetic="isCurrentSynthetic"
             :name="selectedDisplayName"
             :price-cap="(selected.plan && !isSelectedPlanExpired) ? selected.plan.price_cap : (simForm.limit_price || null)"
             :cost-price="selectedCostPriceValue"
             :has-live-snapshot="Boolean(!isCurrentSynthetic && liveQuote && liveQuote.last_price)"
-            :empty-text="selected.status_code === 'MISSING_INPUT' ? '行情数据未更新，暂不显示价格图' : '暂无已准入的历史日 K 线数据'"
+            :empty-text="selected.status_code === 'MISSING_INPUT' ? '行情数据未更新，暂不显示价格图' : '暂无日 K 线数据'"
           />
 
           <!-- Plain-Chinese Three Takeaway Cards -->
@@ -746,12 +751,14 @@
 import AccountSummary from '../components/AccountSummary.vue'
 import PriceChart from '../components/PriceChart.vue'
 import accountMixin from '../accountMixin.js'
+import { resolveResetLimitPrice } from '../chartRange.js'
 import {
   cancelSimOrder,
   listSimOrders,
   loadFundingRules,
   loadMarketSession,
   loadPaperAccount,
+  loadSecurityDailyKline,
   loadSecurityIdentity,
   loadSecurityIntraday,
   loadSecurityQuote,
@@ -816,6 +823,8 @@ export default {
     quoteState: null,
     currentIntraday: null,
     intradayState: null,
+    currentDailyKline: null,
+    dailyKlineState: null,
     securityIdentity: null,
     quoteLoading: false,
     quoteReqSeq: 0,
@@ -974,15 +983,17 @@ export default {
     },
     allQueueItems () {
       const rawOpps = (this.workbench?.opportunities || []).map(item => {
+        const isPaperHolding = String(item.opportunity_id || '').startsWith('paper-holding:')
+        const base = isPaperHolding ? { ...item, selfDirected: true, paperHolding: true } : item
         // Fix Opus P0-2: an exit_plan on a stock the account never held and has no sell orders for is NOT an urgent exit todo.
-        if (this.isUnheldExit(item)) {
-          return { ...item, effective_group: 'ended' }
+        if (this.isUnheldExit(base)) {
+          return { ...base, effective_group: 'ended' }
         }
-        if (this.isOpportunityExpired(item)) {
-          const fallbackGroup = this.heldQtyFor(item.security_code) > 0 ? 'holding' : 'ended'
-          return { ...item, effective_group: fallbackGroup }
+        if (this.isOpportunityExpired(base)) {
+          const fallbackGroup = this.heldQtyFor(base.security_code) > 0 ? 'holding' : 'ended'
+          return { ...base, effective_group: fallbackGroup }
         }
-        return { ...item, effective_group: item.queue_group }
+        return { ...base, effective_group: base.queue_group }
       })
       const oppCodeSet = new Set(rawOpps.map(i => i.security_code))
       const openSimCodes = new Set(
@@ -1023,6 +1034,22 @@ export default {
       if (!this.selected) return false
       if (this.selected.selfDirected) return false
       return isSyntheticItem(this.selected, this.isRehearsal)
+    },
+    effectiveDailyChart () {
+      if (!this.selected) return null
+      if (this.selected.chart && Array.isArray(this.selected.chart.bars) && this.selected.chart.bars.length) {
+        return this.selected.chart
+      }
+      if (
+        !this.isCurrentSynthetic &&
+        this.currentDailyKline &&
+        this.currentDailyKline.status !== 'unavailable' &&
+        Array.isArray(this.currentDailyKline.bars) &&
+        this.currentDailyKline.bars.length
+      ) {
+        return this.currentDailyKline
+      }
+      return null
     },
     isSelectedPlanExpired () {
       return this.isOpportunityExpired(this.selected)
@@ -1402,6 +1429,11 @@ export default {
     actionSentence () {
       const item = this.selected
       if (!item) return ''
+      if (item.paperHolding) {
+        return item.next_observation
+          ? `${item.next_observation}；该持仓为个人自主模拟买入，非系统推荐，可在右侧查看走势或发起模拟卖出。`
+          : '当前为已归桶的自主模拟持仓，非系统推荐；可在右侧跟踪实时行情或发起模拟卖出。'
+      }
       if (item.selfDirected) {
         return '该标的未绑定系统盘后推荐；你可在右侧按实时行情提交自主模拟买入或卖出限价单。'
       }
@@ -1445,6 +1477,7 @@ export default {
     selectedId (newId, oldId) {
       if (this.suppressSelectionReset || newId === oldId) return
       this.ticketTab = null
+      this.clearSelectedMarketData()
       this.resetForm()
       this.resetOrderForm()
       this.resetSimForm()
@@ -1492,11 +1525,15 @@ export default {
         }
       }
       const ids = this.allQueueItems.map(item => item.opportunity_id)
+      const prevSelectedId = this.selectedId
       this.suppressSelectionReset = true
       if (!ids.includes(this.selectedId)) {
         // Prefer first non-ended item if available.
         const activeFirst = this.allQueueItems.find(item => item.effective_group !== 'ended')
         this.selectedId = (activeFirst && activeFirst.opportunity_id) || ids[0] || null
+      }
+      if (this.selectedId !== prevSelectedId) {
+        this.clearSelectedMarketData()
       }
       this.resetForm()
       this.resetOrderForm()
@@ -1683,6 +1720,10 @@ export default {
       return this.statusTone(item.status_code)
     },
     queueBrief (item) {
+      if (item.paperHolding) {
+        const base = item.next_observation || '自主模拟持仓，继续持有'
+        return item.quote_summary ? `${base} · ${item.quote_summary}` : base
+      }
       if (item.selfDirected) {
         return item.quote_summary || item.next_observation || '点击查看当日真实报价、分时走势并可提交模拟限价委托'
       }
@@ -1749,29 +1790,36 @@ export default {
       this.customWatchItems = [entry, ...this.customWatchItems]
       this.selectedId = oppId
     },
-    async syncSelectedMarketData () {
-      const item = this.selected
-      const seq = ++this.quoteReqSeq
+    clearSelectedMarketData () {
       this.liveQuote = null
       this.quoteState = null
       this.currentIntraday = null
       this.intradayState = null
+      this.currentDailyKline = null
+      this.dailyKlineState = null
       this.securityIdentity = null
+    },
+    async syncSelectedMarketData () {
+      const item = this.selected
+      const seq = ++this.quoteReqSeq
+      this.clearSelectedMarketData()
       if (!item || this.isCurrentSynthetic) {
         this.quoteLoading = false
         return
       }
       this.quoteLoading = true
       const code = item.security_code
-      const [quoteRes, intraRes, idRes] = await Promise.all([
+      const [quoteRes, intraRes, dailyRes, idRes] = await Promise.all([
         loadSecurityQuote(code),
         loadSecurityIntraday(code),
+        loadSecurityDailyKline(code),
         loadSecurityIdentity(code)
       ])
       if (seq !== this.quoteReqSeq) return
       this.quoteLoading = false
       this.quoteState = quoteRes
       this.intradayState = intraRes
+      this.dailyKlineState = dailyRes
       if (idRes.available && idRes.data) {
         this.securityIdentity = idRes.data
       }
@@ -1798,6 +1846,9 @@ export default {
       if (intraRes.available && intraRes.data) {
         this.currentIntraday = intraRes.data
       }
+      if (dailyRes.available && dailyRes.data) {
+        this.currentDailyKline = dailyRes.data
+      }
     },
     resetSimForm () {
       const plan = (this.selected?.plan && !this.isOpportunityExpired(this.selected)) ? this.selected.plan : null
@@ -1805,7 +1856,11 @@ export default {
       this.simForm = {
         side: defaultSide,
         quantity: plan && plan.delta_qty > 0 ? String(plan.delta_qty) : (defaultSide === 'sell' && this.selectedSellableQty > 0 ? String(this.selectedSellableQty) : '100'),
-        limit_price: plan ? plan.price_cap : (this.liveQuote && this.liveQuote.last_price ? this.liveQuote.last_price : ''),
+        limit_price: resolveResetLimitPrice({
+          plan,
+          liveQuote: this.liveQuote,
+          securityCode: this.selected ? this.selected.security_code : ''
+        }),
         order_id: newClientId('sim')
       }
       this.simError = ''

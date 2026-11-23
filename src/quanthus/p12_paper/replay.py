@@ -119,6 +119,21 @@ class Replay:
             "points": points,
         }
 
+    def fetch_daily_kline(self, code: str) -> dict[str, Any]:
+        """Safe offline fallback in replay mode: never reaches out to live feeds."""
+        return {
+            "security_code": code,
+            "source": self._source,
+            "basis": "qfq",
+            "price_basis": "tencent_qfq_reference",
+            "disclaimer": "历史回放模式未附带看盘参考日 K 线",
+            "as_of": self.now().isoformat(),
+            "status": "unavailable",
+            "reason": "历史回放模式仅提供当日分时回放，未加载外网日 K 线",
+            "bars": [],
+            "contract_version": "p12-paper-daily-kline-v1",
+        }
+
 
 class ReplayQuotes(QuoteService):
     """A QuoteService over the replay fetcher; quotes carry the replay source."""

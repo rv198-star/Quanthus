@@ -983,6 +983,15 @@
 .p12-chart .level.cost line { stroke: #6b4bd6; }
 .p12-chart .level.cost text { fill: #6b4bd6; }
 .p12-chart .level.prev line { stroke: #8d99ab; stroke-dasharray: 2 3; }
+.p12-chart-offrange {
+  margin: 2px 0 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #f6f8fb;
+  color: #5b6b80;
+  font-size: 11px;
+  line-height: 1.45;
+}
 .p12-chart .level.prev text { fill: #69768a; font-weight: 600; }
 
 .p12-chart-empty {

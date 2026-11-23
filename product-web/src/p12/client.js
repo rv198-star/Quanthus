@@ -88,12 +88,14 @@ async function callPaper (operationId, params = {}, body = null) {
 function normaliseQuotePayload (raw, fallbackCode) {
   if (!raw || typeof raw !== 'object') return null
   const q = raw.quote && typeof raw.quote === 'object' ? raw.quote : raw
+  const secCode = String(raw.security_code || q.security_code || fallbackCode || '')
   return {
-    security_code: String(raw.security_code || q.security_code || fallbackCode || ''),
+    security_code: secCode,
     security_name: String(raw.security_name || q.security_name || ''),
     exchange: String(raw.exchange || q.exchange || ''),
     contract_version: raw.contract_version || q.contract_version || 'p12-paper-quote-v1',
     quote: {
+      security_code: secCode,
       status: q.status || 'unavailable',
       last_price: q.last_price === null || q.last_price === undefined ? null : String(q.last_price),
       previous_close: q.previous_close === null || q.previous_close === undefined ? null : String(q.previous_close),
@@ -167,6 +169,40 @@ export function normaliseIntradayPayload (raw, fallbackCode) {
   }
 }
 
+export function normaliseDailyKlinePayload (raw, fallbackCode) {
+  if (!raw || typeof raw !== 'object') return null
+  const container = raw.daily_kline && typeof raw.daily_kline === 'object' ? raw.daily_kline : raw
+  const rawBars = Array.isArray(container.bars) ? container.bars : []
+  const bars = []
+  for (const bar of rawBars) {
+    if (!bar || typeof bar !== 'object') continue
+    const session = String(bar.session || '').trim()
+    if (!session || bar.open == null || bar.high == null || bar.low == null || bar.close == null) continue
+    bars.push({
+      session,
+      open: String(bar.open),
+      high: String(bar.high),
+      low: String(bar.low),
+      close: String(bar.close),
+      volume: typeof bar.volume === 'number' ? bar.volume : 0
+    })
+  }
+  const status = container.status || (bars.length ? 'live' : 'unavailable')
+  const reason = container.reason || container.reason_text || container.detail || container.reason_code || null
+  return {
+    security_code: String(container.security_code || raw.security_code || fallbackCode || ''),
+    source: container.source || raw.source || 'tencent-qfq-day',
+    basis: container.basis || raw.basis || 'qfq',
+    price_basis: container.price_basis || raw.price_basis || 'tencent_qfq_reference',
+    disclaimer: container.disclaimer || raw.disclaimer || '看盘参考日线（腾讯前复权，非策略准入数据）',
+    as_of: container.as_of || raw.as_of || null,
+    status,
+    reason: reason ? String(reason) : null,
+    bars,
+    contract_version: container.contract_version || raw.contract_version || 'p12-paper-daily-kline-v1'
+  }
+}
+
 export async function loadMarketSession () {
   try {
     const data = await callPaper('p12.market.session')
@@ -192,6 +228,16 @@ export async function loadSecurityIntraday (code) {
     return { available: true, data: normaliseIntradayPayload(raw, code) }
   } catch (error) {
     const codeName = error.reasonCode === 'ENDPOINT_NOT_ENABLED' ? 'INTRADAY_SERVICE_UNAVAILABLE' : error.reasonCode
+    return { available: false, status: error.status, reasonCode: codeName, detail: error.detail }
+  }
+}
+
+export async function loadSecurityDailyKline (code) {
+  try {
+    const raw = await callPaper('p12.securities.daily_kline', { code })
+    return { available: true, data: normaliseDailyKlinePayload(raw, code) }
+  } catch (error) {
+    const codeName = error.reasonCode === 'ENDPOINT_NOT_ENABLED' ? 'DAILY_KLINE_SERVICE_UNAVAILABLE' : error.reasonCode
     return { available: false, status: error.status, reasonCode: codeName, detail: error.detail }
   }
 }

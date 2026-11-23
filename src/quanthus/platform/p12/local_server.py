@@ -71,6 +71,7 @@ def build_local_kernel(
     from quanthus.platform.p12.paper_fixture import (
         PAPER_ACCOUNT_ID,
         build_paper_application,
+        build_quote_live_marks,
     )
     from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
 
@@ -88,6 +89,16 @@ def build_local_kernel(
         )
         system_clock = replay.now
         replay_quotes = ReplayQuotes(replay, replay_source)
+    if replay_quotes is not None:
+        paper_quotes = replay_quotes
+        paper_live_marks = build_quote_live_marks(paper_quotes, ttl_seconds=0.0)
+        paper_valuation_ref = f"replay-quote:{replay_source}"
+    else:
+        from quanthus.p12_paper.quotes import QuoteService
+
+        paper_quotes = QuoteService(now=system_clock)
+        paper_live_marks = build_quote_live_marks(paper_quotes, ttl_seconds=3.0)
+        paper_valuation_ref = "tencent-live-quote"
     paper_decisions = None
     if paper_replay_fixture is not None:
         from quanthus.platform.p12.paper_fixture import PaperReplayDecisionSource
@@ -103,6 +114,8 @@ def build_local_kernel(
         ),
         now=system_clock,
         decision_source=paper_decisions,
+        live_marks=paper_live_marks,
+        live_valuation_ref=paper_valuation_ref,
     )
     bindings = dict(runtime.bindings)
     bindings[PAPER_ACCOUNT_ID] = P12AccountBinding(
@@ -117,8 +130,9 @@ def build_local_kernel(
     paper = build_paper_service(
         state_dir=state_dir,
         applications={PAPER_ACCOUNT_ID: paper_app},
-        quotes=replay_quotes,
+        quotes=paper_quotes,
         intraday=replay,
+        daily_kline=replay,
         now=system_clock,
     )
     kernel = create_platform_kernel(

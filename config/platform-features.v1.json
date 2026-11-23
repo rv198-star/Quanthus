@@ -177,6 +177,7 @@
         "p12.paper.quote",
         "p12.paper.identity",
         "p12.paper.intraday",
+        "p12.paper.kline",
         "p12.paper.account",
         "p12.paper.orders",
         "p12.paper.submit",

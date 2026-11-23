@@ -235,6 +235,11 @@ class P12Endpoints:
     def paper_intraday(self, principal: AuthenticatedPrincipal, code: str, request_id: str) -> Result:
         return self._paper_run(request_id, lambda svc: svc.intraday(code))
 
+    def paper_daily_kline(
+        self, principal: AuthenticatedPrincipal, code: str, request_id: str
+    ) -> Result:
+        return self._paper_run(request_id, lambda svc: svc.daily_kline(code))
+
     def paper_account(
         self, principal: AuthenticatedPrincipal, account_id: str, request_id: str
     ) -> Result:

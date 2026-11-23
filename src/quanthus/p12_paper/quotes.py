@@ -22,7 +22,7 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -433,4 +433,118 @@ class IntradaySeries:
         except ValueError:
             return None
         return start + timedelta(minutes=1)
+
+
+TENCENT_DAILY_KLINE_URL = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get"
+DAILY_KLINE_CONTRACT_VERSION = "p12-paper-daily-kline-v1"
+DAILY_KLINE_DISCLAIMER = "看盘参考日线（腾讯前复权，非策略准入数据）"
+
+
+class DailyKlineSeries:
+    """Reference daily candlestick bars from Tencent qfq kline (display-only)."""
+
+    def __init__(
+        self,
+        *,
+        opener: Callable[..., Any] = urllib.request.urlopen,
+        timeout: float = 10.0,
+        days: int = 90,
+    ) -> None:
+        self._opener = opener
+        self._timeout = timeout
+        self._days = days
+
+    def fetch(
+        self,
+        code: str,
+        *,
+        now: datetime | None = None,
+        days: int | None = None,
+    ) -> dict[str, Any]:
+        symbol, _ = _exchange(code)
+        limit = days if days is not None else self._days
+        request = urllib.request.Request(
+            f"{TENCENT_DAILY_KLINE_URL}?param={symbol},day,,,{limit},qfq",
+            headers={
+                "Referer": "https://gu.qq.com/",
+                "User-Agent": "Mozilla/5.0 Quanthus-TencentKline/1.0",
+            },
+        )
+        received_at = now or datetime.now(UTC).astimezone()
+        try:
+            with self._opener(request, timeout=self._timeout) as response:
+                payload = __import__("json").loads(response.read())
+        except Exception as exc:  # noqa: BLE001 - graceful unavailable
+            return {
+                "security_code": code,
+                "source": "tencent-qfq-day",
+                "basis": "qfq",
+                "price_basis": "tencent_qfq_reference",
+                "disclaimer": DAILY_KLINE_DISCLAIMER,
+                "as_of": received_at.isoformat(),
+                "status": "unavailable",
+                "reason": f"daily kline channel failed: {exc}",
+                "bars": [],
+                "contract_version": DAILY_KLINE_CONTRACT_VERSION,
+            }
+        node = (payload.get("data") or {}).get(symbol) if isinstance(payload, dict) else None
+        node = node if isinstance(node, dict) else {}
+        if isinstance(node.get("qfqday"), list) and node.get("qfqday"):
+            rows = node["qfqday"]
+            basis = "qfq"
+        elif isinstance(node.get("day"), list) and node.get("day"):
+            rows = node["day"]
+            basis = "unadjusted"
+        else:
+            rows = []
+            basis = "qfq"
+        bars: list[dict[str, Any]] = []
+        for row in rows:
+            parsed = self._parse_bar(row)
+            if parsed is not None:
+                bars.append(parsed)
+        status = "live" if bars else "unavailable"
+        reason = None if bars else "no daily kline bars returned"
+        return {
+            "security_code": code,
+            "source": "tencent-qfq-day",
+            "basis": basis,
+            "price_basis": "tencent_qfq_reference",
+            "disclaimer": DAILY_KLINE_DISCLAIMER,
+            "as_of": received_at.isoformat(),
+            "status": status,
+            "reason": reason,
+            "bars": bars,
+            "contract_version": DAILY_KLINE_CONTRACT_VERSION,
+        }
+
+    @staticmethod
+    def _parse_bar(row: Any) -> dict[str, Any] | None:
+        if not isinstance(row, (list, tuple)) or len(row) < 6:
+            return None
+        session = str(row[0]).strip()
+        try:
+            date.fromisoformat(session)
+        except ValueError:
+            return None
+        try:
+            open_p = Decimal(str(row[1]).strip())
+            close_p = Decimal(str(row[2]).strip())
+            high_p = Decimal(str(row[3]).strip())
+            low_p = Decimal(str(row[4]).strip())
+            vol = int(Decimal(str(row[5]).strip() or "0"))
+        except (InvalidOperation, ValueError):
+            return None
+        if not all(p.is_finite() and p > 0 for p in (open_p, close_p, high_p, low_p)):
+            return None
+        if low_p > high_p or vol < 0:
+            return None
+        return {
+            "session": session,
+            "open": format(open_p, "f"),
+            "high": format(high_p, "f"),
+            "low": format(low_p, "f"),
+            "close": format(close_p, "f"),
+            "volume": vol,
+        }
 

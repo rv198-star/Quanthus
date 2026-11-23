@@ -40,8 +40,11 @@
         </template>
       </div>
       <div v-else class="p12-chart-meta">
-        <span v-if="chart && chart.bars.length">来源：{{ basisText }} · 截至 {{ asOf }}</span>
-        <span v-else>暂无已准入历史日 K 线</span>
+        <template v-if="dailyLoading && !(chart && chart.bars && chart.bars.length)">
+          <span>正在读取所选股票日 K 线…</span>
+        </template>
+        <span v-else-if="chart && chart.bars && chart.bars.length" data-testid="p12-daily-meta">来源：{{ basisText }} · 截至 {{ asOf }}</span>
+        <span v-else>暂无日 K 线数据</span>
       </div>
     </div>
 
@@ -69,7 +72,7 @@
           <text :x="pad + 4" :y="iy(intradayPrevClose) - 4">昨收 {{ prevClose || intraday.previous_close }}</text>
         </g>
         <!-- Limit / cap / cost reference lines -->
-        <g v-for="level in intradayLevels" :key="'il' + level.key" :class="['level', level.key]">
+        <g v-for="level in visibleIntradayLevels" :key="'il' + level.key" :class="['level', level.key]">
           <line :x1="pad" :x2="width - pad - 44" :y1="iy(level.value)" :y2="iy(level.value)" />
           <text :x="pad + 4" :y="iy(level.value) - 5">{{ level.label }} {{ level.text }}</text>
         </g>
@@ -113,11 +116,17 @@
       <p class="p12-chart-note">
         分时说明：严格绘制服务端返回的当天已完成分钟点（午休与断点保留原貌）<template v-if="intraday && intraday.as_of"> · 最后源时刻 {{ formatTime(intraday.as_of) || intraday.as_of }}</template>；模拟委托成交另按带源时钟的实时报价快照触发。
       </p>
+      <p v-if="hasIntraday && offRangeIntradayLevels.length" class="p12-chart-offrange" data-testid="p12-intraday-offrange">
+        参考线未计入纵轴以免压缩日内波动：
+        <span v-for="(lv, idx) in offRangeIntradayLevels" :key="'iol' + lv.key">
+          <template v-if="idx > 0"> · </template>{{ lv.label }} ¥{{ lv.text }}（{{ lv.direction === 'above' ? '高于当前分时纵轴' : '低于当前分时纵轴' }}）
+        </span>
+      </p>
     </template>
 
     <!-- Historical Daily Candlestick View -->
     <template v-else>
-      <svg v-if="chart && chart.bars.length" :viewBox="`0 0 ${width} ${height}`" role="img" :aria-label="`${name} 价格与成交量`">
+      <svg v-if="chart && chart.bars && chart.bars.length" :viewBox="`0 0 ${width} ${height}`" role="img" :aria-label="`${name} 价格与成交量`" data-testid="p12-daily-svg">
         <g class="grid">
           <line v-for="tick in priceTicks" :key="'g' + tick.label" :x1="pad" :x2="width - pad - 44" :y1="tick.y" :y2="tick.y" />
           <text v-for="tick in priceTicks" :key="'t' + tick.label" :x="width - pad - 38" :y="tick.y + 3">{{ tick.label }}</text>
@@ -128,7 +137,7 @@
             <rect :x="x(index) - candle / 2" :width="candle" :y="Math.min(y(bar.open), y(bar.close))" :height="Math.max(1, Math.abs(y(bar.open) - y(bar.close)))" />
           </g>
         </g>
-        <g v-for="level in levels" :key="level.key" :class="['level', level.key]">
+        <g v-for="level in visibleDailyLevels" :key="level.key" :class="['level', level.key]">
           <line :x1="pad" :x2="width - pad - 44" :y1="y(level.value)" :y2="y(level.value)" />
           <text :x="pad + 4" :y="y(level.value) - 5">{{ level.label }} {{ level.text }}</text>
         </g>
@@ -141,17 +150,29 @@
         <text class="axis-date" :x="width - pad - 44" :y="height - 4" text-anchor="end">{{ bars[bars.length - 1].session }}</text>
       </svg>
       <div v-else class="p12-chart-empty">
-        <div>
+        <div v-if="dailyLoading">
+          <strong>正在读取所选股票日 K 线走势…</strong>
+          <p>切换股票时同步加载看盘参考日线。</p>
+        </div>
+        <div v-else>
           <strong>{{ emptyText }}</strong>
-          <p v-if="hasLiveSnapshot">实时快照、当日分时与历史日 K 线各自独立标注来源；未接入合格日频数据时，系统不以实时快照拼凑日线图。</p>
+          <p v-if="dailyUnavailableDesc">{{ dailyUnavailableDesc }}</p>
+          <p v-else-if="hasLiveSnapshot">实时快照、当日分时与历史日 K 线各自独立标注来源；未获取到日 K 线时，系统不以实时快照拼凑日线图。</p>
           <p v-else>缺少合格日频行情时暂停依赖该走势的新增建仓建议；你已持有的仓位与账户核对不受影响。</p>
         </div>
       </div>
-      <p v-if="chart" class="p12-chart-note">价格口径：{{ basisText }} · 数据截至 {{ asOf }} · 图形坐标仅用于显示</p>
+      <p v-if="chart && chart.bars && chart.bars.length" class="p12-chart-note">价格口径：{{ basisText }} · 数据截至 {{ asOf }} · 图形坐标仅用于显示</p>
+      <p v-if="chart && chart.bars && chart.bars.length && offRangeDailyLevels.length" class="p12-chart-offrange" data-testid="p12-daily-offrange">
+        部分参考线超出当前日 K 纵轴未拉伸主图：
+        <span v-for="(lv, idx) in offRangeDailyLevels" :key="'dol' + lv.key">
+          <template v-if="idx > 0"> · </template>{{ lv.label }} ¥{{ lv.text }}（{{ lv.direction === 'above' ? '高于当前日 K 纵轴' : '低于当前日 K 纵轴' }}）
+        </span>
+      </p>
     </template>
   </div>
 </template>
 <script>
+import { computeDailyRange, computeIntradayRange, partitionChartLevels } from '../chartRange.js'
 import { formatTime, label, reasonText } from '../format.js'
 
 function hmToSlot (hm) {
@@ -173,6 +194,8 @@ export default {
     intraday: Object,
     intradayState: Object,
     intradayLoading: { type: Boolean, default: false },
+    dailyLoading: { type: Boolean, default: false },
+    dailyState: Object,
     prevClose: String,
     synthetic: { type: Boolean, default: false },
     name: String,
@@ -237,17 +260,23 @@ export default {
     },
     levels () {
       const items = []
+      if (this.prevClose && !this.synthetic) items.push({ key: 'prev', label: '昨收', text: this.prevClose, value: Number(this.prevClose) })
       if (this.priceCap) items.push({ key: 'cap', label: '价格上限', text: this.priceCap, value: Number(this.priceCap) })
       if (this.chart?.support) items.push({ key: 'support', label: '支撑', text: this.chart.support, value: Number(this.chart.support) })
       if (this.costPrice) items.push({ key: 'cost', label: '持仓成本', text: this.costPrice, value: Number(this.costPrice) })
       return items
     },
     range () {
-      const values = this.bars.flatMap(bar => [Number(bar.high), Number(bar.low)]).concat(this.levels.map(level => level.value))
-      const min = Math.min(...values)
-      const max = Math.max(...values)
-      const margin = (max - min) * 0.08 || 1
-      return { min: min - margin, max: max + margin }
+      return computeDailyRange(this.bars)
+    },
+    dailyLevelPartition () {
+      return partitionChartLevels(this.levels, this.range)
+    },
+    visibleDailyLevels () {
+      return this.dailyLevelPartition.visible
+    },
+    offRangeDailyLevels () {
+      return this.dailyLevelPartition.offRange
     },
     maxVolume () { return Math.max(...this.bars.map(bar => bar.volume), this.chart?.volume_baseline || 0) || 1 },
     candle () { return Math.max(3, (this.width - this.pad * 2 - 56) / Math.max(this.bars.length, 1) * 0.6) },
@@ -271,13 +300,16 @@ export default {
       return items
     },
     intradayRange () {
-      const prices = (this.intraday?.points || []).map(b => Number(b.price))
-      if (this.intradayPrevClose !== null) prices.push(this.intradayPrevClose)
-      for (const lv of this.intradayLevels) prices.push(lv.value)
-      const min = Math.min(...prices)
-      const max = Math.max(...prices)
-      const margin = (max - min) * 0.12 || 0.05
-      return { min: min - margin, max: max + margin }
+      return computeIntradayRange(this.intraday?.points || [], this.intradayPrevClose)
+    },
+    intradayLevelPartition () {
+      return partitionChartLevels(this.intradayLevels, this.intradayRange)
+    },
+    visibleIntradayLevels () {
+      return this.intradayLevelPartition.visible
+    },
+    offRangeIntradayLevels () {
+      return this.intradayLevelPartition.offRange
     },
     intradayPlotted () {
       return (this.intraday?.points || []).map(pt => {
@@ -330,7 +362,26 @@ export default {
         return { y: this.iy(value), label: value.toFixed(2) }
       })
     },
-    basisText () { return this.chart?.price_basis === 'unadjusted_synthetic' ? '固定演练合成日线（未复权，非真实行情）' : (this.chart?.price_basis || '—') },
+    basisText () {
+      if (this.chart?.price_basis === 'unadjusted_synthetic') return '固定演练合成日线（未复权，非真实行情）'
+      if (
+        this.chart?.source === 'tencent-qfq-day' ||
+        this.chart?.price_basis === 'tencent_qfq_reference' ||
+        this.chart?.basis === 'qfq'
+      ) {
+        return '腾讯前复权日线（看盘参考，非策略准入）'
+      }
+      return this.chart?.disclaimer || this.chart?.price_basis || '—'
+    },
+    dailyUnavailableDesc () {
+      if (this.dailyState && !this.dailyState.available) {
+        return this.dailyState.detail || reasonText(this.dailyState.reasonCode) || ''
+      }
+      if (this.dailyState && this.dailyState.data && this.dailyState.data.reason) {
+        return `原因：${reasonText(this.dailyState.data.reason) || this.dailyState.data.reason}`
+      }
+      return ''
+    },
     asOf () { return formatTime(this.chart?.as_of) }
   },
   watch: {

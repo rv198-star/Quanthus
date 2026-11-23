@@ -8,7 +8,9 @@ or placeholder security names.  Demo accounts stay for internal comparison.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+import threading
+import time
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace as _dc_replace
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -36,6 +38,48 @@ PAPER_BASELINE_REQUEST = "p12-paper-baseline-v1"
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc).astimezone()
+
+
+def build_quote_live_marks(
+    quotes: object,
+    *,
+    ttl_seconds: float = 3.0,
+) -> Callable[[Iterable[str]], dict[str, Decimal]]:
+    """Build a read-only live mark-price lookup backed by QuoteService/ReplayQuotes."""
+    lock = threading.Lock()
+    cache: dict[str, tuple[float, Decimal | None]] = {}
+
+    def lookup(codes: Iterable[str]) -> dict[str, Decimal]:
+        marks: dict[str, Decimal] = {}
+        now_mono = time.monotonic()
+        for code in dict.fromkeys(codes):
+            cached_price: Decimal | None = None
+            hit = False
+            if ttl_seconds > 0:
+                with lock:
+                    entry = cache.get(code)
+                    if entry is not None and (now_mono - entry[0]) < ttl_seconds:
+                        cached_price = entry[1]
+                        hit = True
+            if not hit:
+                try:
+                    quote = quotes.quote(code)  # type: ignore[attr-defined]
+                except Exception:  # noqa: BLE001 - fail closed
+                    quote = None
+                price = None
+                if quote is not None and getattr(quote, "status", None) != "unavailable":
+                    last = getattr(quote, "last_price", None)
+                    if isinstance(last, Decimal) and last.is_finite() and last > 0:
+                        price = last
+                cached_price = price
+                if ttl_seconds > 0:
+                    with lock:
+                        cache[code] = (now_mono, price)
+            if cached_price is not None:
+                marks[code] = cached_price
+        return marks
+
+    return lookup
 
 
 class PaperDecisionSource:
@@ -154,6 +198,8 @@ def build_paper_application(
     baseline_cash: Decimal = Decimal("100000.00"),
     now: Callable[[], datetime] | None = None,
     decision_source=None,
+    live_marks: Callable[[Iterable[str]], Mapping[str, Decimal]] | None = None,
+    live_valuation_ref: str = "paper-live-quote",
 ) -> P12DesktopApplication:
     """Bind the dedicated paper account on the system clock.
 
@@ -206,6 +252,8 @@ def build_paper_application(
         # sized under the account's trial-fraction cap so a 50% intent cannot
         # over-commit the 13,500 trial limit.
         sizing_trial_cap=True,
+        live_marks=live_marks,
+        live_valuation_ref=live_valuation_ref,
     )
     app.establish_baseline(request_id=PAPER_BASELINE_REQUEST, cash=baseline_cash)
     app.bind_configuration()

@@ -1,0 +1,75 @@
+{
+  "schema": "quanthus.p10.validation-case-source-policy.v1",
+  "case_id": "VAL-NVDA-20261123",
+  "issue": 737,
+  "collection_task": 736,
+  "supersedes_proposal": "P10-NVDA-JENSEN-20261125-RESEARCH-v1; unexecuted draft",
+  "definition_created_at": "2026-11-23T21:15:58Z",
+  "definition_updated_at_at_intake": "2026-11-23T21:15:58Z",
+  "definition_body_sha256": "e01e8c60277b81f8394edfe51acd70a6a6157055f95036ad9da225d1fe73a362",
+  "registered_at_actual": "2026-11-23T21:21:31.336042+00:00",
+  "purpose": "VALIDATION_ONLY",
+  "not_permitted_uses": [
+    "training",
+    "feature_selection",
+    "threshold_tuning"
+  ],
+  "input_cutoff": "2026-11-24T09:15:00+08:00",
+  "input_news_window_start": "2026-11-05T00:00:00-05:00",
+  "input_A_share_bars_end": "2026-11-23",
+  "input_foreign_bars_end": "2026-11-23",
+  "result_dates": [
+    "2026-11-24",
+    "2026-11-25"
+  ],
+  "source_actual_visibility_required": true,
+  "main_codes": [
+    "300308",
+    "300502",
+    "300394",
+    "002463",
+    "300476",
+    "601138",
+    "000977",
+    "002916",
+    "002436",
+    "002837"
+  ],
+  "control_codes": [
+    "688256",
+    "688041"
+  ],
+  "benchmark_codes": [
+    {
+      "code": "399006",
+      "name": "创业板指",
+      "type": "index"
+    },
+    {
+      "code": "000300",
+      "name": "沪深300",
+      "type": "index"
+    }
+  ],
+  "post_0915_additions": "POST_FREEZE_SUPPLEMENT; never main set",
+  "identity_policy": "qualified dwd_disclosure_subject/dwd_security_identifier PIT; confirmed erroneous code logged/excluded, unknown mapping not guessed",
+  "assembly": "after2026-11-25 end; preserve pre-cutoff inputs now, never fabricate retrospective receipt",
+  "input_store": "case/input; immutable CAS and per-member observed clocks",
+  "result_store": "case/sealed-result; ingestion job writes blind; no content output/read after seal without declared validation step",
+  "validation_authorizations": [],
+  "access_log": "append-only reader/time/declared_step/artifact SHA on every authorized result read; currently no authorized reader",
+  "training_exclusion": {
+    "dates": [
+      "2026-11-23",
+      "2026-11-24",
+      "2026-11-25"
+    ],
+    "scope": "frozen codes and benchmarks; exact policy in#737"
+  },
+  "Source_qualification": "pending independent source/member/purpose review",
+  "Base_inclusion": false,
+  "collector_scope": "existing/free sources only; A-share bars reuse daily-core; no new minute collection",
+  "event_window_end": "2026-11-25T16:00:00-05:00",
+  "assembly_at": "2026-11-26T06:30:00+08:00",
+  "window_authority": "Owner confirmation relayed byP12 on2026-11-24;#736 window, #737 frozen pool and access/use"
+}

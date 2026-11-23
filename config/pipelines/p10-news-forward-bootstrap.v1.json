@@ -1,0 +1,42 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "P10-NEWS-FWD-BOOTSTRAP-20261124-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "p10-forward-news-capture",
+  "work_item": "P10-DATA-NEWS-FWD-001",
+  "modules": [
+    "DATA"
+  ],
+  "question": "Can existing/free public announcement and news sources preserve real first-seen clocks and immutable source identities in an isolated forward trial from today?",
+  "consumer": "P11 sentiment research candidate not started; possible P12 display only, no current admission",
+  "scope": "2026-11-24..30 isolated raw forward trial, source/schema/rate/clock preservation and priority text; Base2.6 unchanged. Formal Base2.7 only2026-12-01 onward under own qualification. NVDA case historical/anchor pulls wait Owner window/pool approval.",
+  "deliverable": "Versioned source/storage/clock/limits contract, first real raw captures and receipts today, isolated collector/runtime and bounded tests, case window/pool proposal",
+  "decision_if_pass": "Continue independently logged forward trial and report actual per-source coverage/gaps; no consumer activation",
+  "decision_if_fail": "Retain partial source captures, truthful blockers and next finite recovery; do not delay other working sources or invent publication times",
+  "acceptance": [
+    "Immutable raw HTTP/doc SHA and source ID/version plus real acquisition/storage/channel clocks",
+    "Unknown publication/identity stays null+reason; exact PIT mapping reused when available, no invented IDs",
+    "Versioned dedup/revisions/coverage, rate bounded retries, isolated stores/schedules and all Base2.6 invariants",
+    "Actual startup/run receipts; priority Markdown below32KiB with explicit truncation/extraction status; no model or strategy activation"
+  ],
+  "stop_conditions": [
+    "Initial bootstrap <=7200wall seconds; source probes <=12 public requests, <=10MiB response bytes; stop on403/429 and no authentication/payment workaround",
+    "Collector later runs use separately versioned per-run/source budgets and preserve actual cost",
+    "No case-specific historical or overseas quote acquisition until Owner confirms exact window/pool; no Base2.6/daily-core/726/727 timer mutation"
+  ],
+  "memory_sha256": "7ea37a64fd1c9719615de95c9ef7c87a14730a3c0cfc0aa5961bba48188def8f",
+  "prior_reviews": [],
+  "budget": {
+    "wall_seconds": 7200,
+    "network_requests": 12,
+    "max_new_bytes": 10485760,
+    "accounting_owner": "P10 source-probe HTTP requests/response bytes; GitHub/control/check logs accounted separately; deployed per-run budget separately frozen"
+  },
+  "cumulative_cost_review": "No prior news acquisition in this task; existing source code/PRD and P10 lessons reused. Model/control cost unknown_not_zero; no data purchase.",
+  "base_revision": "63eaa6531e4ed49a0f4ec348ffcccad173b1839e",
+  "owner_authority": "P12 original human messages and Owner section in main archive PR734; broader source collection today explicitly authorized",
+  "case_issue": 736,
+  "runtime_authority_boundary": "Owner explicitly authorized P10 forward source collection from today in a separate trial pipeline; no source procurement, Base2.6 changes, model/strategy activation or case-specific history/overseas quotes before window/pool confirmation."
+}

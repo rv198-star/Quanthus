@@ -15151,6 +15151,192 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-735-20261123T220930188514Z",
+      "recorded_at": "2026-11-23T22:09:30.188514+00:00",
+      "actor": "Quanthus P10 Owner",
+      "work_item": "P10-DATA-NEWS-FWD-001",
+      "outcome": "no_module_change",
+      "summary": "New isolated raw forward capture, cloud-only PDF archival and local tiered extraction fixed for runtime startup; no DATA use qualification change.",
+      "evidence": [
+        {
+          "id": "RAW-NEWS-BOOTSTRAP",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-news/ENGINEERING-CHECKPOINT-v1.json",
+          "sha256": "d516ff8109fad4d0c2d1901366233baffa33f9ed933c4af91378bc4de21474ff",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "27 local focused and lint/type; actual finite source probes, node quota/runtime available; full check and continuous source job tracked separately."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Raw engineering candidate only; actual full source loop and independent source/PIT/consumer qualification remain separate. DATA facets retain prior state.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-NEWS-FWD-001",
+          "number": 735,
+          "title": "[P10-DATA-NEWS-FWD-001] 2026-11-24起公告新闻前向采集与隔离试运行",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:03:37Z",
+          "body_sha256": "2190f1e381e782e71cf6bf65a50e17e6082c3776daef9c248308f124b7cfb2af"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
+    },
+    {
+      "id": "CP-735-20261123T221930796295Z",
+      "recorded_at": "2026-11-23T22:19:30.796295+00:00",
+      "actor": "P10 Owner after first actual source run",
+      "work_item": "P10-DATA-NEWS-FWD-001",
+      "outcome": "no_module_change",
+      "summary": "Raw trial actually captured300 news/30 unique disclosures and6 verified cloud PDFs; bounded repeated-source paging correction.",
+      "evidence": [
+        {
+          "id": "ACTUAL-RAW-TRIAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-news/ENGINEERING-CHECKPOINT-v2.json",
+          "sha256": "b9db63531e5bea39bbbd5b11aa91814782985d2c4ee0bbf8c518a212b965982e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual bounded partial trial; no all-A/source/consumer qualification."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "RAW_TRIAL_ONLY. Full universe/PIT clock/source/consumer qualification unchanged; source pagination partial.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-NEWS-FWD-001",
+          "number": 735,
+          "title": "[P10-DATA-NEWS-FWD-001] 2026-11-24起公告新闻前向采集与隔离试运行",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:03:37Z",
+          "body_sha256": "2190f1e381e782e71cf6bf65a50e17e6082c3776daef9c248308f124b7cfb2af"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
+    },
+    {
+      "id": "CP-735-20261123T222256285992Z",
+      "recorded_at": "2026-11-23T22:22:56.285992+00:00",
+      "actor": "P10 Owner actual raw-trial runtime checkpoint",
+      "work_item": "P10-DATA-NEWS-FWD-001",
+      "outcome": "progress",
+      "summary": "New forward capture engineering is partially running:300 news/30 unique disclosures/6 verified archived PDFs; source pagination gap remains.",
+      "evidence": [
+        {
+          "id": "ACTUAL-RAW-TRIAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-news/ENGINEERING-CHECKPOINT-v2.json",
+          "sha256": "b9db63531e5bea39bbbd5b11aa91814782985d2c4ee0bbf8c518a212b965982e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual bounded partial trial; no all-A/source/consumer qualification."
+        }
+      ],
+      "updates": [
+        {
+          "module": "DATA",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Forward news extension only: immutable raw capture/local tiered extraction/cloud PDF byte verification actually ran. Prior fixed128 acceptance remains within its old scope.",
+          "remaining": "CNINFO supplier pagination/all-A census, continuous corrected runtime, trialweek volume/table assessment and downstream binding. No quality/value/admission change.",
+          "next_action": "Continue independent working sources with repeated-page stop; bounded protocol/source evidence, week receipt and separate Base2.7 module design.",
+          "supersedes": "CP-566-PREFIX128-20261027T130854Z",
+          "evidence": [
+            "ACTUAL-RAW-TRIAL"
+          ]
+        }
+      ],
+      "no_change_reason": "All quality/value/admission facets remain as previously recorded.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-NEWS-FWD-001",
+          "number": 735,
+          "title": "[P10-DATA-NEWS-FWD-001] 2026-11-24起公告新闻前向采集与隔离试运行",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:03:37Z",
+          "body_sha256": "2190f1e381e782e71cf6bf65a50e17e6082c3776daef9c248308f124b7cfb2af"
+        }
+      ]
+    },
+    {
+      "id": "CP-735-20261123T222555155785Z",
+      "recorded_at": "2026-11-23T22:25:55.155785+00:00",
+      "actor": "P10 Owner metadata reconciliation",
+      "work_item": "P10-DATA-NEWS-FWD-001",
+      "outcome": "no_module_change",
+      "summary": "Existing exploration/blueprint mechanism records bounded raw trial and supplier paging failure. Refresh only next-request ledger digest; no research direction change.",
+      "evidence": [
+        {
+          "id": "ACTUAL-RAW-TRIAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-news/ENGINEERING-CHECKPOINT-v2.json",
+          "sha256": "b9db63531e5bea39bbbd5b11aa91814782985d2c4ee0bbf8c518a212b965982e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual bounded partial trial; no all-A/source/consumer qualification."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "TRACE mechanism unchanged; new forward work uses existing ledgers. Original R10 next request execution, scope and authority fields are preserved; only memory SHA follows append-only new conclusion.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-NEWS-FWD-001",
+          "number": 735,
+          "title": "[P10-DATA-NEWS-FWD-001] 2026-11-24起公告新闻前向采集与隔离试运行",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:03:37Z",
+          "body_sha256": "2190f1e381e782e71cf6bf65a50e17e6082c3776daef9c248308f124b7cfb2af"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-735-20261123T231056801198Z",
+      "recorded_at": "2026-11-23T23:10:56.801198+00:00",
+      "actor": "P10 Owner final live issue reconciliation",
+      "work_item": "P10-DATA-NEWS-FWD-001",
+      "outcome": "no_module_change",
+      "summary": "Reconcile live735current body and future task registrations; current raw engineering/runtime and source gaps retained.",
+      "evidence": [
+        {
+          "id": "LIVE-METADATA-REUSE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-news/METADATA-FOLLOWUP-REUSE.json",
+          "sha256": "06c2fe21adcb1cd4247650ab8f533fc606aa1e9fd40ae38cc4ac7f5e62480ae2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Current issue/schedule bookkeeping and byte-identical test reuse only; future samples/assembly/week report not executed."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Documentation/ledger only after exact c2f executable/config/test equality; DATA source/quality/value/admission and TRACE mechanism unchanged.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-NEWS-FWD-001",
+          "number": 735,
+          "title": "[P10-DATA-NEWS-FWD-001] 2026-11-24起公告新闻前向采集与隔离试运行",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T23:07:50Z",
+          "body_sha256": "7bb1701ad61b5395deb55554e7e95c0f5ea5986026f91e426705bc486d2339ee"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

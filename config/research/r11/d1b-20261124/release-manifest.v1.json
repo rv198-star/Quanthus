@@ -18,8 +18,8 @@
     "entry_seam": "src/quanthus/product_daily/risk.py",
     "trend_producer": "src/quanthus/expert_evaluation/experts/trend_stability.py",
     "context_builder": "src/quanthus/expert_strategy/runner.py:build_formal_expert_context",
-    "code_commit": "a94406e1c4e3c36331a48443a43e9a785bfa2948",
-    "code_tree": "f6d8476e1cfacdabd1d1452a5b7e44a40fdab572"
+    "code_commit": "24e2e317bdbdd09686ddf8a034e285873e862f8a",
+    "code_tree": "9479ba966ac4fbd33889bafd00c9c9a53ea90492"
   },
   "input_closure": {
     "pointer": "cn02:/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5/CURRENT_DAILY_CORE_BASE24.json",

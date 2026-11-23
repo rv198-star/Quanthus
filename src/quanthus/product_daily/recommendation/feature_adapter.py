@@ -330,6 +330,14 @@ def compute_security_feature_facts(
         raise ProductDailyError(
             "missing_signal_bar", "the bar history must end on the declared signal_date"
         )
+    # The closure must be single-security: a foreign bar/limit would contaminate the
+    # universe membership and silently change this security's features.
+    foreign = [b.security_id for b in bars if b.security_id != security_id]
+    if foreign:
+        raise ProductDailyError(
+            "cross_security_contamination",
+            "the bar closure contains a row for a different security",
+        )
 
     connection = duckdb.connect(":memory:")
     try:

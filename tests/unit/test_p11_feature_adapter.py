@@ -430,3 +430,59 @@ def test_daily_input_from_bar_projects_amount_not_volume():
     assert row.static_level1_industry_id == "industry-01"
     assert row.close_price == Decimal("100")
     assert row.knowledge_cutoff == CUTOFF
+
+
+def test_cross_security_bar_fails_closed():
+    """A bar for a different security in the closure is contamination, fail closed."""
+
+    days = _days(30)
+    bars = [_bar(d, Decimal("100")) for d in days]
+    foreign = DailyBar(
+        security_id="sec-2",  # not the computed security
+        session_date=days[5],
+        open_price=Decimal("1"),
+        high_price=Decimal("1"),
+        low_price=Decimal("1"),
+        close_price=Decimal("1"),
+        volume=Decimal("1"),
+        amount=Decimal("1"),
+    )
+    with pytest.raises(ProductDailyError) as excinfo:
+        compute_security_feature_facts(
+            security_id="sec-1",
+            bars=bars + [foreign],
+            actions=(),
+            exceptions=(),
+            limits=(),
+            trading_dates=days,
+            identity=_identity(),
+            signal_date=SIGNAL,
+            signal_close=datetime.combine(SIGNAL, time(15, 0), SHANGHAI),
+        )
+    assert "cross_security" in str(excinfo.value) or "contamination" in str(excinfo.value)
+
+
+def test_is_tradable_flows_to_scan_input():
+    """is_tradable on the bar reaches CandidateDailyInput for the event scan."""
+
+    day = SIGNAL
+    non_tradable = DailyBar(
+        security_id="sec-1",
+        session_date=day,
+        open_price=Decimal("100"),
+        high_price=Decimal("101"),
+        low_price=Decimal("99"),
+        close_price=Decimal("100"),
+        volume=Decimal("0"),
+        amount=Decimal("0"),
+        is_tradable=False,
+    )
+    row = daily_input_from_bar(
+        bar=non_tradable,
+        identity=_identity(),
+        listing_sessions=200,
+        close_at=datetime.combine(day, time(15, 0), SHANGHAI),
+        knowledge_cutoff=CUTOFF,
+        source_evidence_digest="sha256:" + "a" * 64,
+    )
+    assert row.is_tradable is False

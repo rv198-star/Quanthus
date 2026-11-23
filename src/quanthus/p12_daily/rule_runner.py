@@ -62,11 +62,45 @@ RULE_VERSION_REJECTED = "RULE_VERSION_REJECTED"
 
 
 @dataclass(frozen=True)
+class HeldPositionFact:
+    "The account facts P12 supplies for one open position (M2 F9)."
+
+    security_code: str
+    quantity: int
+    holding_sessions: int | None = None
+    marked_return: str | None = None
+    prior_strategy_reduction_count: int | None = None
+    unavailable_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class TrendObservation:
+    "A P11 evaluate_trend_stability result bound to its event (M2 F10)."
+
+    opportunity_id: str
+    observation_digest: str
+    applicability: str
+    raw_value: str | None = None
+
+
+@dataclass(frozen=True)
+class HistoryGateResult:
+    "One of the three independent history floors (M2 section 3)."
+
+    gate_id: str
+    satisfied: bool
+    observed_sessions: int | None
+    required_sessions: int
+    unavailable_reason: str | None = None
+
+
+@dataclass(frozen=True)
 class RunnerRequest:
     snapshot: DailyCoreSnapshot
     next_session: date
-    # Account holdings the rule must not double-enter: (security_code, quantity).
-    holdings: tuple[tuple[str, int], ...]
+    # Account holdings (M2 F9): the rule binds these into HeldPositionFacts
+    # and must not double-enter a held security.
+    holdings: tuple[HeldPositionFact, ...]
     published_at: datetime
 
 
@@ -81,6 +115,10 @@ class SecurityExclusion:
 class RunnerOutput:
     decision_set: MarketDecisionSet
     exclusions: tuple[SecurityExclusion, ...]
+    # M2 F10: P11-bound trend observations carried verbatim, abstentions kept.
+    trend_observations: tuple[TrendObservation, ...] = ()
+    # M2 section 3: the three independent history floors evaluated for this run.
+    history_gates: tuple[HistoryGateResult, ...] = ()
 
 
 class StrategyRuleRunner(Protocol):
@@ -141,9 +179,10 @@ class SyntheticRuleRunner:
         cutoff = datetime.combine(snapshot.market_date, SESSION_CLOSE, tzinfo=EXCHANGE_TZ)
         eligible = datetime.combine(request.next_session, SESSION_OPEN, tzinfo=EXCHANGE_TZ)
         expires = datetime.combine(request.next_session, SESSION_CLOSE, tzinfo=EXCHANGE_TZ)
-        held = {code for code, qty in request.holdings if qty > 0}
+        held = {fact.security_code for fact in request.holdings if fact.quantity > 0}
         decisions: list[MarketDecision] = []
         exclusions: list[SecurityExclusion] = []
+        trend_observations: list[TrendObservation] = []
         for item in self._candidates:
             code = str(item["security_code"])
             drop_reason = item.get("unqualified_reason")
@@ -223,6 +262,28 @@ class SyntheticRuleRunner:
                     component_ref=self._ref,
                 )
             )
+        # M2 F10: a candidate may carry the P11 evaluate_trend_stability
+        # observation identity; P12 transports it verbatim, abstentions kept.
+        for item in self._candidates:
+            obs = item.get("trend_observation")
+            if not isinstance(obs, dict):
+                continue
+            if not obs.get("observation_digest"):
+                continue
+            trend_observations.append(
+                TrendObservation(
+                    opportunity_id=str(
+                        obs.get("opportunity_id")
+                        or ("OPP-D1B-{}-{}".format(
+                            snapshot.market_date.strftime("%Y%m%d"),
+                            str(item["security_code"]),
+                        ))
+                    ),
+                    observation_digest=str(obs["observation_digest"]),
+                    applicability=str(obs.get("applicability", "ABSTAINED")),
+                    raw_value=None if obs.get("raw_value") is None else str(obs["raw_value"]),
+                )
+            )
         if not decisions:
             decisions.append(_no_op_decision(self._ref, snapshot.market_date))
         decision_set = validate_decision_set(
@@ -248,4 +309,9 @@ class SyntheticRuleRunner:
                 decisions=tuple(decisions),
             )
         )
-        return RunnerOutput(decision_set=decision_set, exclusions=tuple(exclusions))
+        return RunnerOutput(
+            decision_set=decision_set,
+            exclusions=tuple(exclusions),
+            trend_observations=tuple(trend_observations),
+            history_gates=tuple(snapshot.history_gates),
+        )

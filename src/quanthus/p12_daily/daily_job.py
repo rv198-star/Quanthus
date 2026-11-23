@@ -26,6 +26,11 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from quanthus.p12_daily.consumer_sidecar import (
+    DISPOSITION_INPUT_OR_CLOCK_BLOCKED,
+    SidecarError,
+    read_sidecar,
+)
 from quanthus.p12_daily.daily_core_input import (
     EXCHANGE_TZ,
     DailyCoreSnapshot,
@@ -38,6 +43,7 @@ from quanthus.p12_daily.package_store import (
     DailyPackageStore,
 )
 from quanthus.p12_daily.rule_runner import (
+    HeldPositionFact,
     RunnerOutput,
     RunnerRequest,
     StrategyRuleRunner,
@@ -57,8 +63,13 @@ def _run_id(now: datetime) -> str:
     return now.astimezone(EXCHANGE_TZ).strftime("%Y%m%dT%H%M%S%f%z")
 
 
-def _holdings_from_ledger(state_dir: Path, account_id: str) -> tuple[tuple[str, int], ...]:
+def _holdings_from_ledger(state_dir: Path, account_id: str) -> tuple[HeldPositionFact, ...]:
     '''Read current positions from the paper ledger without writing any fact.
+
+    Returns the raw account facts (M2 F9).  The paper ledger stores
+    security_code and quantity only, so holding_sessions, marked_return and
+    prior_strategy_reduction_count stay None with unavailable_reason set; P12
+    reports account state, it does not invent it.
 
     A store that has not been initialized yields no holdings so the run still
     works on a fresh deployment before the first login.
@@ -94,7 +105,19 @@ def _holdings_from_ledger(state_dir: Path, account_id: str) -> tuple[tuple[str, 
         return ()
     except Exception:  # noqa: BLE001 - an unreadable ledger must not fabricate holdings
         return ()
-    return tuple((p.security_code, int(p.quantity)) for p in snapshot.projection.positions)
+    return tuple(
+        HeldPositionFact(
+            security_code=p.security_code,
+            quantity=int(p.quantity),
+            unavailable_reason=(
+                "ledger records security_code/quantity only; holding_sessions, "
+                "marked_return and prior_strategy_reduction_count are not "
+                "separately materialized for this account"
+            ),
+        )
+        for p in snapshot.projection.positions
+        if int(p.quantity) > 0
+    )
 
 
 def _blocked_receipt(
@@ -136,7 +159,8 @@ def run_daily(
     next_session: date,
     account_id: str,
     now: datetime | None = None,
-    holdings: tuple[tuple[str, int], ...] | None = None,
+    holdings: tuple[HeldPositionFact, ...] | None = None,
+    sidecar_path: Path | None = None,
 ) -> dict:
     '''Execute one daily run and persist its receipt; returns the receipt.'''
 
@@ -235,6 +259,196 @@ def run_daily(
         row_counts=snapshot.row_counts,
     )
 
+    # M2 section 3: the three history floors are checked separately.  A floor
+    # the qualified input cannot prove is a whole-day block, never a pass.
+    failed_gates = [g for g in snapshot.history_gates if not g.satisfied]
+    if failed_gates:
+        reasons = [
+            g.gate_id + (": " + g.unavailable_reason if g.unavailable_reason else "")
+            for g in failed_gates
+        ]
+        t = stage("history", t, result="blocked", gates=reasons)
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail="daily input history floors not satisfied: " + "; ".join(reasons),
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=snapshot.market_date,
+            ),
+            market_date=market_date,
+            missing_members=[g.gate_id for g in failed_gates],
+        )
+        receipt["history_gates"] = [
+            {
+                "gate_id": g.gate_id,
+                "satisfied": g.satisfied,
+                "observed_sessions": g.observed_sessions,
+                "required_sessions": g.required_sessions,
+                "unavailable_reason": g.unavailable_reason,
+            }
+            for g in snapshot.history_gates
+        ]
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
+    receipt["history_gates"] = [
+        {
+            "gate_id": g.gate_id,
+            "satisfied": g.satisfied,
+            "observed_sessions": g.observed_sessions,
+            "required_sessions": g.required_sessions,
+            "unavailable_reason": g.unavailable_reason,
+        }
+        for g in snapshot.history_gates
+    ]
+
+    # M2 F11: corporate-action / adjustment fields must all be present and
+    # mappable; a missing or unmappable field blocks the input, it is never
+    # defaulted or converted.
+    ca = snapshot.corporate_actions
+    ca_missing = ca is None or not ca.get("fields_complete", False)
+    if ca_missing:
+        detail = (
+            "corporate-action/adjustment fields absent from the daily input"
+            if ca is None
+            else "corporate-action/adjustment fields not completely mappable: "
+            + ", ".join(sorted(str(x) for x in ca.get("unmapped_fields", ("unknown",))))
+        )
+        t = stage("corporate_actions", t, result="blocked")
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail=detail,
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=snapshot.market_date,
+            ),
+            market_date=market_date,
+            missing_members=["corporate_actions"],
+        )
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
+    receipt["corporate_actions"] = {
+        k: v for k, v in ca.items() if k != "fields_complete"
+    }
+
+    # M2 F2: next_session is the governed calendar's declared next open
+    # session, not a caller guess.  A snapshot without a calendar member is a
+    # whole-day block; a caller next_session that disagrees with the calendar
+    # is refused rather than silently used.
+    if snapshot.authoritative_next_session is None:
+        t = stage("calendar", t, result="blocked")
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail="daily input lacks the governed trading-calendar member; "
+                "next_session cannot be determined from an authoritative source",
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=snapshot.market_date,
+            ),
+            market_date=market_date,
+            missing_members=["trading_calendar"],
+        )
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
+    if next_session != snapshot.authoritative_next_session:
+        t = stage("calendar", t, result="blocked", caller=next_session.isoformat())
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail=(
+                    "caller next_session "
+                    + next_session.isoformat()
+                    + " disagrees with the governed calendar next_session "
+                    + snapshot.authoritative_next_session.isoformat()
+                ),
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=snapshot.market_date,
+            ),
+            market_date=market_date,
+            missing_members=["trading_calendar"],
+        )
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
+    next_session = snapshot.authoritative_next_session
+
+    # P10 consumer sidecar (task #726): when present, each consumed member's
+    # clocks must order source<=validated<=published<=available<=cutoff.  A
+    # missing sidecar leaves the package publish time null in the receipt; a
+    # REVISE/WITHDRAW event never becomes a same-day replacement package.
+    sidecar_read = None
+    if sidecar_path is not None:
+        try:
+            sidecar_read = read_sidecar(
+                sidecar_path,
+                consumer_now=moment,
+                decision_cutoff=snapshot.knowledge_cutoff,
+            )
+        except SidecarError as exc:
+            t = stage("sidecar", t, result="blocked", detail=str(exc))
+            _blocked_receipt(
+                receipt,
+                InputBlock(
+                    reason_code="INPUT_UNAVAILABLE",
+                    detail="consumer sidecar not consumable: " + str(exc),
+                    checked_at=moment,
+                    expected_market_date=market_date,
+                    observed_market_date=snapshot.market_date,
+                ),
+                market_date=market_date,
+                missing_members=["consumer_sidecar"],
+            )
+            receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+            store.write_run(receipt)
+            return receipt
+        receipt["consumer_receipt"] = sidecar_read.to_dict()
+        receipt["source_published_at"] = (
+            sidecar_read.published_at[1] or sidecar_read.published_at[0]
+        )
+        if sidecar_read.event == "WITHDRAW":
+            # A source withdraw is recorded on the receipt; the day's advice
+            # still comes from the last qualified publish, never a same-day
+            # replacement (frozen decision b).
+            t = stage("sidecar", t, result="withdraw_recorded")
+        elif sidecar_read.disposition == DISPOSITION_INPUT_OR_CLOCK_BLOCKED:
+            t = stage(
+                "sidecar", t, result="blocked",
+                reasons=list(sidecar_read.blocked_reasons),
+            )
+            _blocked_receipt(
+                receipt,
+                InputBlock(
+                    reason_code="INPUT_UNAVAILABLE",
+                    detail="consumer sidecar clocks incomplete: "
+                    + "; ".join(sidecar_read.blocked_reasons),
+                    checked_at=moment,
+                    expected_market_date=market_date,
+                    observed_market_date=snapshot.market_date,
+                ),
+                market_date=market_date,
+                missing_members=["consumer_sidecar"],
+            )
+            receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+            store.write_run(receipt)
+            return receipt
+        else:
+            t = stage("sidecar", t, result=sidecar_read.disposition)
+    else:
+        # No sidecar: the receipt's publish time stays null - P12 records only
+        # what it actually read, never a file mtime as a publish time.
+        receipt["consumer_receipt"] = None
+        receipt["source_published_at"] = None
+
     try:
         output: RunnerOutput = runner.run(
             RunnerRequest(
@@ -296,6 +510,18 @@ def run_daily(
         STATUS_PUBLISHED if outcome.status == "published" else STATUS_ALREADY_PUBLISHED
     )
     entry_plans = sum(1 for item in decisions.decisions if item.entry is not None)
+    # F10: P11-bound trend observations carried verbatim into the receipt;
+    # abstained observations are kept, not dropped.
+    if output.trend_observations:
+        receipt["trend_observations"] = [
+            {
+                "opportunity_id": obs.opportunity_id,
+                "observation_digest": obs.observation_digest,
+                "applicability": obs.applicability,
+                "raw_value": obs.raw_value,
+            }
+            for obs in output.trend_observations
+        ]
     receipt["package"] = {
         "package_id": outcome.package.package_id,
         "file_sha256": outcome.package.file_sha256,
@@ -304,6 +530,14 @@ def run_daily(
         "admission_disposition": "empty_advice" if entry_plans == 0 else "publishable",
         "decision_set_digest": digest(decision_set),
     }
+    # The receipt's own publish time is the run moment P12 committed the
+    # package; the P10 supply-side publish time (source_published_at) comes
+    # only from a real sidecar clock, else null - never a file mtime.
+    receipt["published_at"] = moment.isoformat()
+    if receipt.get("source_published_at") is None and sidecar_read is not None:
+        receipt["source_published_at"] = (
+            sidecar_read.published_at[1] or sidecar_read.published_at[0]
+        )
     receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
     store.write_run(receipt)
     return receipt
@@ -347,6 +581,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runner", default="synthetic-replay")
     parser.add_argument("--candidates", type=Path)
     parser.add_argument(
+        "--sidecar",
+        type=Path,
+        default=None,
+        help="optional P10 daily consumer sidecar record for this run",
+    )
+    parser.add_argument(
         "--retract",
         action="store_true",
         help="append a retraction for --market-date instead of running",
@@ -375,6 +615,7 @@ def main(argv: list[str] | None = None) -> int:
         market_date=args.market_date,
         next_session=args.next_session,
         account_id=args.account,
+        sidecar_path=args.sidecar,
     )
     print(json.dumps(receipt, ensure_ascii=False, indent=2))
     return 0 if receipt["status"] in (STATUS_PUBLISHED, STATUS_ALREADY_PUBLISHED) else 1

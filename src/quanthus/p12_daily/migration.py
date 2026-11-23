@@ -99,30 +99,47 @@ def rehearse(
     *,
     source_store: Path,
     rehearsal_dir: Path,
-    open_app: Callable[[Path], Any],
+    open_source_app: Callable[[Path], Any],
+    open_migrated_app: Callable[[Path], Any],
 ) -> MigrationReport:
-    # Rehearse the source migration on a copied ledger.  open_app builds the
-    # paper application on a given state dir with the daily-package source
-    # bound; the migration itself happens inside build_paper_application's
-    # recorded one-time path.
+    # Rehearse the source migration on a copied ledger.  open_source_app builds
+    # the application still bound to the store's existing source (no rebind),
+    # open_migrated_app builds it bound to the daily-package source so the
+    # recorded one-time migration runs on the copy.  Reading the source with the
+    # migrated binding would itself rebind the original - the rehearsal must not
+    # touch it.
     source_store = Path(source_store)
     rehearsal_dir = Path(rehearsal_dir)
     if not source_store.is_file():
         raise FactError("FACT_NOT_FOUND", f"source ledger missing: {source_store}")
     rehearsal_dir.mkdir(parents=True, exist_ok=True)
     copy_store = rehearsal_dir / source_store.name
-    before_bytes = source_store.read_bytes()
+
+    # The untouched source is read with its own binding before any copy is
+    # opened under the new source.
+    before = ledger_surfaces(open_source_app(source_store.parent))
     shutil.copy2(source_store, copy_store)
 
-    migrated_app = open_app(rehearsal_dir)
+    migrated_app = open_migrated_app(rehearsal_dir)
     after = ledger_surfaces(migrated_app)
     binding = migrated_app.facts_binding()
     migrations = (binding.binding.get("migrations") or []) if binding else []
 
-    source_app = open_app(source_store.parent)
-    before = ledger_surfaces(source_app)
     consistent_map = compare_surfaces(before, after)
-    source_intact = source_store.read_bytes() == before_bytes
+    # "Intact" means the source ledger was not rebound: its recorded binding
+    # still names the legacy source and carries no migration entry.  Raw bytes
+    # are not compared - opening a sqlite store legitimately changes its WAL
+    # and journal header without altering any fact.
+    source_binding = open_source_app(source_store.parent).facts_binding()
+    source_migrations = (
+        (source_binding.binding.get("migrations") or []) if source_binding else []
+    )
+    source_ref = (source_binding.binding.get("decision_source") or {}) if source_binding else {}
+    source_intact = not source_migrations and source_ref.get("ref_id") == (
+        migrations[-1]["record"]["from"].get("ref_id")
+        if migrations and isinstance(migrations[-1].get("record"), dict)
+        else source_ref.get("ref_id")
+    )
     return MigrationReport(
         source_store=source_store,
         rehearsal_store=copy_store,

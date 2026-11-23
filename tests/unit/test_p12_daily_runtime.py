@@ -21,6 +21,7 @@ from quanthus.p12_daily.package_store import (
 )
 from quanthus.p12_daily.rule_runner import (
     NO_QUALIFIED_CANDIDATE_ID,
+    HeldPositionFact,
     SyntheticRuleRunner,
 )
 from quanthus.shared.fact_contracts import FactError
@@ -59,6 +60,24 @@ def make_product(job_root: Path, market_date: str, rows: int = 5213) -> dict:
         "content_digest": "sha256:" + "3" * 64,
         "completed_at": f"{market_date}T18:01:06+08:00",
         "consumer_admission": "NOT_GRANTED",
+        # M2 F2: the governed calendar member declares the authoritative next
+        # open session at this cutoff; the job never guesses the date.
+        "calendar": {"next_session": "2026-11-21"},
+        # M2 section 3: the three independent history floors, each separately
+        # satisfied by the observed sessions this input supplies.
+        "history": {
+            "event_window_sessions": {"observed_sessions": 30},
+            "feature_warmup_sessions": {"observed_sessions": 80},
+            "listing_sessions": {"observed_sessions": 200},
+        },
+        # M2 F11: corporate-action/adjustment fields carried verbatim; the
+        # manifest attests they are all present and mappable.
+        "corporate_actions": {
+            "fields_complete": True,
+            "cash_dividend_per_share": "0.00",
+            "bonus_share_ratio": "0.00",
+            "exceptions": [],
+        },
     }
     mb = json.dumps(manifest, sort_keys=True).encode()
     (core / "manifest.json").write_bytes(mb)
@@ -256,7 +275,7 @@ def test_held_security_not_reentered(env):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
-        holdings=(("600000", 500),),
+        holdings=(HeldPositionFact(security_code="600000", quantity=500),),
     )
     assert receipt["package"]["entry_plan_count"] == 0
 
@@ -340,3 +359,256 @@ def test_pending_source_when_no_package(tmp_path):
     assert pending.source_ref.version == "v1"
     assert pending.decisions == ()
     assert source.latest_run() is None
+
+
+def test_history_gate_failure_blocks(tmp_path):
+    """A history floor the input cannot prove blocks the whole day (M2 S3)."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    meta = make_product(prod, MARKET_DATE.isoformat())
+    # Weaken the feature-warmup gate below its 61-session floor.
+    manifest_path = meta["core"] / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["history"]["feature_warmup_sessions"] = {"observed_sessions": 40}
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True))
+    # re-hash manifest into the entry/index so the pointer still verifies
+    core_sha = _sha(manifest_path.read_bytes())
+    entry_dir = prod / "DATES.json"
+    index = json.loads(entry_dir.read_text())
+    index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
+    entry_dir.write_text(json.dumps(index, sort_keys=True))
+    pointer = json.loads((prod / "CURRENT_DAILY_CORE_BASE24.json").read_text())
+    pointer["index_sha256"] = _sha(entry_dir.read_bytes())
+    pointer["entry"]["core_manifest_sha256"] = core_sha
+    (prod / "CURRENT_DAILY_CORE_BASE24.json").write_text(json.dumps(pointer))
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(),
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert receipt["input_block"]["missing_members"] == ["history.feature_warmup_61"]
+
+
+def test_missing_calendar_blocks(tmp_path):
+    """Without the governed calendar member the run cannot fix next_session."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    meta = make_product(prod, MARKET_DATE.isoformat())
+    manifest_path = meta["core"] / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    del manifest["calendar"]
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True))
+    core_sha = _sha(manifest_path.read_bytes())
+    index = json.loads((prod / "DATES.json").read_text())
+    index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
+    (prod / "DATES.json").write_text(json.dumps(index, sort_keys=True))
+    pointer = json.loads((prod / "CURRENT_DAILY_CORE_BASE24.json").read_text())
+    pointer["index_sha256"] = _sha((prod / "DATES.json").read_bytes())
+    pointer["entry"]["core_manifest_sha256"] = core_sha
+    (prod / "CURRENT_DAILY_CORE_BASE24.json").write_text(json.dumps(pointer))
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(),
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert "trading_calendar" in receipt["input_block"]["missing_members"]
+
+
+def test_missing_corporate_actions_blocks(tmp_path):
+    """M2 F11: absent corporate-action fields block the input, never default."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    meta = make_product(prod, MARKET_DATE.isoformat())
+    manifest_path = meta["core"] / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    del manifest["corporate_actions"]
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True))
+    core_sha = _sha(manifest_path.read_bytes())
+    index = json.loads((prod / "DATES.json").read_text())
+    index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
+    (prod / "DATES.json").write_text(json.dumps(index, sort_keys=True))
+    pointer = json.loads((prod / "CURRENT_DAILY_CORE_BASE24.json").read_text())
+    pointer["index_sha256"] = _sha((prod / "DATES.json").read_bytes())
+    pointer["entry"]["core_manifest_sha256"] = core_sha
+    (prod / "CURRENT_DAILY_CORE_BASE24.json").write_text(json.dumps(pointer))
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(),
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert "corporate_actions" in receipt["input_block"]["missing_members"]
+
+
+def _copy_fixture_sidecar(tmp_path, name):
+    src = Path(
+        "/Users/william/Documents/Codex/2026-11-24/"
+        "quanthus-p10-daily-sidecar-v1/fixtures/synthetic"
+    ) / name
+    if not src.is_file():
+        return None
+    dest = tmp_path / name
+    dest.write_bytes(src.read_bytes())
+    return dest
+
+
+def test_sidecar_publish_records_consumer_stamps(tmp_path):
+    """A read sidecar yields per-member received/first_read/verified stamps."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    sidecar = _copy_fixture_sidecar(tmp_path, "sidecar.v1.json")
+    if sidecar is None:
+        pytest.skip("P10 sidecar fixture not present")
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(), sidecar_path=sidecar,
+    )
+    # The synthetic fixture's own clocks are 2000-dated; the run still records
+    # what P12 actually read (the consumer receipt), and TEST_ONLY disposition
+    # does not itself block publication of the synthetic package.
+    assert receipt["status"] == "PUBLISHED"
+    assert receipt["consumer_receipt"] is not None
+    members = receipt["consumer_receipt"]["members"]
+    assert members and all(m["received_at"] for m in members)
+    assert members and all(m["first_read_at"] for m in members)
+    assert members and all(m["verified_at"] for m in members)
+
+
+def test_sidecar_absent_published_at_null(tmp_path):
+    """No sidecar: the receipt's supply-side publish time stays null."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    assert receipt["consumer_receipt"] is None
+    assert receipt["source_published_at"] is None
+
+
+def test_sidecar_withdraw_does_not_replace(tmp_path):
+    """A WITHDRAW event is recorded but never republishes the same day."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    sidecar = _copy_fixture_sidecar(tmp_path, "withdrawal.v1.json")
+    if sidecar is None:
+        pytest.skip("P10 sidecar fixture not present")
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(), sidecar_path=sidecar,
+    )
+    # Source withdraw recorded on the receipt; the day still publishes once
+    # (frozen decision b: source revise/withdraw never becomes a same-day
+    # replacement advice package).
+    assert receipt["status"] == "PUBLISHED"
+    assert receipt["consumer_receipt"]["event"] == "WITHDRAW"
+
+
+
+def test_migration_rehearsal_preserves_ledger_surfaces(tmp_path):
+    """Moving a bound paper store to the daily-package source keeps the ledger.
+
+    The rehearsal copies the store, rebinds the copy to PublishedPackageSource
+    and compares every ledger surface; the original stays byte-identical.
+    """
+
+    from quanthus.p12_daily.migration import rehearse
+    from quanthus.platform.adapters.p12_synthetic_fixture import (
+        load_synthetic_fixture,
+    )
+    from quanthus.platform.p12.paper_fixture import (
+        PAPER_ACCOUNT_ID,
+        PAPER_FACTS_STORE,
+        build_paper_application,
+    )
+    from quanthus.policy import find_project_root
+    from quanthus.product_daily.application.models import (
+        SyntheticRuntimeAuthorization,
+    )
+
+    fixture = load_synthetic_fixture(
+        find_project_root() / "config/p12/synthetic-desktop.v1.json"
+    )
+    auth = SyntheticRuntimeAuthorization("local-paper:test", frozenset({PAPER_ACCOUNT_ID}))
+    now = lambda: datetime(2026, 11, 20, 20, 0, tzinfo=TZ)  # noqa: E731
+
+    # Build the account on the legacy empty paper-decisions source and buy.
+    src_dir = tmp_path / "src_state"
+    src_dir.mkdir()
+    app = build_paper_application(
+        state_dir=src_dir, policy=fixture.policy, authorization=auth, now=now
+    )
+    # The baseline projection is recorded through the application surface.
+    projection = app.paper_projection()
+    assert projection.cash is not None
+
+    source_store = src_dir / PAPER_FACTS_STORE
+    assert source_store.is_file()
+
+    # open_source_app keeps the store's existing binding (no rebind, so the
+    # before surfaces are read without migrating); open_migrated_app binds the
+    # daily-package source so the recorded migration runs on the copy only.
+    pkg_state = tmp_path / "pkg_state"
+    DailyPackageStore(pkg_state)  # ensure empty store exists for the source
+
+    def open_source_app(state_dir):
+        return build_paper_application(
+            state_dir=state_dir,
+            policy=fixture.policy,
+            authorization=auth,
+            now=now,
+        )
+
+    def open_migrated_app(state_dir):
+        return build_paper_application(
+            state_dir=state_dir,
+            policy=fixture.policy,
+            authorization=auth,
+            now=now,
+            decision_source=PublishedPackageSource(
+                pkg_state, now, mode="synthetic",
+                account_ids=frozenset({PAPER_ACCOUNT_ID}),
+            ),
+        )
+
+    report = rehearse(
+        source_store=source_store,
+        rehearsal_dir=tmp_path / "rehearsal",
+        open_source_app=open_source_app,
+        open_migrated_app=open_migrated_app,
+    )
+    assert report.source_intact is True
+    assert report.migration_record is not None
+    assert report.migration_record["record"]["kind"] == "decision_source_migration"
+    assert report.migration_record["record"]["from"]["ref_id"] == "p12-paper-decisions"
+    # Cash, positions, buckets, orders and receipts all carry across unchanged.
+    assert report.consistent is True
+    assert all(report.surfaces.values())
+

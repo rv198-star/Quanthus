@@ -73,6 +73,9 @@ class DailyCoreSnapshot:
     knowledge_cutoff: datetime | None
     consumer_admission: str
     checked_at: datetime
+    authoritative_next_session: date | None = None
+    history_gates: tuple = ()
+    corporate_actions: dict | None = None
 
 
 def _read_json(path: Path) -> dict:
@@ -255,6 +258,17 @@ def qualify_daily_input(
                     cutoff = None
                 else:
                     break
+    calendar = manifest.get("calendar") or entry.get("calendar") or {}
+    authoritative_next_session = None
+    if isinstance(calendar, dict) and calendar.get("next_session"):
+        try:
+            authoritative_next_session = date.fromisoformat(str(calendar["next_session"]))
+        except ValueError:
+            authoritative_next_session = None
+    history_gates = _history_gates(manifest.get("history"))
+    corporate_actions = manifest.get("corporate_actions")
+    if corporate_actions is not None and not isinstance(corporate_actions, dict):
+        corporate_actions = None
     return DailyCoreSnapshot(
         pointer_path=pointer_path,
         core_root=core_root,
@@ -269,4 +283,58 @@ def qualify_daily_input(
         knowledge_cutoff=cutoff,
         consumer_admission=consumer_admission,
         checked_at=now,
+        authoritative_next_session=authoritative_next_session,
+        history_gates=history_gates,
+        corporate_actions=corporate_actions,
     )
+
+
+HISTORY_GATE_EVENT_WINDOW = "history.event_window_22"
+HISTORY_GATE_FEATURE_WARMUP = "history.feature_warmup_61"
+HISTORY_GATE_LISTING_FLOOR = "history.listing_floor_120"
+
+
+def _history_gates(node) -> tuple:
+    # Build the three independent history floors from the manifest member.
+    # Each gate is checked on its own; a member that cannot be read yields an
+    # unavailable gate with a reason, never a silent pass.
+    from quanthus.p12_daily.rule_runner import HistoryGateResult
+
+    node = node if isinstance(node, dict) else {}
+
+    def gate(gate_id, key, required):
+        raw = node.get(key)
+        if raw is None:
+            return HistoryGateResult(
+                gate_id=gate_id,
+                satisfied=False,
+                observed_sessions=None,
+                required_sessions=required,
+                unavailable_reason="history member " + repr(key) + " absent from manifest",
+            )
+        try:
+            observed = int(raw.get("observed_sessions", raw))
+        except (TypeError, ValueError, AttributeError):
+            return HistoryGateResult(
+                gate_id=gate_id,
+                satisfied=False,
+                observed_sessions=None,
+                required_sessions=required,
+                unavailable_reason="history member " + repr(key) + " not an integer count",
+            )
+        reason = raw.get("unavailable_reason") if isinstance(raw, dict) else None
+        satisfied = observed >= required and not reason
+        return HistoryGateResult(
+            gate_id=gate_id,
+            satisfied=satisfied,
+            observed_sessions=observed,
+            required_sessions=required,
+            unavailable_reason=reason or (None if satisfied else "observed below required floor"),
+        )
+
+    return (
+        gate(HISTORY_GATE_EVENT_WINDOW, "event_window_sessions", 22),
+        gate(HISTORY_GATE_FEATURE_WARMUP, "feature_warmup_sessions", 61),
+        gate(HISTORY_GATE_LISTING_FLOOR, "listing_sessions", 120),
+    )
+

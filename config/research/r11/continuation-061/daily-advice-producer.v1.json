@@ -10,8 +10,19 @@
     "module": "quanthus.product_daily.recommendation",
     "package_schema": "quanthus.r11.daily-advice.v1",
     "decision_set_shape": "p12 MarketDecisionSet/MarketDecision/EntryIntent/Explanation",
-    "stages": ["entry_plan", "waiting", "holding", "exit_plan", "input_blocked", "ended"],
-    "contract_reason_codes": ["NEW_ENTRY_SIGNAL", "INPUT_NOT_READY"]
+    "stages": [
+      "entry_plan",
+      "waiting",
+      "holding",
+      "exit_plan",
+      "input_blocked",
+      "ended"
+    ],
+    "contract_reason_codes": [
+      "NEW_ENTRY_SIGNAL",
+      "STALE_MARKET_INPUT",
+      "INPUT_UNAVAILABLE"
+    ]
   },
   "rules": {
     "cutoff": "declared in AdvicePolicy before produce; never inferred from member times",
@@ -19,7 +30,14 @@
     "required_missing": "INPUT_NOT_READY; no formal package is emitted",
     "empty_advice": "only when all required members are admitted and no candidate was injected",
     "published_at": "injected real publish instant; never backfilled; must not precede cutoff",
-    "append_only": "same market_date rewrite refused; extension requires version bump preserving prior digests"
+    "append_only": "same market_date with different content refused; same (id,version) refused; receipt time must equal decision_set published_at",
+    "blocked_reason": "input_blocked carries only STALE_MARKET_INPUT or INPUT_UNAVAILABLE (P12 validate_decision_set)",
+    "publishable": "false when any decision is input_blocked",
+    "evaluation_receipt": "required on both empty and non-empty paths; bound to batch+policy+cutoff+candidate ids; completed_at <= cutoff; qualified_count equals entry_plan count",
+    "candidate_evidence": "expert/risk digests must equal batch+policy+rule+opportunity bound digests; unknown reason code or mismatch -> input_blocked",
+    "intake_clock": "intake_received_at and intake_verified_at must be <= decision_cutoff",
+    "p12_precheck": "cutoff on market_date; published_at >= cutoff; next_session > market_date; unique ids and live security codes; entry window on next_session; no duplicate market_date in one package",
+    "digest_surfaces": "file_sha256 = on-disk bytes; decision_set_digests = canonical JSON; p12_package_digests = P12-validated object binding digest"
   },
   "does_not_grant": [
     "real signal production",

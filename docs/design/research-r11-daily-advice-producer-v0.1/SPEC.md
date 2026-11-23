@@ -37,17 +37,40 @@
    该 decision 记 `input_blocked`，不视为可发布。
 6. 包字段与 P12 `MarketDecisionSet`/`MarketDecision`/`EntryIntent`/`Explanation`
    对齐：`stage` 限 `entry_plan|waiting|holding|exit_plan|input_blocked|ended`；
-   `reason_codes` 只用既有契约码（如 `NEW_ENTRY_SIGNAL`，受阻用 `INPUT_NOT_READY`）；
+   `reason_codes` 只用既有契约码（entry 用 `NEW_ENTRY_SIGNAL`；`input_blocked` 只接受
+   `STALE_MARKET_INPUT` 或 `INPUT_UNAVAILABLE`，与 P12 `validate_decision_set` 一致）；
    `explanations[].use` 限 `action|explanation`；`entry` 仅在 `entry_plan` 且必须
-   输出 `invalidations`（P12 loader 直读该字段）。
+   输出 `invalidations`（P12 loader 直读该字段）。任何包含 `input_blocked` decision
+   的包不是可发布建议日，`ProducerResult.publishable` 为 `False`。
 7. 逐决策审计块记 `producer_version / policy_id@version / source_version /
    candidate_rule_digest / decision_cutoff / per_member_available_at /
-   admission_disposition / empty_reason / git_revision`。
-8. 物化按 `market_date` append-only：同日期重写拒绝（`idempotency_conflict`），扩展
-   须递增 `package.version` 且保留旧 digest，对齐 P12 绑定规则。两种 digest 分开：
-   `package_digests` 是文件内容 SHA256；`p12_package_digests` 经真实 P12 loader 转成
-   `MarketDecisionSet` 后按 `dataclasses.asdict + default=str + sort_keys` 再
-   `fact_contracts.digest`，与 P12 账户 `configuration_binding` 记录的身份一致。
+   admission_disposition / empty_reason / git_revision / intake_receipt_id /
+   evaluation_receipt`。
+8. `CandidateEvaluationReceipt` 在空与非空候选两条路径都必须存在：
+   `completed_at <= decision_cutoff`，`binding_digest` 绑定 `batch_id /
+   intake_receipt_id / source_id@version / policy_id@version / candidate_rule_digest /
+   decision_cutoff / 排序后的 candidate opportunity_id 集合`，不一致即 fail-closed；
+   `qualified_count` 必须等于实际产出的 `entry_plan` 数。`CandidateSignal` 的
+   `expert_decision_digest` / `risk_decision_digest` 必须等于按同一批次+策略+规则+
+   opportunity_id 绑定的期望 digest，未知或不匹配即 `input_blocked`。候选携带未注册
+   reason code 同样 `input_blocked`。
+9. `intake_received_at` 与 `intake_verified_at` 都必须 `<= decision_cutoff`
+   （且 `verified >= received`，`__post_init__` 已保证）；迟于截止的签收使整批
+   `INPUT_NOT_READY`。
+10. 预校验 P12 边界（`DecisionSet.__post_init__`）：`knowledge_cutoff.date() ==
+    market_date`；`published_at >= knowledge_cutoff`；`next_session > market_date`；
+    `opportunity_id` 唯一；非 ended 决策 `security_code` 唯一；entry 的
+    `eligible_at > knowledge_cutoff` 且其日期等于 `next_session`；`expires_at >
+    eligible_at`。同一 `DailyAdvicePackage` 内重复 `market_date` 显式拒绝。
+11. 物化按 `market_date` append-only：同 `package_id` 下任一已写文件若覆盖相同
+    `market_date` 且内容不同，拒绝（`append_only_conflict`，对齐 P12 绑定规则——
+    同日替换不是 append）；同 `(id, version)` 重写拒绝（`idempotency_conflict`）。
+    `publish_package` 的 `published_at` 必须等于包内每个 `decision_set.published_at`。
+    三种 digest 分开命名：`file_sha256` 是落盘完整 JSON 字节 SHA256；
+    `decision_set_digests` 是各 decision_set 规范 JSON SHA256（旧 `package_digests`
+    保留为别名）；`p12_package_digests` 经真实 P12 loader 转成 `MarketDecisionSet`
+    后按 `dataclasses.asdict + default=str + sort_keys` 再 `fact_contracts.digest`，
+    与 P12 账户 `configuration_binding` 记录的身份一致。
 
 ## 文件
 
@@ -55,15 +78,19 @@
   DecisionSet / DailyAdvicePackage / PublishReceipt`；schema `quanthus.r11.daily-advice.v1`。
 - `admission.py` — `assess_members` 逐成员时钟准入（057 规则）。
 - `producer.py` — `DailyAdviceProducer.produce(facts, account, policy, experts,
-  candidates)` 返回 `ProducerResult{package, disposition, diagnostics, assessment}`。
-- `publish.py` — `package_digests`、`publish_package`（写目录 + `PublishReceipt`）。
+  candidates, evaluation_receipt)` 返回 `ProducerResult{package, disposition,
+  diagnostics, assessment}`；`publishable` 只在无 `input_blocked` 时为真。
+- `publish.py` — `decision_set_digests` / `file_sha256` / `p12_package_digests` /
+  `publish_package`（写目录 + `PublishReceipt`）。
 
 ## 测试
 
 `tests/unit/test_product_daily_recommendation.py`：entry_plan 可发布、必需成员超截止
-fail-closed、可选成员只拒依赖 decision、空建议需完整评估回执、回执与候选不符
-fail-closed、无专家/风险凭据的候选被阻断、同日期重写拒绝、`published_at < cutoff`
-拒绝、真实 P12 `load_synthetic_fixture` 通过、P12 绑定 digest 与文件 digest 分离。
+fail-closed、可选成员只拒依赖 decision 且 publishable=False、空建议需绑定回执、
+回执 binding/completed_at/qualified_count 不符 fail-closed、intake verified/received
+超截止 fail-closed、资格证据不符或未注册 reason 的候选被阻断为合法 `input_blocked`、
+同日期不同内容重写拒绝、receipt 时间不符拒绝、包内重复 market_date 拒绝、真实 P12
+`load_synthetic_fixture` 通过、P12 binding digest 真实消费 raw 且篡改后 digest 改变。
 
 ## 后继条件
 

@@ -40,7 +40,17 @@ STAGES = frozenset({ENTRY_PLAN, WAITING, HOLDING, EXIT_PLAN, INPUT_BLOCKED, ENDE
 # not invent new codes; anything outside this set is a contract violation that the caller must
 # resolve before a package is treated as loadable.
 NEW_ENTRY_SIGNAL = "NEW_ENTRY_SIGNAL"
-INPUT_NOT_READY = "INPUT_NOT_READY"
+
+# The only reason codes the P12 consumer accepts on an input_blocked decision
+# (capabilities.decision_access.validate_decision_set).
+STALE_MARKET_INPUT = "STALE_MARKET_INPUT"
+INPUT_UNAVAILABLE = "INPUT_UNAVAILABLE"
+BLOCKED_REASON_CODES = frozenset({STALE_MARKET_INPUT, INPUT_UNAVAILABLE})
+
+# Reason codes the producer accepts on injected candidates.  A candidate carrying anything
+# outside this set is itself an input defect: it is emitted as input_blocked with a legal
+# blocked reason, never passed through to the package.
+CANDIDATE_REASON_CODES = frozenset({NEW_ENTRY_SIGNAL})
 
 # Explanation `use` values match P12's ExplanationUse enum.
 USE_ACTION = "action"
@@ -201,6 +211,13 @@ class Decision:
             raise ProductDailyError("invalid_stage", "entry_plan requires an entry block")
         if self.stage != ENTRY_PLAN and self.entry is not None:
             raise ProductDailyError("invalid_stage", "only entry_plan carries an entry block")
+        if self.stage == INPUT_BLOCKED and not any(
+            code in BLOCKED_REASON_CODES for code in self.reason_codes
+        ):
+            raise ProductDailyError(
+                "invalid_reason",
+                "input_blocked requires STALE_MARKET_INPUT or INPUT_UNAVAILABLE",
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -228,6 +245,8 @@ class AuditBlock:
     admission_disposition: str
     empty_reason: str | None
     git_revision: str | None
+    intake_receipt_id: str | None = None
+    evaluation_receipt: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -253,6 +272,8 @@ class AuditBlock:
             "admission_disposition": self.admission_disposition,
             "empty_reason": self.empty_reason,
             "git_revision": self.git_revision,
+            "intake_receipt_id": self.intake_receipt_id,
+            "evaluation_receipt": self.evaluation_receipt,
         }
 
 
@@ -272,6 +293,32 @@ class DecisionSet:
         require_text(self.version, "version")
         require_aware(self.knowledge_cutoff, "knowledge_cutoff")
         require_aware(self.published_at, "published_at")
+        if not isinstance(self.market_date, date) or not isinstance(self.next_session, date):
+            raise ProductDailyError("invalid_date", "market_date and next_session must be dates")
+        if self.knowledge_cutoff.date() != self.market_date:
+            raise ProductDailyError(
+                "invalid_cutoff", "knowledge_cutoff must fall on the market date"
+            )
+        if self.published_at < self.knowledge_cutoff:
+            raise ProductDailyError("invalid_publish", "published_at precedes the knowledge cutoff")
+        if self.next_session <= self.market_date:
+            raise ProductDailyError("invalid_date", "next_session must follow market_date")
+        opportunity_ids = [item.opportunity_id for item in self.decisions]
+        if len(opportunity_ids) != len(set(opportunity_ids)):
+            raise ProductDailyError("invalid_decision", "opportunity ids must be unique")
+        live_codes = [item.security_code for item in self.decisions if item.stage != ENDED]
+        if len(live_codes) != len(set(live_codes)):
+            raise ProductDailyError("invalid_decision", "one live opportunity per security")
+        for item in self.decisions:
+            if item.entry is not None:
+                if item.entry.eligible_at <= self.knowledge_cutoff:
+                    raise ProductDailyError(
+                        "invalid_window", "entry may first execute after the cutoff"
+                    )
+                if item.entry.eligible_at.date() != self.next_session:
+                    raise ProductDailyError(
+                        "invalid_window", "entry window must open on next_session"
+                    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -298,6 +345,9 @@ class DailyAdvicePackage:
             raise ProductDailyError("invalid_schema", f"schema must be {SCHEMA}")
         require_text(self.package_id, "package_id")
         require_text(self.version, "version")
+        dates = [item.market_date for item in self.decision_sets]
+        if len(dates) != len(set(dates)):
+            raise ProductDailyError("invalid_package", "duplicate market_date inside one package")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -313,19 +363,28 @@ class PublishReceipt:
     package_id: str
     version: str
     path: str
-    package_digests: tuple[tuple[str, str], ...]
+    file_sha256: str
+    decision_set_digests: tuple[tuple[str, str], ...]
     decision_count: int
     entry_plan_count: int
     admission_disposition: str
     published_at: datetime
     elapsed_ms: int
 
+    def __post_init__(self) -> None:
+        require_text(self.package_id, "package_id")
+        require_text(self.version, "version")
+        require_text(self.path, "path")
+        require_text(self.file_sha256, "file_sha256")
+        require_aware(self.published_at, "published_at")
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "package_id": self.package_id,
             "version": self.version,
             "path": self.path,
-            "package_digests": dict(self.package_digests),
+            "file_sha256": self.file_sha256,
+            "decision_set_digests": dict(self.decision_set_digests),
             "decision_count": self.decision_count,
             "entry_plan_count": self.entry_plan_count,
             "admission_disposition": self.admission_disposition,

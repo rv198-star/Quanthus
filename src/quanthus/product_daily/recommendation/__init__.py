@@ -30,6 +30,8 @@ from quanthus.product_daily.recommendation.producer import (
     ProducerResult,
 )
 from quanthus.product_daily.recommendation.publish import (
+    decision_set_digests,
+    file_sha256,
     p12_package_digests,
     package_digests,
     publish_package,
@@ -53,6 +55,8 @@ __all__ = [
     "PublishReceipt",
     "ProducerResult",
     "assess_members",
+    "decision_set_digests",
+    "file_sha256",
     "p12_package_digests",
     "package_digests",
     "publish_package",

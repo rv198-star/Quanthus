@@ -1,18 +1,23 @@
 """Materialize a produced package into one directory and receipt its digests.
 
-Writes are append-only per `market_date`: an existing file for the same date is never
-rewritten silently; a caller must bump `package.version` while keeping prior digests to extend
-the set, matching P12's append-only binding rule.
+Writes are append-only per market_date and per package_id file: an existing file is
+never rewritten.  Under P12's append-only binding rule a new release may only *add*
+market dates; re-publishing the same market date with different content would be rejected by
+the consumer, so this module refuses that case up front instead of letting an unusable file
+exist on disk.
 
-Two digest surfaces exist and are kept distinct on purpose:
+Three digest surfaces are kept distinct on purpose and named explicitly:
 
-- `package_digests(package)` hashes the producer's own decision_set dict (canonical JSON,
-  ensure_ascii=False) and receipts what was written.
-- `p12_package_digests(decision_set, loader)` mirrors the digest the P12 account binding
-  records for the same content: `digest(_package_content(MarketDecisionSet))`, i.e. the
-  canonical `fact_contracts.digest` of `dataclasses.asdict` applied to the *validated*
-  P12 `MarketDecisionSet`.  The caller passes the real P12 loader so the identity is the one
-  the consumer actually binds.
+- file_sha256: SHA-256 of the exact bytes written to the package file.  It is the
+  identity of the on-disk artifact.
+- decision_set_digests: SHA-256 of each decision_set canonical JSON (compact,
+  sort-keys, ASCII-free).  It identifies the decision_set content independent of file
+  framing.
+- p12_package_digests: the digest the P12 account binding records for the same content,
+  computed through the real P12 loader so the identity is what the consumer actually binds.
+
+A caller must never conflate them: binding continuity is judged on p12_package_digests,
+artifact identity on file_sha256.
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -37,8 +43,8 @@ def _canonical_bytes(value: object) -> bytes:
     )
 
 
-def package_digests(package: DailyAdvicePackage) -> dict[str, str]:
-    """sha256 of each decision_set's canonical JSON (the file-content identity)."""
+def decision_set_digests(package: DailyAdvicePackage) -> dict[str, str]:
+    """sha256 of each decision_set canonical JSON (content identity, not file bytes)."""
 
     return {
         item.market_date.isoformat(): "sha256:"
@@ -47,13 +53,32 @@ def package_digests(package: DailyAdvicePackage) -> dict[str, str]:
     }
 
 
-def p12_package_digests(decision_set_dict: dict[str, Any], loader) -> dict[str, str]:
+def file_sha256(path: Path | str) -> str:
+    """SHA-256 of the exact on-disk bytes of one written package file."""
+
+    return "sha256:" + hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def package_digests(package: DailyAdvicePackage) -> dict[str, str]:
+    """Deprecated alias kept for callers: canonical decision_set digests.
+
+    Use decision_set_digests for the content surface or file_sha256 for the artifact
+    surface; this alias exists only so older call sites keep working.
+    """
+
+    return decision_set_digests(package)
+
+
+def p12_package_digests(
+    decision_set_dict: dict[str, Any],
+    loader: Callable[[dict[str, Any]], Any],
+) -> dict[str, str]:
     """Digest as the P12 account binding records it, computed through the P12 loader.
 
-    `loader` is a callable receiving a decision_set dict and returning the P12-validated
-    `MarketDecisionSet` (for example a small wrapper around
-    `platform.adapters.p12_synthetic_fixture._decision` / `validate_decision_set`).  Using
-    the real consumer-side object keeps this from drifting away from what P12 binds.
+    loader is a callable receiving one raw decision_set dict and returning the
+    P12-validated MarketDecisionSet (for example a small wrapper around
+    platform.adapters.p12_synthetic_fixture._decision / validate_decision_set).  The
+    raw input is consumed by the loader, so tampering with the dict changes the digest.
     """
 
     from quanthus.shared.fact_contracts import digest as p12_digest
@@ -65,6 +90,12 @@ def p12_package_digests(decision_set_dict: dict[str, Any], loader) -> dict[str, 
     }
 
 
+def _package_file_bytes(package: DailyAdvicePackage) -> bytes:
+    return (
+        json.dumps(package.to_dict(), ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+    ).encode("utf-8")
+
+
 def publish_package(
     package: DailyAdvicePackage,
     *,
@@ -72,20 +103,50 @@ def publish_package(
     published_at: datetime,
     elapsed_ms: int = 0,
 ) -> PublishReceipt:
+    """Write one package file append-only and return a receipt with all digest surfaces.
+
+    published_at must equal every decision_set's own published_at; a mismatch would
+    produce an artifact whose receipt disagrees with its payload, so it is refused.
+    """
+
     require_aware(published_at, "published_at")
+    for item in package.decision_sets:
+        if item.published_at != published_at:
+            raise ProductDailyError(
+                "invalid_receipt",
+                "publish_package published_at differs from the decision_set's",
+            )
     target_dir = Path(directory)
     target_dir.mkdir(parents=True, exist_ok=True)
-    digests = package_digests(package)
-    path = target_dir / f"{package.package_id}.v{package.version}.json"
+
+    # The on-disk layout is one file per (package_id, version).  A second write of the same
+    # package_id for the same market date but different content is exactly what P12's
+    # append-only binding rejects, so refuse before any bytes land.
+    this_sets = [item.to_dict() for item in package.decision_sets]
+    this_dates = {item["market_date"] for item in this_sets}
+    for existing in sorted(target_dir.glob(package.package_id + ".v*.json")):
+        try:
+            other = json.loads(existing.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        other_sets = other.get("decision_sets", [])
+        other_dates = {item.get("market_date") for item in other_sets}
+        if other_dates & this_dates and other_sets != this_sets:
+            raise ProductDailyError(
+                "append_only_conflict",
+                str(existing) + " already covers a market date this package rewrites; "
+                "a same-date replacement is not append-only and P12 would refuse it",
+            )
+
+    path = target_dir / (package.package_id + ".v" + package.version + ".json")
     if path.exists():
         raise ProductDailyError(
             "idempotency_conflict",
-            f"{path} already exists; bump package.version to extend the append-only set",
+            str(path) + " already exists; a same-(id, version) rewrite is never allowed",
         )
-    path.write_text(
-        json.dumps(package.to_dict(), ensure_ascii=False, indent=1, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    payload = _package_file_bytes(package)
+    path.write_bytes(payload)
+
     decision_count = sum(len(item.decisions) for item in package.decision_sets)
     entry_count = sum(
         1 for item in package.decision_sets for d in item.decisions if d.stage == "entry_plan"
@@ -94,7 +155,8 @@ def publish_package(
         package_id=package.package_id,
         version=package.version,
         path=str(path),
-        package_digests=tuple(sorted(digests.items())),
+        file_sha256="sha256:" + hashlib.sha256(payload).hexdigest(),
+        decision_set_digests=tuple(sorted(decision_set_digests(package).items())),
         decision_count=decision_count,
         entry_plan_count=entry_count,
         admission_disposition=package.decision_sets[0].audit.admission_disposition

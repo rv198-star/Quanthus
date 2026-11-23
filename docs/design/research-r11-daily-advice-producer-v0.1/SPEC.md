@@ -40,9 +40,10 @@
    `reason_codes` 只用既有契约码（entry 用 `NEW_ENTRY_SIGNAL`；`input_blocked` 只接受
    `STALE_MARKET_INPUT` 或 `INPUT_UNAVAILABLE`，与 P12 `validate_decision_set` 一致），
    `Decision.__post_init__` 对全部 stage 强制已注册 reason、entry 必带 reason、
-   blocked 不得带 entry reason；`explanations[].use` 限 `action|explanation` 且 code /
-   component_ref 非空，非法即在构造层拒绝；`entry` 仅在 `entry_plan` 且必须
-   输出 `invalidations`（P12 loader 直读该字段）。任何包含 `input_blocked` decision
+   blocked 不得带 entry reason；`explanations[].use` 限 `action|explanation` 且
+   code 必须在 `EXPLANATION_CODES` 注册表内、component_ref 非空，非法即在构造层拒绝；
+   producer 侧亦在构造前捕获非法 explanation 并 fail-closed；`entry` 仅在
+   `entry_plan` 且必须输出 `invalidations`（P12 loader 直读该字段）。任何包含 `input_blocked` decision
    的包不是可发布建议日，`ProducerResult.publishable` 为 `False`；构建期
    `ProductDailyError` 一律转为 fail-closed `ProducerResult(package=None)`。
 7. 逐决策审计块记 `producer_version / policy_id@version / source_version /
@@ -56,8 +57,9 @@
    `qualified_count` 必须等于实际产出的 `entry_plan` 数；`evaluated_count` 必须 >0
    （零评估范围等于没跑，fail-closed）；`completed_at` 必须 `>= intake_verified_at`
    （评估必须看到已签收批次）且 `<= decision_cutoff`。`binding_digest` 除绑定批次/
-   策略/截止/候选集合外还覆盖完整候选载荷（component、security、fraction、
-   mark/price、reason、explanations、依赖成员），任一字段被改都使 receipt 不符。
+   策略/截止/候选集合外还覆盖完整候选载荷（component、security_code、security_name、
+   industry_id、fraction、mark/price、reason、explanations、invalidations、
+   next_observation、依赖成员），任一字段被改都使 receipt 不符。
    `CandidateSignal` 的 `expert_decision_digest` / `risk_decision_digest` 必须等于按
    同一批次+策略+规则+opportunity_id 绑定的期望 digest，未知或不匹配即
    `input_blocked`。候选携带未注册 reason code 同样 `input_blocked`。
@@ -72,14 +74,15 @@
     `eligible_at > knowledge_cutoff` 且 `eligible_at`/`expires_at` 同日且都落在
     `next_session`；`expires_at > eligible_at` 非零窗口。同一 `DailyAdvicePackage`
     内重复 `market_date` 显式拒绝。`EntryPlan.__post_init__` 直接校验会话窗口：
-    `eligible_at`/`expires_at` 时间均须在 09:30–15:00 之间且同日，`AdvicePolicy`
-    对注入窗口做同等校验。
+    `eligible_at`/`expires_at` 先转 Asia/Shanghai 再校验 09:30–15:00 且同日
+    （与 P12 `execution_window_issue` 一致），`AdvicePolicy` 对注入窗口做同等校验。
 11. 物化按 `market_date` append-only：同 `package_id` 下任一已写文件若覆盖相同
     `market_date` 且内容不同，拒绝（`append_only_conflict`，对齐 P12 绑定规则——
     同日替换不是 append）；同 `(id, version)` 重写拒绝（`idempotency_conflict`）。
     `publish_package` 的 `published_at` 必须等于包内每个 `decision_set.published_at`；
-    blocked-only 包（无 live decision）拒绝发布；同 lineage 已写文件损坏
-    （JSON 不可读）fail-closed 不静默跳过。三种 digest 分开命名：`file_sha256` 是
+    含任何 `input_blocked` decision 的包一律拒绝落盘（无论是否同时含 live decision）；
+    `p12_loader` 提供的 binding digest 在写文件前完成全部校验，loader 失败目录不残留；
+    同 lineage 已写文件损坏（JSON 不可读）fail-closed 不静默跳过。三种 digest 分开命名：`file_sha256` 是
     落盘完整 JSON 字节 SHA256；`decision_set_digests` 是各 decision_set 规范 JSON
     SHA256（旧 `package_digests` 保留为别名）；`p12_package_digests` 经真实 P12
     loader 转成 `MarketDecisionSet` 后按 `dataclasses.asdict + default=str +

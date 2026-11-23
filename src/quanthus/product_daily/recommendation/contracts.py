@@ -12,7 +12,7 @@ backfilled.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -28,10 +28,13 @@ SCHEMA = "quanthus.r11.daily-advice.v1"
 PACKAGE_VERSION = "1.0.0"
 
 # Session bounds of the active daily profile (close-to-next-open-v1): the next-session
-# window may only open at/after 09:30 and close at/before 15:00 exchange time.
+# window may only open at/after 09:30 and close at/before 15:00 exchange time
+# (Asia/Shanghai, matching P12 decision_access._EXCHANGE_TZ).
+EXCHANGE_TZ = timezone(timedelta(hours=8))
 SESSION_OPEN = time(9, 30)
 SESSION_CLOSE = time(15, 0)
 # Backwards-compatible private aliases used by EntryPlan/AdvicePolicy checks.
+_EXCHANGE_TZ = EXCHANGE_TZ
 _SESSION_OPEN = SESSION_OPEN
 _SESSION_CLOSE = SESSION_CLOSE
 
@@ -202,14 +205,17 @@ class EntryPlan:
         require_text(self.window_ref, "window_ref")
         if self.expires_at <= self.eligible_at:
             raise ProductDailyError("invalid_window", "entry window must be non-empty")
-        # P12 execution profile bounds (close-to-next-open-v1 session hours).
-        if self.eligible_at.time() < _SESSION_OPEN or self.eligible_at.time() > _SESSION_CLOSE:
+        # P12 execution profile bounds (close-to-next-open-v1 session hours): convert to
+        # exchange time before comparing, matching P12's execution_window_issue exactly.
+        eligible_local = self.eligible_at.astimezone(EXCHANGE_TZ)
+        expires_local = self.expires_at.astimezone(EXCHANGE_TZ)
+        if eligible_local.time() < _SESSION_OPEN or eligible_local.time() > _SESSION_CLOSE:
             raise ProductDailyError(
                 "invalid_window", "eligible_at must fall inside the session open/close"
             )
-        if self.expires_at.time() > _SESSION_CLOSE:
+        if expires_local.time() > _SESSION_CLOSE:
             raise ProductDailyError("invalid_window", "expires_at must not pass the session close")
-        if self.expires_at.date() != self.eligible_at.date():
+        if expires_local.date() != eligible_local.date():
             raise ProductDailyError(
                 "invalid_window", "entry window must open and close on the same session"
             )
@@ -285,6 +291,11 @@ class Decision:
             explanation_code = item.get("code")
             if not explanation_code:
                 raise ProductDailyError("invalid_explanation", "explanation code must not be empty")
+            if explanation_code not in EXPLANATION_CODES:
+                raise ProductDailyError(
+                    "invalid_explanation",
+                    f"unregistered explanation code: {explanation_code}",
+                )
             explanation_component = item.get("component_ref")
             if not explanation_component:
                 raise ProductDailyError(
@@ -389,11 +400,13 @@ class DecisionSet:
                     raise ProductDailyError(
                         "invalid_window", "entry may first execute after the cutoff"
                     )
-                if item.entry.eligible_at.date() != self.next_session:
+                eligible_local = item.entry.eligible_at.astimezone(EXCHANGE_TZ)
+                expires_local = item.entry.expires_at.astimezone(EXCHANGE_TZ)
+                if eligible_local.date() != self.next_session:
                     raise ProductDailyError(
                         "invalid_window", "entry window must open on next_session"
                     )
-                if item.entry.expires_at.date() != self.next_session:
+                if expires_local.date() != self.next_session:
                     raise ProductDailyError(
                         "invalid_window", "entry window must close on next_session"
                     )

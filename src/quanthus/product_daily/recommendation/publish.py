@@ -127,17 +127,22 @@ def publish_package(
         for item in package.decision_sets
         for decision in item.decisions
     )
-    has_live = any(
-        decision.stage not in ("input_blocked", "ended")
-        for item in package.decision_sets
-        for decision in item.decisions
-    )
-    if has_blocked and not has_live:
+    if has_blocked:
         raise ProductDailyError(
             "unpublishable_package",
-            "a package whose decisions are all blocked is a diagnostic artifact, "
+            "a package containing any blocked decision is a diagnostic artifact, "
             "never a published advice day",
         )
+
+    # The P12 binding digest is computed and validated *before* any bytes land so a loader
+    # failure leaves the directory untouched.
+    p12_digests: dict[str, str] | None = None
+    if p12_loader is not None:
+        merged: dict[str, str] = {}
+        for item in package.decision_sets:
+            merged.update(p12_package_digests(item.to_dict(), p12_loader))
+        p12_digests = merged
+
     target_dir = Path(directory)
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -177,12 +182,6 @@ def publish_package(
     entry_count = sum(
         1 for item in package.decision_sets for d in item.decisions if d.stage == "entry_plan"
     )
-    p12_digests: dict[str, str] | None = None
-    if p12_loader is not None:
-        merged: dict[str, str] = {}
-        for item in package.decision_sets:
-            merged.update(p12_package_digests(item.to_dict(), p12_loader))
-        p12_digests = merged
     return PublishReceipt(
         package_id=package.package_id,
         version=package.version,

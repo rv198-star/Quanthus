@@ -33,15 +33,16 @@
     "append_only": "same market_date with different content refused; same (id,version) refused; receipt time must equal decision_set published_at",
     "blocked_reason": "input_blocked carries only STALE_MARKET_INPUT or INPUT_UNAVAILABLE (P12 validate_decision_set)",
     "publishable": "false when any decision is input_blocked",
-    "evaluation_receipt": "required on all paths; binding_digest covers batch+policy+cutoff+full candidate payload; completed_at between intake_verified_at and cutoff; evaluated_count>0; qualified_count equals entry_plan count",
+    "evaluation_receipt": "required on all paths; binding_digest covers batch+policy+cutoff+full candidate payload incl. security_name/industry_id/invalidations/next_observation; completed_at between intake_verified_at and cutoff; evaluated_count>0; qualified_count equals entry_plan count",
     "candidate_evidence": "expert/risk digests must equal batch+policy+rule+opportunity bound digests; unknown reason code or mismatch -> input_blocked",
     "intake_clock": "intake_received_at and intake_verified_at must be <= decision_cutoff",
     "p12_precheck": "cutoff on market_date; published_at >= cutoff; next_session > market_date; unique ids and live security codes; entry window on next_session; no duplicate market_date in one package",
     "digest_surfaces": "file_sha256 = on-disk bytes; decision_set_digests = canonical JSON; p12_package_digests = P12-validated object binding digest",
-    "explanation_contract": "Decision enforces registered reason/use/code/component_ref on all stages; ProductDailyError during build becomes a fail-closed ProducerResult",
-    "entry_window": "eligible/expires inside 09:30-15:00 on next_session; expires_at>eligible_at; checked in EntryPlan, AdvicePolicy and DecisionSet",
-    "publish_blocked": "blocked-only package refused; corrupt same-lineage file fail-closed; PublishReceipt may carry p12_package_digests when p12_loader is supplied",
-    "structural_gate": "receipt/evidence checks are structural only; they grant no real upstream qualification"
+    "explanation_contract": "Decision enforces registered reason, registered EXPLANATION_CODES code, valid use and non-empty component_ref on all stages; producer blocks invalid explanations before build; ProductDailyError during build becomes fail-closed",
+    "entry_window": "eligible/expires converted to Asia/Shanghai then inside 09:30-15:00 on next_session; expires_at>eligible_at; checked in EntryPlan, AdvicePolicy and DecisionSet",
+    "publish_blocked": "any input_blocked decision refuses write; p12_loader digests all decision_sets before write so a loader failure leaves no file; PublishReceipt carries p12_package_digests when loader supplied",
+    "structural_gate": "receipt/evidence checks are structural only; they grant no real upstream qualification",
+    "limitations": "P12 worktree path is an environment-conditional integration dependency; the producer validates the P12 shape but does not own P12 raw reason schema"
   },
   "does_not_grant": [
     "real signal production",

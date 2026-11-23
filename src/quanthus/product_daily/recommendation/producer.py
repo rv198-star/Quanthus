@@ -37,11 +37,13 @@ from quanthus.product_daily.recommendation.admission import (
     assess_members,
 )
 from quanthus.product_daily.recommendation.contracts import (
+    _EXCHANGE_TZ,
     _SESSION_CLOSE,
     _SESSION_OPEN,
     ENDED,
     ENTRY_PLAN,
     ENTRY_REASON_CODES,
+    EXPLANATION_CODES,
     INPUT_BLOCKED,
     INPUT_UNAVAILABLE,
     PACKAGE_VERSION,
@@ -179,7 +181,6 @@ class CandidateEvaluationReceipt:
             raise ProductDailyError("invalid_receipt", "qualified_count exceeds evaluated_count")
 
     @staticmethod
-    @staticmethod
     def _candidate_payload(candidates: tuple[CandidateSignal, ...]) -> list[dict[str, Any]]:
         """The full injected candidate material the receipt claims to have evaluated."""
 
@@ -187,6 +188,8 @@ class CandidateEvaluationReceipt:
             {
                 "opportunity_id": item.opportunity_id,
                 "security_code": item.security_code,
+                "security_name": item.security_name,
+                "industry_id": item.industry_id,
                 "component_ref_id": item.component_ref_id,
                 "component_version": item.component_version,
                 "fraction": str(item.fraction),
@@ -194,6 +197,8 @@ class CandidateEvaluationReceipt:
                 "mark_price": str(item.mark_price),
                 "reason_codes": sorted(item.reason_codes),
                 "explanations": item.explanations,
+                "invalidations": list(item.invalidations),
+                "next_observation": item.next_observation,
                 "depends_on_member_ids": sorted(item.depends_on_member_ids),
             }
             for item in sorted(candidates, key=lambda item: item.opportunity_id)
@@ -285,11 +290,13 @@ class AdvicePolicy:
         require_aware(self.expires_at, "expires_at")
         if self.expires_at <= self.eligible_at:
             raise ProductDailyError("invalid_window", "entry window must be non-empty")
-        if self.eligible_at.time() < _SESSION_OPEN or self.eligible_at.time() > _SESSION_CLOSE:
+        eligible_local = self.eligible_at.astimezone(_EXCHANGE_TZ)
+        expires_local = self.expires_at.astimezone(_EXCHANGE_TZ)
+        if eligible_local.time() < _SESSION_OPEN or eligible_local.time() > _SESSION_CLOSE:
             raise ProductDailyError(
                 "invalid_window", "eligible_at must fall inside the session open/close"
             )
-        if self.expires_at.time() > _SESSION_CLOSE:
+        if expires_local.time() > _SESSION_CLOSE:
             raise ProductDailyError("invalid_window", "expires_at must not pass the session close")
         if self.published_at < self.decision_cutoff:
             raise ProductDailyError(
@@ -670,34 +677,28 @@ class DailyAdviceProducer:
                 )
                 continue
 
-            # An injected explanation must carry a registered use and code before it can
-            # reach a decision; anything else is an unverifiable claim, blocked fail-closed.
+            # An injected explanation must carry a registered use, code and component before
+            # it can reach a decision; anything else is an unverifiable claim that fails the
+            # whole call closed rather than producing a malformed or mislabeled decision.
             bad_explanations = [
                 item
                 for item in signal.explanations
                 if item.get("use") not in (USE_ACTION, USE_EXPLANATION)
                 or not item.get("code")
+                or item.get("code") not in EXPLANATION_CODES
                 or not item.get("component_ref")
             ]
             if bad_explanations:
-                diagnostics.append(
-                    {
+                return self._block(
+                    diagnostics=diagnostics,
+                    assessment=assessment,
+                    disposition=AdmissionDisposition.INPUT_NOT_READY,
+                    reason="invalid_explanation",
+                    detail={
                         "opportunity_id": signal.opportunity_id,
-                        "reason": "invalid_explanation",
                         "invalid": bad_explanations,
-                    }
+                    },
                 )
-                decisions.append(
-                    self._blocked_decision(
-                        signal=signal,
-                        experts=experts,
-                        code="INVALID_EXPLANATION",
-                        text="candidate carries an explanation outside the registered "
-                        "use/code/component shape",
-                        fallback_reason=INPUT_UNAVAILABLE,
-                    )
-                )
-                continue
 
             missing = [mid for mid in signal.depends_on_member_ids if mid not in admitted_ids]
             if missing:

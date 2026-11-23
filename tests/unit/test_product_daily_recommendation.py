@@ -500,6 +500,56 @@ def test_candidate_with_invalid_explanation_use_is_blocked():
     assert not result.publishable
 
 
+def test_candidate_with_unregistered_explanation_code_is_blocked():
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    object.__setattr__(
+        cand,
+        "explanations",
+        (
+            {
+                "code": "MADE_UP_CODE",
+                "use": "explanation",
+                "component_ref": "replay.trend-position-risk@1.0.0",
+                "text": "bad",
+            },
+        ),
+    )
+    result = _produced((cand,), facts=facts, policy=policy, receipt_qualified=0)
+    assert result.package is None
+    assert result.diagnostics[0]["reason"] == "invalid_explanation"
+    assert not result.publishable
+
+
+def test_session_window_uses_exchange_timezone():
+    """UTC 09:30-15:00+08 is legal; a window that is 09:30 UTC (17:30+08) is not."""
+
+    # Beijing-legal window expressed in UTC passes.
+    AdvicePolicy(
+        policy_id="p",
+        version="0.1.0",
+        decision_cutoff=CUTOFF,
+        published_at=PUBLISHED,
+        window_ref="w",
+        eligible_at=datetime(2026, 11, 23, 1, 30, tzinfo=timezone.utc),
+        expires_at=datetime(2026, 11, 23, 7, 0, tzinfo=timezone.utc),
+        candidate_rule_digest="sha256:" + "b" * 64,
+    )
+    # A 09:30 UTC window is 17:30 exchange time and must be refused.
+    with pytest.raises(ProductDailyError):
+        AdvicePolicy(
+            policy_id="p",
+            version="0.1.0",
+            decision_cutoff=CUTOFF,
+            published_at=PUBLISHED,
+            window_ref="w",
+            eligible_at=datetime(2026, 11, 23, 9, 30, tzinfo=timezone.utc),
+            expires_at=datetime(2026, 11, 23, 15, 0, tzinfo=timezone.utc),
+            candidate_rule_digest="sha256:" + "b" * 64,
+        )
+
+
 def test_receipt_mismatch_fails_closed():
     facts = _facts(_full_members())
     policy = _policy()
@@ -699,7 +749,7 @@ def test_decision_set_rejects_zero_window_and_bogus_reason():
         reason_codes=("INPUT_UNAVAILABLE",),
         explanations=(
             {
-                "code": "X",
+                "code": "INPUT_CLOCK",
                 "use": "explanation",
                 "component_ref": "c@1",
                 "text": "t",
@@ -782,6 +832,49 @@ def test_publish_refuses_blocked_only_package(tmp_path: Path):
     assert not result.publishable
     with pytest.raises(ProductDailyError):
         publish_package(result.package, directory=tmp_path, published_at=PUBLISHED)
+
+
+def test_publish_refuses_mixed_blocked_and_live(tmp_path: Path):
+    """A package with any blocked decision is refused, even alongside an entry_plan."""
+
+    members = [
+        _member("daily-bars", datetime(2026, 11, 20, 18, 0, tzinfo=TZ)),
+        _member("calendar", datetime(2026, 11, 20, 18, 0, tzinfo=TZ)),
+        _member("industry-map", datetime(2026, 11, 20, 23, 0, tzinfo=TZ), required=False),
+    ]
+    facts = _facts(members, required=("daily-bars", "calendar"))
+    policy = _policy()
+    good = _candidate(("daily-bars",), facts=facts, policy=policy, opp_id="OPP-1")
+    late = _candidate(
+        ("industry-map",), facts=facts, policy=policy, opp_id="OPP-2", security_code="600001"
+    )
+    result = _produced((good, late), facts=facts, policy=policy, receipt_qualified=1)
+    assert not result.publishable
+    with pytest.raises(ProductDailyError, match="unpublishable_package"):
+        publish_package(result.package, directory=tmp_path, published_at=PUBLISHED)
+    # Nothing landed.
+    assert list(tmp_path.glob("*.json")) == []
+
+
+def test_publish_does_not_leave_file_when_loader_fails(tmp_path: Path):
+    """p12_loader failure happens before any write, so the directory stays clean."""
+
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    result = _produced((cand,), facts=facts, policy=policy)
+
+    def bad_loader(raw):
+        raise RuntimeError("loader exploded")
+
+    with pytest.raises(RuntimeError):
+        publish_package(
+            result.package,
+            directory=tmp_path,
+            published_at=PUBLISHED,
+            p12_loader=bad_loader,
+        )
+    assert list(tmp_path.glob("*.json")) == []
 
 
 def test_publish_refuses_corrupt_existing_file(tmp_path: Path):

@@ -67,8 +67,12 @@ class RawSecurityInput:
 
     bars is the PIT-trimmed daily history ending at the signal date; each bar carries
     its own session close instant (`close_at`) and source knowledge cutoff
-    (`knowledge_cutoff`) so the prospective/legacy clocks stay separated.  trading_dates
-    is the universe membership the listing-session count runs over; actions/exceptions/
+    (`knowledge_cutoff`) so the prospective/legacy clocks stay separated.
+    universe_membership is the FULL source_daily_universe/calendar membership sequence
+    the listing-session count runs over -- it is NOT the OHLC bar window; a security
+    listed for 200 sessions with 130 delivered bars must still report
+    listing_sessions=200 (the membership row_number), matching the original SQL which
+    row_numbers universe rows <= scope_end, never the bar count.  actions/exceptions/
     limits are the normalized members already qualified by P10.  identity carries the
     P10 identity/dependency facts.  Held securities supply the same shape plus
     position_facts / prior_deterioration_sessions.
@@ -76,7 +80,7 @@ class RawSecurityInput:
 
     identity: IdentityFacts
     bars: tuple[DailyBar, ...]
-    trading_dates: tuple[date, ...]
+    universe_membership: tuple[date, ...]
     actions: tuple[CorporateAction, ...] = ()
     exceptions: tuple[ExceptionSpan, ...] = ()
     limits: tuple[LimitFacts, ...] = ()
@@ -143,7 +147,7 @@ def run_daily_advice_from_raw(
             actions=item.actions,
             exceptions=item.exceptions,
             limits=item.limits,
-            trading_dates=item.trading_dates,
+            trading_dates=item.universe_membership,
             identity=identity,
             signal_date=signal_date,
             signal_close=signal_close,
@@ -176,7 +180,7 @@ def run_daily_advice_from_raw(
                     adjustment_effective=day in action_dates,
                 )
             )
-        all_trading_dates.update(item.trading_dates)
+        all_trading_dates.update(item.universe_membership)
 
         if item.position_facts is not None:
             held_facts[code] = item.position_facts

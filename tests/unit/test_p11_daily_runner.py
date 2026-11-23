@@ -143,7 +143,7 @@ def _raw_security(code: str, *, trigger: bool = True, n: int = 130) -> RawSecuri
     return RawSecurityInput(
         identity=_identity(code),
         bars=tuple(bars),
-        trading_dates=days,
+        universe_membership=days,
         actions=(),
         exceptions=(),
         limits=limits,
@@ -393,7 +393,7 @@ def test_entry_eligible_false_blocks_entry_feature_ready_true(runner, resources)
     raw = RawSecurityInput(
         identity=_identity("600000"),
         bars=tuple(bars),
-        trading_dates=days,
+        universe_membership=days,
         actions=(),
         exceptions=(),
         limits=limits,
@@ -445,7 +445,7 @@ def test_is_tradable_none_is_not_defaulted_to_true(runner, resources):
     raw = RawSecurityInput(
         identity=_identity("600000"),
         bars=tuple(bars),
-        trading_dates=days,
+        universe_membership=days,
         actions=(),
         exceptions=(),
         limits=(),
@@ -471,3 +471,46 @@ def test_is_tradable_none_is_not_defaulted_to_true(runner, resources):
         clock=lambda: policy.decision_cutoff,
     )
     assert output is not None
+
+
+def test_listing_sessions_from_membership_not_bar_window():
+    """listing_sessions is the universe-membership row_number, not the bar count.
+
+    A security listed for 200 sessions but delivering only the last 130 OHLC bars must
+    still report listing_sessions=200 -- the original SQL row_numbers the
+    source_daily_universe membership (<= scope_end), never the delivered bar window.
+    """
+
+    from quanthus.product_daily.recommendation.feature_adapter import (
+        DailyBar,
+        compute_security_feature_facts,
+    )
+
+    membership = _weekdays_ending(TARGET, 200)
+    bar_days = membership[-130:]  # only the last 130 sessions carry OHLC bars
+    bars = [
+        DailyBar(
+            security_id="security-600000",
+            session_date=d,
+            open_price=Decimal("100"),
+            high_price=Decimal("101"),
+            low_price=Decimal("99"),
+            close_price=Decimal("100"),
+            volume=Decimal("1000"),
+            amount=Decimal("100"),
+            is_tradable=True,
+        )
+        for d in bar_days
+    ]
+    facts = compute_security_feature_facts(
+        security_id="security-600000",
+        bars=bars,
+        actions=(),
+        exceptions=(),
+        limits=(),
+        trading_dates=membership,
+        identity=_identity("600000"),
+        signal_date=TARGET,
+        signal_close=datetime.combine(TARGET, time(15, 0), SHANGHAI),
+    )
+    assert facts.listing_sessions == 200  # membership, not the 130-bar window

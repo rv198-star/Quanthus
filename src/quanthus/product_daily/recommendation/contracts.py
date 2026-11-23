@@ -84,12 +84,42 @@ class DailyFactsView:
     calendar_version: str
     price_basis: str
     members: tuple[MemberEvidence, ...]
+    required_member_ids: tuple[str, ...]
+    intake_receipt_id: str
+    intake_received_at: datetime
+    intake_verified_at: datetime
 
     def __post_init__(self) -> None:
         for name in ("batch_id", "source_id", "source_version", "calendar_version", "price_basis"):
             require_text(getattr(self, name), name)
         if not isinstance(self.market_date, date) or not isinstance(self.next_session, date):
             raise ProductDailyError("invalid_date", "market_date and next_session must be dates")
+        require_text(self.intake_receipt_id, "intake_receipt_id")
+        require_aware(self.intake_received_at, "intake_received_at")
+        require_aware(self.intake_verified_at, "intake_verified_at")
+        if self.intake_verified_at < self.intake_received_at:
+            raise ProductDailyError(
+                "invalid_intake", "intake_verified_at precedes intake_received_at"
+            )
+        if not self.required_member_ids:
+            raise ProductDailyError(
+                "invalid_members", "a signed-off daily batch must name required members"
+            )
+        for mid in self.required_member_ids:
+            require_text(mid, "required_member_ids[]")
+        member_ids = {item.member_id for item in self.members}
+        missing = [mid for mid in self.required_member_ids if mid not in member_ids]
+        if missing:
+            raise ProductDailyError(
+                "invalid_members",
+                f"required members absent from the signed-off batch: {missing}",
+            )
+        for member in self.members:
+            if member.member_id in self.required_member_ids and not member.required:
+                raise ProductDailyError(
+                    "invalid_members",
+                    f"member {member.member_id} is declared required but marked optional",
+                )
 
     @property
     def latest_available_at(self) -> datetime:
@@ -105,6 +135,10 @@ class DailyFactsView:
             "calendar_version": self.calendar_version,
             "price_basis": self.price_basis,
             "members": [item.to_dict() for item in self.members],
+            "required_member_ids": list(self.required_member_ids),
+            "intake_receipt_id": self.intake_receipt_id,
+            "intake_received_at": self.intake_received_at.isoformat(),
+            "intake_verified_at": self.intake_verified_at.isoformat(),
         }
 
 
@@ -117,6 +151,7 @@ class EntryPlan:
     eligible_at: datetime
     expires_at: datetime
     window_ref: str
+    invalidations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         require_decimal(self.fraction, "fraction", minimum=Decimal("0"), maximum=Decimal("1"))
@@ -128,6 +163,8 @@ class EntryPlan:
         require_text(self.window_ref, "window_ref")
         if self.expires_at < self.eligible_at:
             raise ProductDailyError("invalid_window", "expires_at precedes eligible_at")
+        for item in self.invalidations:
+            require_text(item, "invalidations[]")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -138,6 +175,7 @@ class EntryPlan:
             "eligible_at": self.eligible_at.isoformat(),
             "expires_at": self.expires_at.isoformat(),
             "window_ref": self.window_ref,
+            "invalidations": list(self.invalidations),
         }
 
 

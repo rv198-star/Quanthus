@@ -3,14 +3,26 @@
 Writes are append-only per `market_date`: an existing file for the same date is never
 rewritten silently; a caller must bump `package.version` while keeping prior digests to extend
 the set, matching P12's append-only binding rule.
+
+Two digest surfaces exist and are kept distinct on purpose:
+
+- `package_digests(package)` hashes the producer's own decision_set dict (canonical JSON,
+  ensure_ascii=False) and receipts what was written.
+- `p12_package_digests(decision_set, loader)` mirrors the digest the P12 account binding
+  records for the same content: `digest(_package_content(MarketDecisionSet))`, i.e. the
+  canonical `fact_contracts.digest` of `dataclasses.asdict` applied to the *validated*
+  P12 `MarketDecisionSet`.  The caller passes the real P12 loader so the identity is the one
+  the consumer actually binds.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from quanthus.product_daily.contracts import ProductDailyError, require_aware
 from quanthus.product_daily.recommendation.contracts import (
@@ -26,10 +38,30 @@ def _canonical_bytes(value: object) -> bytes:
 
 
 def package_digests(package: DailyAdvicePackage) -> dict[str, str]:
+    """sha256 of each decision_set's canonical JSON (the file-content identity)."""
+
     return {
         item.market_date.isoformat(): "sha256:"
         + hashlib.sha256(_canonical_bytes(item.to_dict())).hexdigest()
         for item in package.decision_sets
+    }
+
+
+def p12_package_digests(decision_set_dict: dict[str, Any], loader) -> dict[str, str]:
+    """Digest as the P12 account binding records it, computed through the P12 loader.
+
+    `loader` is a callable receiving a decision_set dict and returning the P12-validated
+    `MarketDecisionSet` (for example a small wrapper around
+    `platform.adapters.p12_synthetic_fixture._decision` / `validate_decision_set`).  Using
+    the real consumer-side object keeps this from drifting away from what P12 binds.
+    """
+
+    from quanthus.shared.fact_contracts import digest as p12_digest
+
+    validated = loader(decision_set_dict)
+    content = json.loads(json.dumps(dataclasses.asdict(validated), default=str, sort_keys=True))
+    return {
+        validated.market_date.isoformat(): p12_digest(content),
     }
 
 

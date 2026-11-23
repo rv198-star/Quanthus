@@ -22,6 +22,7 @@ from quanthus.product_daily.contracts import (
     ProductDailyError,
     require_aware,
     require_decimal,
+    require_nonnegative_int,
     require_text,
 )
 from quanthus.product_daily.recommendation.admission import (
@@ -35,6 +36,7 @@ from quanthus.product_daily.recommendation.contracts import (
     INPUT_BLOCKED,
     PACKAGE_VERSION,
     SCHEMA,
+    USE_ACTION,
     USE_EXPLANATION,
     AuditBlock,
     DailyAdvicePackage,
@@ -63,6 +65,8 @@ class CandidateSignal:
     invalidations: tuple[str, ...]
     next_observation: str
     depends_on_member_ids: tuple[str, ...]
+    expert_decision_digest: str | None = None
+    risk_decision_digest: str | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -76,6 +80,52 @@ class CandidateSignal:
         require_decimal(self.fraction, "fraction", minimum=Decimal("0"), maximum=Decimal("1"))
         require_decimal(self.price_bound, "price_bound", minimum=Decimal("0.01"))
         require_decimal(self.mark_price, "mark_price", minimum=Decimal("0.01"))
+        for name in ("expert_decision_digest", "risk_decision_digest"):
+            value = getattr(self, name)
+            if value is not None:
+                require_text(value, name)
+
+    @property
+    def qualified(self) -> bool:
+        """A candidate is publishable only with named expert and risk decision evidence."""
+
+        return bool(self.expert_decision_digest and self.risk_decision_digest)
+
+
+@dataclass(frozen=True)
+class CandidateEvaluationReceipt:
+    """Positive proof that the upstream candidate producer ran to completion for this batch.
+
+    Without it a zero-candidate input is "not run", never a real empty advice day.
+    """
+
+    producer_id: str
+    producer_version: str
+    run_id: str
+    completed_at: datetime
+    coverage_digest: str
+    evaluated_count: int
+    qualified_count: int
+
+    def __post_init__(self) -> None:
+        for name in ("producer_id", "producer_version", "run_id", "coverage_digest"):
+            require_text(getattr(self, name), name)
+        require_aware(self.completed_at, "completed_at")
+        require_nonnegative_int(self.evaluated_count, "evaluated_count")
+        require_nonnegative_int(self.qualified_count, "qualified_count")
+        if self.qualified_count > self.evaluated_count:
+            raise ProductDailyError("invalid_receipt", "qualified_count exceeds evaluated_count")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "producer_id": self.producer_id,
+            "producer_version": self.producer_version,
+            "run_id": self.run_id,
+            "completed_at": self.completed_at.isoformat(),
+            "coverage_digest": self.coverage_digest,
+            "evaluated_count": self.evaluated_count,
+            "qualified_count": self.qualified_count,
+        }
 
 
 @dataclass(frozen=True)
@@ -185,6 +235,7 @@ class DailyAdviceProducer:
         policy: AdvicePolicy,
         experts: ExpertBundle,
         candidates: tuple[CandidateSignal, ...],
+        evaluation_receipt: CandidateEvaluationReceipt | None = None,
     ) -> ProducerResult:
         diagnostics: list[dict[str, Any]] = []
         assessment = assess_members(facts.members, policy.decision_cutoff)
@@ -315,6 +366,60 @@ class DailyAdviceProducer:
                     )
                 )
                 continue
+            if not signal.qualified:
+                diagnostics.append(
+                    {
+                        "opportunity_id": signal.opportunity_id,
+                        "reason": "unqualified_candidate",
+                        "expert_decision_digest": signal.expert_decision_digest,
+                        "risk_decision_digest": signal.risk_decision_digest,
+                    }
+                )
+                decisions.append(
+                    Decision(
+                        opportunity_id=signal.opportunity_id,
+                        security_code=signal.security_code,
+                        security_name=signal.security_name,
+                        stage=INPUT_BLOCKED,
+                        component_ref_id=signal.component_ref_id,
+                        component_version=signal.component_version,
+                        reason_codes=("INPUT_NOT_READY",),
+                        explanations=(
+                            {
+                                "code": "QUALIFICATION_EVIDENCE",
+                                "use": USE_EXPLANATION,
+                                "component_ref": f"{experts.ref_id}@{experts.version}",
+                                "text": (
+                                    "candidate lacks named expert and risk decision "
+                                    "evidence; treated as not publishable"
+                                ),
+                            },
+                        ),
+                        next_observation=signal.next_observation,
+                    )
+                )
+                continue
+            if not any(item.get("use") == USE_ACTION for item in signal.explanations):
+                diagnostics.append(
+                    {
+                        "opportunity_id": signal.opportunity_id,
+                        "reason": "missing_action_explanation",
+                    }
+                )
+                decisions.append(
+                    Decision(
+                        opportunity_id=signal.opportunity_id,
+                        security_code=signal.security_code,
+                        security_name=signal.security_name,
+                        stage=INPUT_BLOCKED,
+                        component_ref_id=signal.component_ref_id,
+                        component_version=signal.component_version,
+                        reason_codes=("INPUT_NOT_READY",),
+                        explanations=signal.explanations,
+                        next_observation=signal.next_observation,
+                    )
+                )
+                continue
             decisions.append(
                 Decision(
                     opportunity_id=signal.opportunity_id,
@@ -334,11 +439,53 @@ class DailyAdviceProducer:
                         eligible_at=policy.eligible_at,
                         expires_at=policy.expires_at,
                         window_ref=policy.window_ref,
+                        invalidations=signal.invalidations,
                     ),
                 )
             )
         if not decisions:
-            # Genuine empty result: admitted members exist and no candidate was injected.
+            if evaluation_receipt is None:
+                # No positive proof the upstream producer ran to completion: fail closed
+                # rather than emit a normal empty day that hides an unrun or missing feed.
+                audit = AuditBlock(
+                    producer_version=policy.producer_version,
+                    policy_id=policy.policy_id,
+                    policy_version=policy.version,
+                    source_version=facts.source_version,
+                    candidate_rule_digest=policy.candidate_rule_digest,
+                    decision_cutoff=policy.decision_cutoff,
+                    per_member_available_at=per_member_clock,
+                    admission_disposition=AdmissionDisposition.INPUT_NOT_READY.value,
+                    empty_reason="candidate evaluation receipt missing",
+                    git_revision=git_revision,
+                )
+                diagnostics.append(
+                    {
+                        "reason": "candidate_evaluation_receipt_missing",
+                        "decision_cutoff": policy.decision_cutoff.isoformat(),
+                    }
+                )
+                return ProducerResult(
+                    package=None,
+                    disposition=AdmissionDisposition.INPUT_NOT_READY,
+                    diagnostics=tuple(diagnostics),
+                    assessment=assessment,
+                )
+            if evaluation_receipt.qualified_count != 0:
+                diagnostics.append(
+                    {
+                        "reason": "receipt_candidate_mismatch",
+                        "qualified_count": evaluation_receipt.qualified_count,
+                        "decisions": 0,
+                    }
+                )
+                return ProducerResult(
+                    package=None,
+                    disposition=AdmissionDisposition.INPUT_NOT_READY,
+                    diagnostics=tuple(diagnostics),
+                    assessment=assessment,
+                )
+            # Genuine empty result: admitted members, a completed upstream run, no candidate.
             decisions.append(
                 Decision(
                     opportunity_id="no-qualified-candidate",

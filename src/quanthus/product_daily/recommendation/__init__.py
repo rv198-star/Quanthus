@@ -23,17 +23,23 @@ from quanthus.product_daily.recommendation.contracts import (
 from quanthus.product_daily.recommendation.producer import (
     AccountFactsView,
     AdvicePolicy,
+    CandidateEvaluationReceipt,
     CandidateSignal,
     DailyAdviceProducer,
     ExpertBundle,
     ProducerResult,
 )
-from quanthus.product_daily.recommendation.publish import package_digests, publish_package
+from quanthus.product_daily.recommendation.publish import (
+    p12_package_digests,
+    package_digests,
+    publish_package,
+)
 
 __all__ = [
     "AccountFactsView",
     "AdmissionDisposition",
     "AdvicePolicy",
+    "CandidateEvaluationReceipt",
     "CandidateSignal",
     "DailyAdvicePackage",
     "DailyAdviceProducer",
@@ -47,6 +53,7 @@ __all__ = [
     "PublishReceipt",
     "ProducerResult",
     "assess_members",
+    "p12_package_digests",
     "package_digests",
     "publish_package",
 ]

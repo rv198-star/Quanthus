@@ -539,7 +539,7 @@ class DailyAdviceProducer:
     def _blocked_decision(
         self,
         *,
-        signal: "CandidateSignal | HeldSignal | None",
+        signal: CandidateSignal | HeldSignal | None,
         experts: ExpertBundle,
         code: str,
         text: str,

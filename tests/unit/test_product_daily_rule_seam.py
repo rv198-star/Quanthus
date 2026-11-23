@@ -1387,14 +1387,20 @@ def test_review_1bee_held_audit_is_nonempty(tmp_path, runner, resources):
 
 
 def test_review_1bee_day_block_reason_survives(tmp_path, runner, resources):
-    _, result, _, _ = _forward_chain(
+    output = _forward_chain(
         tmp_path,
         runner,
         resources,
         run_override={"shared_prereq_ok": False, "shared_prereq_reason": "named_shared_failure"},
+        return_output=True,
     )
+    result = output.result
     assert result.package is None
     assert any(d["reason"] == "named_shared_failure" for d in result.diagnostics)
+    assert output.source_closure["day_blocked"] is True
+    assert output.source_closure["day_block_reason"] == "named_shared_failure"
+    assert output.stage_metrics[1]["disposition"] == "blocked_before_scan"
+    assert output.stage_metrics[1]["rows"] == 0
 
 
 def test_review_1bee_producer_version_mismatch_blocks(tmp_path, runner, resources):

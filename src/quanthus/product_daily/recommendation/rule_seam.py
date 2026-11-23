@@ -1218,8 +1218,9 @@ def run_daily_advice(
             },
             {
                 "stage": "scan_and_expert_evaluation",
-                "disposition": "built_once_TMP",
-                "rows": len(current_rows),
+                "disposition": "blocked_before_scan" if seam.day_blocked else "built_once_TMP",
+                "rows": 0 if seam.day_blocked else len(current_rows),
+                "input_rows": len(current_rows),
                 "bytes": None,
                 "elapsed_seconds": evaluation_elapsed,
             },

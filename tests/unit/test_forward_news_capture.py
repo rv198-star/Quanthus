@@ -25,6 +25,7 @@ def cfg():
     config = json.loads((root / "config/pipelines/p10-forward-news-capture.v1.json").read_bytes())
     config["min_host_interval_seconds"] = 0
     config["pdf_per_run"] = 0
+    config["ann_partitions"] = [{"column": "szse", "plate": "sz"}]
     return config
 
 
@@ -457,3 +458,57 @@ def test_distinct_provider_pages_complete_only_after_unique_census(tmp_path, mon
     result = worker.announcements(conn)
     assert result["provider_pagination_complete"] is True
     assert result["unique_source_rows"] == 2 and result["pagination_blocker"] is None
+
+
+def test_cninfo_posts_use_explicit_form_and_ajax_protocol(tmp_path, monkeypatch):
+    from urllib.parse import parse_qs
+
+    config = cfg()
+    worker = Capture(tmp_path, config, "b" * 40)
+    seen = []
+
+    class Reply:
+        status = 200
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self, limit):
+            return b"{}"
+
+    def opening(req, **kwargs):
+        seen.append(req)
+        return Reply()
+
+    monkeypatch.setattr("quanthus.forward_news_capture.urlopen", opening)
+    worker.fetch(
+        "cninfo-announcements",
+        "https://www.cninfo.com.cn/new/hisAnnouncement/query",
+        {"pageNum": 2, "pageSize": 30, "column": "szse", "plate": "sz"},
+        post=True,
+    )
+    headers = {k.lower(): v for k, v in seen[0].headers.items()}
+    assert headers["x-requested-with"] == "XMLHttpRequest"
+    assert headers["content-type"].startswith("application/x-www-form-urlencoded")
+    assert parse_qs(seen[0].data.decode())["pageNum"] == ["2"]
+
+
+def test_venue_failure_preserves_independent_partition_capture(tmp_path, monkeypatch):
+    config = cfg()
+    config["ann_partitions"] = [{"column": "szse", "plate": "sz"}, {"column": "sse", "plate": "sh"}]
+    worker = Capture(tmp_path, config, "b" * 40)
+
+    def venue(conn, partition):
+        if partition["column"] == "szse":
+            raise ValueError("SOURCE_HTTP_403")
+        return {"column": "sse", "provider_pagination_complete": True, "unique_source_rows": 3}
+
+    monkeypatch.setattr(worker, "announcements_partition", venue)
+    result = worker.announcements(db())
+    assert result["partitions"][0]["status"] == "PARTIAL_OR_BLOCKED"
+    assert result["partitions"][1]["provider_pagination_complete"]
+    assert result["unique_source_rows"] == 3 and not result["provider_pagination_complete"]

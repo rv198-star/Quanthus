@@ -320,6 +320,14 @@ class Capture:
             headers={
                 "User-Agent": "Quanthus-P10-Forward-Trial/0.1 (+https://github.com/rv198-star/Quanthus)",
                 "Accept-Encoding": "gzip",
+                **(
+                    {
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                        "X-Requested-With": "XMLHttpRequest",
+                    }
+                    if post
+                    else {}
+                ),
                 "Referer": "https://www.cninfo.com.cn/"
                 if "cninfo" in str(host)
                 else "https://finance.sina.com.cn/",
@@ -532,13 +540,44 @@ class Capture:
         }
 
     def announcements(self, db: sqlite3.Connection) -> dict[str, Any]:
+        partitions = []
+        for partition in self.config["ann_partitions"]:
+            try:
+                partitions.append(self.announcements_partition(db, partition))
+            except Exception as exc:
+                partitions.append(
+                    {
+                        "column": partition["column"],
+                        "provider_pagination_complete": False,
+                        "status": "PARTIAL_OR_BLOCKED",
+                        "reason": type(exc).__name__ + ":" + str(exc),
+                    }
+                )
+        if len(partitions) == 1:
+            return partitions[0]
+        return {
+            "partitions": partitions,
+            "provider_pagination_complete": all(
+                p["provider_pagination_complete"] for p in partitions
+            ),
+            "unique_source_rows": sum(p.get("unique_source_rows", 0) for p in partitions),
+            "status": "CAPTURED"
+            if all(p["provider_pagination_complete"] for p in partitions)
+            else "PARTIAL_SOURCE_COVERAGE",
+            "A_share_universe_qualification": "PENDING_QUALIFIED_PIT_MAPPING_AND_VENDOR_SCOPE",
+        }
+
+    def announcements_partition(
+        self, db: sqlite3.Connection, partition: dict[str, str]
+    ) -> dict[str, Any]:
         count = new = 0
         ids: set[str] = set()
         totals: set[int] = set()
         end = overlap = repeated_page = False
         page_keys: set[str] = set()
         db.execute("CREATE TABLE IF NOT EXISTS scan_state(id TEXT PRIMARY KEY,value TEXT)")
-        prior = db.execute("SELECT value FROM scan_state WHERE id='ann-full'").fetchone()
+        state_id = "ann-full:" + partition["column"]
+        prior = db.execute("SELECT value FROM scan_state WHERE id=?", [state_id]).fetchone()
         prior_state = json.loads(prior[0]) if prior else {}
         day = datetime.now(BJT).date().isoformat()
         full_scan = (
@@ -553,9 +592,9 @@ class Capture:
                 {
                     "pageNum": page,
                     "pageSize": 100,
-                    "column": "szse",
+                    "column": partition["column"],
                     "tabName": "fulltext",
-                    "plate": "",
+                    "plate": partition["plate"],
                     "stock": "",
                     "searchkey": "",
                     "secid": "",
@@ -601,8 +640,9 @@ class Capture:
         complete = end and len(totals) == 1 and len(ids) >= next(iter(totals))
         if complete or repeated_page:
             db.execute(
-                "INSERT OR REPLACE INTO scan_state VALUES('ann-full',?)",
+                "INSERT OR REPLACE INTO scan_state VALUES(?,?)",
                 [
+                    state_id,
                     encoded(
                         {
                             "day": day,
@@ -610,7 +650,7 @@ class Capture:
                             "complete": complete,
                             "reason": "PROVIDER_REPEATED_PAGE" if repeated_page else None,
                         }
-                    ).decode()
+                    ).decode(),
                 ],
             )
             db.commit()
@@ -619,7 +659,11 @@ class Capture:
             "status": "PARTIAL_SOURCE_COVERAGE"
             if repeated_page or (full_scan and not complete)
             else "CAPTURED",
-            "pagination_blocker": "PROVIDER_REPEATED_PAGE" if repeated_page else None,
+            "column": partition["column"],
+            "plate": partition["plate"],
+            "pagination_blocker": "PROVIDER_REPEATED_PAGE"
+            if repeated_page
+            else prior_state.get("reason"),
             "rows_seen": count,
             "unique_source_rows": len(ids),
             "provider_totals": sorted(totals),

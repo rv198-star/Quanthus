@@ -1,0 +1,48 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "P10-NEWS-FWD-PROTOCOL-20261124-003",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "repair",
+  "family": "p10-forward-news-capture",
+  "work_item": "P10-DATA-NEWS-FWD-001",
+  "modules": [
+    "DATA"
+  ],
+  "question": "Can proper existing CNINFO form/AJAX/venue parameters restore source paging while independent raw news/PDF capture continues?",
+  "consumer": "P11 sentiment research candidate not started; possible P12 display only, no current admission",
+  "scope": "Same existing free endpoint, proper form/AJAX headers and venue partitions. Repeated-page stop and6h full-attempt cooldown remain; no new endpoint, history PDF, strategy or mechanism change.",
+  "deliverable": "Isolated actual source loop, bounded PDF cloud-readback/deletion pipeline, real trial measurements and week-end receipt",
+  "decision_if_pass": "Continue independently logged forward trial and report actual per-source coverage/gaps; no consumer activation",
+  "decision_if_fail": "Retain partial source captures, truthful blockers and next finite recovery; do not delay other working sources or invent publication times",
+  "acceptance": [
+    "Immutable raw HTTP/doc SHA and source ID/version plus real acquisition/storage/channel clocks",
+    "Unknown publication/identity stays null+reason; exact PIT mapping reused when available, no invented IDs",
+    "Versioned dedup/revisions/coverage, rate bounded retries, isolated stores/schedules and all Base2.6 invariants",
+    "Actual startup/run receipts; priority Markdown below32KiB with explicit truncation/extraction status; no model or strategy activation"
+  ],
+  "stop_conditions": [
+    "Per-source/runtime/cloud/staging/process limits fixed in capture policy; source access hold without bypass",
+    "No Base2.6 modification;12-01-onward candidate only for separate2.7 ODS/DWD package group; no ADM in Base",
+    "Mechanism fixed through11-30; no LLM/vision calls; no historical PDF backfill"
+  ],
+  "memory_sha256": "88568e09823966ae5aaf594e686f28d61a31292b7bf04ea04a97ff854f94f0b6",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-P10-NEWS-FWD-TRIAL-20261124-001",
+      "relation": "respect",
+      "rationale": "Retain30-row repeated-page failure and actual cost. New P12 protocol lead plus actual654-SZ versus1274-mixed result is material evidence for one bounded existing-endpoint correction; source/universe qualification stays pending."
+    }
+  ],
+  "budget": {
+    "wall_seconds": 7200,
+    "network_requests": 12,
+    "max_new_bytes": 10485760,
+    "accounting_owner": "Initial bootstrap probe budget; actual completed8 probe requests retained. Newly authorized operating trial uses explicit per-run policy limits plus measured elapsed/bytes/cloud and daily counts. Dependency/GitHub/control costs separate."
+  },
+  "cumulative_cost_review": "Initial probes8 requests,130 first-page records plus42 anchor rows; source disclosure count1274. Quota/pinned-runtime/isolated-code work retained; no paid data/model calls; cumulative human/model cost unknown. First actual runtime177.306s/69source calls/36cloud calls preserved. Initial protocol probes12/12 complete; correction uses the existing operating70source-call/64cloud-call run budget; no budget reset.",
+  "base_revision": "63eaa6531e4ed49a0f4ec348ffcccad173b1839e",
+  "owner_authority": "P12 original human messages and Owner section in main archive PR734; broader source collection today explicitly authorized",
+  "case_issue": 736,
+  "runtime_authority_boundary": "Owner explicitly authorized P10 forward source collection from today in a separate trial pipeline; no source procurement, Base2.6 changes, model/strategy activation or case-specific history/overseas quotes before window/pool confirmation."
+}

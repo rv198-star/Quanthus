@@ -55,7 +55,7 @@
   },
   "source_scope_caveat": "CNINFO complete pagination is provider result completeness; A-share universe/PIT identity qualification is separate and pending; no invented IDs",
   "result_blindness": "No result values/titles in runtime logs; case result files later sealed with declared-step read log. No metrics/training/feature selection or threshold tuning.",
-  "budget_rationale": "Blank-stock source result has1274 current-day announcements; finite60-page bound also supports provider page-size clamping. Configured complete-day pagination replaces5000 per-code queries; max70requests/240s, host interval2s. PDF queue independent2/run. PDF6/run max, background<=2 after priorities; separate64 bounded cloud calls,512MiB/256file staging plus1GiB free floor; all-forward archive authorized after actual27.31TB free capacity report. After initial scan, incremental top-page overlap every5min plus full provider rescan6h; older-page revisions visible at next rescan.",
+  "budget_rationale": "Blank-stock source result has1274 current-day announcements; finite60-page bound also supports provider page-size clamping. Configured complete-day pagination replaces5000 per-code queries; max70requests/240s, host interval2s. PDF queue independent2/run. PDF6/run max, background<=2 after priorities; separate64 bounded cloud calls,512MiB/256file staging plus1GiB free floor; all-forward archive authorized after actual27.31TB free capacity report. After initial scan, incremental top-page overlap every5min plus full provider rescan6h; older-page revisions visible at next rescan. Corrected form/AJAX and supplier venue partitions follow actual654 SZ result vs1274mixed, with per-partition overlap/repeated-page guards and one global70-request budget. Source/BJ/universe qualification remains explicit.",
   "pdftotext": "/usr/bin/pdftotext",
   "pdf_background_per_run": 2,
   "pdf_storage": {
@@ -102,5 +102,19 @@
     "timeout_seconds": 60,
     "policy": "only pages failing text checks; remaining failures explicit; zero LLM/vision API"
   },
-  "trial_mechanism_frozen_through": "2026-11-30"
+  "trial_mechanism_frozen_through": "2026-11-30",
+  "ann_partitions": [
+    {
+      "column": "szse",
+      "plate": "sz"
+    },
+    {
+      "column": "sse",
+      "plate": "sh"
+    },
+    {
+      "column": "bj",
+      "plate": ""
+    }
+  ]
 }

@@ -70,3 +70,11 @@ the repository validator rejected that link. A new scoped DATA engineering/parti
 checkpoint now records the actual extension (preserving prior fixed128 acceptance); the
 proposal reference is corrected before PR handoff. Existing accepted ledger entries are
 byte-preserved and0839 remains in Git history. Quality/value/admission are unchanged.
+
+P12's AJAX/form/venue lead changed one finite SZ probe to654 results and a different ID
+digest, versus1274 mixed before. The corrected candidate uses the same endpoint with
+explicit form/AJAX and SZ/SH/BJ partitions, retaining independent statuses, repeated-page
+stop, per-partition6h cooldown and global70-request bound. Initial probe budget ends12/12.
+Old partial captures/costs/hashes remain; the tiered PDF mechanism is unchanged. TRACE
+no-change bookkeeping and only the next-request memory digest follow the new DATA
+conclusion; original completed R10 scope/execution/authority fields are preserved.

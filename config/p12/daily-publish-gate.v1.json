@@ -1,0 +1,9 @@
+{
+ "schema_version": "quanthus.p12.daily-publish-gate.v1",
+ "purpose": "Trusted rule-producer identities bound to each account mode for the daily publish gate (issue #719 seam). P12 never hardcodes a producer id; a synthetic id is only admitted for synthetic accounts.",
+ "trusted_producer_ids_by_mode": {
+  "synthetic": ["p12-synthetic-rule-producer"],
+  "simulation": [],
+  "live": []
+ }
+}

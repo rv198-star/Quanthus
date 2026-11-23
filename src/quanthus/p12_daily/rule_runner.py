@@ -64,6 +64,9 @@ NO_QUALIFIED_PLACEHOLDER = "000000"
 NO_QUALIFIED_ENTRY = "NO_QUALIFIED_ENTRY"
 
 RULE_VERSION_REJECTED = "RULE_VERSION_REJECTED"
+# The synthetic batch-A producer identity; bound only to synthetic accounts
+# in the publish-gate config, never to a live/simulation account.
+SYNTHETIC_PRODUCER_ID = "p12-synthetic-rule-producer"
 
 
 @dataclass(frozen=True)
@@ -101,6 +104,11 @@ class HistoryGateResult:
 
 @dataclass(frozen=True)
 class RunnerRequest:
+    '''E1 port input: the raw rows P12 read - the qualified daily-core snapshot
+    (daily bars, corporate actions, calendar, listing facts) plus the raw
+    account holding facts.  P12 never constructs CandidateDailyInput or
+    SecurityFeatureFacts; those are the P11 adapter's job (issue #719 seam).'''
+
     snapshot: DailyCoreSnapshot
     next_session: date
     # Account holdings (M2 F9): the rule binds these into HeldPositionFacts
@@ -158,6 +166,12 @@ class HoldingDirective:
 class RunnerOutput:
     decision_set: MarketDecisionSet
     exclusions: tuple[SecurityExclusion, ...]
+    # Run-seam contract (issue #719 seam note): the evaluation coverage receipt
+    # and the source closure are produced by the runner inside this same run.
+    # P12 transports and validates them, never constructs, parses or rewrites
+    # them - the publish gate rejects a missing or self-minted receipt.
+    evaluation_receipt: dict | None = None
+    source_closure: dict | None = None
     # Per-holding dispositions (volume-boundary HOLD_AND_ALERT vs qualified
     # exits); recorded on the run receipt, never inside the published package.
     holding_directives: tuple[HoldingDirective, ...] = ()
@@ -482,9 +496,77 @@ class SyntheticRuleRunner:
                 decisions=tuple(decisions),
             )
         )
+        # Run-seam: the synthetic runner mints its own evaluation receipt and
+        # source closure inside this same run.  producer_id is the synthetic
+        # identity (bound only to synthetic accounts); coverage_digest is
+        # recomputed over this run's producer identity, run id and evaluated
+        # universe; evaluated_candidates carries the per-decision identity the
+        # publish gate matches one-to-one against the emitted decisions.
+        evaluated_universe = sorted(
+            {
+                str(item["security_code"])
+                for item in self._candidates
+                if item.get("security_code")
+            }
+            | {
+                fact.security_code
+                for fact in request.holdings
+                if fact.quantity > 0
+            }
+        )
+        run_id = digest(
+            {
+                "run": self._ref.ref_id,
+                "market_date": snapshot.market_date.isoformat(),
+                "manifest": snapshot.core_manifest_sha256,
+                "published_at": request.published_at.isoformat(),
+            }
+        )
+        evaluated_candidates = sorted(
+            {
+                "opportunity_id": d.opportunity_id,
+                "security_code": d.security_code,
+            }
+            for d in decision_set.decisions
+        )
+        coverage_payload = {
+            "producer_id": SYNTHETIC_PRODUCER_ID,
+            "producer_version": self._ref.version,
+            "run_id": run_id,
+            "evaluated_universe": evaluated_universe,
+        }
+        evaluation_receipt = {
+            "producer_id": SYNTHETIC_PRODUCER_ID,
+            "producer_version": self._ref.version,
+            "run_id": run_id,
+            "completed_at": request.published_at.isoformat(),
+            "coverage_digest": digest(coverage_payload),
+            "evaluated_count": len(evaluated_universe),
+            "qualified_count": sum(
+                1 for d in decision_set.decisions if d.entry is not None
+            ),
+            "evaluated_universe": evaluated_universe,
+            "evaluated_candidates": evaluated_candidates,
+        }
+        source_closure = {
+            "package_id": snapshot.package_id,
+            "market_date": snapshot.market_date.isoformat(),
+            "core_manifest_sha256": snapshot.core_manifest_sha256,
+            "index_sha256": snapshot.index_sha256,
+            "base_manifest_sha256": snapshot.base_manifest_sha256,
+            "content_digest": snapshot.content_digest,
+            "row_counts": dict(snapshot.row_counts),
+            "runner": {
+                "ref_id": self._ref.ref_id,
+                "version": self._ref.version,
+                "digest": self._ref.digest,
+            },
+        }
         return RunnerOutput(
             decision_set=decision_set,
             exclusions=tuple(exclusions),
+            evaluation_receipt=evaluation_receipt,
+            source_closure=source_closure,
             holding_directives=tuple(holding_directives),
             trend_observations=tuple(trend_observations),
             history_gates=tuple(snapshot.history_gates),

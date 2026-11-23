@@ -827,6 +827,79 @@ def test_volume_scope_full_day_without_end_degrades_to_unknown(env):
     assert timing["full_day_volume_amount_observation_end"] is None
 
 
+def test_run_seam_evaluation_receipt_transported(env):
+    """Run-seam: the synthetic runner mints its own evaluation receipt and
+    source closure in the same run; P12 transports them verbatim onto the run
+    receipt and the package input evidence, never constructing them."""
+    prod, state, _ = env
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(), account_mode="synthetic",
+    )
+    assert receipt["status"] == "PUBLISHED"
+    er = receipt["evaluation_receipt"]
+    assert er["producer_id"] == "p12-synthetic-rule-producer"
+    assert er["coverage_digest"].startswith("sha256:")
+    assert er["evaluated_count"] == 1
+    assert er["qualified_count"] == 1
+    assert receipt["source_closure"]["package_id"]
+    # The source closure rides inside the published package's input evidence.
+    stored = DailyPackageStore(state).package_for(MARKET_DATE)
+    assert stored.input_evidence["source_closure"]["package_id"]
+
+
+def test_publish_gate_blocks_untrusted_producer_mode(env):
+    """A synthetic producer id is only admitted for synthetic accounts; the
+    same run under a simulation account mode is a whole-day block."""
+    prod, state, _ = env
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(), account_mode="simulation",
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert receipt["publish_gate"]["reason_code"] == "untrusted_evaluation_producer"
+    assert "evaluation_receipt" in receipt["input_block"]["missing_members"]
+
+
+def test_publish_gate_blocks_forged_coverage(env):
+    """A receipt whose coverage digest does not recompute over this run is a
+    whole-day block - a self-minted receipt can never pass."""
+    prod, state, _ = env
+
+    class ForgedRunner(SyntheticRuleRunner):
+        def run(self, request):
+            output = super().run(request)
+            forged = dict(output.evaluation_receipt)
+            forged["coverage_digest"] = "sha256:" + "9" * 64
+            return type(output)(
+                decision_set=output.decision_set,
+                exclusions=output.exclusions,
+                evaluation_receipt=forged,
+                source_closure=output.source_closure,
+                holding_directives=output.holding_directives,
+                trend_observations=output.trend_observations,
+                history_gates=output.history_gates,
+            )
+
+    runner = ForgedRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(), account_mode="synthetic",
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert receipt["publish_gate"]["reason_code"] == (
+        "candidate_evaluation_coverage_mismatch"
+    )
+
+
 def _volume_boundary_candidate(code):
     return one_candidate(
         security_code=code,

@@ -59,10 +59,97 @@ STATUS_FAILED = "FAILED"
 
 DEFAULT_JOB_ROOT = "/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5"
 ZERO_QUALIFIED_TABLES = ("dwd_security_bar",)
+PUBLISH_GATE_CONFIG = (
+    Path(__file__).resolve().parents[3] / "config/p12/daily-publish-gate.v1.json"
+)
 
 
 def _run_id(now: datetime) -> str:
     return now.astimezone(EXCHANGE_TZ).strftime("%Y%m%dT%H%M%S%f%z")
+
+
+def _trusted_producer_ids(config_path: Path, account_mode: str) -> tuple[str, ...]:
+    '''Trusted rule-producer ids bound to this account mode (issue #719 seam).
+
+    The list comes from config, never code; a synthetic producer id is only
+    admitted under the synthetic mode.  A mode with no entry, or a config that
+    cannot be read, fails closed as an empty trusted set.'''
+
+    try:
+        raw = json.loads(Path(config_path).read_text(encoding="utf-8"))
+        mapping = raw.get("trusted_producer_ids_by_mode") or {}
+        value = mapping.get(account_mode) or ()
+        return tuple(str(item) for item in value)
+    except (OSError, json.JSONDecodeError, TypeError):
+        return ()
+
+
+def _publish_gate_block(
+    output: RunnerOutput,
+    *,
+    trusted_ids: tuple[str, ...],
+) -> tuple[str, dict] | None:
+    '''Run-seam publish gate (issue #719): publish only when all three hold.
+
+    1. coverage summary consistent with this run (receipt recomputes its own
+       coverage digest over producer/run/evaluated-universe and matches);
+    2. producer_id inside the account mode's trusted list;
+    3. decisions correspond one-to-one with the receipt's evaluated candidates.
+
+    Returns (reason_code, detail) on any breach, else None.'''
+
+    receipt = output.evaluation_receipt
+    if not isinstance(receipt, dict):
+        return ("evaluation_receipt_missing", {"detail": "runner produced no evaluation receipt"})
+    # 2. trusted producer for this account mode.
+    producer_id = receipt.get("producer_id")
+    if not producer_id or (trusted_ids and producer_id not in trusted_ids):
+        return (
+            "untrusted_evaluation_producer",
+            {"producer_id": producer_id, "trusted": sorted(trusted_ids)},
+        )
+    if not trusted_ids:
+        # A mode with an empty trusted list trusts no producer at all.
+        return (
+            "untrusted_evaluation_producer",
+            {"producer_id": producer_id, "trusted": sorted(trusted_ids)},
+        )
+    # 1. coverage digest consistent with this run: recompute the producer's
+    #    own coverage identity and compare; a self-minted or stale digest fails.
+    coverage_payload = {
+        "producer_id": producer_id,
+        "producer_version": receipt.get("producer_version"),
+        "run_id": receipt.get("run_id"),
+        "evaluated_universe": sorted(receipt.get("evaluated_universe") or ()),
+    }
+    if receipt.get("coverage_digest") != digest(coverage_payload):
+        return (
+            "candidate_evaluation_coverage_mismatch",
+            {"expected": digest(coverage_payload), "actual": receipt.get("coverage_digest")},
+        )
+    # 3. decisions correspond one-to-one with the receipt's evaluated
+    #    candidates (opportunity_id + security_code identity).
+    emitted = sorted(
+        {
+            "opportunity_id": d.opportunity_id,
+            "security_code": d.security_code,
+        }
+        for d in output.decision_set.decisions
+    )
+    claimed = sorted(
+        {
+            "opportunity_id": c.get("opportunity_id"),
+            "security_code": c.get("security_code"),
+        }
+        for c in (receipt.get("evaluated_candidates") or ())
+        if isinstance(c, dict)
+    )
+    if emitted != claimed:
+        return (
+            "candidate_evaluation_binding_mismatch",
+            {"emitted": emitted, "claimed": claimed},
+        )
+    return None
 
 
 def _holdings_from_ledger(state_dir: Path, account_id: str) -> tuple[HeldPositionFact, ...]:
@@ -164,10 +251,12 @@ def run_daily(
     market_date: date,
     next_session: date,
     account_id: str,
+    account_mode: str = "synthetic",
     now: datetime | None = None,
     holdings: tuple[HeldPositionFact, ...] | None = None,
     sidecar_path: Path | None = None,
     decision_cutoff: datetime | None = None,
+    publish_gate_config: Path | None = None,
 ) -> dict:
     '''Execute one daily run and persist its receipt; returns the receipt.'''
 
@@ -576,6 +665,38 @@ def run_daily(
         ]
 
     decision_set = decision_set_to_dict(decisions)
+
+    # Run-seam publish gate (issue #719): the runner's own evaluation receipt
+    # and source closure must pass coverage/producer/candidate checks before
+    # the package publishes; any breach is a whole-day block, receipt only.
+    gate_config = publish_gate_config or PUBLISH_GATE_CONFIG
+    trusted_ids = _trusted_producer_ids(gate_config, account_mode)
+    gate_block = _publish_gate_block(output, trusted_ids=trusted_ids)
+    if gate_block is not None:
+        reason_code, detail = gate_block
+        t = stage("publish_gate", t, result="blocked", reason_code=reason_code)
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail="publish gate refused the run: " + reason_code,
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=snapshot.market_date,
+            ),
+            market_date=market_date,
+            missing_members=["evaluation_receipt"],
+        )
+        receipt["publish_gate"] = {"reason_code": reason_code, **detail}
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
+    # The runner's own evaluation receipt and source closure are carried on
+    # the P12 run receipt verbatim - P12 transports them, never constructs or
+    # rewrites them; the client never rebuilds them either.
+    receipt["evaluation_receipt"] = output.evaluation_receipt
+    receipt["source_closure"] = output.source_closure
+
     outcome = store.publish(
         decision_set=decision_set,
         runner={
@@ -589,6 +710,9 @@ def run_daily(
             "manifest_sha256": snapshot.core_manifest_sha256,
             "content_digest": snapshot.content_digest,
             "row_counts": snapshot.row_counts,
+            # The runner-produced source closure rides inside input evidence
+            # verbatim; it attests the exact input closure this package came from.
+            "source_closure": output.source_closure,
         },
         published_at=moment,
     )
@@ -668,6 +792,11 @@ def main(argv: list[str] | None = None) -> int:
         default=Path(os.environ.get("QUANTHUS_P12_DAILY_JOB_ROOT", DEFAULT_JOB_ROOT)),
     )
     parser.add_argument("--account", default="SYN-PAPER-A")
+    parser.add_argument(
+        "--account-mode",
+        default="synthetic",
+        help="account mode binding the trusted producer list (synthetic|simulation|live)",
+    )
     parser.add_argument("--market-date", type=date.fromisoformat, required=True)
     parser.add_argument("--next-session", type=date.fromisoformat, required=True)
     parser.add_argument("--runner", default="synthetic-replay")
@@ -713,6 +842,7 @@ def main(argv: list[str] | None = None) -> int:
         market_date=args.market_date,
         next_session=args.next_session,
         account_id=args.account,
+        account_mode=args.account_mode,
         sidecar_path=args.sidecar,
         decision_cutoff=args.decision_cutoff,
     )

@@ -28,6 +28,10 @@ reference criteria or promotion. Shared data-consistency #193 belongs to P10; fe
 definitions and changed consumer acceptance remain with the domain owner. P6 retains its access
 ledger and the business impact decision for a published correction; source repair belongs to P10.
 
+The independent [P12 forward calendar / #743](../../work-items/p10-forward-calendar-next-001.md)
+supplies date-only next-session facts from pinned official rules and notices. It has its own
+immutable descriptor and discovery pointer; retained warehouse calendars and manifests are unchanged.
+
 ## 2. Business disposition instead of local repair
 
 Base 2.2 uses the opt-in `p10-base22-purpose-qualified-delivery-v2` contract for its isolated

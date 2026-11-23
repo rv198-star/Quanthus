@@ -15151,6 +15151,41 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-743-20261123T232905002119Z",
+      "recorded_at": "2026-11-23T23:36:31.307589+00:00",
+      "actor": "P10 data Owner",
+      "work_item": "P10-DATA-CALENDAR-NEXT-001",
+      "outcome": "progress",
+      "summary": "Register independent calendar repair #743 for P12; narrow pinned source builder candidate and partial venue boundary. Real publication/consumer integration are pending.",
+      "evidence": [
+        {
+          "id": "REQ-743-V1",
+          "kind": "assessment",
+          "sha256": "0aa7f63bd34ff502e65f96de5d719c3c993785fc04c68e1c8eca9ea3008f2c25",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Bounded independent calendar delivery scope only; no source or consumer acceptance.",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/REQUEST-v1.json"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Current blueprint DATA historical quality/admission is unchanged by a new prospective P12 calendar candidate. Official date-only sources do not repair old acquisition clocks or grant consumer use.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-CALENDAR-NEXT-001",
+          "number": 743,
+          "title": "[P10-DATA-CALENDAR-NEXT-001] daily-core 提供权威的下一交易日（next_session）",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T23:21:32Z",
+          "body_sha256": "6b55eb2f6a12dd99e907b12858a8a35730fc9ed502b649450de3fa243838872c"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
     }
   ],
   "history_imports": [

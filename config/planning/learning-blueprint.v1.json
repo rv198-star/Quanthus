@@ -878,9 +878,10 @@
       "id": "P10-DATA-P12-DAILY-001",
       "issue": 726,
       "modules": [
-        "DATA"
+        "DATA",
+        "TRACE"
       ],
-      "contribution": "日线消费元信息的身份/时钟/追加事件工程；不改变研究质量、源资格或消费者准入"
+      "contribution": "日线消费元信息的身份/时钟/追加事件工程；TRACE仅记追加工程结论后的既有提案memory hash同步，无facet/算法/准入变更"
     }
   ]
 }

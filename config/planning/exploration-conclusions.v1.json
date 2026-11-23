@@ -2817,6 +2817,58 @@
         "CP-690-R11-FINAL-ACCEPTED-20261116"
       ],
       "supersedes": "CON-R11-LIMITED-SYNTHETIC-PARK-20261116"
+    },
+    {
+      "id": "CON-P10-726-SESSION-METADATA-20261124",
+      "recorded_at": "2026-11-23T20:25:10.265837+00:00",
+      "actor": "P10 current Owner; engineering candidate only",
+      "question_id": "P10-DAILY-SIDECAR-ENGINEERING-001",
+      "family": "p10-daily-consumer-sidecar",
+      "work_item": "P10-DATA-P12-DAILY-001",
+      "modules": [
+        "DATA"
+      ],
+      "question": "Can fixed input identities, explicit unknown clocks and versioned session/quantity metadata support a reusable sidecar without changing source data or production?",
+      "consumer": "P11 independent engineering reviewer and P12 #719 input adapter",
+      "scope": "Pure configurable metadata library, isolated append-only event store and synthetic probes; M2v3 source-code-only gap map. Actual source-observed pool/member and consumer gates remain open.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "74 focused synthetic probes plus source-code inventory support engineering review of the isolated module; real source supply, node acceptance and consumer admission are outside this conclusion.",
+      "decision_effect": "Keep fixed f32/PR729 for independent review; deliver session metadata on a separate dependent branch. Retain UNKNOWN vendor totals and native-limit gaps. Do not activate publisher or reopen #701/#727 recovery.",
+      "reopen_conditions": [
+        "Exact versioned consumer pool/member/field/calendar/industry/source closure is delivered for source-observed qualification.",
+        "Independent reviewer identifies a concrete defect against the fixed contract, or separately scoped publisher integration is authorized."
+      ],
+      "retained_assets": [
+        "Fixed f32 code/tree and CHECKPOINT-001 with all full/baseline logs.",
+        "Opt-in v2 config/record schemas, 74 focused probes, four explicit synthetic examples, unchanged v1 serialization.",
+        "M2v2 map retained; M2v3 and vendor/venue/board/date inventory with UNKNOWN and finite recovery conditions."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Finite initial 90-minute checkpoint delivered; 1-hour bounded metadata increment, zero market endpoint requests/market rows/data procurement. Local full and baseline elapsed-time logs are retained separately; model/control and earlier total cost unknown_not_zero. No repeated identical remote fetch after two source timeouts.",
+      "evidence": [
+        {
+          "id": "FOCUSED-002",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-sidecar-engineering-002/FOCUSED-002.json",
+          "sha256": "17cf89bbe1070d717e6479038970225e5d967d9333e0667d8d387e91102631e3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "74 focused synthetic probes and changed-file Ruff/format/strict mypy against exact recorded files; no actual vendor coverage/clock claim."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-P10-726-SESSION-METADATA-002",
+        "CP-566-PREFIX128-20261027T130854Z"
+      ],
+      "blueprint_reference_roles": {
+        "CP-P10-726-SESSION-METADATA-002": "New engineering disposition; explicitly no DATA facet change.",
+        "CP-566-PREFIX128-20261027T130854Z": "Existing unchanged DATA engineering baseline, scope only historical fixed128; referenced solely as retained module state, not qualification for this new consumer."
+      },
+      "supersedes": null
     }
   ]
 }

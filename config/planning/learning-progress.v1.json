@@ -15186,6 +15186,76 @@
       "reviewed_modules": [
         "DATA"
       ]
+    },
+    {
+      "id": "CP-P10-726-SESSION-METADATA-002",
+      "recorded_at": "2026-11-23T20:24:35.791721+00:00",
+      "actor": "P10 Owner; isolated successor to fixed f32 candidate",
+      "work_item": "P10-DATA-P12-DAILY-001",
+      "outcome": "no_module_change",
+      "summary": "M2v3 source gap map and opt-in v2 session/measure metadata; vendor FULL_DAY inclusion UNKNOWN, native limits unbound, no publisher activated.",
+      "evidence": [
+        {
+          "id": "P10-726-SESSION-FOCUSED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-sidecar-engineering-002/FOCUSED-002.json",
+          "sha256": "17cf89bbe1070d717e6479038970225e5d967d9333e0667d8d387e91102631e3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "74 synthetic metadata/policy-boundary probes and changed-file Ruff/format/strict mypy; exact closure hashes. No source facts/real clocks, node runtime or consumer qualification."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Retain all existing DATA facets and scopes. Metadata candidate/source inventory adds no source qualification, historical PIT, strategy results or consumer admission.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-P12-DAILY-001",
+          "number": 726,
+          "title": "[P10-DATA-P12-DAILY-001] 固定日线供给的发布、可见时点与修订撤回合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T19:29:34Z",
+          "body_sha256": "0a3fba23c3e36bf6f206d912995fe25b0c230c9529613b6770feedacca1c5f94"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
+    },
+    {
+      "id": "CP-P10-726-TRACE-MEMORY-REFRESH-003",
+      "recorded_at": "2026-11-23T20:25:34.468491+00:00",
+      "actor": "P10 Owner; isolated successor to fixed f32 candidate",
+      "work_item": "P10-DATA-P12-DAILY-001",
+      "outcome": "no_module_change",
+      "summary": "Refresh only the existing next-proposal conclusion-memory digest after this appended DATA engineering conclusion; TRACE behavior and all original proposal scope/reviews unchanged.",
+      "evidence": [
+        {
+          "id": "P10-726-SESSION-FOCUSED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-sidecar-engineering-002/FOCUSED-002.json",
+          "sha256": "17cf89bbe1070d717e6479038970225e5d967d9333e0667d8d387e91102631e3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "74 synthetic metadata/policy-boundary probes and changed-file Ruff/format/strict mypy; exact closure hashes. No source facts/real clocks, node runtime or consumer qualification."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "The path map associates next-delivery-request with TRACE. This update changes only its memory hash for the append-only conclusion; no TRACE implementation, policy, authority or facet changes.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-P12-DAILY-001",
+          "number": 726,
+          "title": "[P10-DATA-P12-DAILY-001] 固定日线供给的发布、可见时点与修订撤回合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T19:29:34Z",
+          "body_sha256": "0a3fba23c3e36bf6f206d912995fe25b0c230c9529613b6770feedacca1c5f94"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

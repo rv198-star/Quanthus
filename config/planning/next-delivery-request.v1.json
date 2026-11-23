@@ -34,7 +34,7 @@
     "Newpaid reference/training/market acquisition/capital replay0; no second update or reinterpretation of frozen labels.",
     "If needed runtime changes require full checks; use docs/ledger reuse only after byte-identical executable/config/test closure and fresh metadata checks."
   ],
-  "memory_sha256": "7ea37a64fd1c9719615de95c9ef7c87a14730a3c0cfc0aa5961bba48188def8f",
+  "memory_sha256": "ff07dcd6ded43a6aa8131abf9a97016d52d16eb86b9b710f8802f355a2ffcde8",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",

@@ -1,0 +1,307 @@
+{
+  "schema": "quanthus.p10.p12-member-map-candidate.v2",
+  "work_item": "P10-DATA-P12-DAILY-001",
+  "issue": 726,
+  "status": "CANDIDATE_UNBOUND_NOT_CONSUMER_ADMITTED",
+  "m2_version": "v3",
+  "m2_sha256": "e50e6396aeca56e574da379ada96ab0a69bb939377fedbcd7025eef074d7c892",
+  "source_code_base": "b995967655cb7ed2265f6eca1a1e2c27fb84f3e3",
+  "market_rows_read": false,
+  "universe_sha256": null,
+  "rows": [
+    {
+      "member_id": "F1.identity",
+      "field_group": "F1",
+      "required": true,
+      "tables": [
+        "dwd_listing",
+        "dwd_security",
+        "dwd_security_identifier",
+        "dwd_listed_company",
+        "dwd_company_identifier",
+        "dwd_trading_venue"
+      ],
+      "columns": [
+        "security_id",
+        "listing_id",
+        "listing_code",
+        "company_id",
+        "venue_id",
+        "instrument_type",
+        "effective_from",
+        "effective_to",
+        "knowledge_from",
+        "source_revision",
+        "source_artifact_sha256"
+      ],
+      "existing": "Base2.5.1 references + inherited prior identity + current five-table overlay; overlays only contain new/missing identities",
+      "gap": "exact pool and immutable physical member identities/coverage not frozen",
+      "state": "MEMBER_ADMISSION_PENDING"
+    },
+    {
+      "member_id": "F1.daily_bars",
+      "field_group": "F1/F13",
+      "required": true,
+      "tables": [
+        "dwd_security_bar"
+      ],
+      "columns": [
+        "listing_id",
+        "calendar_session_id",
+        "observation_start",
+        "observation_end",
+        "interval_size",
+        "price_basis",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "turnover",
+        "knowledge_from",
+        "source_revision",
+        "source_artifact_sha256"
+      ],
+      "existing": "core payload/security_market_observation/dwd_security_bar/market_date=T/part-00000.parquet; standard projection/payload/1d.parquet; none=unadjusted",
+      "gap": "bind Base+continuous Daily history to final pool, event 22 eligible sessions and feature last61/adjacent returns; no 120-bar force backfill; FULL_DAY target, actual BaoStock/local-sot after-hours inclusion UNKNOWN; per-board/date/session/source evidence and volume completeness end unbound",
+      "state": "PHYSICAL_SOURCE_EXISTS_PURPOSE_PENDING",
+      "required_metadata": [
+        "session_scope",
+        "volume_basis",
+        "official_price_close_anchor",
+        "full_day_volume_amount_observation_end",
+        "venue/board/effective_range/calendar/rule/security_scope/evidence",
+        "vendor_scope_evidence"
+      ]
+    },
+    {
+      "member_id": "F1.tradability",
+      "field_group": "F1",
+      "required": true,
+      "tables": [
+        "dwd_tradability_state"
+      ],
+      "columns": [
+        "listing_id",
+        "calendar_session_id",
+        "observation_start",
+        "is_tradable",
+        "can_buy",
+        "can_sell",
+        "reason_code",
+        "knowledge_from",
+        "source_revision",
+        "source_artifact_sha256"
+      ],
+      "existing": "core payload/tradability_state/dwd_tradability_state/market_date=T/part-00000.parquet",
+      "gap": "current/previous-session pool coverage must be bound; these flags do not supply native price limits",
+      "state": "PHYSICAL_SOURCE_EXISTS_PURPOSE_PENDING"
+    },
+    {
+      "member_id": "F1.static_industry",
+      "field_group": "F1",
+      "required": true,
+      "tables": [
+        "named static concentration-only industry mapping"
+      ],
+      "columns": [
+        "security/listing identity",
+        "static_level1_industry_id",
+        "mapping version",
+        "source SHA",
+        "coverage",
+        "permitted concentration purpose"
+      ],
+      "existing": "retained Base/static mapping is a named recovery/admission reference; not present in current five reference overlay",
+      "gap": "physical mapping identity, current pool coverage and purpose admission remain unbound; no new historical sector PIT gate",
+      "state": "NAMED_REFERENCE_REQUIRED"
+    },
+    {
+      "member_id": "F2.calendar",
+      "field_group": "F2",
+      "required": true,
+      "tables": [
+        "dwd_trading_calendar",
+        "source trading_calendar artifact"
+      ],
+      "columns": [
+        "venue_id",
+        "calendar_session_id",
+        "trade_date",
+        "is_open",
+        "session_type",
+        "open_at",
+        "close_at",
+        "knowledge_from",
+        "source_revision",
+        "source_artifact_sha256"
+      ],
+      "existing": "core calendar projection filters trade_date=T and fixes the declared 09:30/15:00 session; prior calendar comes from Base+Daily",
+      "gap": "next_session requires an already-known authoritative calendar member covering T+1 next open; current T-only projection is not that proof",
+      "state": "NEXT_SESSION_COVERAGE_PENDING"
+    },
+    {
+      "member_id": "F1.adjustment_boundary",
+      "field_group": "F1/F11",
+      "required": true,
+      "tables": [
+        "dwd_adjustment_factor",
+        "dwd_adjustment_factor_input"
+      ],
+      "columns": [
+        "security_id",
+        "effective_from",
+        "knowledge_from",
+        "source_revision",
+        "source_artifact_sha256",
+        "factor-boundary source evidence"
+      ],
+      "existing": "P4 physical_scan uses factor boundary count/effective_from to derive adjustment_effective; this is not a default from missing rows",
+      "gap": "exact qualified factor-boundary members for final pool/window not in daily-core seven-table closure",
+      "state": "QUALIFIED_SOURCE_BINDING_REQUIRED"
+    },
+    {
+      "member_id": "F11.actions",
+      "field_group": "F11",
+      "required": true,
+      "tables": [
+        "source_corporate_actions_normalized_mapped"
+      ],
+      "columns": [
+        "security_id",
+        "effective_date",
+        "known_at",
+        "cash_dividend_per_share",
+        "bonus_share_ratio"
+      ],
+      "existing": "baseline_research mapped_actions requires known_at date before effective_date; normalized values and per-key complete/no-action coverage required",
+      "gap": "daily-core defers corporate_actions/dividends/factor artifacts; equivalent named normalized-action members not supplied for this use; null is not no action",
+      "state": "QUALIFIED_SOURCE_BINDING_REQUIRED"
+    },
+    {
+      "member_id": "F11.exceptions",
+      "field_group": "F11",
+      "required": true,
+      "tables": [
+        "source_corporate_action_exceptions_mapped"
+      ],
+      "columns": [
+        "security_id",
+        "blocked_from",
+        "blocked_through"
+      ],
+      "existing": "baseline panel maps exceptions then checks last61 and unexplained-transition windows",
+      "gap": "versioned scoped exception census including proven-empty scope needed; factor series does not silently replace it",
+      "state": "QUALIFIED_SOURCE_BINDING_REQUIRED"
+    },
+    {
+      "member_id": "F12.limits",
+      "field_group": "F12",
+      "required": true,
+      "tables": [
+        "source_price_limit_execution_daily",
+        "dwd_tradability_state"
+      ],
+      "columns": [
+        "security_id",
+        "execution_date",
+        "entry_policy_allows",
+        "is_executable",
+        "upper_limit_pct",
+        "lower_limit_pct",
+        "upper_limit_price",
+        "lower_limit_price",
+        "is_tradable",
+        "knowledge/source identity"
+      ],
+      "existing": "baseline panel uses named source_price_limit_execution_daily; current daily-core upper_price/lower_price are NULL",
+      "gap": "T/T-1 input qualification and T+1 preopen scope require exact native limits/regime/source clocks; current null fields remain hard missing; versioned venue+board+actual ST state+date+exceptions source facts required; existing price-limit.v2 has main ST 5% before 7/6 and 10% after; native daily-core limits still NULL",
+      "state": "QUALIFIED_SOURCE_BINDING_REQUIRED"
+    }
+  ],
+  "role_boundary": {
+    "P10": "source facts/identity/version/clocks/coverage",
+    "P11": "all candidate/features/trend algorithms; actions/factor equivalence proof",
+    "P12": "physical reading, account/position/mark facts, daily orchestration"
+  },
+  "time_binding": {
+    "observation_end": "T authoritative market close; day1 2026-11-24T15:00:00+08:00",
+    "decision_cutoff": "explicit prospective deadline; day1 2026-11-24T22:30:00+08:00",
+    "source_clock": "retain actual artifact knowledge_cutoff; do not backdate",
+    "next_session": "authoritative calendar covering next open must be known by T deadline; no T+1 market observations",
+    "historical_cutoffs": "unchanged"
+  },
+  "all_named_hard_facts_required": true,
+  "requirements_template": [
+    {
+      "id": "F1.identity",
+      "required": true
+    },
+    {
+      "id": "F1.daily_bars",
+      "required": true
+    },
+    {
+      "id": "F1.tradability",
+      "required": true
+    },
+    {
+      "id": "F1.static_industry",
+      "required": true
+    },
+    {
+      "id": "F2.calendar",
+      "required": true
+    },
+    {
+      "id": "F1.adjustment_boundary",
+      "required": true
+    },
+    {
+      "id": "F11.actions",
+      "required": true
+    },
+    {
+      "id": "F11.exceptions",
+      "required": true
+    },
+    {
+      "id": "F12.limits",
+      "required": true
+    }
+  ],
+  "feature_history": "event22; feature-ready last61 with >=60 valid adjacent returns and exception window; listing120 uses listing facts+open calendar",
+  "factor_action_policy": "fieldwise equivalence to fixed baseline panel only; no silent factor/actions+exceptions substitution",
+  "F10": "EXISTS P11 evaluate_trend_stability per-event adapter; no external P10 trend labels",
+  "availability_example": {
+    "market_date": "2026-11-23",
+    "base_manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "core_manifest_sha256": "205b95c6d18fc9179b74e09a7f3924942934fad908f55401e3ff7845965b66c7",
+    "market_source_knowledge_cutoff": "2026-11-23T18:01:06+08:00",
+    "qualification": "historical metadata only; consumer publish/receive chain absent"
+  },
+  "supersedes": {
+    "path": "config/pipelines/p10-p12-member-map.m2-v2.json",
+    "sha256": "b0cd2bdadb95cde67bf394324cf5349c7b56af4fda768fb3e303277abd37c055"
+  },
+  "regulation_addendum_sha256": "10a87a3f86259869d70f272ffac9b84f03c6c3ed14e8c4dab0020f7bf82057fe",
+  "source_map": "config/pipelines/p10-session-source-map.rules-20260706.v1.json",
+  "F13": {
+    "source_dependencies": [
+      "F1.daily_bars",
+      "F1.identity",
+      "F2.calendar"
+    ],
+    "P10": "session/vendor/regime/source identity and effective scope facts; UNKNOWN retained",
+    "P11": "compute actual affected security/window comparability; no global July6 boundary; existing comparable boards continue",
+    "P12_reason_mapping": {
+      "VOLUME_REGIME_BOUNDARY": "INPUT_UNAVAILABLE",
+      "unevaluable_held_volume_use": "HOLD_AND_ALERT"
+    },
+    "price_and_holding_dependencies": "independently evaluated by P11/P12; no P10 action algorithm"
+  },
+  "m2_v3_review_corrections": {
+    "None_volume_end": "UNKNOWN; N/A requires named applicability evidence",
+    "source_latency": "no invented buffer or tolerance; real measured source/publication clocks only"
+  }
+}

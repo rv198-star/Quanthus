@@ -1,0 +1,46 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "P10-DAILY-SIDECAR-ENGINEERING-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "p10-daily-consumer-sidecar",
+  "work_item": "P10-DATA-P12-DAILY-001",
+  "modules": [
+    "DATA"
+  ],
+  "question": "Can fixed source identity and honest unknown clocks support append-only publication/revision/withdrawal metadata and conservative as-of selection without production mutation?",
+  "consumer": "P11 #700 independent review and P12 #719 input adapter",
+  "scope": "Configurable pure metadata validation plus isolated append-only sidecar store, synthetic probes only. No publisher activation, market rows, new source, scheduler, account or protected-window mutation.",
+  "deliverable": "src/quanthus/p10_daily_sidecar.py, focused unit probes, draft work item and M2 F1/F2/F11/F12 availability map; fixed candidate commit/tree and local evidence.",
+  "decision_if_pass": "Submit narrow engineering candidate for independent review; bind final source-observed consumer closure after M2/pool gates.",
+  "decision_if_fail": "Retain failures and fixed checkpoint; stop affected feature and give exact next repair without enlarging scope.",
+  "acceptance": [
+    "Strict schema/config/source identity and exact member coverage",
+    "Explicit source/publication/channel/consumer responsibility, unknown never filled with now",
+    "Append-only crash-safe idempotent events and conservative as-of withdrawal/revision selection",
+    "Focused adversarial tests, lint/type/maintenance checks; exact closure make check and node status reported honestly"
+  ],
+  "stop_conditions": [
+    "First fixed engineering checkpoint within 5400 wall seconds from 2026-11-24T03:31:43+08:00",
+    "No market rows, new endpoints, procurement, deployment or production mutation",
+    "If integration needs domain meaning or activation, retain configurable seam and return the dependency"
+  ],
+  "memory_sha256": "7ea37a64fd1c9719615de95c9ef7c87a14730a3c0cfc0aa5961bba48188def8f",
+  "prior_reviews": [],
+  "budget": {
+    "wall_seconds": 5400,
+    "network_requests": 20,
+    "max_new_bytes": 5242880,
+    "accounting_owner": "P10 current Owner; local checks/logs measured separately from data network"
+  },
+  "cumulative_cost_review": "Continue accepted inventory/spec work and its 23 specimen checks; prior data spend 0, model/active cost unknown_not_zero. This tranche is engineering, no renewed market experiment.",
+  "runtime_authority_boundary": "Owner/P11 authorized #726 isolated metadata engineering in current message; no source data reads or deployed publisher.",
+  "base_revision": "b995967655cb7ed2265f6eca1a1e2c27fb84f3e3",
+  "code_paths": [
+    "src/quanthus/p10_daily_sidecar.py",
+    "tests/unit/test_p10_daily_sidecar.py"
+  ],
+  "write_boundary": "explicit fresh/disjoint isolated metadata store only; no existing source/root/CURRENT writes",
+  "spec_baseline_sha256": "b072a68abf79167d052511e79817bb6eca58e0a123be31698c2fe24f3d77716f"
+}

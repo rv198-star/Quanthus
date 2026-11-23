@@ -65,6 +65,7 @@ def _facts(
         required_member_ids=tuple(required),
         intake_receipt_id="intake-20261120",
         intake_received_at=received,
+        intake_first_read_at=datetime(2026, 11, 20, 18, 40, tzinfo=TZ),
         intake_verified_at=verified,
     )
 
@@ -87,6 +88,7 @@ def _policy() -> AdvicePolicy:
         eligible_at=datetime(2026, 11, 23, 9, 30, tzinfo=TZ),
         expires_at=datetime(2026, 11, 23, 15, 0, tzinfo=TZ),
         candidate_rule_digest="sha256:" + "b" * 64,
+        trusted_producer_ids=("r11-candidate-producer",),
     )
 
 
@@ -171,18 +173,25 @@ def _receipt(
 ) -> CandidateEvaluationReceipt:
     facts = facts or _facts(_full_members())
     policy = policy or _policy()
+    universe = tuple(sorted({c.security_code for c in candidates})) or ("000000",)
+    identity = {
+        "producer_id": "r11-candidate-producer",
+        "producer_version": "1.0.0",
+        "run_id": "run-20261120",
+        "evaluated_universe": sorted(universe),
+    }
     receipt = CandidateEvaluationReceipt(
-        producer_id="r11-candidate-producer",
-        producer_version="1.0.0",
-        run_id="run-20261120",
+        producer_id=identity["producer_id"],
+        producer_version=identity["producer_version"],
+        run_id=identity["run_id"],
         completed_at=completed_at,
         coverage_digest="sha256:" + "0" * 64,  # replaced below with the run-bound digest
         evaluated_count=evaluated if evaluated is not None else max(len(candidates), 1),
         qualified_count=qualified,
         binding_digest=CandidateEvaluationReceipt.expected_binding_digest(
-            facts, policy, candidates
+            facts, policy, candidates, receipt_identity=identity
         ),
-        evaluated_universe=tuple(sorted({c.security_code for c in candidates})) or ("000000",),
+        evaluated_universe=universe,
     )
     return dataclasses.replace(receipt, coverage_digest=receipt.expected_coverage_digest())
 
@@ -623,7 +632,7 @@ def test_intake_clock_tamper_invalidates_binding():
     facts_a = _facts(_full_members())
     facts_b = _facts(
         _full_members(),
-        verified=datetime(2026, 11, 20, 18, 30, tzinfo=TZ),
+        verified=datetime(2026, 11, 20, 18, 50, tzinfo=TZ),
     )
     policy = _policy()
     cand = _candidate(facts=facts_a, policy=policy)
@@ -681,7 +690,79 @@ def test_evaluated_universe_tamper_changes_coverage():
     object.__setattr__(receipt, "evaluated_universe", ("000001", "000002"))
     result = _produced((cand,), facts=facts, policy=policy, receipt=receipt)
     assert not result.publishable
-    assert result.diagnostics[0]["reason"] == "candidate_evaluation_coverage_mismatch"
+    # The tampered universe changes the run identity bound into expected_binding_digest,
+    # so the receipt's stored binding no longer matches (fail-closed on binding first).
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_binding_mismatch"
+
+
+def test_untrusted_evaluation_producer_fails_closed():
+    """A receipt minted by a producer the policy does not trust is refused even when
+    every field-level digest is internally consistent (the C 324 attack surface)."""
+
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    receipt = _receipt(facts, policy, (cand,), qualified=1)
+    # Re-mint the receipt under an attacker-chosen producer and recompute every digest so
+    # the fields are self-consistent; only the trusted-producer gate can catch it.
+    universe = receipt.evaluated_universe
+    identity = {
+        "producer_id": "attacker.no-run",
+        "producer_version": "1.0.0",
+        "run_id": "attacker-run",
+        "evaluated_universe": sorted(universe),
+    }
+    forged = dataclasses.replace(
+        receipt,
+        producer_id=identity["producer_id"],
+        run_id=identity["run_id"],
+        binding_digest=CandidateEvaluationReceipt.expected_binding_digest(
+            facts, policy, (cand,), receipt_identity=identity
+        ),
+    )
+    forged = dataclasses.replace(forged, coverage_digest=forged.expected_coverage_digest())
+    result = _produced((cand,), facts=facts, policy=policy, receipt=forged)
+    assert not result.publishable
+    assert result.diagnostics[0]["reason"] == "untrusted_evaluation_producer"
+
+
+def test_first_read_after_verified_is_rejected():
+    """received <= first_read <= verified is a hard causal gate, not optional."""
+
+    with pytest.raises(ProductDailyError):
+        DailyFactsView(
+            batch_id="b",
+            market_date=date(2026, 11, 20),
+            next_session=date(2026, 11, 23),
+            source_id="s",
+            source_version="1",
+            calendar_version="c",
+            price_basis="u",
+            members=tuple(_full_members()),
+            required_member_ids=("daily-bars", "calendar", "industry-map"),
+            intake_receipt_id="i",
+            intake_received_at=datetime(2026, 11, 20, 18, 0, tzinfo=TZ),
+            intake_first_read_at=datetime(2026, 11, 20, 19, 0, tzinfo=TZ),
+            intake_verified_at=datetime(2026, 11, 20, 18, 30, tzinfo=TZ),
+        )
+
+
+def test_missing_first_read_is_rejected():
+    with pytest.raises(TypeError):
+        DailyFactsView(
+            batch_id="b",
+            market_date=date(2026, 11, 20),
+            next_session=date(2026, 11, 23),
+            source_id="s",
+            source_version="1",
+            calendar_version="c",
+            price_basis="u",
+            members=tuple(_full_members()),
+            required_member_ids=("daily-bars", "calendar", "industry-map"),
+            intake_receipt_id="i",
+            intake_received_at=datetime(2026, 11, 20, 18, 0, tzinfo=TZ),
+            intake_verified_at=datetime(2026, 11, 20, 18, 30, tzinfo=TZ),
+        )  # intake_first_read_at omitted
 
 
 def test_receipt_after_cutoff_fails_closed():

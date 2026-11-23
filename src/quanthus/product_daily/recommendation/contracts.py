@@ -130,7 +130,7 @@ class DailyFactsView:
     intake_receipt_id: str
     intake_received_at: datetime
     intake_verified_at: datetime
-    intake_first_read_at: datetime | None = None
+    intake_first_read_at: datetime
 
     def __post_init__(self) -> None:
         for name in ("batch_id", "source_id", "source_version", "calendar_version", "price_basis"):
@@ -140,12 +140,15 @@ class DailyFactsView:
         require_text(self.intake_receipt_id, "intake_receipt_id")
         require_aware(self.intake_received_at, "intake_received_at")
         require_aware(self.intake_verified_at, "intake_verified_at")
-        if self.intake_first_read_at is not None:
-            require_aware(self.intake_first_read_at, "intake_first_read_at")
-            if self.intake_first_read_at < self.intake_received_at:
-                raise ProductDailyError(
-                    "invalid_intake", "intake_first_read_at precedes intake_received_at"
-                )
+        require_aware(self.intake_first_read_at, "intake_first_read_at")
+        if self.intake_first_read_at < self.intake_received_at:
+            raise ProductDailyError(
+                "invalid_intake", "intake_first_read_at precedes intake_received_at"
+            )
+        if self.intake_verified_at < self.intake_first_read_at:
+            raise ProductDailyError(
+                "invalid_intake", "intake_verified_at precedes intake_first_read_at"
+            )
         if self.intake_verified_at < self.intake_received_at:
             raise ProductDailyError(
                 "invalid_intake", "intake_verified_at precedes intake_received_at"
@@ -188,9 +191,7 @@ class DailyFactsView:
             "intake_receipt_id": self.intake_receipt_id,
             "intake_received_at": self.intake_received_at.isoformat(),
             "intake_verified_at": self.intake_verified_at.isoformat(),
-            "intake_first_read_at": (
-                None if self.intake_first_read_at is None else self.intake_first_read_at.isoformat()
-            ),
+            "intake_first_read_at": self.intake_first_read_at.isoformat(),
         }
 
 

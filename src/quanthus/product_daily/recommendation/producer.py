@@ -44,7 +44,9 @@ from quanthus.product_daily.recommendation.contracts import (
     ENDED,
     ENTRY_PLAN,
     ENTRY_REASON_CODES,
+    EXIT_PLAN,
     EXPLANATION_CODES,
+    HOLDING,
     INPUT_BLOCKED,
     INPUT_UNAVAILABLE,
     PACKAGE_VERSION,
@@ -148,6 +150,79 @@ class CandidateSignal:
 
 
 @dataclass(frozen=True)
+class HeldSignal:
+    """One injected held-position decision already qualified by the expert path.
+
+    Mirrors CandidateSignal but for an open position: the expert reduce/exit/hold evidence
+    is bound to the batch, policy, candidate rule and security the same way, and the real
+    clocks travel with the signal so the downstream decision keeps the three-layer time.
+    `action` is the expert's held outcome (held | reduce | exit | hold_alert).
+    """
+
+    opportunity_id: str
+    security_code: str
+    security_name: str
+    industry_id: str
+    action: str
+    component_ref_id: str
+    component_version: str
+    reason_codes: tuple[str, ...]
+    explanations: tuple[dict[str, str], ...]
+    next_observation: str
+    depends_on_member_ids: tuple[str, ...]
+    target_maximum_position: Decimal | None = None
+    expert_decision_digest: str | None = None
+    risk_decision_digest: str | None = None
+    signal_close: datetime | None = None
+    knowledge_cutoff: datetime | None = None
+    decision_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        for name in (
+            "opportunity_id",
+            "security_code",
+            "industry_id",
+            "action",
+            "component_ref_id",
+            "component_version",
+        ):
+            require_text(getattr(self, name), name)
+        for name in (
+            "expert_decision_digest",
+            "risk_decision_digest",
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                require_text(value, name)
+        for name in ("signal_close", "knowledge_cutoff", "decision_at"):
+            value = getattr(self, name)
+            if value is not None:
+                require_aware(value, name)
+
+    def expected_expert_digest(self, facts: DailyFactsView, policy: AdvicePolicy) -> str:
+        return _evidence_digest(
+            "expert-held",
+            facts.batch_id,
+            facts.intake_receipt_id,
+            policy.policy_id,
+            policy.version,
+            policy.candidate_rule_digest,
+            self.opportunity_id,
+        )
+
+    def expected_risk_digest(self, facts: DailyFactsView, policy: AdvicePolicy) -> str:
+        return _evidence_digest(
+            "risk-held",
+            facts.batch_id,
+            facts.intake_receipt_id,
+            policy.policy_id,
+            policy.version,
+            policy.candidate_rule_digest,
+            self.opportunity_id,
+        )
+
+
+@dataclass(frozen=True)
 class CandidateEvaluationReceipt:
     """Positive proof that the upstream candidate producer ran to completion for this batch.
 
@@ -215,6 +290,7 @@ class CandidateEvaluationReceipt:
         facts: DailyFactsView,
         policy: AdvicePolicy,
         candidates: tuple[CandidateSignal, ...],
+        receipt_identity: dict[str, object] | None = None,
     ) -> str:
         """Digest the receipt must carry to be valid for this produce() call.
 
@@ -252,17 +328,17 @@ class CandidateEvaluationReceipt:
                 ],
                 "required_member_ids": sorted(facts.required_member_ids),
                 "intake_received_at": facts.intake_received_at.isoformat(),
-                "intake_first_read_at": (
-                    None
-                    if facts.intake_first_read_at is None
-                    else facts.intake_first_read_at.isoformat()
-                ),
+                "intake_first_read_at": facts.intake_first_read_at.isoformat(),
                 "intake_verified_at": facts.intake_verified_at.isoformat(),
                 "policy_id": policy.policy_id,
                 "policy_version": policy.version,
                 "candidate_rule_digest": policy.candidate_rule_digest,
                 "decision_cutoff": policy.decision_cutoff.isoformat(),
                 "candidates": CandidateEvaluationReceipt._candidate_payload(candidates),
+                # The run identity the receipt claims (producer, version, run id, evaluated
+                # universe): binding it makes a self-minted receipt for a different run or
+                # universe fail closed even when the field-level digests are recomputed.
+                "receipt_identity": receipt_identity,
             }
         )
 
@@ -326,6 +402,10 @@ class AdvicePolicy:
     expires_at: datetime
     candidate_rule_digest: str
     producer_version: str = PACKAGE_VERSION
+    # The producer identities this policy trusts to have actually run the candidate
+    # evaluation in this job.  A receipt from any other producer_id is refused, so a
+    # caller cannot mint a self-consistent receipt for a run that never happened.
+    trusted_producer_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for name in (
@@ -336,6 +416,8 @@ class AdvicePolicy:
             "producer_version",
         ):
             require_text(getattr(self, name), name)
+        for pid in self.trusted_producer_ids:
+            require_text(pid, "trusted_producer_ids[]")
         require_aware(self.decision_cutoff, "decision_cutoff")
         require_aware(self.published_at, "published_at")
         require_aware(self.eligible_at, "eligible_at")
@@ -457,7 +539,7 @@ class DailyAdviceProducer:
     def _blocked_decision(
         self,
         *,
-        signal: CandidateSignal | None,
+        signal: "CandidateSignal | HeldSignal | None",
         experts: ExpertBundle,
         code: str,
         text: str,
@@ -502,6 +584,7 @@ class DailyAdviceProducer:
         policy: AdvicePolicy,
         experts: ExpertBundle,
         candidates: tuple[CandidateSignal, ...],
+        held_signals: tuple[HeldSignal, ...] = (),
         evaluation_receipt: CandidateEvaluationReceipt | None = None,
     ) -> ProducerResult:
         diagnostics: list[dict[str, Any]] = []
@@ -518,6 +601,7 @@ class DailyAdviceProducer:
                 policy=policy,
                 experts=experts,
                 candidates=candidates,
+                held_signals=held_signals,
                 evaluation_receipt=evaluation_receipt,
                 diagnostics=diagnostics,
                 assessment=assessment,
@@ -549,6 +633,7 @@ class DailyAdviceProducer:
         policy: AdvicePolicy,
         experts: ExpertBundle,
         candidates: tuple[CandidateSignal, ...],
+        held_signals: tuple[HeldSignal, ...],
         evaluation_receipt: CandidateEvaluationReceipt | None,
         diagnostics: list[dict[str, Any]],
         assessment: MemberAssessment,
@@ -579,10 +664,7 @@ class DailyAdviceProducer:
                     "decision_cutoff": policy.decision_cutoff.isoformat(),
                 },
             )
-        if (
-            facts.intake_first_read_at is not None
-            and facts.intake_first_read_at > policy.decision_cutoff
-        ):
+        if facts.intake_first_read_at > policy.decision_cutoff:
             return self._block(
                 diagnostics=diagnostics,
                 assessment=assessment,
@@ -640,8 +722,33 @@ class DailyAdviceProducer:
                     "before it",
                 },
             )
+        # The receipt must come from a producer this policy actually trusts to have run
+        # the evaluation in this job; a self-consistent receipt for a run that never ran
+        # is refused before any field check.
+        if (
+            policy.trusted_producer_ids
+            and evaluation_receipt.producer_id not in policy.trusted_producer_ids
+        ):
+            return self._block(
+                diagnostics=diagnostics,
+                assessment=assessment,
+                disposition=AdmissionDisposition.INPUT_NOT_READY,
+                reason="untrusted_evaluation_producer",
+                detail={
+                    "producer_id": evaluation_receipt.producer_id,
+                    "trusted": sorted(policy.trusted_producer_ids),
+                },
+            )
         expected_binding = CandidateEvaluationReceipt.expected_binding_digest(
-            facts, policy, candidates
+            facts,
+            policy,
+            candidates,
+            receipt_identity={
+                "producer_id": evaluation_receipt.producer_id,
+                "producer_version": evaluation_receipt.producer_version,
+                "run_id": evaluation_receipt.run_id,
+                "evaluated_universe": sorted(evaluation_receipt.evaluated_universe),
+            },
         )
         if evaluation_receipt.binding_digest != expected_binding:
             return self._block(
@@ -884,6 +991,90 @@ class DailyAdviceProducer:
                     "qualified_count": evaluation_receipt.qualified_count,
                     "publishable_candidates": publishable_candidates,
                 },
+            )
+
+        # --- held positions: independent traversal, real held signals ----------------------
+        # Held decisions travel the same decision set as entries.  A held signal that is
+        # evaluable becomes holding / exit_plan (a reduce is still an exit-class action);
+        # a held signal whose evidence cannot be verified becomes input_blocked; a held
+        # position whose facts are unavailable arrives as a hold_alert HeldSignal and is
+        # emitted HOLDING with an alert explanation, never a forced sale and never dropped.
+        for held in held_signals:
+            missing = [mid for mid in held.depends_on_member_ids if mid not in admitted_ids]
+            if missing:
+                diagnostics.append(
+                    {
+                        "opportunity_id": held.opportunity_id,
+                        "missing_member_ids": missing,
+                        "reason": "member_clock_blocked",
+                    }
+                )
+                decisions.append(
+                    self._blocked_decision(
+                        signal=held,
+                        experts=experts,
+                        code="INPUT_CLOCK",
+                        text="a member this held decision depends on did not reach a "
+                        "qualified consumer-visible version before the cutoff",
+                        fallback_reason=STALE_MARKET_INPUT,
+                    )
+                )
+                continue
+            expected_expert = held.expected_expert_digest(facts, policy)
+            expected_risk = held.expected_risk_digest(facts, policy)
+            if (
+                held.expert_decision_digest is not None
+                and held.risk_decision_digest is not None
+                and (
+                    held.expert_decision_digest != expected_expert
+                    or held.risk_decision_digest != expected_risk
+                )
+            ):
+                diagnostics.append(
+                    {
+                        "opportunity_id": held.opportunity_id,
+                        "reason": "qualification_evidence_mismatch",
+                        "expert_decision_digest": held.expert_decision_digest,
+                        "risk_decision_digest": held.risk_decision_digest,
+                    }
+                )
+                decisions.append(
+                    self._blocked_decision(
+                        signal=held,
+                        experts=experts,
+                        code="QUALIFICATION_EVIDENCE",
+                        text="held decision lacks the batch-bound expert evidence this "
+                        "package requires",
+                        fallback_reason=INPUT_UNAVAILABLE,
+                    )
+                )
+                continue
+            stage = EXIT_PLAN if held.action in {"reduce", "exit"} else HOLDING
+            explanations: tuple[dict[str, str], ...] = held.explanations
+            if held.action == "hold_alert" and not any(
+                item.get("use") == USE_EXPLANATION for item in explanations
+            ):
+                explanations = (
+                    *explanations,
+                    {
+                        "code": "INPUT_CLOCK",
+                        "use": USE_EXPLANATION,
+                        "component_ref": f"{experts.ref_id}@{experts.version}",
+                        "text": "position facts unavailable; hold and alert, never a forced sale",
+                    },
+                )
+            decisions.append(
+                Decision(
+                    opportunity_id=held.opportunity_id,
+                    security_code=held.security_code,
+                    security_name=held.security_name,
+                    stage=stage,
+                    component_ref_id=held.component_ref_id,
+                    component_version=held.component_version,
+                    reason_codes=held.reason_codes,
+                    explanations=explanations,
+                    next_observation=held.next_observation,
+                )
             )
 
         if not decisions:

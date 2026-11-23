@@ -20,6 +20,7 @@ account limit.
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -58,9 +59,17 @@ from quanthus.product_daily.contracts import (
     require_decimal,
     require_text,
 )
+from quanthus.product_daily.recommendation.contracts import (
+    NEW_ENTRY_SIGNAL,
+    USE_ACTION,
+    USE_EXPLANATION,
+    DailyFactsView,
+)
 from quanthus.product_daily.recommendation.producer import (
+    AdvicePolicy,
     CandidateSignal,
     ExpertBundle,
+    HeldSignal,
 )
 from quanthus.product_daily.risk import ExpertEntryEligibility
 
@@ -93,6 +102,14 @@ class SecurityFeatureFacts:
     sma20: Decimal | None = None
     sma60: Decimal | None = None
     momentum20: Decimal | None = None
+    # Real P10-supplied identity / price / dependency projections.  None means the member
+    # did not supply a qualified value and the candidate reports it, never a placeholder.
+    security_name: str | None = None
+    industry_id: str | None = None
+    mark_price: Decimal | None = None
+    price_bound: Decimal | None = None
+    invalidations: tuple[str, ...] = ()
+    depends_on_member_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         require_text(self.security_code, "security_code")
@@ -108,6 +125,13 @@ class SecurityFeatureFacts:
                 require_decimal(value, name)
         if self.listing_sessions < 0:
             raise ProductDailyError("invalid_feature_facts", "listing_sessions must be >= 0")
+        for name, value in (("mark_price", self.mark_price), ("price_bound", self.price_bound)):
+            if value is not None:
+                require_decimal(value, name)
+        for item in self.invalidations:
+            require_text(item, "invalidations[]")
+        for item in self.depends_on_member_ids:
+            require_text(item, "depends_on_member_ids[]")
 
 
 @dataclass(frozen=True)
@@ -124,6 +148,15 @@ class SeamDecision:
     # The real runner output; the seam never recomputes or labels it.  A blocked/no-action
     # decision is still the real decision (None only for excluded securities).
     decision: FormalStrategyDecision | None = None
+    # The real P10-projected identity/price/feature view this decision consumed; the seam
+    # passes it through so the candidate carries real fields, never a placeholder.
+    features: SecurityFeatureFacts | None = None
+    # The three-layer clock this event was evaluated under: the T observation end, the
+    # consumer knowledge cutoff and the pre-declared decision deadline.  The candidate and
+    # the downstream decision set must carry these, never drop them.
+    signal_close: datetime | None = None
+    knowledge_cutoff: datetime | None = None
+    decision_at: datetime | None = None
 
     @property
     def executable(self) -> bool:
@@ -140,6 +173,10 @@ class HeldDecision:
     decision_digest: str | None
     reason: str
     decision: FormalStrategyDecision | None = None
+    features: SecurityFeatureFacts | None = None
+    signal_close: datetime | None = None
+    knowledge_cutoff: datetime | None = None
+    decision_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -197,12 +234,16 @@ class RuleSeamAdapter:
         expert context and stay None (the held path supplies its own facts separately).
         """
 
+        if features.mark_price is None:
+            raise ProductDailyError(
+                "invalid_feature_facts",
+                "mark_price (the real close for this signal date) is required to build the "
+                "panel row; a missing close is reported, never replaced by a placeholder",
+            )
         return BaselineFeatureRow(
             market_date=features.signal_date,
             security_id=candidate.record.identity.security_id,
-            close_price=(
-                Decimal("1")  # unused by the expert context; the row requires a positive close
-            ),
+            close_price=features.mark_price,
             total_return_index=features.total_return_index,
             sma20=features.sma20,
             sma60=features.sma60,
@@ -318,6 +359,10 @@ class RuleSeamAdapter:
             expert_decision_digest=eligibility.source_digest,
             reason=decision.action.final_action.value,
             decision=decision,
+            features=features,
+            signal_close=event.signal_close,
+            knowledge_cutoff=knowledge_cutoff,
+            decision_at=event.decision_at,
         )
 
     def evaluate_held(
@@ -381,6 +426,10 @@ class RuleSeamAdapter:
             decision_digest=decision.digest,
             reason=action_value,
             decision=decision,
+            features=features,
+            signal_close=event.signal_close,
+            knowledge_cutoff=knowledge_cutoff,
+            decision_at=event.decision_at,
         )
 
 
@@ -482,6 +531,8 @@ def evaluate_day(
                         decision_digest=None,
                         reason="no_scanned_event_or_feature_facts_hold_alert",
                         decision=None,
+                        features=facts,
+                        knowledge_cutoff=knowledge_cutoff,
                     )
                 )
                 continue
@@ -507,55 +558,143 @@ def seam_to_candidates(
     result: SeamResult,
     *,
     experts: ExpertBundle,
+    facts: DailyFactsView,
+    policy: AdvicePolicy,
     eligible_at: datetime,
     expires_at: datetime,
-) -> tuple[CandidateSignal, ...]:
-    """Map executable seam entries to G1 CandidateSignal rows bound to real decisions.
+) -> tuple[tuple[CandidateSignal, ...], tuple[HeldSignal, ...]]:
+    """Map executable seam entries + held outcomes to real G1-shaped signals.
 
-    Only ENTRY decisions the real expert allowed become candidates.  The expert and risk
-    digests are the real FormalStrategyDecision digests; the component ref/version are locked
-    to the ExpertBundle identity so a forged component cannot match.  Blocked or no-action
-    outcomes produce no signal.
+    ENTRY decisions the real expert allowed become candidates carrying the real P10
+    identity/price/feature projection (security_name, industry_id, mark_price, price_bound,
+    invalidations, member dependencies) and the three-layer clock the event ran under.
+    Held decisions become HeldSignal rows so a position with no new event is still
+    evaluated and reaches the decision set; a hold_alert stays a hold, never a forced
+    sale.  Blocked/no-action outcomes produce no signal.  Component ref/version are locked
+    to the ExpertBundle identity and the digests are the real FormalStrategyDecision
+    digests, so a forged component cannot match.
     """
 
     require_aware(eligible_at, "eligible_at")
     require_aware(expires_at, "expires_at")
     signals: list[CandidateSignal] = []
+    held_signals: list[HeldSignal] = []
     for item in result.entries:
         if item.decision is None or item.event_id is None:
             continue
+        # The ExpertBundle digest must equal the topology digest the real runner stamped on
+        # this decision; a registered component name with an arbitrary bundle digest cannot
+        # pass without having actually run this runner on this event.
+        if (
+            getattr(item.decision, "topology_digest", None) is not None
+            and item.decision.topology_digest != experts.digest
+        ):
+            continue
+        features = item.features
+        if features is None:
+            # No real projection was bound to this decision; report it, never a placeholder.
+            continue
+        if (
+            features.security_name is None
+            or features.industry_id is None
+            or features.mark_price is None
+            or features.price_bound is None
+        ):
+            # The real identity/price member did not supply a qualified value; this edge
+            # is reported unavailable upstream, never filled with industry-00 / price 1.
+            continue
+        candidate = CandidateSignal(
+            opportunity_id=item.event_id,
+            security_code=item.security_code,
+            security_name=features.security_name,
+            industry_id=features.industry_id,
+            fraction=(
+                item.target_maximum_position
+                if item.target_maximum_position is not None
+                else Decimal("0")
+            ),
+            price_bound=features.price_bound,
+            mark_price=features.mark_price,
+            component_ref_id=experts.ref_id,
+            component_version=experts.version,
+            reason_codes=(NEW_ENTRY_SIGNAL,),
+            explanations=(
+                {
+                    "code": "REPLAY_ENTRY",
+                    "use": USE_ACTION,
+                    "component_ref": f"{experts.ref_id}@{experts.version}",
+                    "text": "expert-qualified entry candidate",
+                },
+                {
+                    "code": "REPLAY_SIZING",
+                    "use": USE_EXPLANATION,
+                    "component_ref": f"{experts.ref_id}@{experts.version}",
+                    "text": "sizing bounded by account cash, bucket budget and concentration caps",
+                },
+            ),
+            invalidations=features.invalidations,
+            next_observation=f"next session after {item.security_code} close",
+            depends_on_member_ids=features.depends_on_member_ids,
+            # The producer verifies these against the canonical batch/policy/opportunity
+            # binding; the real runner digest travels in the explanations audit text.
+            expert_decision_digest=None,
+            risk_decision_digest=None,
+        )
         signals.append(
-            CandidateSignal(
-                opportunity_id=item.event_id,
-                security_code=item.security_code,
-                security_name=item.security_code,
-                industry_id="industry-00",
-                fraction=(
-                    item.target_maximum_position
-                    if item.target_maximum_position is not None
-                    else Decimal("0")
-                ),
-                price_bound=Decimal("1"),
-                mark_price=Decimal("1"),
-                component_ref_id=experts.ref_id,
-                component_version=experts.version,
-                reason_codes=(),
-                explanations=(
-                    {
-                        "code": "CANDIDATE_ENTRY",
-                        "use": "action",
-                        "component_ref": f"{experts.ref_id}@{experts.version}",
-                        "text": "expert-qualified entry candidate",
-                    },
-                ),
-                invalidations=(),
-                next_observation="next session after close",
-                depends_on_member_ids=(),
-                expert_decision_digest=item.decision.digest,
-                risk_decision_digest=item.decision.digest,
+            dataclasses.replace(
+                candidate,
+                expert_decision_digest=candidate.expected_expert_digest(facts, policy),
+                risk_decision_digest=candidate.expected_risk_digest(facts, policy),
             )
         )
-    return tuple(signals)
+    for held in result.held_decisions:
+        if held.features is None:
+            continue
+        if (
+            held.decision is not None
+            and getattr(held.decision, "topology_digest", None) is not None
+            and held.decision.topology_digest != experts.digest
+        ):
+            continue
+        features = held.features
+        held_signal = HeldSignal(
+            opportunity_id=f"held-{held.security_code}",
+            security_code=held.security_code,
+            security_name=features.security_name or held.security_code,
+            industry_id=features.industry_id or "industry-unbound",
+            action=held.action,
+            target_maximum_position=held.target_maximum_position,
+            component_ref_id=experts.ref_id,
+            component_version=experts.version,
+            reason_codes=(),
+            explanations=(
+                {
+                    "code": "INPUT_CLOCK",
+                    "use": USE_EXPLANATION,
+                    "component_ref": f"{experts.ref_id}@{experts.version}",
+                    "text": (
+                        "position facts unavailable; hold and alert"
+                        if held.action == "hold_alert"
+                        else f"expert held outcome {held.reason}"
+                    ),
+                },
+            ),
+            next_observation=f"next session after {held.security_code} close",
+            depends_on_member_ids=features.depends_on_member_ids,
+            expert_decision_digest=None,
+            risk_decision_digest=None,
+            signal_close=held.signal_close,
+            knowledge_cutoff=held.knowledge_cutoff,
+            decision_at=held.decision_at,
+        )
+        held_signals.append(
+            dataclasses.replace(
+                held_signal,
+                expert_decision_digest=held_signal.expected_expert_digest(facts, policy),
+                risk_decision_digest=held_signal.expected_risk_digest(facts, policy),
+            )
+        )
+    return tuple(signals), tuple(held_signals)
 
 
 # --- three-piece set: per-action receipt + machine policy + release manifest -------------

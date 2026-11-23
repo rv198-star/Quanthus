@@ -70,7 +70,12 @@ class DailyCoreSnapshot:
     content_digest: str
     row_counts: dict[str, int]
     daily_payload: Path | None
+    # Source knowledge_cutoff carried verbatim; null with a reason when the
+    # input does not declare it.  Never inferred from completed_at.
     knowledge_cutoff: datetime | None
+    # The job's own completion time, recorded on the receipt only; never
+    # used as a knowledge or decision cutoff.
+    completed_at: datetime | None
     consumer_admission: str
     checked_at: datetime
     authoritative_next_session: date | None = None
@@ -245,19 +250,20 @@ def qualify_daily_input(
         str(k): int(v)
         for k, v in (entry.get("core_row_counts") or manifest.get("row_counts") or {}).items()
     }
-    cutoff = None
-    for key in ("completed_at", "knowledge_cutoff"):
-        raw = manifest.get(key) or entry.get(key)
-        if raw:
-            try:
-                cutoff = datetime.fromisoformat(str(raw))
-            except ValueError:
-                cutoff = None
-            else:
-                if cutoff.tzinfo is None:
-                    cutoff = None
-                else:
-                    break
+    def _aware_ts(value):
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value))
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo is not None else None
+
+    # The source knowledge_cutoff is read under its own name and carried
+    # verbatim; a missing or non-tz value stays null, never back-filled from
+    # completed_at.  completed_at is only the job's completion timestamp.
+    cutoff = _aware_ts(manifest.get("knowledge_cutoff") or entry.get("knowledge_cutoff"))
+    completed_at = _aware_ts(manifest.get("completed_at") or entry.get("completed_at"))
     calendar = manifest.get("calendar") or entry.get("calendar") or {}
     authoritative_next_session = None
     if isinstance(calendar, dict) and calendar.get("next_session"):
@@ -281,6 +287,7 @@ def qualify_daily_input(
         row_counts=row_counts,
         daily_payload=daily_payload,
         knowledge_cutoff=cutoff,
+        completed_at=completed_at,
         consumer_admission=consumer_admission,
         checked_at=now,
         authoritative_next_session=authoritative_next_session,

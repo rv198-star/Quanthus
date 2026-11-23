@@ -161,6 +161,7 @@ def run_daily(
     now: datetime | None = None,
     holdings: tuple[HeldPositionFact, ...] | None = None,
     sidecar_path: Path | None = None,
+    decision_cutoff: datetime | None = None,
 ) -> dict:
     '''Execute one daily run and persist its receipt; returns the receipt.'''
 
@@ -172,6 +173,9 @@ def run_daily(
         "run_id": _run_id(moment),
         "market_date": market_date.isoformat(),
         "next_session": next_session.isoformat(),
+        "decision_cutoff": (
+            decision_cutoff.isoformat() if decision_cutoff is not None else None
+        ),
         "account_id": account_id,
         "runner": {
             "ref_id": runner.runner_ref.ref_id,
@@ -194,6 +198,30 @@ def run_daily(
         return time.monotonic()
 
     t = time.monotonic()
+
+    # The decision cutoff is configured per use (e.g. forward-day-1 22:30+08),
+    # carried with its timezone.  A run without it cannot fix the package
+    # knowledge cutoff, so the whole day is blocked before any input read.
+    if decision_cutoff is None or decision_cutoff.tzinfo is None:
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail=(
+                    "decision_cutoff is not configured with a timezone; the "
+                    "package knowledge cutoff cannot be fixed"
+                ),
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=None,
+            ),
+            market_date=market_date,
+            missing_members=["decision_cutoff"],
+        )
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
+
     resolved_holdings = (
         holdings
         if holdings is not None
@@ -258,6 +286,24 @@ def run_daily(
         manifest_sha256=snapshot.core_manifest_sha256,
         row_counts=snapshot.row_counts,
     )
+    # The job completion time and the source's own knowledge_cutoff are
+    # carried verbatim on the receipt.  Neither is used as a cutoff; a missing
+    # source cutoff stays null with its reason recorded.
+    receipt["input_timing"] = {
+        "completed_at": (
+            snapshot.completed_at.isoformat() if snapshot.completed_at else None
+        ),
+        "source_knowledge_cutoff": (
+            snapshot.knowledge_cutoff.isoformat()
+            if snapshot.knowledge_cutoff
+            else None
+        ),
+        "source_knowledge_cutoff_note": (
+            None
+            if snapshot.knowledge_cutoff
+            else "source did not declare a tz-aware knowledge_cutoff"
+        ),
+    }
 
     # M2 section 3: the three history floors are checked separately.  A floor
     # the qualified input cannot prove is a whole-day block, never a pass.
@@ -392,7 +438,7 @@ def run_daily(
             sidecar_read = read_sidecar(
                 sidecar_path,
                 consumer_now=moment,
-                decision_cutoff=snapshot.knowledge_cutoff,
+                decision_cutoff=decision_cutoff,
             )
         except SidecarError as exc:
             t = stage("sidecar", t, result="blocked", detail=str(exc))
@@ -456,6 +502,7 @@ def run_daily(
                 next_session=next_session,
                 holdings=resolved_holdings,
                 published_at=moment,
+                decision_cutoff=decision_cutoff,
             )
         )
     except FactError as exc:
@@ -581,6 +628,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runner", default="synthetic-replay")
     parser.add_argument("--candidates", type=Path)
     parser.add_argument(
+        "--decision-cutoff",
+        type=lambda v: datetime.fromisoformat(v),
+        default=None,
+        help="configured tz-aware decision cutoff, e.g. 2026-11-20T22:30:00+08:00",
+    )
+    parser.add_argument(
         "--sidecar",
         type=Path,
         default=None,
@@ -616,6 +669,7 @@ def main(argv: list[str] | None = None) -> int:
         next_session=args.next_session,
         account_id=args.account,
         sidecar_path=args.sidecar,
+        decision_cutoff=args.decision_cutoff,
     )
     print(json.dumps(receipt, ensure_ascii=False, indent=2))
     return 0 if receipt["status"] in (STATUS_PUBLISHED, STATUS_ALREADY_PUBLISHED) else 1

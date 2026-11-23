@@ -31,6 +31,7 @@ TZ = timezone(timedelta(hours=8))
 MARKET_DATE = date(2026, 11, 20)
 NEXT_SESSION = date(2026, 11, 21)
 BASE_SHA = "sha256:" + "1" * 64
+CUTOFF = datetime(2026, 11, 20, 22, 30, tzinfo=TZ)
 
 
 def _sha(payload: bytes) -> str:
@@ -143,14 +144,16 @@ def test_publish_and_idempotent_rerun(env):
     r1 = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=now, holdings=(),
+        account_id="SYN-PAPER-A", now=now,
+        decision_cutoff=CUTOFF, holdings=(),
     )
     assert r1["status"] == "PUBLISHED"
     assert r1["package"]["entry_plan_count"] == 1
     r2 = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=now, holdings=(),
+        account_id="SYN-PAPER-A", now=now,
+        decision_cutoff=CUTOFF, holdings=(),
     )
     assert r2["status"] == "ALREADY_PUBLISHED"
     assert r2["package"]["decision_set_digest"] == r1["package"]["decision_set_digest"]
@@ -164,7 +167,8 @@ def test_same_day_different_content_refused(env):
     run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=now, holdings=(),
+        account_id="SYN-PAPER-A", now=now,
+        decision_cutoff=CUTOFF, holdings=(),
     )
     store = DailyPackageStore(state)
     with pytest.raises(FactError) as exc:
@@ -184,6 +188,7 @@ def test_input_blocked_writes_receipt_only(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "INPUT_BLOCKED"
@@ -197,6 +202,7 @@ def test_stale_input_blocked(env):
         state_dir=state, job_root=prod, runner=runner,
         market_date=date(2026, 11, 21), next_session=date(2026, 11, 22),
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 21, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "INPUT_BLOCKED"
@@ -216,6 +222,7 @@ def test_wrong_kind_blocked(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "INPUT_BLOCKED"
@@ -229,6 +236,7 @@ def test_no_qualified_candidate_is_noop_package(env):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "PUBLISHED"
@@ -261,6 +269,7 @@ def test_single_security_exclusion(env):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "PUBLISHED"
@@ -275,6 +284,7 @@ def test_held_security_not_reentered(env):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(HeldPositionFact(security_code="600000", quantity=500),),
     )
     assert receipt["package"]["entry_plan_count"] == 0
@@ -287,7 +297,8 @@ def test_package_source_and_retraction(env):
     run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=now, holdings=(),
+        account_id="SYN-PAPER-A", now=now,
+        decision_cutoff=CUTOFF, holdings=(),
     )
     def clock():
         return datetime(2026, 11, 21, 10, 0, tzinfo=TZ)
@@ -341,6 +352,7 @@ def test_wire_dict_loads_through_same_loader(env):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     stored = DailyPackageStore(state).package_for(MARKET_DATE)
@@ -387,6 +399,7 @@ def test_history_gate_failure_blocks(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "INPUT_BLOCKED"
@@ -416,6 +429,7 @@ def test_missing_calendar_blocks(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "INPUT_BLOCKED"
@@ -445,6 +459,7 @@ def test_missing_corporate_actions_blocks(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "INPUT_BLOCKED"
@@ -477,6 +492,7 @@ def test_sidecar_publish_records_consumer_stamps(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(), sidecar_path=sidecar,
     )
     # The synthetic fixture's own clocks are 2000-dated; the run still records
@@ -501,6 +517,7 @@ def test_sidecar_absent_published_at_null(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "PUBLISHED"
@@ -522,6 +539,7 @@ def test_sidecar_withdraw_does_not_replace(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(), sidecar_path=sidecar,
     )
     # Source withdraw recorded on the receipt; the day still publishes once
@@ -632,15 +650,18 @@ def test_trend_observation_bound_to_package_and_receipt(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     assert receipt["status"] == "PUBLISHED"
     obs = receipt["trend_observations"][0]
     assert obs["observation_digest"] == "sha256:trend-1"
+    # The trend identity stays on the run receipt audit, not on the shared
+    # MarketDecisionSet wire shape - the decision carries no trend field.
     stored = DailyPackageStore(state).package_for(MARKET_DATE)
     loaded = load_decision_set_dict(stored.decision_set, mode="synthetic")
     codes = [e.code for d in loaded.decisions for e in d.explanations]
-    assert "TREND_OBSERVATION" in codes
+    assert "TREND_OBSERVATION" not in codes
 
 
 def test_abstained_trend_observation_kept(tmp_path):
@@ -661,10 +682,70 @@ def test_abstained_trend_observation_kept(tmp_path):
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
         holdings=(),
     )
     obs = receipt["trend_observations"][0]
     assert obs["applicability"] == "ABSTAINED"
     assert obs["raw_value"] is None
     assert obs["observation_digest"] == "sha256:trend-abstained"
+
+
+
+def test_missing_decision_cutoff_blocks(tmp_path):
+    """A run without a configured tz-aware decision cutoff is a whole-day block."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(), decision_cutoff=None,
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert "decision_cutoff" in receipt["input_block"]["missing_members"]
+
+
+def test_source_completed_after_close_still_publishes(tmp_path):
+    """Source data finished after the 15:00 close is normal - 15:00 is only the
+    observation anchor, never the knowledge cutoff.  The package knowledge
+    cutoff stays the configured 22:30 decision cutoff."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    meta = make_product(prod, MARKET_DATE.isoformat())
+    # Give the source a knowledge_cutoff and completed_at after the 15:00 close.
+    manifest_path = meta["core"] / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["knowledge_cutoff"] = f"{MARKET_DATE.isoformat()}T18:00:00+08:00"
+    manifest["completed_at"] = f"{MARKET_DATE.isoformat()}T19:30:00+08:00"
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True))
+    core_sha = _sha(manifest_path.read_bytes())
+    index = json.loads((prod / "DATES.json").read_text())
+    index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
+    (prod / "DATES.json").write_text(json.dumps(index, sort_keys=True))
+    pointer = json.loads((prod / "CURRENT_DAILY_CORE_BASE24.json").read_text())
+    pointer["index_sha256"] = _sha((prod / "DATES.json").read_bytes())
+    pointer["entry"]["core_manifest_sha256"] = core_sha
+    (prod / "CURRENT_DAILY_CORE_BASE24.json").write_text(json.dumps(pointer))
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(), decision_cutoff=CUTOFF,
+    )
+    assert receipt["status"] == "PUBLISHED"
+    # completed_at is recorded verbatim, source knowledge_cutoff verbatim; the
+    # package knowledge cutoff is the configured 22:30 decision cutoff and the
+    # package published_at is never earlier than it.
+    assert receipt["input_timing"]["completed_at"] == "2026-11-20T19:30:00+08:00"
+    assert receipt["input_timing"]["source_knowledge_cutoff"] == "2026-11-20T18:00:00+08:00"
+    stored = DailyPackageStore(state).package_for(MARKET_DATE)
+    loaded = load_decision_set_dict(stored.decision_set, mode="synthetic")
+    assert loaded.knowledge_cutoff == CUTOFF
+    assert loaded.published_at >= loaded.knowledge_cutoff
 

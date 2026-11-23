@@ -322,6 +322,57 @@ class P12DesktopApplication:
             )
         return existing
 
+    def migrate_decision_source(self) -> ConfigurationBinding:
+        '''One-time decision-source migration for a bound account store.
+
+        Records the currently bound source under the binding's migrations list
+        and rebinds the account to the source this application was assembled
+        with (same mode, composition and execution profile).  Ledger history,
+        reports and receipts are untouched; the migration is auditable through
+        the stored record.  Only a store already bound to a *different* source
+        takes this path - a same-source call is a plain rebind.
+        '''
+
+        decisions = self._current_decisions()
+        source_ref = decisions.source_ref
+        published = self._decisions.history(self._scope)
+        package_digests = {
+            item.market_date.isoformat(): digest(_package_content(item))
+            for item in published
+        }
+        binding: dict[str, object] = {
+            "mode": self._scope.mode,
+            "composition": self._policy.composition_ref.to_dict(),
+            "decision_source": {
+                "ref_id": source_ref.ref_id,
+                "version": source_ref.version,
+                "package_digests": package_digests,
+            },
+            "execution_profile": self._policy.execution_profile,
+        }
+        existing = self._facts.configuration_binding(self._context)
+        if existing is None:
+            raise FactError(
+                CONFIGURATION_BINDING_MISMATCH,
+                "no bound configuration to migrate; use bind_configuration on a fresh store",
+            )
+        stored_source = existing.binding.get("decision_source", {})
+        if (stored_source.get("ref_id"), stored_source.get("version")) == (
+            source_ref.ref_id,
+            source_ref.version,
+        ):
+            return existing
+        record = {
+            "kind": "decision_source_migration",
+            "from": stored_source,
+            "to": binding["decision_source"],
+            "migrated_at": self._now().isoformat(),
+        }
+        new_digest = digest(binding)
+        return self._facts.migrate_configuration(
+            self._context, new_digest, binding, record
+        )
+
     @staticmethod
     def _binding_is_append_only(stored: dict, new: dict) -> bool:
         """True when ``new`` keeps every bound package digest and only adds releases."""
@@ -376,10 +427,16 @@ class P12DesktopApplication:
             )
 
     def _publication(self, decisions: MarketDecisionSet, now: datetime) -> PublicationStatus:
+        retraction = None
+        read = getattr(self._decisions, "retraction_for", None)
+        if callable(read):
+            retraction = read(decisions.market_date)
         return PublicationStatus(
             status="PUBLISHED" if self._visible(decisions, now) else "NOT_YET_PUBLISHED",
             market_date=decisions.market_date,
             published_at=decisions.published_at,
+            retracted=retraction is not None,
+            retraction_reason=None if retraction is None else str(retraction.get("reason")),
         )
 
     # ---- package publication ----------------------------------------------------------
@@ -1035,6 +1092,10 @@ class P12DesktopApplication:
         items = [
             self._opportunity(item, decisions, package, projection, history, account, blockers, now)
             for item in (decisions.decisions if visible else ())
+            # The no-qualified-candidate no-op marks a published "nothing to
+            # do" day: it is evidence, never a queue row, a position or an
+            # order surface.
+            if item.opportunity_id != "no-qualified-candidate"
         ]
         known = {item.security_code for item in decisions.decisions}
         active_buckets = self._active_bucket_by_security(funding)
@@ -1095,6 +1156,10 @@ class P12DesktopApplication:
                 )
             )
         items.sort(key=lambda x: (_GROUP_ORDER[x.queue_group], x.opportunity_id))
+        run_receipt = None
+        latest_run = getattr(self._decisions, "latest_run", None)
+        if callable(latest_run):
+            run_receipt = latest_run()
         return WorkbenchView(
             scope=scope,
             package=package if visible else None,
@@ -1105,6 +1170,7 @@ class P12DesktopApplication:
             opportunities=tuple(items),
             orders=history.orders,
             action_blockers=blockers,
+            run_receipt=run_receipt,
         )
 
     def _active_bucket_by_security(self, funding: FundingView) -> dict[str, str]:
@@ -1961,6 +2027,10 @@ class P12DesktopApplication:
             estimated_fee_upper=estimated_fee_upper,
         )
 
+    def facts_binding(self):
+        """The configuration binding recorded on this account store, if any."""
+        return self._facts.configuration_binding(self._context)
+
     def paper_projection(self):
         return self._facts.projection(self._context)
 
@@ -1980,6 +2050,11 @@ class P12DesktopApplication:
         decisions = self._current_decisions()
         now = self._now()
         if not self._visible(decisions, now):
+            return None
+        # A retracted package keeps its filled facts but its unconfirmed plans
+        # can no longer confirm: the order path then refuses with PLAN_NOT_FOUND.
+        is_retracted = getattr(self._decisions, "is_retracted", None)
+        if callable(is_retracted) and is_retracted(decisions.market_date):
             return None
         snapshot = self._facts.snapshot(self._context)
         package = self._publish(decisions, snapshot.history)

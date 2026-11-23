@@ -1,0 +1,13 @@
+[Unit]
+Description=Nightly P12 daily advice run (isolated 8791)
+
+[Timer]
+# T evening 20:00 start; retries at 21:00 and 22:00 keep the run inside the
+# 22:30 job window.  Persistent catches a missed boot-time slot next login.
+OnCalendar=*-*-* 20:00:00 Asia/Shanghai
+OnCalendar=*-*-* 21:00:00 Asia/Shanghai
+OnCalendar=*-*-* 22:00:00 Asia/Shanghai
+Persistent=true
+
+[Install]
+WantedBy=timers.target

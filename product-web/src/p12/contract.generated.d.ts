@@ -324,6 +324,8 @@ export interface PriceBar {
 export interface PublicationStatus {
   market_date: MarketDate
   published_at: Timestamp
+  retracted: boolean
+  retraction_reason: string | null
   status: "NOT_YET_PUBLISHED" | "PUBLISHED"
 }
 
@@ -398,6 +400,48 @@ export interface RiskPolicy {
   total_limit: PolicyDecimal
 }
 
+export interface RunReceipt {
+  elapsed_ms: number
+  exclusions: Array<RunReceiptExclusion>
+  input_block: RunReceiptInputBlock | null
+  market_date: MarketDate
+  package: RunReceiptPackage | null
+  run_id: string
+  runner: RunReceiptRunner
+  schema_version: string
+  started_at: Timestamp
+  status: "PUBLISHED" | "ALREADY_PUBLISHED" | "INPUT_BLOCKED" | "FAILED"
+}
+
+export interface RunReceiptExclusion {
+  detail: string
+  reason_code: string
+  security_code: string
+}
+
+export interface RunReceiptInputBlock {
+  affected_scope: string
+  detail: string
+  missing_members: Array<string>
+  reason_code: string
+  recovery_condition: string
+}
+
+export interface RunReceiptPackage {
+  admission_disposition: string
+  decision_count: number
+  decision_set_digest: Digest
+  entry_plan_count: number
+  file_sha256: Digest
+  package_id: string
+}
+
+export interface RunReceiptRunner {
+  digest: Digest
+  ref_id: string
+  version: string
+}
+
 export type SchemaVersion = "p12.desktop.v1"
 
 export interface Scope {
@@ -452,6 +496,7 @@ export interface Workbench {
   orders: Array<OrderRecord>
   package: Package | null
   publication: PublicationStatus
+  run_receipt: RunReceipt | null
   schema_version: SchemaVersion
   scope: Scope
 }

@@ -28,7 +28,7 @@ from quanthus.platform.adapters.product_daily_facts_sqlite import build_syntheti
 from quanthus.product_daily.application.desktop import P12DesktopApplication
 from quanthus.product_daily.application.desktop.policy import DesktopPolicyBundle
 from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
-from quanthus.shared.fact_contracts import digest
+from quanthus.shared.fact_contracts import FactError, digest
 from quanthus.shared.values import VersionRef
 
 PAPER_ACCOUNT_ID = "SYN-PAPER-A"
@@ -256,7 +256,22 @@ def build_paper_application(
         live_valuation_ref=live_valuation_ref,
     )
     app.establish_baseline(request_id=PAPER_BASELINE_REQUEST, cash=baseline_cash)
-    app.bind_configuration()
+    try:
+        app.bind_configuration()
+    except FactError as exc:
+        # A store bound to the earlier empty paper source migrates once to the
+        # daily-package source: the old binding is recorded under migrations,
+        # the new binding is appended, and ledger history is untouched.
+        bound = facts.configuration_binding(context)
+        bound_source = (bound.binding.get("decision_source") or {}) if bound else {}
+        if (
+            exc.reason_code == "CONFIGURATION_BINDING_MISMATCH"
+            and bound_source.get("ref_id") == "p12-paper-decisions"
+            and decision_source is not None
+        ):
+            app.migrate_decision_source()
+        else:
+            raise
     # Establish the funding partition once so a fresh account shows bound
     # buckets and a real reserve, never the "assignment conflict" placeholder.
     if app.funding_state(app.scope) is None:

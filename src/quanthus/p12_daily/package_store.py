@@ -1,0 +1,266 @@
+'''Immutable daily package store, retraction log and run receipts.
+
+Layout under one state directory:
+
+  daily-packages/<market_date>.json    one immutable published package
+  daily-packages/retractions.jsonl     append-only retraction records
+  daily-runs/<run_id>.json             one run receipt per job attempt
+
+Frozen contract (2026-11-24): a market_date gets at most one package - never
+a same-day replacement.  An error discovered after publication appends a
+retraction record naming the original digest, reason and time; the source then
+marks that package superseded so unconfirmed plans can no longer confirm while
+filled facts stay untouched.  Blocked input writes only a run receipt, never
+a package.
+'''
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from dataclasses import dataclass
+from datetime import date, datetime
+from pathlib import Path
+
+from quanthus.shared.fact_contracts import FactError
+
+PACKAGES_DIR = "daily-packages"
+RETRACTIONS_FILE = "retractions.jsonl"
+RUNS_DIR = "daily-runs"
+PACKAGE_SCHEMA = "quanthus.p12.daily-package.v1"
+RETRACTION_SCHEMA = "quanthus.p12.package-retraction.v1"
+RUN_SCHEMA = "quanthus.p12.daily-run.v1"
+
+PACKAGE_EXISTS_DIFFERS = "PACKAGE_EXISTS_DIFFERS"
+
+
+def _canonical(value: object) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def _write_atomic(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".{os.getpid():d}.tmp")
+    with tmp.open("x", encoding="utf-8") as stream:
+        json.dump(value, stream, ensure_ascii=False, sort_keys=True, indent=2)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(tmp, path)
+
+
+def _read_json(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise FactError("INVALID_PACKAGE", f"stored artifact unreadable: {exc}") from exc
+    if not isinstance(value, dict):
+        raise FactError("INVALID_PACKAGE", "stored artifact is not an object")
+    return value
+
+
+@dataclass(frozen=True)
+class StoredPackage:
+    '''One published package plus its on-disk identity.'''
+
+    market_date: date
+    package_id: str
+    file_path: Path
+    file_sha256: str
+    decision_set: dict
+    runner: dict
+    input_evidence: dict
+    published_at: datetime
+    retracted: bool
+    retraction: dict | None
+
+
+@dataclass(frozen=True)
+class PublishOutcome:
+    '''Result of one publish attempt.'''
+
+    status: str
+    package: StoredPackage | None
+    reason: str | None
+
+
+class DailyPackageStore:
+    '''Append-only package directory the daily job writes and the source reads.'''
+
+    def __init__(self, state_dir: Path) -> None:
+        self._root = Path(state_dir)
+        self._packages = self._root / PACKAGES_DIR
+        self._runs = self._root / RUNS_DIR
+
+    @property
+    def packages_dir(self) -> Path:
+        return self._packages
+
+    @property
+    def runs_dir(self) -> Path:
+        return self._runs
+
+    # ---- packages ------------------------------------------------------------
+    def package_path(self, market_date: date) -> Path:
+        return self._packages / (f"{market_date.isoformat()}.json")
+
+    def _retractions_path(self) -> Path:
+        return self._packages / RETRACTIONS_FILE
+
+    def retractions(self) -> tuple[dict, ...]:
+        path = self._retractions_path()
+        if not path.is_file():
+            return ()
+        out = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                out.append(json.loads(line))
+        return tuple(out)
+
+    def retraction_for(self, market_date: date) -> dict | None:
+        found = [
+            item
+            for item in self.retractions()
+            if item.get("market_date") == market_date.isoformat()
+        ]
+        return found[-1] if found else None
+
+    def _load_package_file(self, path: Path) -> StoredPackage:
+        raw = _read_json(path)
+        if raw.get("schema_version") != PACKAGE_SCHEMA:
+            raise FactError("INVALID_PACKAGE", "daily package schema differs")
+        market_date = date.fromisoformat(str(raw["market_date"]))
+        retraction = self.retraction_for(market_date)
+        return StoredPackage(
+            market_date=market_date,
+            package_id=str(raw["package_id"]),
+            file_path=path,
+            file_sha256=_sha256_bytes(path.read_bytes()),
+            decision_set=raw["decision_set"],
+            runner=raw.get("runner") or {},
+            input_evidence=raw.get("input_evidence") or {},
+            published_at=datetime.fromisoformat(str(raw["published_at"])),
+            retracted=retraction is not None,
+            retraction=retraction,
+        )
+
+    def packages(self) -> tuple[StoredPackage, ...]:
+        if not self._packages.is_dir():
+            return ()
+        out = []
+        for path in sorted(self._packages.glob("*.json")):
+            out.append(self._load_package_file(path))
+        return tuple(sorted(out, key=lambda item: item.market_date))
+
+    def package_for(self, market_date: date) -> StoredPackage | None:
+        path = self.package_path(market_date)
+        if not path.is_file():
+            return None
+        return self._load_package_file(path)
+
+    def publish(
+        self,
+        *,
+        decision_set: dict,
+        runner: dict,
+        input_evidence: dict,
+        published_at: datetime,
+    ) -> PublishOutcome:
+        '''Write the one allowed package for a market date; never overwrite.
+
+        A rerun over the identical decision_set replays the existing package
+        (idempotent), while different content for the same date is refused -
+        errors after publication go through retraction, not replacement.
+        '''
+
+        market_date = date.fromisoformat(str(decision_set["market_date"]))
+        path = self.package_path(market_date)
+        body = {
+            "schema_version": PACKAGE_SCHEMA,
+            "package_id": f"p12-daily-{market_date.isoformat()}",
+            "market_date": market_date.isoformat(),
+            "published_at": published_at.isoformat(),
+            "runner": runner,
+            "input_evidence": input_evidence,
+            "decision_set": decision_set,
+        }
+        if path.is_file():
+            existing = self._load_package_file(path)
+            if existing.decision_set == decision_set:
+                return PublishOutcome("already_published", existing, None)
+            raise FactError(
+                PACKAGE_EXISTS_DIFFERS,
+                f"a different package already covers {market_date.isoformat()}; append a "
+                "retraction instead of replacing it",
+            )
+        _write_atomic(path, body)
+        return PublishOutcome("published", self._load_package_file(path), None)
+
+    def retract(
+        self,
+        *,
+        market_date: date,
+        reason: str,
+        retracted_at: datetime,
+        actor: str,
+    ) -> dict:
+        '''Append one retraction record; the original package stays on disk.'''
+
+        package = self.package_for(market_date)
+        if package is None:
+            raise FactError("PLAN_NOT_FOUND", f"no published package for {market_date}")
+        record = {
+            "schema_version": RETRACTION_SCHEMA,
+            "market_date": market_date.isoformat(),
+            "package_id": package.package_id,
+            "package_file_sha256": package.file_sha256,
+            "reason": reason,
+            "retracted_at": retracted_at.isoformat(),
+            "actor": actor,
+        }
+        path = self._retractions_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        return record
+
+    # ---- run receipts ----------------------------------------------------------
+    def write_run(self, receipt: dict) -> Path:
+        '''Persist one run receipt under a sortable run id.'''
+
+        if receipt.get("schema_version") != RUN_SCHEMA:
+            raise FactError("INVALID_PACKAGE", "run receipt schema differs")
+        run_id = str(receipt["run_id"])
+        path = self._runs / (f"{run_id}.json")
+        _write_atomic(path, receipt)
+        return path
+
+    def runs(self) -> tuple[dict, ...]:
+        if not self._runs.is_dir():
+            return ()
+        out = []
+        for path in sorted(self._runs.glob("*.json")):
+            out.append(_read_json(path))
+        return tuple(out)
+
+    def latest_run(self) -> dict | None:
+        runs = self.runs()
+        return runs[-1] if runs else None
+
+    def latest_run_for_date(self, market_date: date) -> dict | None:
+        found = [
+            item
+            for item in self.runs()
+            if item.get("market_date") == market_date.isoformat()
+        ]
+        return found[-1] if found else None

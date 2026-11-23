@@ -89,10 +89,21 @@
         <router-link :to="{ path: '/p12/funding', query: accountRouteQuery }" class="p12-inline-link">查看准入详情 →</router-link>
       </div>
 
+      <div v-if="workbench.publication && workbench.publication.retracted" class="p12-banner-note warning" data-testid="p12-package-retracted">
+        <div>
+          <strong>本日盘后建议已被撤回{{ workbench.publication.retraction_reason ? '：' + workbench.publication.retraction_reason : '' }}</strong>
+          <p>未确认的计划不能再确认；已成交事实保留。下一份可执行建议为下一交易日的盘后包。</p>
+        </div>
+      </div>
+
       <section v-if="!workbench.package && !customWatchItems.length && !extraHoldingItems.length" class="panel p12-unpublished" data-testid="p12-unpublished">
         <div class="p12-unpublished-inner">
-          <div>
-            <h2>{{ label('publication_status', workbench.publication.status) }}</h2>
+          <div v-if="runBlocked" data-testid="p12-input-blocked">
+            <h2>数据缺失，今日建议暂停</h2>
+            <p>{{ runReceipt.input_block.detail }}；缺失成员：{{ (runReceipt.input_block.missing_members || []).join('、') }}。影响范围：{{ inputBlockScopeText }}；恢复条件：{{ runReceipt.input_block.recovery_condition }}。已有持仓照常显示持有，不因缺数生成卖出。</p>
+          </div>
+          <div v-else data-testid="p12-not-yet-generated">
+            <h2>今日建议尚未生成</h2>
             <p>{{ workbench.publication.market_date }} 收盘后的系统计划将于 {{ time(workbench.publication.published_at) }} 发布。发布前系统不展示未定稿的策略推荐；你可以直接查询真实 A 股行情并进行自主模拟操作。</p>
           </div>
           <form v-if="!isRehearsal" class="p12-lookup-inline" @submit.prevent="lookupSecurity()">
@@ -860,6 +871,19 @@ export default {
         this.workbench?.package?.source_ref?.ref_id || ''
       )
     },
+    runReceipt () {
+      return this.workbench?.run_receipt || null
+    },
+    runBlocked () {
+      return this.runReceipt?.status === 'INPUT_BLOCKED' && Boolean(this.runReceipt?.input_block)
+    },
+    inputBlockScopeText () {
+      const scope = this.runReceipt?.input_block?.affected_scope
+      return scope === 'new_entries' ? '暂停新增买入评估，持仓保持不变' : (scope || '受影响范围见回执')
+    },
+    isEmptyAdvice () {
+      return this.workbench?.run_receipt?.package?.admission_disposition === 'empty_advice'
+    },
     isEmptyPaperPackage () {
       return Boolean(
         this.workbench?.package?.source_ref?.ref_id === 'p12-paper-decisions' &&
@@ -1206,6 +1230,15 @@ export default {
       if (parts.length) return `今日重点：${parts.join('；')}。请先核对右侧任务并按顺序处理。`
       if (expiredCount > 0) {
         return `今日无可执行待办（原 ${expiredCount} 项建仓计划执行窗口已过，不再引导买入）。`
+      }
+      if (this.runBlocked) {
+        return '今日建议暂停：日线输入未通过资格校验，新增买入暂不评估；已有持仓照常显示，不因缺数卖出。'
+      }
+      if (this.workbench.publication?.retracted) {
+        return '本日盘后建议已被撤回：未确认计划不可再确认，已成交事实保留；下一份可执行建议为下一交易日盘后包。'
+      }
+      if (this.isEmptyAdvice && this.workbench.package) {
+        return '今天无须下单：已评估无合格新增候选；持仓与委托按计划窗口继续。'
       }
       if (this.workbench.action_blockers.length) {
         return '今日无系统推荐操作（日常策略准入待放行）；你可以自主查询真实股票并提交模拟限价委托。'

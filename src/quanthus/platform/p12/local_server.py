@@ -46,6 +46,7 @@ def build_local_kernel(
     users: dict[str, tuple[str, str]],
     clock: Callable[[], datetime] | None = None,
     paper_replay_fixture: Path | None = None,
+    daily_packages: bool = False,
     replay_tape: dict | None = None,
     replay_day: str | None = None,
     replay_source: str = "历史回放",
@@ -105,6 +106,12 @@ def build_local_kernel(
 
         paper_decisions = PaperReplayDecisionSource.from_path(
             paper_replay_fixture, system_clock
+        )
+    elif daily_packages:
+        from quanthus.p12_daily.package_source import PublishedPackageSource
+
+        paper_decisions = PublishedPackageSource(
+            state_dir, system_clock, mode="synthetic"
         )
     paper_app = build_paper_application(
         state_dir=state_dir,
@@ -200,6 +207,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--daily-packages",
+        action="store_true",
+        help=(
+            "bind the paper account to the published daily advice packages in "
+            "the state dir (written by quanthus.p12_daily.daily_job) instead "
+            "of the empty source"
+        ),
+    )
+    parser.add_argument(
         "--paper-replay",
         type=Path,
         default=None,
@@ -285,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
         users=users,
         clock=fixed_clock,
         paper_replay_fixture=args.paper_replay,
+        daily_packages=args.daily_packages,
         replay_tape=replay_tape,
         replay_day=args.replay_day,
         replay_source=args.replay_source,

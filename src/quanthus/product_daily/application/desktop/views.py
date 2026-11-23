@@ -68,6 +68,8 @@ class PublicationStatus:
     status: str
     market_date: date
     published_at: datetime
+    retracted: bool = False
+    retraction_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -146,6 +148,10 @@ class WorkbenchView:
     # Per-order ledger for the on-screen sell task: filled/remaining/finalization.
     orders: tuple[OrderRecord, ...]
     action_blockers: tuple[str, ...]
+    # Latest daily-run receipt for this account, when the runtime binds one:
+    # the workbench renders "input blocked" and "not yet generated" from it,
+    # kept strictly separate from the published package itself.
+    run_receipt: dict | None = None
 
 
 @dataclass(frozen=True)

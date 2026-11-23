@@ -181,6 +181,8 @@ def _publication(value: PublicationStatus) -> dict[str, Any]:
         "status": value.status,
         "market_date": value.market_date.isoformat(),
         "published_at": _ts(value.published_at),
+        "retracted": value.retracted,
+        "retraction_reason": value.retraction_reason,
     }
 
 
@@ -246,6 +248,56 @@ def _opportunity(value: OpportunityView) -> dict[str, Any]:
     }
 
 
+def _run_receipt(value: dict | None) -> dict | None:
+    """Project the stored run receipt onto the closed contract shape."""
+    if value is None:
+        return None
+    block = value.get("input_block")
+    package = value.get("package")
+    return {
+        "schema_version": str(value.get("schema_version") or ""),
+        "run_id": str(value.get("run_id") or ""),
+        "market_date": str(value.get("market_date") or ""),
+        "status": str(value.get("status") or ""),
+        "started_at": _ts(datetime.fromisoformat(str(value["started_at"])))
+        if value.get("started_at")
+        else "",
+        "elapsed_ms": int(value.get("elapsed_ms") or 0),
+        "runner": {
+            "ref_id": str((value.get("runner") or {}).get("ref_id") or ""),
+            "version": str((value.get("runner") or {}).get("version") or ""),
+            "digest": str((value.get("runner") or {}).get("digest") or ""),
+        },
+        "input_block": None
+        if block is None
+        else {
+            "reason_code": str(block.get("reason_code") or ""),
+            "detail": str(block.get("detail") or ""),
+            "affected_scope": str(block.get("affected_scope") or ""),
+            "missing_members": [str(x) for x in block.get("missing_members") or ()],
+            "recovery_condition": str(block.get("recovery_condition") or ""),
+        },
+        "package": None
+        if package is None
+        else {
+            "package_id": str(package.get("package_id") or ""),
+            "file_sha256": str(package.get("file_sha256") or ""),
+            "decision_count": int(package.get("decision_count") or 0),
+            "entry_plan_count": int(package.get("entry_plan_count") or 0),
+            "admission_disposition": str(package.get("admission_disposition") or ""),
+            "decision_set_digest": str(package.get("decision_set_digest") or ""),
+        },
+        "exclusions": [
+            {
+                "security_code": str(item.get("security_code") or ""),
+                "reason_code": str(item.get("reason_code") or ""),
+                "detail": str(item.get("detail") or ""),
+            }
+            for item in value.get("exclusions") or ()
+        ],
+    }
+
+
 def workbench_dto(value: WorkbenchView) -> dict[str, Any]:
     return _out(
         "Workbench",
@@ -278,6 +330,7 @@ def workbench_dto(value: WorkbenchView) -> dict[str, Any]:
                 for o in value.orders
             ],
             "action_blockers": list(value.action_blockers),
+            "run_receipt": _run_receipt(value.run_receipt),
         },
     )
 

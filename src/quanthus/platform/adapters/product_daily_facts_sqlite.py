@@ -1475,6 +1475,76 @@ class SQLiteSyntheticFactsAdapter:
             row["binding_digest"], json.loads(row["binding_json"]), row["recorded_at"]
         )
 
+
+
+    def migrate_configuration(
+        self,
+        context: SyntheticContext,
+        binding_digest: str,
+        binding: dict[str, object],
+        migration_record: dict[str, object],
+    ) -> ConfigurationBinding:
+        '''Append one decision-source migration to the bound configuration, once.
+
+        The account keeps a single binding row: the stored binding_json gains a
+        migrations list whose entries name each prior decision source, the
+        record that moved it, and when.  Re-running the same migration replays
+        the stored row; a second migration with different content appends
+        another entry instead of rewriting history.
+        '''
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._require_baseline(connection, context)
+                row = connection.execute(
+                    "SELECT * FROM configuration_bindings WHERE account_id=? AND mode=?",
+                    (context.account_id, context.mode),
+                ).fetchone()
+                if row is None:
+                    raise FactError(
+                        "CONFIGURATION_BINDING_MISMATCH",
+                        "no bound configuration to migrate; bind first",
+                    )
+                stored = json.loads(row["binding_json"])
+                migrations = list(stored.get("migrations") or [])
+                if row["binding_digest"] != binding_digest:
+                    already = any(
+                        item.get("binding_digest") == binding_digest for item in migrations
+                    )
+                    if not already:
+                        migrations.append(
+                            {
+                                "record": migration_record,
+                                "binding_digest": row["binding_digest"],
+                                "superseded_source": stored.get("decision_source"),
+                                "migrated_at": migration_record.get("migrated_at"),
+                            }
+                        )
+                    new_binding = dict(binding)
+                    new_binding["migrations"] = migrations
+                    connection.execute(
+                        "UPDATE configuration_bindings SET binding_digest=?, "
+                        "binding_json=? WHERE account_id=? AND mode=?",
+                        (
+                            binding_digest,
+                            json.dumps(new_binding, sort_keys=True),
+                            context.account_id,
+                            context.mode,
+                        ),
+                    )
+                out = connection.execute(
+                    "SELECT * FROM configuration_bindings WHERE account_id=? AND mode=?",
+                    (context.account_id, context.mode),
+                ).fetchone()
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+            return ConfigurationBinding(
+                out["binding_digest"], json.loads(out["binding_json"]), out["recorded_at"]
+            )
+
+
     def _history(self, connection: sqlite3.Connection, context: SyntheticContext) -> FactHistory:
         self._restore_order_states(connection, context)
         baseline = connection.execute(

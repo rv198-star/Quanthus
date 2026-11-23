@@ -1,0 +1,39 @@
+{
+ "schema_version": "quanthus.p12.daily-synthetic-candidates.v1",
+ "purpose": "Batch-A labelled synthetic replay candidates for the daily advice runner; never P11 strategy output.",
+ "candidates": [
+  {
+   "security_code": "600000",
+   "security_name": "浦发银行",
+   "industry_id": "SYN-IND-BANK",
+   "fraction": "0.5",
+   "mark_price": "10.60",
+   "price_bound": "10.75",
+   "support": "10.30",
+   "volume_baseline": 900000,
+   "volume_baseline_window": 20,
+   "invalidations": [
+    "开盘价高于价格上限时不追买",
+    "下一交易日收盘前未成交则本计划失效，次日重新评估",
+    "收盘跌破支撑时取消"
+   ],
+   "bars": [
+    {"session": "2026-11-19", "open": "10.20", "high": "10.35", "low": "10.15", "close": "10.30", "volume": 920000},
+    {"session": "2026-11-20", "open": "10.30", "high": "10.48", "low": "10.26", "close": "10.42", "volume": 1050000},
+    {"session": "2026-11-23", "open": "10.42", "high": "10.66", "low": "10.38", "close": "10.60", "volume": 1480000}
+   ]
+  },
+  {
+   "security_code": "000001",
+   "security_name": "平安银行",
+   "industry_id": "SYN-IND-BANK",
+   "fraction": "0.5",
+   "mark_price": "11.20",
+   "price_bound": "11.45",
+   "unqualified_reason": {
+    "reason_code": "STALE_MARKET_INPUT",
+    "detail": "synthetic single-security input defect: member evidence for 000001 not qualified"
+   }
+  }
+ ]
+}

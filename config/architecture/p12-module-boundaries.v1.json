@@ -52,6 +52,19 @@
       "note": "Paper-trading slice: real quotes, the versioned matching rule and the persistent simulated order book. It reaches the account ledger only through the application paper_* port, never private members."
     },
     {
+      "id": "p12_daily_runtime",
+      "package": "quanthus.p12_daily",
+      "path": "src/quanthus/p12_daily",
+      "may_import": [
+        "quanthus.shared",
+        "quanthus.capabilities",
+        "quanthus.product_daily.application",
+        "quanthus.platform.adapters",
+        "quanthus.p12_daily"
+      ],
+      "note": "Daily advice runtime orchestration: input qualification, the rule-execution port, the immutable package store, retraction append, the PublishedPackageSource reader and migration rehearsal. It reads the paper ledger through the platform adapter only to know current holdings when running rules; it never writes ledger facts."
+    },
+    {
       "id": "p12_entry_adapters",
       "package": "quanthus.platform.p12",
       "path": "src/quanthus/platform/p12",
@@ -63,6 +76,7 @@
         "quanthus.capabilities.execution",
         "quanthus.capabilities.funding",
         "quanthus.p12_paper",
+        "quanthus.p12_daily",
         "quanthus.capabilities.decision_access"
       ],
       "note": "HTTP/CLI/assembly translate the contract; capabilities.execution is admitted only for the trusted assembly context (see platform-domain-imports exception). p12_paper and capabilities.funding are admitted for the paper-trading assembly and the funding write path (R1)."

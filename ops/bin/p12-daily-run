@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Nightly P12 daily advice run for the isolated 8791 paper account.
+#
+# Resolves the market date from the bound base24 pointer's DATES index (the
+# latest qualified daily) unless P12_MARKET_DATE is pinned, and derives the
+# next session by skipping weekend days.  A trading-calendar edge (holiday)
+# is an operator-pinned P12_NEXT_SESSION; the job still records whichever
+# value it ran with inside the receipt.
+set -euo pipefail
+
+JOB_ROOT="$""{QUANTHUS_P12_DAILY_JOB_ROOT:-/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5}"
+STATE_DIR="$""{P12_STATE_DIR:-/var/lib/quanthus-p12-isolated}"
+ACCOUNT="$""{P12_ACCOUNT:-SYN-PAPER-A}"
+MARKET_DATE="$""{P12_MARKET_DATE:-}"
+NEXT_SESSION="$""{P12_NEXT_SESSION:-}"
+
+if [ -z "$MARKET_DATE" ]; then
+  MARKET_DATE="$(python3 - "$JOB_ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+dates = sorted(json.loads((root / "DATES.json").read_text()).get("dates", {}))
+if not dates:
+    raise SystemExit("no dates in DATES.json")
+print(dates[-1])
+PY
+)"
+fi
+
+if [ -z "$NEXT_SESSION" ]; then
+  NEXT_SESSION="$(python3 - "$MARKET_DATE" <<'PY'
+import sys
+from datetime import date, timedelta
+day = date.fromisoformat(sys.argv[1]) + timedelta(days=1)
+while day.weekday() >= 5:
+    day += timedelta(days=1)
+print(day.isoformat())
+PY
+)"
+fi
+
+exec python3 -m quanthus.p12_daily.daily_job \
+    --state-dir "$STATE_DIR" \
+    --job-root "$JOB_ROOT" \
+    --account "$ACCOUNT" \
+    --market-date "$MARKET_DATE" \
+    --next-session "$NEXT_SESSION"

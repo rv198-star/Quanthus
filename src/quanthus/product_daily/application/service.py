@@ -256,3 +256,18 @@ class SyntheticFactService:
 
     def configuration_binding(self, context: SyntheticContext) -> ConfigurationBinding | None:
         return self._port.configuration_binding(self._authorize(context))
+
+    def migrate_configuration(
+        self,
+        context: SyntheticContext,
+        binding_digest: str,
+        binding: dict[str, object],
+        migration_record: dict[str, object],
+    ) -> ConfigurationBinding:
+        migrate = getattr(self._port, "migrate_configuration", None)
+        if not callable(migrate):
+            raise FactError(
+                "CONFIGURATION_BINDING_MISMATCH",
+                "this fact store cannot migrate its bound decision source",
+            )
+        return migrate(self._authorize(context), binding_digest, binding, migration_record)

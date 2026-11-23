@@ -16,6 +16,7 @@ from quanthus.aggregator import (
     aggregate_score_and_map_action,
 )
 from quanthus.backtest.baseline_research import BaselineFeaturePanelReport, BaselineFeatureRow
+from quanthus.event_library.contracts import EventRecord
 from quanthus.expert_evaluation.serialization import canonical_json_bytes, digest_value
 from quanthus.expert_protocols import (
     ConstraintOutput,
@@ -32,7 +33,7 @@ from quanthus.expert_protocols import (
     run_scoring_expert,
     run_veto_expert,
 )
-from quanthus.expert_strategy.context import ExpertDecisionSubject, FormalExpertContext
+from quanthus.expert_strategy.context import FormalExpertContext
 from quanthus.expert_strategy.contracts import ExpertStrategyCard
 from quanthus.expert_strategy.position_risk import HeldPositionFacts, PositionRiskPolicy
 from quanthus.feature_registry import FeatureLineage, FeatureRegistry, FeatureSourceEvidence
@@ -55,7 +56,7 @@ def _context_ref(context: ExpertContext, evidence_id: str) -> ExpertEvidenceRef:
 
 def build_formal_expert_context(
     *,
-    event: ExpertDecisionSubject,
+    event: EventRecord,
     feature: BaselineFeatureRow | None,
     feature_registry: FeatureRegistry,
     panel_report: BaselineFeaturePanelReport,
@@ -74,7 +75,9 @@ def build_formal_expert_context(
     facts: list[FeatureFact] = []
     values = {
         "price.rsi14": None if feature is None else feature.rsi14,
-        "risk.realized_volatility20": (None if feature is None else feature.realized_volatility20),
+        "risk.realized_volatility20": (
+            None if feature is None else feature.realized_volatility20
+        ),
     }
     for feature_id in sorted(values):
         definition = feature_registry.active(feature_id)
@@ -286,7 +289,9 @@ class FormalStrategyDecision:
             "governance": self.governance.to_dict(),
             "action": self.action.to_dict(),
             "target_maximum_position": (
-                None if self.target_maximum_position is None else str(self.target_maximum_position)
+                None
+                if self.target_maximum_position is None
+                else str(self.target_maximum_position)
             ),
         }
 
@@ -319,7 +324,9 @@ class FormalStrategyRunner:
             minimum_entry_score=Decimal(str(aggregation["minimum_entry_score"])),
         )
         self.base_maximum_position = Decimal(str(position["base_trial_position_fraction"]))
-        self.intervention_ids = {str(item["intervention_id"]) for item in card.interventions}
+        self.intervention_ids = {
+            str(item["intervention_id"]) for item in card.interventions
+        }
 
     def _intervention_flags(self, intervention_id: str | None) -> tuple[bool, bool]:
         if intervention_id is not None and intervention_id not in self.intervention_ids:
@@ -428,7 +435,9 @@ class FormalStrategyRunner:
             _SystemGuardian(
                 allow=system_ready,
                 required_action=(RequiredAction.NONE if system_ready else RequiredAction.BLOCK_NEW),
-                reason_code=("entry_guardians_clear" if system_ready else "entry_guardian_blocked"),
+                reason_code=(
+                    "entry_guardians_clear" if system_ready else "entry_guardian_blocked"
+                ),
                 evidence_id=event_id,
             ),
             context,
@@ -486,7 +495,9 @@ class FormalStrategyRunner:
             ),
             context,
         )
-        base = run_constraint_expert(_BasePositionConstraint(self.base_maximum_position), context)
+        base = run_constraint_expert(
+            _BasePositionConstraint(self.base_maximum_position), context
+        )
         governance = aggregate_governance(
             context,
             (system, position.veto),
@@ -532,7 +543,9 @@ class FormalStrategyRunner:
             ),
             context,
         )
-        base = run_constraint_expert(_BasePositionConstraint(self.base_maximum_position), context)
+        base = run_constraint_expert(
+            _BasePositionConstraint(self.base_maximum_position), context
+        )
         governance = aggregate_governance(context, (system, position.veto), (base,))
         action = self._map_action(context, governance, (score,))
         return FormalStrategyDecision(

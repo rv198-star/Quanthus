@@ -1549,3 +1549,12 @@ def test_review_1bee_consumer_version_mismatch_refuses_loader(tmp_path):
     (tmp_path / path).write_text("# changed consumer source\n")
     with pytest.raises(ProductDailyError, match="consumer source differs"):
         resolve_p12_test_root(ROOT, str(tmp_path))
+
+
+def test_legacy_r7_frozen_implementation_remains_loadable():
+    from quanthus.r7_decision_review import load_request
+
+    # The shared entry/held adapter must preserve the original sealed consumer gate.
+    request = load_request(ROOT)
+    assert request["request_id"] == "RESEARCH-R7-MULTIOP-001"
+    assert request["decisions"]["entry_evidence_ready"] is False

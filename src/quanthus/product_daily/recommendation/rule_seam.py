@@ -28,7 +28,7 @@ from decimal import Decimal
 from enum import Enum
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import Any, cast
 
 from quanthus.backtest.baseline_research import (
     BaselineFeaturePanelReport,
@@ -524,8 +524,10 @@ class RuleSeamAdapter:
                 ) and prior_deterioration_sessions + 1 >= int(base["deterioration_sessions"]):
                     base_required_action = RequiredAction.FORCE_LIQUIDATE
                     base_reason_code = "base_structural_deterioration_exit"
+        # Preserve the sealed runner's EventRecord annotation. Its builder reads only
+        # ExpertDecisionSubject; the actual held object remains a HeldReviewSubject.
         ctx = build_formal_expert_context(
-            event=event,
+            event=cast(EventRecord, event),
             feature=feature,
             feature_registry=self.resources.feature_registry,
             panel_report=self.resources.panel_report,

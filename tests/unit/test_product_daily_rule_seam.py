@@ -1291,6 +1291,7 @@ def test_core_empty_advice_requires_an_actual_scan(tmp_path, runner, resources):
         ("mark_price", None),
         ("security_name", None),
         ("price_bound", None),
+        ("price_bound", Decimal("0.005")),
     ],
 )
 def test_review_1bee_bad_projection_is_local(tmp_path, runner, resources, field, value):

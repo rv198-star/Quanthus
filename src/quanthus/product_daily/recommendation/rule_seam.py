@@ -607,7 +607,7 @@ def _projection_issues(
             value = getattr(features, name)
             if not isinstance(value, str) or not value.strip():
                 fields.append(name)
-        if features.price_bound is None or features.price_bound <= 0:
+        if features.price_bound is None or features.price_bound < Decimal("0.01"):
             fields.append("price_bound")
     return tuple(dict.fromkeys(fields))
 

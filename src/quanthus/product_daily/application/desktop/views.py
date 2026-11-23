@@ -45,6 +45,12 @@ class PublishedPlan:
     reason_codes: tuple[str, ...]
     primary_constraint: str | None
     risk_check_ref: str
+    # Issue #719 R12: the pre-open facts this plan's conditions depend on
+    # (suspension/resumption, native limit price, call auction).  When a
+    # declared fact has no named supply, a confirm relying on it is refused
+    # with a typed unavailable reason; plans that depend on nothing are
+    # unaffected.
+    depends_on_preopen: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

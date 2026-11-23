@@ -334,3 +334,123 @@ def test_paper_application_reopen_still_rejects_tampered_digest(tmp_path):
             authorization=auth,
             now=lambda: day2,
         )
+
+
+class _Scope:
+    account_id = "SYN-P12-A"
+
+
+class _PlanStub:
+    def __init__(self, depends=()):
+        self.plan_id = "p-dep"
+        self.side = "buy"
+        self.security_code = "600000"
+        self.delta_qty = 100
+        self.price_cap = Decimal("10.80")
+        self.depends_on_preopen = tuple(depends)
+
+
+class _PreopenProjection:
+    cash = Decimal("1000000.00")
+    positions = ()
+
+    def quantity(self, code):
+        return 0
+
+
+class _PreopenHistory:
+    reports = ()
+    facts = ()
+
+
+class _PreopenAppStub:
+    """Minimal desktop-app stub for the R12 pre-open confirm gate."""
+
+    scope = _Scope()
+
+    def __init__(self, plan, facts=None):
+        self._plan = plan
+        self._facts = facts or {}
+
+    def paper_current_plan(self, plan_id):
+        return self._plan if plan_id == self._plan.plan_id else None
+
+    def preopen_fact_for(self, security_code, fact):
+        return self._facts.get((security_code, fact))
+
+    def paper_projection(self):
+        return _PreopenProjection()
+
+    def paper_history(self):
+        return _PreopenHistory()
+
+    def paper_bucket_capacity_for(self, security_code):
+        return True
+
+    def paper_submit_order_observation(self, observation, **kwargs):
+        class _R:
+            status = "POSTED"
+            receipt_id = "receipt-1"
+
+        return _R()
+
+    def paper_submit_report(self, report):
+        class _R:
+            status = "POSTED"
+            receipt_id = "receipt-1"
+
+        return _R()
+
+
+def _preopen_account(tmp_path, plan, facts=None):
+    box = [datetime(2026, 11, 19, 14, 0, 0, tzinfo=SHANGHAI)]
+    now = _clock(box)
+    qbox = [_quote("10.66", box[0])]
+    store = PaperOrderStore(tmp_path / "paper.sqlite", clock=now)
+    app = _PreopenAppStub(plan, facts)
+    return PaperAccount(app=app, store=store, quotes=_quotes(now, qbox), now=now)
+
+
+def test_preopen_dependency_blocked_when_fact_unavailable(tmp_path):
+    """R12: a plan depending on suspension fact is refused with the typed
+    unavailable reason when no named supply attests it."""
+    plan = _PlanStub(depends=("SUSPENSION",))
+    a = _preopen_account(tmp_path, plan, facts={})
+    out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 100, Decimal("10.80")))
+    assert out.status == "rejected"
+    assert out.reason_code == "PREOPEN_SUSPENSION_UNAVAILABLE"
+
+
+def test_preopen_dependency_blocked_each_fact_kind(tmp_path):
+    """R12: the three pre-open fact kinds each gate with a typed reason."""
+    for fact, reason in (
+        ("SUSPENSION", "PREOPEN_SUSPENSION_UNAVAILABLE"),
+        ("LIMIT_PRICE", "PREOPEN_LIMIT_PRICE_UNAVAILABLE"),
+        ("AUCTION", "PREOPEN_AUCTION_UNAVAILABLE"),
+    ):
+        plan = _PlanStub(depends=(fact,))
+        sub = tmp_path / fact
+        sub.mkdir(parents=True, exist_ok=True)
+        a = _preopen_account(sub, plan, facts={})
+        out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 100, Decimal("10.80")))
+        assert out.status == "rejected"
+        assert out.reason_code == reason, fact
+
+
+def test_preopen_dependency_passes_when_fact_supplied(tmp_path):
+    """R12: a supplied pre-open fact lets the dependent confirm proceed."""
+    plan = _PlanStub(depends=("SUSPENSION",))
+    a = _preopen_account(
+        tmp_path, plan, facts={("600000", "SUSPENSION"): True}
+    )
+    out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 100, Decimal("10.80")))
+    assert out.status != "rejected"
+    assert out.reason_code != "PREOPEN_SUSPENSION_UNAVAILABLE"
+
+
+def test_plan_without_preopen_dependency_unaffected(tmp_path):
+    """R12: a plan that declares no pre-open fact is never gated."""
+    plan = _PlanStub(depends=())
+    a = _preopen_account(tmp_path, plan, facts={})
+    out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 100, Decimal("10.80")))
+    assert out.reason_code != "PREOPEN_SUSPENSION_UNAVAILABLE"

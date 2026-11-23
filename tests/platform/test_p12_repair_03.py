@@ -63,11 +63,15 @@ def test_reads_before_publication_expose_no_candidate_identity(tmp_path, attribu
     for endpoint in ("workbench", "records"):
         body = _read(kernel, headers, endpoint)
         assert body["package"] is None
-        assert body["publication"] == {
-            "status": "NOT_YET_PUBLISHED",
-            "market_date": "2026-11-18",
-            "published_at": "2026-11-18T18:30:00+08:00",
-        }
+        publication = body["publication"]
+        assert publication["status"] == "NOT_YET_PUBLISHED"
+        assert publication["market_date"] == "2026-11-18"
+        assert publication["published_at"] == "2026-11-18T18:30:00+08:00"
+        # next_check_at is an optional additive field (issue #721 R15), never
+        # a candidate identity; only its presence/shape is checked here.
+        assert set(publication).issubset(
+            {"status", "market_date", "published_at", "retracted", "retraction_reason", "next_check_at"}
+        )
         serialized = json.dumps(body, ensure_ascii=False)
         leaked = [marker for marker in CANDIDATE_MARKERS if marker in serialized]
         assert leaked == [], (endpoint, leaked)

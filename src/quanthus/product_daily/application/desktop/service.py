@@ -570,6 +570,11 @@ class P12DesktopApplication:
                     reason_codes=sizing.reason_codes,
                     primary_constraint=sizing.primary_reason,
                     risk_check_ref=sizing.decision_digest,
+                    depends_on_preopen=tuple(
+                        marker.split(":", 1)[1]
+                        for marker in item.entry.invalidations
+                        if str(marker).startswith("requires:PREOPEN_")
+                    ),
                 )
             )
         body = {
@@ -2140,6 +2145,29 @@ class P12DesktopApplication:
         if remaining <= 0:
             return None
         return dataclasses.replace(plan, delta_qty=remaining)
+
+    def preopen_fact_for(self, security_code: str, fact: str):
+        """Resolve one pre-open fact for a confirm-the-suggestion check (R12).
+
+        Returns True only when a named supply attests the fact for this
+        security and trading day; returns None/False when no named supply is
+        bound, which makes any confirm that depends on it fail closed with
+        the typed unavailable reason.  The desktop never infers a fact from a
+        zero-volume bar, a last price or the prior session state.
+        """
+        provider = getattr(self, "_preopen_facts", None)
+        if callable(provider):
+            return provider(security_code, fact)
+        return None
+
+    def bind_preopen_facts(self, provider) -> None:
+        """Bind the named pre-open fact supply used by the R12 confirm gates.
+
+        The provider maps (security_code, fact) -> True when a named supply
+        attests the fact; any other result means the fact is unavailable and
+        a dependent confirm is refused.  Absent a bound supply every declared
+        fact reads unavailable."""
+        self._preopen_facts = provider
 
     def rebuild_matches(self, scope: AccountScope) -> bool:
         """Deterministic rebuild from baseline + events equals the stored projection."""

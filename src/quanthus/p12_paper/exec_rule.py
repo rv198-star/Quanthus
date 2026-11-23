@@ -52,6 +52,12 @@ REJECT = {
     "INVALID_ORDER": "order field is invalid",
     "PLAN_NOT_FOUND": "the referenced plan is not currently effective",
     "ORDER_CONTEXT_MISMATCH": "the order disagrees with the plan's side or security",
+    # Issue #719 R12: typed unavailable gates for the pre-open facts a plan's
+    # conditions may depend on; never inferred from a zero-volume bar, a last
+    # price or the prior session state.
+    "PREOPEN_SUSPENSION_UNAVAILABLE": "suspension/resumption fact for this plan has no named supply",
+    "PREOPEN_LIMIT_PRICE_UNAVAILABLE": "native limit-price fact for this plan has no named supply",
+    "PREOPEN_AUCTION_UNAVAILABLE": "call-auction fact for this plan has no named supply",
 }
 
 ORDER_STATUS = {

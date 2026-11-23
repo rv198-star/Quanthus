@@ -7,7 +7,7 @@ from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
 SCHEMA_VERSION = 'p12.desktop.v1'
-SCHEMA_DIGEST = 'sha256:3f11ff4066b6e2dd5369d8d32d7beab46ebf249b744bf81f84663fe418ea4803'
+SCHEMA_DIGEST = 'sha256:0a7c2c70a354b55b6d5258af7d79db8f5b3188a8aa92e367aab4d6c0f9f6b8a2'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -105,6 +105,9 @@ REASON_TEXTS: dict[str, str] = {'ACCOUNT_NOT_ADMITTED': '该账户未对当前�
  'POSITION_COOLDOWN': '仍在冷却期',
  'POSITION_MISMATCH': '持仓与来源记录不一致',
  'POSSIBLE_DUPLICATE': '可能重复登记',
+ 'PREOPEN_AUCTION_UNAVAILABLE': '该计划依赖的集合竞价事实暂无具名供给，确认已阻断',
+ 'PREOPEN_LIMIT_PRICE_UNAVAILABLE': '该计划依赖的原生涨跌停价暂无具名供给，确认已阻断',
+ 'PREOPEN_SUSPENSION_UNAVAILABLE': '该计划依赖的停复牌事实暂无具名供给，确认已阻断',
  'PRICE_DEVIATION': '成交价高于计划上限',
  'QUANTITY_DEVIATION': '成交数量与计划不同',
  'RECONCILIATION_PENDING': '有记录待核对',
@@ -956,6 +959,9 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                          'POSITION_COOLDOWN',
                          'POSITION_MISMATCH',
                          'POSSIBLE_DUPLICATE',
+                         'PREOPEN_AUCTION_UNAVAILABLE',
+                         'PREOPEN_LIMIT_PRICE_UNAVAILABLE',
+                         'PREOPEN_SUSPENSION_UNAVAILABLE',
                          'PRICE_DEVIATION',
                          'QUANTITY_DEVIATION',
                          'RECONCILIATION_PENDING',

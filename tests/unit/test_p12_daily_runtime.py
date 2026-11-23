@@ -416,6 +416,104 @@ def test_history_gate_failure_blocks(tmp_path):
     assert receipt["input_block"]["missing_members"] == ["history.feature_warmup_61"]
 
 
+def _reshash_manifest(prod, market_date, mutate):
+    """Rewrite a manifest member and re-hash it through index and pointer."""
+    meta = make_product(prod, market_date)
+    manifest_path = meta["core"] / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    mutate(manifest)
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True))
+    core_sha = _sha(manifest_path.read_bytes())
+    index_path = prod / "DATES.json"
+    index = json.loads(index_path.read_text())
+    index["dates"][market_date]["core_manifest_sha256"] = core_sha
+    index_path.write_text(json.dumps(index, sort_keys=True))
+    pointer_path = prod / "CURRENT_DAILY_CORE_BASE24.json"
+    pointer = json.loads(pointer_path.read_text())
+    pointer["index_sha256"] = _sha(index_path.read_bytes())
+    pointer["entry"]["core_manifest_sha256"] = core_sha
+    pointer_path.write_text(json.dumps(pointer))
+
+
+def _run_and_receipt(state, prod, candidates=None):
+    runner = SyntheticRuleRunner(
+        candidates=candidates if candidates is not None else (one_candidate(),)
+    )
+    return run_daily(
+        state_dir=state,
+        job_root=prod,
+        runner=runner,
+        market_date=MARKET_DATE,
+        next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A",
+        now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(),
+    )
+
+
+def test_history_feature_warmup_valid_bar_gap_blocks(tmp_path):
+    """R8: a 60-day warmup window missing one valid bar is explicit evidence.
+
+    The member reaches the 61-session count but carries an evidence gap reason
+    (one valid bar absent in the recent window); the gate fails closed and the
+    reason is preserved on the run receipt."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+
+    def mutate(manifest):
+        manifest["history"]["feature_warmup_sessions"] = {
+            "observed_sessions": 80,
+            "unavailable_reason": (
+                "近 60 日特征窗口缺一条有效 bar，证据缺口未修复"
+            ),
+        }
+
+    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate)
+    receipt = _run_and_receipt(state, prod)
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert "history.feature_warmup_61" in receipt["input_block"]["missing_members"]
+    gate = next(
+        g
+        for g in receipt["history_gates"]
+        if g["gate_id"] == "history.feature_warmup_61"
+    )
+    assert gate["observed_sessions"] == 80
+    assert "有效 bar" in (gate["unavailable_reason"] or "")
+
+
+def test_history_listing_floor_corporate_action_anomaly_blocks(tmp_path):
+    """R8: a corporate-action anomaly inside the 61-day window is evidence.
+
+    The listing floor reaches 120 sessions but the member records a recent
+    corporate-action anomaly; the gate fails closed and the reason rides the
+    receipt rather than being dropped."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+
+    def mutate(manifest):
+        manifest["history"]["listing_sessions"] = {
+            "observed_sessions": 200,
+            "unavailable_reason": (
+                "近 61 日存在公司行为异常，上市满 120 日仍需按成员证据阻断"
+            ),
+        }
+
+    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate)
+    receipt = _run_and_receipt(state, prod)
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert "history.listing_floor_120" in receipt["input_block"]["missing_members"]
+    gate = next(
+        g
+        for g in receipt["history_gates"]
+        if g["gate_id"] == "history.listing_floor_120"
+    )
+    assert gate["observed_sessions"] == 200
+    assert "公司行为异常" in (gate["unavailable_reason"] or "")
+
+
 def test_missing_calendar_blocks(tmp_path):
     """Without the governed calendar member the run cannot fix next_session."""
     prod = tmp_path / "job"

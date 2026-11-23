@@ -470,6 +470,24 @@ class PaperAccount:
                 quantity=plan.delta_qty,
                 limit_price=plan.price_cap,
             )
+            # Issue #719 R12: typed unavailable gates for the pre-open facts
+            # this plan's conditions declare (suspension/resumption, native
+            # limit price, call auction).  A declared fact with no named
+            # supply refuses the confirm with its typed reason; the fact is
+            # never inferred from a zero-volume bar, a last price or the
+            # prior session state.  A plan that depends on nothing is
+            # unaffected.
+            for fact in getattr(plan, "depends_on_preopen", ()) or ():
+                provider = getattr(self._app, "preopen_fact_for", None)
+                available = (
+                    provider(plan.security_code, fact) if callable(provider) else None
+                )
+                if available is not True:
+                    return self._reject(
+                        command,
+                        f"PREOPEN_{fact}_UNAVAILABLE",
+                        None,
+                    )
 
         quote = self._quotes.quote(command.security_code)
 

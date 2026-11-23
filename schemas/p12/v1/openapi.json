@@ -82,7 +82,10 @@
   "VALUATION_UNAVAILABLE": "缺少估值价格",
   "WAITING_FOR_PULLBACK": "等待回落到更合适的价位",
   "FUNDING_NO_FREE_BUCKET": "没有可用的资金桶，需先卖出持仓或腾出一个桶",
-  "FUNDING_PENDING_ATTRIBUTION": "有成交的资金归属待核对"
+  "FUNDING_PENDING_ATTRIBUTION": "有成交的资金归属待核对",
+  "PREOPEN_SUSPENSION_UNAVAILABLE": "该计划依赖的停复牌事实暂无具名供给，确认已阻断",
+  "PREOPEN_LIMIT_PRICE_UNAVAILABLE": "该计划依赖的原生涨跌停价暂无具名供给，确认已阻断",
+  "PREOPEN_AUCTION_UNAVAILABLE": "该计划依赖的集合竞价事实暂无具名供给，确认已阻断"
  },
  "x-quanthus-labels": {
   "mode": {
@@ -2288,6 +2291,9 @@
      "POSITION_COOLDOWN",
      "POSITION_MISMATCH",
      "POSSIBLE_DUPLICATE",
+     "PREOPEN_AUCTION_UNAVAILABLE",
+     "PREOPEN_LIMIT_PRICE_UNAVAILABLE",
+     "PREOPEN_SUSPENSION_UNAVAILABLE",
      "PRICE_DEVIATION",
      "QUANTITY_DEVIATION",
      "RECONCILIATION_PENDING",

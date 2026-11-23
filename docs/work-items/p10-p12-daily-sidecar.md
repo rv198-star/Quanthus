@@ -7,7 +7,7 @@
 | Design status | approved for the bounded metadata scope accepted by P11 |
 | Delivery gate | open; isolated candidate, independent review and consumer binding pending |
 | Baseline | origin/main b995967655cb7ed2265f6eca1a1e2c27fb84f3e3 |
-| Runtime | p10-daily-consumer-sidecar-runtime-v1.1, src/quanthus/p10_daily_sidecar.py |
+| Runtime | p10-daily-consumer-sidecar-runtime-v2.1, src/quanthus/p10_daily_sidecar.py |
 | Tests | tests/unit/test_p10_daily_sidecar.py |
 | Request | [finite engineering request](../../config/pipelines/p10-daily-sidecar-engineering.v1.json) |
 
@@ -168,3 +168,33 @@ Independent source/publisher loading, P11/P12 actual receipts and consumer quali
 node acceptance and any production deployment remain the next scoped integration steps.
 Focused repair probes and full exact-closure check receipts are retained externally under
 quanthus-p10-sidecar-audit-repair-003; no market-row read or new source endpoint is involved.
+
+## Repaired independent session successor
+
+The retained PR730/2a6f5eee session candidate is superseded by this successor based on
+30503b92, preserving both old Git trees, audit evidence and branch-local checkpoints. Only
+the prior product changes/maps are reused; a fresh checkpoint records this new closure.
+No prior checkpoint is rewritten or imported with an altered timestamp.
+
+M2v3 SHA e50e6396aeca56e574da379ada96ab0a69bb939377fedbcd7025eef074d7c892 and rule-addendum
+SHA10a87a3f86259869d70f272ffac9b84f03c6c3ed14e8c4dab0020f7bf82057fe map to the retained
+[M2v3 candidate](../../config/pipelines/p10-p12-member-map.m2-v3.json) and
+[source inventory](../../config/pipelines/p10-session-source-map.rules-20260706.v1.json).
+
+Consumer MeasureRequirement freezes actual measures and FULL_DAY vs regular quantity use.
+The opt-in v2 member session fields and effective-scope/vendor/calendar/rule evidence enter
+complete verification identity. Combined bounded session configs use v2.1, unbounded v2 and
+v1/v1.1 remain byte-compatible. SOURCE_OBSERVED stays qualification-blocked in all versions;
+synthetic session probes stay TEST_ONLY. Atomic verified envelopes and exact whole-version
+withdrawal therefore include the full session metadata too.
+
+Price close remains15:00; only applicable FULL_DAY volume/turnover members require explicit
+quantity observation end at least15:30 and real source/publication/visible clocks no earlier.
+None is UNKNOWN; NOT_APPLICABLE needs named evidence; no latency buffer is invented.
+Reference and explicitly price-only dependencies remain separate.
+
+Vendor after-hours inclusion is UNKNOWN. The independent after_hours_tdx product is not added
+to daily totals; its amount is price x quantity, derived. Native core limits are NULL. Final
+pool, field/source members, industry/action/exception facts and real clocks remain unbound;
+#727 is blocked. P11 owns window/regime comparability and algorithms, P12 physical/account
+consumption. This successor adds no source collection, strategy or publisher deployment.

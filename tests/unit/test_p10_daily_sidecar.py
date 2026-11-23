@@ -10,8 +10,10 @@ import pytest
 
 from quanthus.p10_daily_sidecar import (
     SCHEMA,
+    SESSION_SCHEMA,
     ConsumerConfig,
     InputVerification,
+    MeasureRequirement,
     ResourceLimits,
     SidecarError,
     SidecarStore,
@@ -734,3 +736,306 @@ def test_partial_clock_still_rejects_known_impossible_causality():
     seal(record)
     with pytest.raises(SidecarError, match="MEMBER_CAUSALITY"):
         assess(record, cfg, receipt)
+
+
+def test_bounded_session_config_roundtrip_and_store_share_full_identity(tmp_path):
+    record, cfg, _ = session_specimen()
+    cfg = replace(
+        cfg,
+        resource_limits=ResourceLimits(
+            "session-day1-test-v1", max_members=2, max_record_bytes=262144
+        ),
+    )
+    record["binding"]["m0_ref"] = cfg.identity
+    record, cfg, receipt = reseal_session(record, cfg)
+    assert cfg.to_dict()["schema"].endswith(".v2.1")
+    assert ConsumerConfig.from_dict(cfg.to_dict()) == cfg
+    store = SidecarStore(tmp_path / "bounded-session", cfg, protected_roots=[])
+    assert store.append(record, receipt)
+    assert not assess(record, cfg, receipt).blockers
+
+
+def test_whole_session_withdrawal_cannot_change_applicability_identity():
+    record, cfg, _ = session_specimen()
+    new = withdraw(record)
+    session_meta(new)["applicability"]["rule_sha256"] = sha("5")
+    new, cfg, receipt = reseal_session(new, cfg)
+    with pytest.raises(SidecarError, match="WITHDRAWAL_INVENTORY_MISMATCH"):
+        assess(new, cfg, receipt, previous=record)
+
+
+def session_specimen(*, price_only=False):
+    req = MeasureRequirement(
+        "bars",
+        ("close",) if price_only else ("close", "turnover", "volume"),
+        "NOT_REQUESTED" if price_only else "FULL_DAY",
+    )
+    cfg = replace(config(), config_id="test-session-v2", measure_requirements=(req,))
+    record, _, _ = specimen(cfg)
+    record["schema"] = SESSION_SCHEMA
+    for member in record["members"]:
+        member["session"] = None
+    record["members"][0]["session"] = {
+        "session_scope": "REGULAR_AND_APPLICABLE_AFTER_HOURS",
+        "volume_basis": "FULL_DAY",
+        "official_price_close_anchor": "2026-11-24T15:00:00+08:00",
+        "full_day_volume_amount_observation_end": "2026-11-24T15:30:00+08:00",
+        "vendor_scope_evidence": {"uri": "fixture:vendor-definition", "sha256": sha("9")},
+        "applicability": {
+            "venue_mic": "XSHG",
+            "board": "SSE_main",
+            "security_scope_sha256": sha("b"),
+            "effective_start": "2026-07-06",
+            "effective_end": None,
+            "after_hours": "APPLIES",
+            "calendar_sha256": sha("7"),
+            "rule_sha256": sha("8"),
+            "evidence": {"uri": "fixture:scoped-rule", "sha256": sha("6")},
+        },
+    }
+    return reseal_session(record, cfg)
+
+
+def reseal_session(record, cfg):
+    record["publication"]["covered_inventory_sha256"] = inventory_digest(record["members"])
+    return seal(record), cfg, verification(record, cfg)
+
+
+def session_meta(record):
+    return record["members"][0]["session"]
+
+
+def test_session_v2_accepts_explicit_complete_volume_and_keeps_v1_shape():
+    record, cfg, receipt = session_specimen()
+    assert assess(record, cfg, receipt).disposition == "TEST_ONLY"
+    assert ConsumerConfig.from_dict(cfg.to_dict()) == cfg
+    assert "measure_requirements" not in config().to_dict()
+    assert config().to_dict()["schema"].endswith(".v1")
+
+
+@pytest.mark.parametrize(
+    "field", ["full_day_volume_amount_observation_end", "applicability", "vendor_scope_evidence"]
+)
+def test_missing_quantity_metadata_stays_unknown(field):
+    record, cfg, _ = session_specimen()
+    session_meta(record)[field] = None
+    record, cfg, receipt = reseal_session(record, cfg)
+    result = assess(record, cfg, receipt)
+    assert "HARD_MEMBER_BLOCKED:bars" in result.blockers
+    assert any("UNKNOWN" in reason for _, reasons in result.member_blockers for reason in reasons)
+
+
+@pytest.mark.parametrize(
+    "basis,scope",
+    [
+        ("UNKNOWN", "UNKNOWN"),
+        ("REGULAR_ONLY", "REGULAR_ONLY"),
+        ("INDEPENDENT_AFTER_HOURS", "AFTER_HOURS_ONLY"),
+    ],
+)
+def test_non_full_day_quantity_cannot_satisfy_full_day_config(basis, scope):
+    record, cfg, _ = session_specimen()
+    session_meta(record).update(volume_basis=basis, session_scope=scope)
+    record, cfg, receipt = reseal_session(record, cfg)
+    result = assess(record, cfg, receipt)
+    assert result.disposition == "TEST_ONLY"
+    assert "VOLUME_BASIS_NOT_FULL_DAY" in dict(result.member_blockers)["bars"]
+
+
+def test_full_day_volume_claim_at_price_close_is_incomplete():
+    record, cfg, _ = session_specimen()
+    session_meta(record)["full_day_volume_amount_observation_end"] = "2026-11-24T15:00:00+08:00"
+    record, cfg, receipt = reseal_session(record, cfg)
+    assert (
+        "FULL_DAY_VOLUME_WINDOW_INCOMPLETE"
+        in dict(assess(record, cfg, receipt).member_blockers)["bars"]
+    )
+
+
+def test_source_clock_must_follow_full_volume_observation():
+    record, cfg, _ = session_specimen()
+    record["members"][0]["source_available_at"] = clock(
+        "15:00:00", "source_artifact_known", "source"
+    )
+    record, cfg, receipt = reseal_session(record, cfg)
+    assert (
+        "SOURCE_PRECEDES_VOLUME_COMPLETENESS"
+        in dict(assess(record, cfg, receipt).member_blockers)["bars"]
+    )
+
+
+def test_full_volume_publication_and_visibility_cannot_precede_completion():
+    record, cfg, _ = session_specimen()
+    for member in record["members"]:
+        member["source_available_at"] = clock("15:00:00", "source_artifact_known", "source")
+        member["validated_at"] = clock("15:01:00", "validation_complete", "verified")
+        member["available_at"] = clock("15:03:00", "consumer_channel_visible", "members-visible")
+    record["publication"].update(
+        published_at=clock("15:02:00", "publication_commit", "published"),
+        visible_at=clock("15:04:00", "consumer_channel_visible", "event-visible"),
+    )
+    record, cfg, receipt = reseal_session(record, cfg)
+    receipt = replace(receipt, start="2026-11-24T15:01:00+08:00", end="2026-11-24T15:01:00+08:00")
+    assert {
+        "PUBLICATION_PRECEDES_VOLUME_COMPLETENESS",
+        "AVAILABLE_PRECEDES_VOLUME_COMPLETENESS",
+    } <= set(dict(assess(record, cfg, receipt).member_blockers)["bars"])
+
+
+def test_early_calendar_and_price_only_use_are_independent_of_quantity_floor():
+    record, cfg, _ = session_specimen(price_only=True)
+    session_meta(record).update(
+        session_scope="UNKNOWN",
+        volume_basis="UNKNOWN",
+        applicability=None,
+        full_day_volume_amount_observation_end=None,
+        vendor_scope_evidence=None,
+    )
+    record["members"][1]["source_available_at"] = clock(
+        "08:00:00", "source_artifact_known", "source"
+    )
+    record, cfg, receipt = reseal_session(record, cfg)
+    assert not assess(record, cfg, receipt).blockers
+
+
+def test_not_applicable_needs_named_scope_evidence_and_explicit_volume_end():
+    record, cfg, _ = session_specimen()
+    session_meta(record)["applicability"]["after_hours"] = "NOT_APPLICABLE"
+    session_meta(record)["full_day_volume_amount_observation_end"] = "2026-11-24T15:00:00+08:00"
+    record, cfg, receipt = reseal_session(record, cfg)
+    assert not assess(record, cfg, receipt).blockers
+    session_meta(record)["applicability"]["evidence"] = None
+    record, cfg, receipt = reseal_session(record, cfg)
+    with pytest.raises(SidecarError, match="INVALID_SESSION_EVIDENCE"):
+        assess(record, cfg, receipt)
+
+
+def test_session_scope_changes_invalidate_verified_input_and_inventory_identity():
+    record, cfg, old_receipt = session_specimen()
+    old_inventory = record["publication"]["covered_inventory_sha256"]
+    session_meta(record)["applicability"]["rule_sha256"] = sha("5")
+    record, cfg, _ = reseal_session(record, cfg)
+    assert old_inventory != record["publication"]["covered_inventory_sha256"]
+    with pytest.raises(SidecarError, match="VERIFICATION_IDENTITY_MISMATCH"):
+        assess(record, cfg, old_receipt)
+
+
+def test_publisher_cannot_downgrade_v2_consumer_to_v1():
+    record, cfg, receipt = session_specimen()
+    record["schema"] = SCHEMA
+    seal(record)
+    with pytest.raises(SidecarError, match="SESSION_CONFIG_VERSION_MISMATCH"):
+        assess(record, cfg, receipt)
+
+
+def test_session_v2_append_retry_and_asof_reuse_the_same_store(tmp_path):
+    record, cfg, receipt = session_specimen()
+    store = SidecarStore(tmp_path / "v2-store", cfg, protected_roots=[tmp_path / "sources"])
+    assert store.append(record, receipt)
+    assert not store.append(record, receipt)
+    assert (
+        select(store.read(), cfg, {record["record_id"]: receipt}).record_id == record["record_id"]
+    )
+
+
+def test_exact_volume_end_is_accepted_without_an_invented_latency_buffer():
+    record, cfg, _ = session_specimen()
+    for member in record["members"]:
+        member["source_available_at"] = clock("15:30:00", "source_artifact_known", "source")
+        member["validated_at"] = clock("15:30:00", "validation_complete", "verified")
+        member["available_at"] = clock("15:30:00", "consumer_channel_visible", "members-visible")
+    record["publication"].update(
+        published_at=clock("15:30:00", "publication_commit", "published"),
+        visible_at=clock("15:30:00", "consumer_channel_visible", "event-visible"),
+    )
+    record, cfg, receipt = reseal_session(record, cfg)
+    receipt = replace(receipt, start="2026-11-24T15:30:00+08:00", end="2026-11-24T15:30:00+08:00")
+    assert not assess(record, cfg, receipt).blockers
+
+
+def test_pre_expansion_day_requires_explicit_applicability_instead_of_global_date_rule():
+    record, cfg, _ = session_specimen()
+    record = json.loads(json.dumps(record).replace("2026-11-24", "2026-07-03"))
+    meta = session_meta(record)
+    meta["full_day_volume_amount_observation_end"] = "2026-07-03T15:00:00+08:00"
+    meta["applicability"].update(
+        effective_start="1900-01-01", effective_end="2026-07-05", after_hours="NOT_APPLICABLE"
+    )
+    record, cfg, receipt = reseal_session(record, cfg)
+    receipt = replace(receipt, start="2026-07-03T18:30:00+08:00", end="2026-07-03T18:30:00+08:00")
+    assert not assess(record, cfg, receipt).blockers
+    meta["applicability"] = None
+    record, cfg, receipt = reseal_session(record, cfg)
+    receipt = replace(receipt, start="2026-07-03T18:30:00+08:00", end="2026-07-03T18:30:00+08:00")
+    assert (
+        "AFTER_HOURS_APPLICABILITY_UNKNOWN"
+        in dict(assess(record, cfg, receipt).member_blockers)["bars"]
+    )
+
+
+def test_named_applicability_outside_effective_scope_stays_blocked():
+    record, cfg, _ = session_specimen()
+    session_meta(record)["applicability"]["effective_end"] = "2026-11-23"
+    record, cfg, receipt = reseal_session(record, cfg)
+    assert (
+        "SESSION_EFFECTIVE_SCOPE_MISMATCH"
+        in dict(assess(record, cfg, receipt).member_blockers)["bars"]
+    )
+
+
+def test_required_volume_member_cannot_hide_its_session_annotation():
+    record, cfg, _ = session_specimen()
+    record["members"][0]["session"] = None
+    record, cfg, receipt = reseal_session(record, cfg)
+    assert "SESSION_METADATA_UNKNOWN" in dict(assess(record, cfg, receipt).member_blockers)["bars"]
+
+
+@pytest.mark.parametrize(
+    "board,day,expected",
+    [
+        ("SSE_main", "2026-07-03", "5.0"),
+        ("SSE_main", "2026-07-06", "10.0"),
+        ("SZ_main", "2026-07-03", "5.0"),
+        ("SZ_main", "2026-07-06", "10.0"),
+        ("ChiNext", "2026-07-03", "20.0"),
+        ("ChiNext", "2026-07-06", "20.0"),
+        ("STAR", "2026-07-03", "20.0"),
+        ("STAR", "2026-07-06", "20.0"),
+    ],
+)
+def test_existing_price_limit_v2_scopes_main_st_change_without_rewriting_other_boards(
+    board, day, expected
+):
+    from decimal import Decimal
+
+    from quanthus.price_limits import resolve_price_limit_policy
+
+    policy = json.loads(
+        (Path(__file__).resolve().parents[2] / "config/price-limit.v2.json").read_text()
+    )
+    decision = resolve_price_limit_policy(
+        board=board,
+        market_date=day,
+        status_known=True,
+        is_st_class=True,
+        listing_window_rule=None,
+        eligible_session_index=200,
+        ipo_window_sessions=5,
+        observed_tradestatus="1",
+        prior_trading_close=Decimal("10"),
+        policy=policy,
+    )
+    assert decision.upper_limit_pct == Decimal(expected)
+    unknown = resolve_price_limit_policy(
+        board=board,
+        market_date=day,
+        status_known=False,
+        is_st_class=True,
+        listing_window_rule=None,
+        eligible_session_index=200,
+        ipo_window_sessions=5,
+        observed_tradestatus="1",
+        prior_trading_close=Decimal("10"),
+        policy=policy,
+    )
+    assert not unknown.entry_policy_allows

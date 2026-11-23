@@ -164,20 +164,21 @@ def _receipt(
     candidates: tuple[CandidateSignal, ...] = (),
     qualified: int = 0,
     evaluated: int | None = None,
-    completed_at: datetime = datetime(2026, 11, 20, 18, 5, tzinfo=TZ),
+    completed_at: datetime = datetime(2026, 11, 20, 19, 0, tzinfo=TZ),
 ) -> CandidateEvaluationReceipt:
     facts = facts or _facts(_full_members())
     policy = policy or _policy()
-    ids = tuple(item.opportunity_id for item in candidates)
     return CandidateEvaluationReceipt(
         producer_id="r11-candidate-producer",
         producer_version="1.0.0",
         run_id="run-20261120",
         completed_at=completed_at,
         coverage_digest="sha256:" + "d" * 64,
-        evaluated_count=evaluated if evaluated is not None else len(candidates),
+        evaluated_count=evaluated if evaluated is not None else max(len(candidates), 1),
         qualified_count=qualified,
-        binding_digest=CandidateEvaluationReceipt.expected_binding_digest(facts, policy, ids),
+        binding_digest=CandidateEvaluationReceipt.expected_binding_digest(
+            facts, policy, candidates
+        ),
     )
 
 
@@ -194,10 +195,12 @@ def _produced(
     policy = receipt_kw.pop("policy", None) or _policy()
     receipt = receipt_kw.pop("receipt", None)
     if receipt is None:
+        evaluated = len(candidates) if len(candidates) else 1  # evaluated scope is never 0
         receipt = _receipt(
             facts,
             policy,
             candidates,
+            evaluated=evaluated,
             qualified=(receipt_qualified if receipt_qualified is not None else len(candidates)),
         )
     return producer().produce(
@@ -423,6 +426,80 @@ def test_empty_advice_with_bound_receipt_is_ended_noop():
     assert ds.audit.admission_disposition == "empty_advice"
 
 
+def test_empty_evaluated_scope_fails_closed():
+    """evaluated_count=0 is 'not run', never a legitimate empty advice day."""
+
+    facts = _facts(_full_members())
+    policy = _policy()
+    receipt = _receipt(facts, policy, (), qualified=0, evaluated=0)
+    result = _produced((), facts=facts, policy=policy, receipt=receipt)
+    assert not result.publishable
+    assert result.package is None
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_empty_scope"
+
+
+def test_evaluation_before_intake_verified_fails_closed():
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    receipt = _receipt(
+        facts,
+        policy,
+        (cand,),
+        qualified=1,
+        completed_at=datetime(2026, 11, 20, 18, 5, tzinfo=TZ),
+    )
+    result = _produced((cand,), facts=facts, policy=policy, receipt=receipt)
+    assert not result.publishable
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_before_intake_verified"
+
+
+def test_candidate_payload_change_invalidates_binding():
+    """Mutating an injected candidate changes the expected receipt binding digest."""
+
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    good = _receipt(facts, policy, (cand,), qualified=1, evaluated=1)
+
+    tampered = _candidate(
+        facts=facts,
+        policy=policy,
+        opp_id=cand.opportunity_id,
+        security_code="600001",
+    )
+    # The receipt was issued for the original payload; the tampered candidate does not
+    # match it and the whole call fails closed before any package exists.
+    result = _produced((tampered,), facts=facts, policy=policy, receipt=good)
+    assert not result.publishable
+    assert result.package is None
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_binding_mismatch"
+
+
+def test_candidate_with_invalid_explanation_use_is_blocked():
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    object.__setattr__(
+        cand,
+        "explanations",
+        (
+            {
+                "code": "REPLAY_ENTRY",
+                "use": "bogus-use",
+                "component_ref": "replay.trend-position-risk@1.0.0",
+                "text": "bad",
+            },
+        ),
+    )
+    result = _produced((cand,), facts=facts, policy=policy, receipt_qualified=0)
+    # The contract itself refuses to materialize a Decision carrying an illegal
+    # explanation use; nothing reaches the package.
+    assert result.package is None
+    assert result.diagnostics[0]["reason"] == "invalid_explanation"
+    assert not result.publishable
+
+
 def test_receipt_mismatch_fails_closed():
     facts = _facts(_full_members())
     policy = _policy()
@@ -532,6 +609,119 @@ def test_expires_equal_eligible_is_rejected():
         )
 
 
+def test_eligible_before_session_open_is_rejected():
+    with pytest.raises(ProductDailyError):
+        AdvicePolicy(
+            policy_id="p",
+            version="0.1.0",
+            decision_cutoff=CUTOFF,
+            published_at=PUBLISHED,
+            window_ref="w",
+            eligible_at=datetime(2026, 11, 23, 9, 0, tzinfo=TZ),
+            expires_at=datetime(2026, 11, 23, 15, 0, tzinfo=TZ),
+            candidate_rule_digest="sha256:" + "b" * 64,
+        )
+
+
+def test_expires_after_session_close_is_rejected():
+    with pytest.raises(ProductDailyError):
+        AdvicePolicy(
+            policy_id="p",
+            version="0.1.0",
+            decision_cutoff=CUTOFF,
+            published_at=PUBLISHED,
+            window_ref="w",
+            eligible_at=datetime(2026, 11, 23, 9, 30, tzinfo=TZ),
+            expires_at=datetime(2026, 11, 23, 15, 30, tzinfo=TZ),
+            candidate_rule_digest="sha256:" + "b" * 64,
+        )
+
+
+def test_decision_set_rejects_zero_window_and_bogus_reason():
+    """Directly built contracts refuse a zero-width or cross-day window and a bogus reason."""
+
+    from quanthus.product_daily.recommendation.contracts import (
+        AuditBlock,
+        DailyAdvicePackage,
+        Decision,
+        DecisionSet,
+        EntryPlan,
+    )
+
+    audit = AuditBlock(
+        producer_version="1",
+        policy_id="p",
+        policy_version="1",
+        source_version="1",
+        candidate_rule_digest="x",
+        decision_cutoff=CUTOFF,
+        per_member_available_at=(),
+        admission_disposition="empty_advice",
+        empty_reason=None,
+        git_revision=None,
+    )
+    base = dict(
+        opportunity_id="o",
+        security_code="600000",
+        security_name="n",
+        component_ref_id="c",
+        component_version="1",
+        next_observation="x",
+    )
+    with pytest.raises(ProductDailyError):
+        EntryPlan(
+            fraction=Decimal("0.5"),
+            price_bound=Decimal("10"),
+            mark_price=Decimal("10"),
+            industry_id="i",
+            eligible_at=datetime(2026, 11, 23, 9, 30, tzinfo=TZ),
+            expires_at=datetime(2026, 11, 23, 9, 30, tzinfo=TZ),
+            window_ref="w",
+        )
+    with pytest.raises(ProductDailyError):
+        Decision(
+            stage="entry_plan",
+            reason_codes=("BOGUS",),
+            explanations=(),
+            entry=EntryPlan(
+                fraction=Decimal("0.5"),
+                price_bound=Decimal("10"),
+                mark_price=Decimal("10"),
+                industry_id="i",
+                eligible_at=datetime(2026, 11, 23, 9, 30, tzinfo=TZ),
+                expires_at=datetime(2026, 11, 23, 15, 0, tzinfo=TZ),
+                window_ref="w",
+            ),
+            **base,
+        )
+    good = Decision(
+        stage="input_blocked",
+        reason_codes=("INPUT_UNAVAILABLE",),
+        explanations=(
+            {
+                "code": "X",
+                "use": "explanation",
+                "component_ref": "c@1",
+                "text": "t",
+            },
+        ),
+        **base,
+    )
+    ds = DecisionSet(
+        source_id="s",
+        version="1",
+        market_date=date(2026, 11, 20),
+        knowledge_cutoff=CUTOFF,
+        published_at=PUBLISHED,
+        next_session=date(2026, 11, 23),
+        decisions=(good,),
+        audit=audit,
+    )
+    assert ds.decisions[0].stage == "input_blocked"
+    with pytest.raises(ProductDailyError):
+        DailyAdvicePackage(schema=SCHEMA, package_id="p", version="1", decision_sets=())
+
+
 # --- publish surface ----------------------------------------------------------------
 
 
@@ -575,6 +765,44 @@ def test_publish_refuses_receipt_time_mismatch(tmp_path: Path):
             directory=tmp_path,
             published_at=PUBLISHED + timedelta(hours=1),
         )
+
+
+def test_publish_refuses_blocked_only_package(tmp_path: Path):
+    """A package whose decisions are all blocked is a diagnostic, never published."""
+
+    members = [
+        _member("daily-bars", datetime(2026, 11, 20, 18, 0, tzinfo=TZ)),
+        _member("calendar", datetime(2026, 11, 20, 18, 0, tzinfo=TZ)),
+        _member("industry-map", datetime(2026, 11, 20, 23, 0, tzinfo=TZ), required=False),
+    ]
+    facts = _facts(members, required=("daily-bars", "calendar"))
+    policy = _policy()
+    late = _candidate(("industry-map",), facts=facts, policy=policy, opp_id="OPP-LATE")
+    result = _produced((late,), facts=facts, policy=policy, receipt_qualified=0)
+    assert not result.publishable
+    with pytest.raises(ProductDailyError):
+        publish_package(result.package, directory=tmp_path, published_at=PUBLISHED)
+
+
+def test_publish_refuses_corrupt_existing_file(tmp_path: Path):
+    """A damaged same-lineage file is fail-closed, never silently skipped."""
+
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    result = _produced((cand,), facts=facts, policy=policy)
+    publish_package(result.package, directory=tmp_path, published_at=PUBLISHED)
+    (tmp_path / f"{result.package.package_id}.v0.0.1.json").write_text(
+        "{ not json", encoding="utf-8"
+    )
+    bumped = type(result.package)(
+        schema=result.package.schema,
+        package_id=result.package.package_id,
+        version="9.9.9",
+        decision_sets=result.package.decision_sets,
+    )
+    with pytest.raises(ProductDailyError, match="corrupt_artifact"):
+        publish_package(bumped, directory=tmp_path, published_at=PUBLISHED)
 
 
 def test_duplicate_market_date_inside_package_rejected():
@@ -695,3 +923,44 @@ def test_p12_binding_digest_uses_the_validated_object_and_consumes_raw(tmp_path:
     # The on-disk file digest is a different surface and must not be conflated with binding.
     content_digest = decision_set_digests(result.package)["2026-11-20"]
     assert binding["2026-11-20"] != content_digest
+
+
+def test_publish_receipt_carries_p12_binding_digest(tmp_path: Path):
+    """When the caller supplies the real loader, the receipt records the binding digest."""
+
+    validate_raw, _ = _p12_loader()
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    result = _produced((cand,), facts=facts, policy=policy)
+    ds_dict = result.package.decision_sets[0].to_dict()
+
+    from quanthus.product_daily.recommendation import p12_package_digests
+
+    def loader(raw: dict):
+        decision = validate_raw(raw["decisions"][0], raw)
+        from quanthus.capabilities.decision_access import MarketDecisionSet
+        from quanthus.shared.values import VersionRef
+
+        from quanthus.shared.fact_contracts import digest as p12_digest
+
+        return MarketDecisionSet(
+            source_ref=VersionRef(raw["source_id"], raw["version"], p12_digest(raw)),
+            mode="synthetic",
+            synthetic=True,
+            market_date=date.fromisoformat(raw["market_date"]),
+            knowledge_cutoff=datetime.fromisoformat(raw["knowledge_cutoff"]),
+            published_at=datetime.fromisoformat(raw["published_at"]),
+            next_session=date.fromisoformat(raw["next_session"]),
+            decisions=(decision,),
+        )
+
+    receipt = publish_package(
+        result.package,
+        directory=tmp_path,
+        published_at=PUBLISHED,
+        p12_loader=loader,
+    )
+    expected = p12_package_digests(ds_dict, loader)
+    assert receipt.p12_package_digests is not None
+    assert dict(receipt.p12_package_digests) == expected

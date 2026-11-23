@@ -37,9 +37,11 @@ from quanthus.product_daily.recommendation.admission import (
     assess_members,
 )
 from quanthus.product_daily.recommendation.contracts import (
-    CANDIDATE_REASON_CODES,
+    _SESSION_CLOSE,
+    _SESSION_OPEN,
     ENDED,
     ENTRY_PLAN,
+    ENTRY_REASON_CODES,
     INPUT_BLOCKED,
     INPUT_UNAVAILABLE,
     PACKAGE_VERSION,
@@ -177,12 +179,38 @@ class CandidateEvaluationReceipt:
             raise ProductDailyError("invalid_receipt", "qualified_count exceeds evaluated_count")
 
     @staticmethod
+    @staticmethod
+    def _candidate_payload(candidates: tuple[CandidateSignal, ...]) -> list[dict[str, Any]]:
+        """The full injected candidate material the receipt claims to have evaluated."""
+
+        return [
+            {
+                "opportunity_id": item.opportunity_id,
+                "security_code": item.security_code,
+                "component_ref_id": item.component_ref_id,
+                "component_version": item.component_version,
+                "fraction": str(item.fraction),
+                "price_bound": str(item.price_bound),
+                "mark_price": str(item.mark_price),
+                "reason_codes": sorted(item.reason_codes),
+                "explanations": item.explanations,
+                "depends_on_member_ids": sorted(item.depends_on_member_ids),
+            }
+            for item in sorted(candidates, key=lambda item: item.opportunity_id)
+        ]
+
+    @staticmethod
     def expected_binding_digest(
         facts: DailyFactsView,
         policy: AdvicePolicy,
-        candidate_ids: tuple[str, ...],
+        candidates: tuple[CandidateSignal, ...],
     ) -> str:
-        """Digest the receipt must carry to be valid for this produce() call."""
+        """Digest the receipt must carry to be valid for this produce() call.
+
+        The digest covers the full injected candidate payload, not only ids: changing a
+        candidate's component, security, marks, prices, reasons, or explanations changes the
+        expected binding and makes a mismatched receipt fail closed.
+        """
 
         return _json_digest(
             {
@@ -194,7 +222,7 @@ class CandidateEvaluationReceipt:
                 "policy_version": policy.version,
                 "candidate_rule_digest": policy.candidate_rule_digest,
                 "decision_cutoff": policy.decision_cutoff.isoformat(),
-                "candidate_ids": sorted(candidate_ids),
+                "candidates": CandidateEvaluationReceipt._candidate_payload(candidates),
             }
         )
 
@@ -257,6 +285,12 @@ class AdvicePolicy:
         require_aware(self.expires_at, "expires_at")
         if self.expires_at <= self.eligible_at:
             raise ProductDailyError("invalid_window", "entry window must be non-empty")
+        if self.eligible_at.time() < _SESSION_OPEN or self.eligible_at.time() > _SESSION_CLOSE:
+            raise ProductDailyError(
+                "invalid_window", "eligible_at must fall inside the session open/close"
+            )
+        if self.expires_at.time() > _SESSION_CLOSE:
+            raise ProductDailyError("invalid_window", "expires_at must not pass the session close")
         if self.published_at < self.decision_cutoff:
             raise ProductDailyError(
                 "invalid_publish", "published_at precedes the declared decision_cutoff"
@@ -418,6 +452,51 @@ class DailyAdviceProducer:
         )
         git_revision = _git_revision(self._repo_root) if self._repo_root else None
 
+        try:
+            return self._produce(
+                facts=facts,
+                account=account,
+                policy=policy,
+                experts=experts,
+                candidates=candidates,
+                evaluation_receipt=evaluation_receipt,
+                diagnostics=diagnostics,
+                assessment=assessment,
+                per_member_clock=per_member_clock,
+                git_revision=git_revision,
+            )
+        except ProductDailyError as exc:
+            # A contract-level refusal while building a decision (bad explanation, bogus
+            # reason, invalid window) is an input defect, not a runtime crash: convert it
+            # to a fail-closed diagnostic so no partial or malformed package escapes.
+            diagnostics.append(
+                {
+                    "reason": "contract_violation",
+                    "detail": str(exc),
+                }
+            )
+            return ProducerResult(
+                package=None,
+                disposition=AdmissionDisposition.INPUT_NOT_READY,
+                diagnostics=tuple(diagnostics),
+                assessment=assessment,
+            )
+
+    def _produce(
+        self,
+        *,
+        facts: DailyFactsView,
+        account: AccountFactsView,
+        policy: AdvicePolicy,
+        experts: ExpertBundle,
+        candidates: tuple[CandidateSignal, ...],
+        evaluation_receipt: CandidateEvaluationReceipt | None,
+        diagnostics: list[dict[str, Any]],
+        assessment: MemberAssessment,
+        per_member_clock: tuple[tuple[str, str], ...],
+        git_revision: str | None,
+    ) -> ProducerResult:
+
         # --- hard input gates, all fail closed -----------------------------------------
         if facts.intake_received_at > policy.decision_cutoff:
             return self._block(
@@ -463,8 +542,33 @@ class DailyAdviceProducer:
                     "decision_cutoff": policy.decision_cutoff.isoformat(),
                 },
             )
+        if evaluation_receipt.evaluated_count == 0:
+            return self._block(
+                diagnostics=diagnostics,
+                assessment=assessment,
+                disposition=AdmissionDisposition.INPUT_NOT_READY,
+                reason="candidate_evaluation_empty_scope",
+                detail={
+                    "evaluated_count": 0,
+                    "note": "an evaluated scope of zero can prove neither a candidate day "
+                    "nor an empty advice day",
+                },
+            )
+        if evaluation_receipt.completed_at < facts.intake_verified_at:
+            return self._block(
+                diagnostics=diagnostics,
+                assessment=assessment,
+                disposition=AdmissionDisposition.INPUT_NOT_READY,
+                reason="candidate_evaluation_before_intake_verified",
+                detail={
+                    "completed_at": evaluation_receipt.completed_at.isoformat(),
+                    "intake_verified_at": facts.intake_verified_at.isoformat(),
+                    "note": "a candidate evaluation must see the verified intake, not run "
+                    "before it",
+                },
+            )
         expected_binding = CandidateEvaluationReceipt.expected_binding_digest(
-            facts, policy, tuple(item.opportunity_id for item in candidates)
+            facts, policy, candidates
         )
         if evaluation_receipt.binding_digest != expected_binding:
             return self._block(
@@ -503,6 +607,7 @@ class DailyAdviceProducer:
         decisions: list[Decision] = []
         publishable_candidates = 0
         seen_ids: set[str] = set()
+        seen_security_codes: set[str] = set()
         for signal in candidates:
             if signal.opportunity_id in seen_ids:
                 diagnostics.append(
@@ -523,8 +628,28 @@ class DailyAdviceProducer:
                 continue
             seen_ids.add(signal.opportunity_id)
 
+            if signal.security_code in seen_security_codes:
+                diagnostics.append(
+                    {
+                        "opportunity_id": signal.opportunity_id,
+                        "reason": "duplicate_security_code",
+                        "security_code": signal.security_code,
+                    }
+                )
+                decisions.append(
+                    self._blocked_decision(
+                        signal=signal,
+                        experts=experts,
+                        code="DUPLICATE_SECURITY",
+                        text="two live candidates claim the same security code",
+                        fallback_reason=INPUT_UNAVAILABLE,
+                    )
+                )
+                continue
+            seen_security_codes.add(signal.security_code)
+
             unknown_reasons = [
-                code for code in signal.reason_codes if code not in CANDIDATE_REASON_CODES
+                code for code in signal.reason_codes if code not in ENTRY_REASON_CODES
             ]
             if unknown_reasons:
                 diagnostics.append(
@@ -540,6 +665,35 @@ class DailyAdviceProducer:
                         experts=experts,
                         code="UNREGISTERED_REASON",
                         text="candidate carries a reason code outside the registered set",
+                        fallback_reason=INPUT_UNAVAILABLE,
+                    )
+                )
+                continue
+
+            # An injected explanation must carry a registered use and code before it can
+            # reach a decision; anything else is an unverifiable claim, blocked fail-closed.
+            bad_explanations = [
+                item
+                for item in signal.explanations
+                if item.get("use") not in (USE_ACTION, USE_EXPLANATION)
+                or not item.get("code")
+                or not item.get("component_ref")
+            ]
+            if bad_explanations:
+                diagnostics.append(
+                    {
+                        "opportunity_id": signal.opportunity_id,
+                        "reason": "invalid_explanation",
+                        "invalid": bad_explanations,
+                    }
+                )
+                decisions.append(
+                    self._blocked_decision(
+                        signal=signal,
+                        experts=experts,
+                        code="INVALID_EXPLANATION",
+                        text="candidate carries an explanation outside the registered "
+                        "use/code/component shape",
                         fallback_reason=INPUT_UNAVAILABLE,
                     )
                 )

@@ -38,10 +38,13 @@
 6. 包字段与 P12 `MarketDecisionSet`/`MarketDecision`/`EntryIntent`/`Explanation`
    对齐：`stage` 限 `entry_plan|waiting|holding|exit_plan|input_blocked|ended`；
    `reason_codes` 只用既有契约码（entry 用 `NEW_ENTRY_SIGNAL`；`input_blocked` 只接受
-   `STALE_MARKET_INPUT` 或 `INPUT_UNAVAILABLE`，与 P12 `validate_decision_set` 一致）；
-   `explanations[].use` 限 `action|explanation`；`entry` 仅在 `entry_plan` 且必须
+   `STALE_MARKET_INPUT` 或 `INPUT_UNAVAILABLE`，与 P12 `validate_decision_set` 一致），
+   `Decision.__post_init__` 对全部 stage 强制已注册 reason、entry 必带 reason、
+   blocked 不得带 entry reason；`explanations[].use` 限 `action|explanation` 且 code /
+   component_ref 非空，非法即在构造层拒绝；`entry` 仅在 `entry_plan` 且必须
    输出 `invalidations`（P12 loader 直读该字段）。任何包含 `input_blocked` decision
-   的包不是可发布建议日，`ProducerResult.publishable` 为 `False`。
+   的包不是可发布建议日，`ProducerResult.publishable` 为 `False`；构建期
+   `ProductDailyError` 一律转为 fail-closed `ProducerResult(package=None)`。
 7. 逐决策审计块记 `producer_version / policy_id@version / source_version /
    candidate_rule_digest / decision_cutoff / per_member_available_at /
    admission_disposition / empty_reason / git_revision / intake_receipt_id /
@@ -50,27 +53,39 @@
    `completed_at <= decision_cutoff`，`binding_digest` 绑定 `batch_id /
    intake_receipt_id / source_id@version / policy_id@version / candidate_rule_digest /
    decision_cutoff / 排序后的 candidate opportunity_id 集合`，不一致即 fail-closed；
-   `qualified_count` 必须等于实际产出的 `entry_plan` 数。`CandidateSignal` 的
-   `expert_decision_digest` / `risk_decision_digest` 必须等于按同一批次+策略+规则+
-   opportunity_id 绑定的期望 digest，未知或不匹配即 `input_blocked`。候选携带未注册
-   reason code 同样 `input_blocked`。
+   `qualified_count` 必须等于实际产出的 `entry_plan` 数；`evaluated_count` 必须 >0
+   （零评估范围等于没跑，fail-closed）；`completed_at` 必须 `>= intake_verified_at`
+   （评估必须看到已签收批次）且 `<= decision_cutoff`。`binding_digest` 除绑定批次/
+   策略/截止/候选集合外还覆盖完整候选载荷（component、security、fraction、
+   mark/price、reason、explanations、依赖成员），任一字段被改都使 receipt 不符。
+   `CandidateSignal` 的 `expert_decision_digest` / `risk_decision_digest` 必须等于按
+   同一批次+策略+规则+opportunity_id 绑定的期望 digest，未知或不匹配即
+   `input_blocked`。候选携带未注册 reason code 同样 `input_blocked`。
+   这些校验是结构门，不授真实资格；真实上游适配仍属主会话/P11 决定事项。
 9. `intake_received_at` 与 `intake_verified_at` 都必须 `<= decision_cutoff`
    （且 `verified >= received`，`__post_init__` 已保证）；迟于截止的签收使整批
    `INPUT_NOT_READY`。
 10. 预校验 P12 边界（`DecisionSet.__post_init__`）：`knowledge_cutoff.date() ==
     market_date`；`published_at >= knowledge_cutoff`；`next_session > market_date`；
-    `opportunity_id` 唯一；非 ended 决策 `security_code` 唯一；entry 的
-    `eligible_at > knowledge_cutoff` 且其日期等于 `next_session`；`expires_at >
-    eligible_at`。同一 `DailyAdvicePackage` 内重复 `market_date` 显式拒绝。
+    空 `decisions` / 空 `decision_sets` 拒绝；`opportunity_id` 唯一；非 ended 决策
+    `security_code` 唯一（producer 侧亦拒重复 live security）；entry 的
+    `eligible_at > knowledge_cutoff` 且 `eligible_at`/`expires_at` 同日且都落在
+    `next_session`；`expires_at > eligible_at` 非零窗口。同一 `DailyAdvicePackage`
+    内重复 `market_date` 显式拒绝。`EntryPlan.__post_init__` 直接校验会话窗口：
+    `eligible_at`/`expires_at` 时间均须在 09:30–15:00 之间且同日，`AdvicePolicy`
+    对注入窗口做同等校验。
 11. 物化按 `market_date` append-only：同 `package_id` 下任一已写文件若覆盖相同
     `market_date` 且内容不同，拒绝（`append_only_conflict`，对齐 P12 绑定规则——
     同日替换不是 append）；同 `(id, version)` 重写拒绝（`idempotency_conflict`）。
-    `publish_package` 的 `published_at` 必须等于包内每个 `decision_set.published_at`。
-    三种 digest 分开命名：`file_sha256` 是落盘完整 JSON 字节 SHA256；
-    `decision_set_digests` 是各 decision_set 规范 JSON SHA256（旧 `package_digests`
-    保留为别名）；`p12_package_digests` 经真实 P12 loader 转成 `MarketDecisionSet`
-    后按 `dataclasses.asdict + default=str + sort_keys` 再 `fact_contracts.digest`，
-    与 P12 账户 `configuration_binding` 记录的身份一致。
+    `publish_package` 的 `published_at` 必须等于包内每个 `decision_set.published_at`；
+    blocked-only 包（无 live decision）拒绝发布；同 lineage 已写文件损坏
+    （JSON 不可读）fail-closed 不静默跳过。三种 digest 分开命名：`file_sha256` 是
+    落盘完整 JSON 字节 SHA256；`decision_set_digests` 是各 decision_set 规范 JSON
+    SHA256（旧 `package_digests` 保留为别名）；`p12_package_digests` 经真实 P12
+    loader 转成 `MarketDecisionSet` 后按 `dataclasses.asdict + default=str +
+    sort_keys` 再 `fact_contracts.digest`，与 P12 账户 `configuration_binding`
+    记录的身份一致；`publish_package` 在提供 `p12_loader` 时把该 binding digest
+    一并写入 `PublishReceipt`。
 
 ## 文件
 

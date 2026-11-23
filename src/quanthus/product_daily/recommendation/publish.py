@@ -102,11 +102,17 @@ def publish_package(
     directory: Path | str,
     published_at: datetime,
     elapsed_ms: int = 0,
+    p12_loader: Callable[[dict[str, Any]], Any] | None = None,
 ) -> PublishReceipt:
     """Write one package file append-only and return a receipt with all digest surfaces.
 
     published_at must equal every decision_set's own published_at; a mismatch would
     produce an artifact whose receipt disagrees with its payload, so it is refused.
+
+    When p12_loader is supplied (a callable that validates one raw decision_set dict
+    into a MarketDecisionSet) the receipt additionally carries the P12 binding digest
+    for each released date; without it p12_package_digests is None and the caller
+    must not treat the file as bound on the consumer side.
     """
 
     require_aware(published_at, "published_at")
@@ -116,6 +122,22 @@ def publish_package(
                 "invalid_receipt",
                 "publish_package published_at differs from the decision_set's",
             )
+    has_blocked = any(
+        decision.stage == "input_blocked"
+        for item in package.decision_sets
+        for decision in item.decisions
+    )
+    has_live = any(
+        decision.stage not in ("input_blocked", "ended")
+        for item in package.decision_sets
+        for decision in item.decisions
+    )
+    if has_blocked and not has_live:
+        raise ProductDailyError(
+            "unpublishable_package",
+            "a package whose decisions are all blocked is a diagnostic artifact, "
+            "never a published advice day",
+        )
     target_dir = Path(directory)
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -127,8 +149,12 @@ def publish_package(
     for existing in sorted(target_dir.glob(package.package_id + ".v*.json")):
         try:
             other = json.loads(existing.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ProductDailyError(
+                "corrupt_artifact",
+                f"{existing} exists but is unreadable; refusing to publish next to a "
+                "damaged same-lineage file",
+            ) from exc
         other_sets = other.get("decision_sets", [])
         other_dates = {item.get("market_date") for item in other_sets}
         if other_dates & this_dates and other_sets != this_sets:
@@ -151,12 +177,19 @@ def publish_package(
     entry_count = sum(
         1 for item in package.decision_sets for d in item.decisions if d.stage == "entry_plan"
     )
+    p12_digests: dict[str, str] | None = None
+    if p12_loader is not None:
+        merged: dict[str, str] = {}
+        for item in package.decision_sets:
+            merged.update(p12_package_digests(item.to_dict(), p12_loader))
+        p12_digests = merged
     return PublishReceipt(
         package_id=package.package_id,
         version=package.version,
         path=str(path),
         file_sha256="sha256:" + hashlib.sha256(payload).hexdigest(),
         decision_set_digests=tuple(sorted(decision_set_digests(package).items())),
+        p12_package_digests=(None if p12_digests is None else tuple(sorted(p12_digests.items()))),
         decision_count=decision_count,
         entry_plan_count=entry_count,
         admission_disposition=package.decision_sets[0].audit.admission_disposition

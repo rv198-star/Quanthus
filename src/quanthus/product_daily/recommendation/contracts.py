@@ -12,7 +12,7 @@ backfilled.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
@@ -26,6 +26,14 @@ from quanthus.product_daily.contracts import (
 
 SCHEMA = "quanthus.r11.daily-advice.v1"
 PACKAGE_VERSION = "1.0.0"
+
+# Session bounds of the active daily profile (close-to-next-open-v1): the next-session
+# window may only open at/after 09:30 and close at/before 15:00 exchange time.
+SESSION_OPEN = time(9, 30)
+SESSION_CLOSE = time(15, 0)
+# Backwards-compatible private aliases used by EntryPlan/AdvicePolicy checks.
+_SESSION_OPEN = SESSION_OPEN
+_SESSION_CLOSE = SESSION_CLOSE
 
 ENTRY_PLAN = "entry_plan"
 WAITING = "waiting"
@@ -47,14 +55,35 @@ STALE_MARKET_INPUT = "STALE_MARKET_INPUT"
 INPUT_UNAVAILABLE = "INPUT_UNAVAILABLE"
 BLOCKED_REASON_CODES = frozenset({STALE_MARKET_INPUT, INPUT_UNAVAILABLE})
 
-# Reason codes the producer accepts on injected candidates.  A candidate carrying anything
-# outside this set is itself an input defect: it is emitted as input_blocked with a legal
-# blocked reason, never passed through to the package.
-CANDIDATE_REASON_CODES = frozenset({NEW_ENTRY_SIGNAL})
+# Reason codes a produced entry_plan decision may carry on the wire.  The P12 gate
+# (validate_decision_set) does not police entry reason codes, so the producer keeps its own
+# registered set: an injected candidate carrying anything else is an input defect and is
+# emitted input_blocked, never passed through.
+ENTRY_REASON_CODES = frozenset({NEW_ENTRY_SIGNAL})
+# Reason codes a non-blocked, non-entry decision may carry (none today; ended/waiting carry
+# no business reason codes in this profile).
+NON_LIVE_REASON_CODES: frozenset[str] = frozenset()
+REGISTERED_REASON_CODES = ENTRY_REASON_CODES | BLOCKED_REASON_CODES | NON_LIVE_REASON_CODES
+
+# Explanation codes registered for this producer.  The action-use explanation on an entry
+# must be one of these; anything else is an unverifiable claim.
+EXPLANATION_CODES = frozenset(
+    {
+        "REPLAY_ENTRY",
+        "REPLAY_SIZING",
+        "NO_QUALIFIED_ENTRY",
+        "INPUT_CLOCK",
+        "QUALIFICATION_EVIDENCE",
+        "UNREGISTERED_REASON",
+        "MISSING_ACTION_EXPLANATION",
+        "DUPLICATE_IDENTITY",
+    }
+)
 
 # Explanation `use` values match P12's ExplanationUse enum.
 USE_ACTION = "action"
 USE_EXPLANATION = "explanation"
+EXPLANATION_USES = frozenset({USE_ACTION, USE_EXPLANATION})
 
 
 @dataclass(frozen=True)
@@ -171,8 +200,19 @@ class EntryPlan:
         require_aware(self.eligible_at, "eligible_at")
         require_aware(self.expires_at, "expires_at")
         require_text(self.window_ref, "window_ref")
-        if self.expires_at < self.eligible_at:
-            raise ProductDailyError("invalid_window", "expires_at precedes eligible_at")
+        if self.expires_at <= self.eligible_at:
+            raise ProductDailyError("invalid_window", "entry window must be non-empty")
+        # P12 execution profile bounds (close-to-next-open-v1 session hours).
+        if self.eligible_at.time() < _SESSION_OPEN or self.eligible_at.time() > _SESSION_CLOSE:
+            raise ProductDailyError(
+                "invalid_window", "eligible_at must fall inside the session open/close"
+            )
+        if self.expires_at.time() > _SESSION_CLOSE:
+            raise ProductDailyError("invalid_window", "expires_at must not pass the session close")
+        if self.expires_at.date() != self.eligible_at.date():
+            raise ProductDailyError(
+                "invalid_window", "entry window must open and close on the same session"
+            )
         for item in self.invalidations:
             require_text(item, "invalidations[]")
 
@@ -211,13 +251,45 @@ class Decision:
             raise ProductDailyError("invalid_stage", "entry_plan requires an entry block")
         if self.stage != ENTRY_PLAN and self.entry is not None:
             raise ProductDailyError("invalid_stage", "only entry_plan carries an entry block")
-        if self.stage == INPUT_BLOCKED and not any(
-            code in BLOCKED_REASON_CODES for code in self.reason_codes
+        for code in self.reason_codes:
+            if code not in REGISTERED_REASON_CODES:
+                raise ProductDailyError("invalid_reason", f"unregistered reason code: {code}")
+        if self.stage == ENTRY_PLAN and not self.reason_codes:
+            raise ProductDailyError(
+                "invalid_reason", "an entry_plan must carry a registered reason"
+            )
+        if self.stage == ENTRY_PLAN and not all(
+            code in ENTRY_REASON_CODES for code in self.reason_codes
         ):
             raise ProductDailyError(
-                "invalid_reason",
-                "input_blocked requires STALE_MARKET_INPUT or INPUT_UNAVAILABLE",
+                "invalid_reason", "entry_plan may only carry entry reason codes"
             )
+        if self.stage == INPUT_BLOCKED:
+            if not any(code in BLOCKED_REASON_CODES for code in self.reason_codes):
+                raise ProductDailyError(
+                    "invalid_reason",
+                    "input_blocked requires STALE_MARKET_INPUT or INPUT_UNAVAILABLE",
+                )
+            if any(code in ENTRY_REASON_CODES for code in self.reason_codes):
+                raise ProductDailyError(
+                    "invalid_reason",
+                    "an input_blocked decision may not carry an entry reason",
+                )
+        for item in self.explanations:
+            use = item.get("use")
+            if use not in EXPLANATION_USES:
+                raise ProductDailyError(
+                    "invalid_explanation",
+                    "explanation use must be one of " + str(sorted(EXPLANATION_USES)),
+                )
+            explanation_code = item.get("code")
+            if not explanation_code:
+                raise ProductDailyError("invalid_explanation", "explanation code must not be empty")
+            explanation_component = item.get("component_ref")
+            if not explanation_component:
+                raise ProductDailyError(
+                    "invalid_explanation", "explanation component_ref must not be empty"
+                )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -303,6 +375,8 @@ class DecisionSet:
             raise ProductDailyError("invalid_publish", "published_at precedes the knowledge cutoff")
         if self.next_session <= self.market_date:
             raise ProductDailyError("invalid_date", "next_session must follow market_date")
+        if not self.decisions:
+            raise ProductDailyError("invalid_package", "a decision set must not be empty")
         opportunity_ids = [item.opportunity_id for item in self.decisions]
         if len(opportunity_ids) != len(set(opportunity_ids)):
             raise ProductDailyError("invalid_decision", "opportunity ids must be unique")
@@ -318,6 +392,10 @@ class DecisionSet:
                 if item.entry.eligible_at.date() != self.next_session:
                     raise ProductDailyError(
                         "invalid_window", "entry window must open on next_session"
+                    )
+                if item.entry.expires_at.date() != self.next_session:
+                    raise ProductDailyError(
+                        "invalid_window", "entry window must close on next_session"
                     )
 
     def to_dict(self) -> dict[str, Any]:
@@ -345,6 +423,8 @@ class DailyAdvicePackage:
             raise ProductDailyError("invalid_schema", f"schema must be {SCHEMA}")
         require_text(self.package_id, "package_id")
         require_text(self.version, "version")
+        if not self.decision_sets:
+            raise ProductDailyError("invalid_package", "a package must carry a decision set")
         dates = [item.market_date for item in self.decision_sets]
         if len(dates) != len(set(dates)):
             raise ProductDailyError("invalid_package", "duplicate market_date inside one package")
@@ -365,6 +445,7 @@ class PublishReceipt:
     path: str
     file_sha256: str
     decision_set_digests: tuple[tuple[str, str], ...]
+    p12_package_digests: tuple[tuple[str, str], ...] | None
     decision_count: int
     entry_plan_count: int
     admission_disposition: str
@@ -385,6 +466,9 @@ class PublishReceipt:
             "path": self.path,
             "file_sha256": self.file_sha256,
             "decision_set_digests": dict(self.decision_set_digests),
+            "p12_package_digests": (
+                None if self.p12_package_digests is None else dict(self.p12_package_digests)
+            ),
             "decision_count": self.decision_count,
             "entry_plan_count": self.entry_plan_count,
             "admission_disposition": self.admission_disposition,

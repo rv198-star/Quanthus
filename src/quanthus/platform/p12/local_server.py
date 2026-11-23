@@ -15,7 +15,7 @@ import json
 import mimetypes
 import secrets
 from collections.abc import Callable, Iterable
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from wsgiref.simple_server import make_server
@@ -76,7 +76,10 @@ def build_local_kernel(
     )
     from quanthus.product_daily.application.models import SyntheticRuntimeAuthorization
 
-    system_clock = clock
+    # The paper account runs on the host system clock when no replay or
+    # pinned clock is given; a None clock must not reach the daily-package
+  # source or the quote service.
+    system_clock = clock or (lambda: datetime.now(timezone.utc))
     replay = None
     replay_quotes = None
     if replay_tape is not None:

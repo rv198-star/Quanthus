@@ -241,12 +241,16 @@ def _p12_loader():
     (not-run surfaced as fail), never skipped silently.
     """
 
-    p12_root = Path(
-        os.environ.get(
-            "QUANTHUS_P12_WORKTREE_ROOT",
-            "/Users/william/Projects/Github/Quanthus/artifacts/worktrees/p12-paper-integration-20261120",
+    from quanthus.policy import find_project_root
+    from quanthus.product_daily.recommendation.runtime_identity import resolve_p12_test_root
+
+    try:
+        p12_root = resolve_p12_test_root(
+            find_project_root(Path(__file__)),
+            os.environ.get("QUANTHUS_P12_WORKTREE_ROOT"),
         )
-    )
+    except ProductDailyError as exc:
+        pytest.fail(f"Pinned P12 consumer unavailable: {exc}")
     p12_src = p12_root / "src"
     if not p12_src.is_dir():
         pytest.fail(
@@ -1167,6 +1171,8 @@ def test_p12_blocked_package_loads_and_is_not_publishable(tmp_path: Path):
     assert loaded.decisions[0].decisions[0].stage.value == INPUT_BLOCKED
     assert "STALE_MARKET_INPUT" in loaded.decisions[0].decisions[0].reason_codes
     assert not result.publishable
+    assert result.package.decision_sets[0].audit.admission_disposition == "input_not_ready"
+    assert result.disposition is AdmissionDisposition.INPUT_NOT_READY
 
 
 def test_p12_binding_digest_uses_the_validated_object_and_consumes_raw(tmp_path: Path):

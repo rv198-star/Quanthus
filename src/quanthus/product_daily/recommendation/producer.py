@@ -65,6 +65,8 @@ from quanthus.product_daily.recommendation.contracts import (
     EntryPlan,
 )
 
+RULE_DAY_PRODUCER_VERSION = "1.1.0"
+
 
 def _json_digest(value: object) -> str:
     """sha256 over the canonical JSON of value (sort keys, compact, ASCII-free)."""
@@ -412,6 +414,7 @@ class CandidateEvaluationReceipt:
                 "policy_id": policy.policy_id,
                 "policy_version": policy.version,
                 "candidate_rule_digest": policy.candidate_rule_digest,
+                "policy_digest": policy.digest,
                 "decision_cutoff": policy.decision_cutoff.isoformat(),
                 "candidates": CandidateEvaluationReceipt._candidate_payload(candidates),
                 "held_signals": [
@@ -505,7 +508,7 @@ class AdvicePolicy:
     eligible_at: datetime
     expires_at: datetime
     candidate_rule_digest: str
-    producer_version: str = PACKAGE_VERSION
+    producer_version: str = RULE_DAY_PRODUCER_VERSION
     # Runtime configuration must name accepted producers. An empty set admits none;
     # allowlisting is separate from execution, which run_daily_advice owns.
     trusted_producer_ids: tuple[str, ...] = ()
@@ -544,6 +547,26 @@ class AdvicePolicy:
             raise ProductDailyError(
                 "invalid_publish", "published_at precedes the declared decision_cutoff"
             )
+
+    @property
+    def binding_payload(self) -> dict[str, Any]:
+        return {
+            "policy_id": self.policy_id,
+            "version": self.version,
+            "producer_version": self.producer_version,
+            "evidence_mode": self.evidence_mode,
+            "candidate_rule_digest": self.candidate_rule_digest,
+            "trusted_producer_ids": sorted(self.trusted_producer_ids),
+            "decision_cutoff": self.decision_cutoff.isoformat(),
+            "published_at": self.published_at.isoformat(),
+            "window_ref": self.window_ref,
+            "eligible_at": self.eligible_at.isoformat(),
+            "expires_at": self.expires_at.isoformat(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return _json_digest(self.binding_payload)
 
 
 @dataclass(frozen=True)
@@ -948,6 +971,14 @@ class DailyAdviceProducer:
 
         if policy.evidence_mode == "formal_runner":
             run_signals: tuple[CandidateSignal | HeldSignal, ...] = (*candidates, *held_signals)
+            if policy.producer_version != evaluation_receipt.producer_version:
+                return self._block(
+                    diagnostics=diagnostics,
+                    assessment=assessment,
+                    disposition=AdmissionDisposition.INPUT_NOT_READY,
+                    reason="producer_version_mismatch",
+                    detail={},
+                )
             if (
                 evaluation_receipt.evaluation_started_at is None
                 or evaluation_receipt.source_closure_digest is None
@@ -1333,21 +1364,19 @@ class DailyAdviceProducer:
                 )
             )
 
+        blocked_content = any(item.stage == INPUT_BLOCKED for item in decisions)
+        ended_only = all(item.stage == ENDED for item in decisions)
         audit = self._audit(
             facts=facts,
             policy=policy,
             git_revision=git_revision,
             receipt=evaluation_receipt,
             admission_disposition=(
-                AdmissionDisposition.PUBLISHABLE.value
-                if any(item.stage == ENTRY_PLAN for item in decisions)
-                else "empty_advice"
+                AdmissionDisposition.INPUT_NOT_READY.value
+                if blocked_content
+                else ("empty_advice" if ended_only else AdmissionDisposition.PUBLISHABLE.value)
             ),
-            empty_reason=(
-                None
-                if any(item.stage == ENTRY_PLAN for item in decisions)
-                else "no qualified entry candidate"
-            ),
+            empty_reason=(None if not ended_only else "no qualified entry candidate"),
             per_member_clock=per_member_clock,
             signals=(*candidates, *held_signals),
         )
@@ -1369,7 +1398,9 @@ class DailyAdviceProducer:
         )
         return ProducerResult(
             package=package,
-            disposition=assessment.disposition,
+            disposition=(
+                AdmissionDisposition.INPUT_NOT_READY if blocked_content else assessment.disposition
+            ),
             diagnostics=tuple(diagnostics),
             assessment=assessment,
         )

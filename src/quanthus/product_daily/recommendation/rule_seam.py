@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
+from pathlib import Path
 from time import perf_counter
 from typing import Any
 
@@ -76,6 +77,7 @@ from quanthus.product_daily.recommendation.contracts import (
     DailyFactsView,
 )
 from quanthus.product_daily.recommendation.producer import (
+    RULE_DAY_PRODUCER_VERSION,
     AccountFactsView,
     AdvicePolicy,
     CandidateEvaluationReceipt,
@@ -85,6 +87,7 @@ from quanthus.product_daily.recommendation.producer import (
     HeldSignal,
     ProducerResult,
 )
+from quanthus.product_daily.recommendation.runtime_identity import code_identity, consumer_identity
 from quanthus.product_daily.risk import ExpertEntryEligibility
 
 
@@ -258,6 +261,28 @@ class HeldReviewSubject:
             "decision_at": self.decision_at.isoformat(),
             "source_evidence_digest": self.source_evidence_digest,
         }
+
+
+def _held_no_trend_evidence(
+    *,
+    subject_id: str,
+    security_id: str,
+    snapshot_id: str,
+    knowledge_cutoff: datetime,
+    topology_digest: str,
+) -> dict[str, Any]:
+    """Versioned context-only evidence; no trend assessment/prediction is requested."""
+    return {
+        "schema_version": "quanthus.p11.held-no-trend-context.v1",
+        "subject_id": subject_id,
+        "security_id": security_id,
+        "snapshot_id": snapshot_id,
+        "knowledge_cutoff": knowledge_cutoff.astimezone(timezone.utc).isoformat(),
+        "topology_digest": topology_digest,
+        "assessment_requested": False,
+        "score_applicability": "ABSTAINED",
+        "scope": "held_position_management",
+    }
 
 
 class RuleSeamAdapter:
@@ -506,10 +531,13 @@ class RuleSeamAdapter:
             panel_report=self.resources.panel_report,
             position_state=position_state,
             trend_observation_digest=sha256_digest(
-                {
-                    "held_review": event.event_id,
-                    "trend": "not_requested",
-                }
+                _held_no_trend_evidence(
+                    subject_id=event.event_id,
+                    security_id=event.identity.security_id,
+                    snapshot_id=event.identity.snapshot_id,
+                    knowledge_cutoff=event.knowledge_cutoff,
+                    topology_digest=self.runner.topology_digest,
+                )
             ),
             position_facts=position_facts,
         )
@@ -553,6 +581,52 @@ def _digest(label: str) -> str:
     import hashlib
 
     return "sha256:" + hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
+def _projection_issues(
+    features: SecurityFeatureFacts,
+    row: CandidateDailyInput,
+    *,
+    entry: bool,
+) -> tuple[str, ...]:
+    """Bind prepared domain output to the exact source coordinate before expert use."""
+    fields = []
+    for field, expected in (
+        ("security_code", row.listing_code),
+        ("signal_date", row.session_date),
+        ("mark_price", row.close_price),
+        ("industry_id", row.static_level1_industry_id),
+        ("listing_sessions", row.listing_sessions),
+    ):
+        if getattr(features, field) != expected:
+            fields.append(field)
+    if features.mark_price is None or features.mark_price <= 0:
+        fields.append("mark_price")
+    if entry:
+        for name in ("security_name", "industry_id"):
+            value = getattr(features, name)
+            if not isinstance(value, str) or not value.strip():
+                fields.append(name)
+        if features.price_bound is None or features.price_bound <= 0:
+            fields.append("price_bound")
+    return tuple(dict.fromkeys(fields))
+
+
+def _held_source_only(row: CandidateDailyInput) -> SecurityFeatureFacts:
+    """Reject an unbound feature payload while retaining independent base facts.
+
+    These values come from the already-read source row; no domain feature is inferred.
+    Holding duration/marked return can still trigger the fixed base guardian.
+    """
+    return SecurityFeatureFacts(
+        security_code=row.listing_code,
+        signal_date=row.session_date,
+        rsi14=None,
+        realized_volatility20=None,
+        listing_sessions=row.listing_sessions,
+        mark_price=row.close_price if row.close_price is not None and row.close_price > 0 else None,
+        industry_id=row.static_level1_industry_id,
+    )
 
 
 def evaluate_day(
@@ -609,6 +683,10 @@ def evaluate_day(
     )
     decisions: list[SeamDecision] = []
     excluded: list[dict[str, str]] = []
+    source_rows: dict[tuple[str, date], list[CandidateDailyInput]] = {}
+    for row in rows:
+        if row.knowledge_cutoff <= knowledge_cutoff:
+            source_rows.setdefault((row.listing_code, row.session_date), []).append(row)
     for candidate in scan.candidates:
         code = candidate.listing_code
         if held_facts_by_security is not None and code in held_facts_by_security:
@@ -627,6 +705,23 @@ def evaluate_day(
                 }
             )
             continue
+        matching = source_rows.get((code, candidate.record.identity.signal_date), [])
+        issues = (
+            ("source_row",)
+            if len(matching) != 1
+            else _projection_issues(facts, matching[0], entry=True)
+        )
+        if issues:
+            excluded.append(
+                {
+                    "security_code": code,
+                    "reason": "feature_projection_invalid",
+                    "member_or_field": "|".join(issues),
+                    "at": knowledge_cutoff.isoformat(),
+                    "scope": "new_entry",
+                }
+            )
+            continue
         decisions.append(
             adapter.evaluate_security(
                 candidate=candidate,
@@ -640,15 +735,9 @@ def evaluate_day(
         for code in sorted(held_facts_by_security):
             position_facts = held_facts_by_security[code]
             facts = features_by_security.get(code)
-            review_rows = [
-                row
-                for row in rows
-                if row.listing_code == code
-                and facts is not None
-                and row.session_date == facts.signal_date
-                and row.knowledge_cutoff <= knowledge_cutoff
-            ]
-            if len(review_rows) != 1 or facts is None:
+            dates = [day for row_code, day in source_rows if row_code == code]
+            review_rows = source_rows.get((code, max(dates)), []) if dates else []
+            if len(review_rows) != 1:
                 held_decisions.append(
                     HeldDecision(
                         security_code=code,
@@ -663,6 +752,22 @@ def evaluate_day(
                 )
                 continue
             row = review_rows[0]
+            issues = (
+                ("feature_facts",) if facts is None else _projection_issues(facts, row, entry=False)
+            )
+            if issues:
+                excluded.append(
+                    {
+                        "security_code": code,
+                        "reason": "held_feature_projection_invalid",
+                        "member_or_field": "|".join(issues),
+                        "at": knowledge_cutoff.isoformat(),
+                        "scope": "held_features",
+                        "fallback": "source_only_base_review",
+                    }
+                )
+                facts = _held_source_only(row)
+            assert facts is not None
             review = HeldReviewSubject(
                 identity=EventIdentity(
                     row.security_id,
@@ -844,7 +949,6 @@ def seam_to_candidates(
 
 
 RULE_DAY_PRODUCER_ID = "p11.fixed-rule-day"
-RULE_DAY_PRODUCER_VERSION = "1.1.0"
 
 
 @dataclass(frozen=True)
@@ -907,6 +1011,7 @@ def run_daily_advice(
     ):
         raise ProductDailyError("daily_clock_binding_mismatch", "daily clock identity differs")
     require_text(run_id, "run_id")
+    library_root = find_project_root(Path(__file__))
     started_at = clock()
     require_aware(started_at, "evaluation_started_at")
     stage_start = perf_counter()
@@ -925,8 +1030,12 @@ def run_daily_advice(
         knowledge_cutoff=policy.decision_cutoff,
         held_facts_by_security=held_facts_by_security,
         prior_deterioration_sessions_by_security=prior_deterioration_sessions_by_security,
-        shared_prereq_ok=shared_prereq_ok,
-        shared_prereq_reason=shared_prereq_reason,
+        shared_prereq_ok=shared_prereq_ok and policy.producer_version == RULE_DAY_PRODUCER_VERSION,
+        shared_prereq_reason=(
+            "producer_version_mismatch"
+            if policy.producer_version != RULE_DAY_PRODUCER_VERSION
+            else shared_prereq_reason
+        ),
     )
     evaluation_elapsed = perf_counter() - stage_start
     assembly_start = perf_counter()
@@ -943,6 +1052,10 @@ def run_daily_advice(
     require_aware(completed_at, "evaluation_completed_at")
     source_closure = {
         "schema_version": "quanthus.p11-rule-source-closure.v1",
+        "code_provenance": code_identity(library_root),
+        "consumer": consumer_identity(library_root),
+        "source_policy_digest": source_policy.semantic_digest,
+        "split_policy_digest": split_policy.semantic_digest,
         "snapshot_id": snapshot_id,
         "snapshot_manifest_digest": snapshot_manifest_digest,
         "raw_inputs_digest": sha256_digest(
@@ -980,6 +1093,10 @@ def run_daily_advice(
         "intake_verified_at": facts.intake_verified_at.isoformat(),
         "policy_id": policy.policy_id,
         "policy_version": policy.version,
+        "policy_digest": policy.digest,
+        "policy": policy.binding_payload,
+        "day_blocked": seam.day_blocked,
+        "day_block_reason": seam.day_block_reason,
         "decision_cutoff": policy.decision_cutoff.isoformat(),
         "candidate_rule_digest": policy.candidate_rule_digest,
         "members": [m.to_dict() for m in sorted(facts.members, key=lambda m: m.member_id)],
@@ -1003,6 +1120,15 @@ def run_daily_advice(
                 "action": d.action,
                 "decision_digest": d.decision_digest,
                 "reason": d.reason,
+                "trend_context": None
+                if d.decision is None
+                else _held_no_trend_evidence(
+                    subject_id=d.decision.event_id,
+                    security_id=d.decision.governance.security_code,
+                    snapshot_id=d.decision.governance.snapshot_id,
+                    knowledge_cutoff=d.decision.governance.knowledge_cutoff,
+                    topology_digest=d.decision.topology_digest,
+                ),
             }
             for d in seam.held_decisions
         ],
@@ -1041,7 +1167,7 @@ def run_daily_advice(
             ),
         )
         receipt = dataclasses.replace(receipt, coverage_digest=receipt.expected_coverage_digest())
-    result = DailyAdviceProducer(repo_root=find_project_root())._assemble(
+    result = DailyAdviceProducer(repo_root=library_root)._assemble(
         facts=facts,
         account=account,
         policy=policy,
@@ -1050,6 +1176,31 @@ def run_daily_advice(
         held_signals=held,
         evaluation_receipt=receipt,
     )
+    if seam.day_blocked:
+        result = dataclasses.replace(
+            result,
+            diagnostics=(
+                {
+                    "reason": seam.day_block_reason or "shared_prerequisite_failed",
+                    "scope": "whole_day",
+                    "stage": "shared_prerequisite",
+                },
+            ),
+        )
+    elif len(candidates) != len(seam.entries):
+        result = dataclasses.replace(
+            result,
+            diagnostics=(
+                {
+                    "reason": "entry_materialization_mismatch",
+                    "scope": "whole_day",
+                    "expected": len(seam.entries),
+                    "actual": len(candidates),
+                },
+            ),
+        )
+    elif seam.excluded:
+        result = dataclasses.replace(result, diagnostics=(*result.diagnostics, *seam.excluded))
     return RuleDayOutput(
         seam,
         candidates,

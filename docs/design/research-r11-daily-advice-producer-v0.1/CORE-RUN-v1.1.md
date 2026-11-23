@@ -86,3 +86,35 @@ reported as NOT_RUN. The M2 raw adapter, P10 source qualification/publisher and 
 facts, P11 action adoption and the P12 isolation-station acceptance remain separate work.
 Historical U06/U07 stays parked. No market rows, strategy thresholds, P6 runtime, accounts,
 production configuration or deployment change in this repair.
+
+## Successor after the 1bee0686 review
+
+The 1bee candidate remains CHANGES_REQUIRED. The successor binds prepared feature code,
+signal date, close/mark price, industry and listing-session coordinate to the exact scan
+row before entry evaluation. Missing required entry projection fields produce named local
+exclusions and preserve qualified neighbors. For held reviews an unbound feature payload
+is discarded; a source-only view carries no inferred domain feature, and independently
+qualified duration/marked-return base guards still run. Unknown branches hold and alert.
+
+Holding and exit plans now count as non-empty audit content. Only an ENDED-only package
+is empty advice. Source closure and result diagnostics preserve a named whole-day block,
+and local exclusions are retained in diagnostics as well as source closure.
+
+The normal producer version is shared by policy, receipt and audit. A mismatched policy
+version blocks the run. The complete policy digest, including window_ref/eligible/expires,
+binds the receipt and source closure. Held context uses a versioned no-trend contract with
+assessment_requested=false; the actual scorer is abstained, with the context body retained.
+
+Code provenance records the checkout HEAD separately from the last source/config commit
+and tree. Local uncommitted source is explicitly marked dirty with actual file hashes and
+no asserted committed source identity. Metadata-only checkpoint commits therefore do not
+replace the executable source identity. Source and split policy digests are also recorded.
+
+`config/research/r11/d1b-20261124/p12-consumer.synthetic.v1.json` pins the existing 9de1cdb9
+test consumer and loader bytes. Integration tests verify that consumer, using an explicit
+QUANTHUS_P12_WORKTREE_ROOT or discovery of the pinned Git worktree; no absolute machine
+path is embedded in the tests. This binding is synthetic compatibility only, separate from
+P12's future E5 consumer registration. These changes keep RuleDayOutput's seven fields and
+their types unchanged. The Owner's paper_quote_feed principle is a separate pending
+machine-policy update: it applies to P10-verified T+1 preopen fields, not daily source or
+historical qualification.

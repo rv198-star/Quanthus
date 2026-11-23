@@ -1,0 +1,16 @@
+{
+  "schema_version": "quanthus.p11.p12-consumer-binding.v1",
+  "binding_id": "p11-p12-g1-synthetic-compatibility",
+  "binding_version": "1.0.0",
+  "use_grade": "SYNTHETIC_COMPATIBILITY_ONLY",
+  "source_commit": "9de1cdb999f692d6cc1cd5be13b53116600ab4bf",
+  "source_tree": "53417ed848db0b78acb928ea2f7d1bfafa44be95",
+  "loader_entry": "quanthus.platform.adapters.p12_synthetic_fixture.load_synthetic_fixture",
+  "source_files_sha256": {
+    "src/quanthus/capabilities/decision_access/__init__.py": "bb0584ac734f02ce29ba22942fe03686bf4f3b1a7376b5b2298d719b6d8f1fe8",
+    "src/quanthus/platform/adapters/p12_synthetic_fixture.py": "c0ea957c47cd021299c16cdeab0c32823bbd2ff3065c986281efdc1d9c41b5bf",
+    "src/quanthus/shared/fact_contracts.py": "54ba64674c76e3392bb6d649ab52db35d96f9eae8caa1e19f5c4635e6ee6f07e",
+    "src/quanthus/shared/values.py": "6059bfd2f55102fe5b5a8a3effbab852c736a4f6618f44435fb02aa21c5ef8d9"
+  },
+  "production_adoption": "NOT_REGISTERED"
+}

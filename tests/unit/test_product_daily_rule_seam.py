@@ -24,6 +24,7 @@ from quanthus.expert_strategy.registry import ExpertStrategyRegistry
 from quanthus.expert_strategy.runner import FormalStrategyRunner, position_facts_evidence
 from quanthus.feature_registry import load_feature_registry
 from quanthus.policy import find_project_root
+from quanthus.product_daily.contracts import ProductDailyError
 from quanthus.product_daily.recommendation.contracts import (
     DailyFactsView,
     MemberEvidence,
@@ -794,12 +795,16 @@ def _p12_loader():
     import sys
     from pathlib import Path
 
-    p12_root = Path(
-        os.environ.get(
-            "QUANTHUS_P12_WORKTREE_ROOT",
-            "/Users/william/Projects/Github/Quanthus/artifacts/worktrees/p12-paper-integration-20261120",
+    from quanthus.policy import find_project_root
+    from quanthus.product_daily.recommendation.runtime_identity import resolve_p12_test_root
+
+    try:
+        p12_root = resolve_p12_test_root(
+            find_project_root(Path(__file__)),
+            os.environ.get("QUANTHUS_P12_WORKTREE_ROOT"),
         )
-    )
+    except ProductDailyError as exc:
+        pytest.fail(f"Pinned P12 consumer unavailable: {exc}")
     p12_src = p12_root / "src"
     if not p12_src.is_dir():
         pytest.fail(
@@ -863,6 +868,9 @@ def _forward_chain(
     feature_override=None,
     policy_override=None,
     omit_features=(),
+    extra_entries=(),
+    run_override=None,
+    return_output=False,
 ):
     """Run the real prospective seam -> producer chain and return (result, produced)."""
     target = date(2026, 11, 24)
@@ -894,6 +902,22 @@ def _forward_chain(
         RULE_DAY_PRODUCER_ID,
         run_daily_advice,
     )
+
+    for code in extra_entries:
+        features[code] = _features(code, Decimal("60"), Decimal("0.20"), signal_date=target)
+        rows.extend(
+            dataclasses.replace(
+                row,
+                security_id=f"security-{code}",
+                listing_id=f"listing-{code}",
+                listing_code=code,
+                company_id=f"company-{code}",
+                source_evidence_digest=sha256_digest(
+                    {"code": code, "row": row.source_evidence_digest}
+                ),
+            )
+            for row in _prospective_series(days, cutoff_hour=18, cutoff_minute=1)
+        )
 
     if feature_override:
         features.update(feature_override)
@@ -941,7 +965,10 @@ def _forward_chain(
         run_id="run-pc9",
         held_facts_by_security=held,
         clock=lambda: policy.decision_cutoff,
+        **(run_override or {}),
     )
+    if return_output:
+        return output
     return output.seam, output.result, output.candidates, output.held_signals
 
 
@@ -1223,7 +1250,7 @@ def test_core_missing_held_features_is_explicit_holding_alert(tmp_path, runner, 
     )
     assert not entries and len(held_signals) == 1
     assert seam.held_decisions[0].action == "hold_alert"
-    assert seam.held_decisions[0].decision is None
+    assert seam.held_decisions[0].decision.action.final_action.value == "no_action"
     assert result.publishable
     decision = result.package.decision_sets[0].decisions[0]
     assert decision.stage == "holding" and decision.entry is None
@@ -1251,3 +1278,215 @@ def test_core_empty_advice_requires_an_actual_scan(tmp_path, runner, resources):
     assert receipt["evaluation_started_at"] is not None
     assert receipt["source_closure_digest"].startswith("sha256:")
     assert result.package.decision_sets[0].decisions[0].stage == "ended"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("security_code", "999999"),
+        ("signal_date", date(2026, 11, 23)),
+        ("mark_price", Decimal("999")),
+        ("industry_id", "forged-industry"),
+        ("listing_sessions", 199),
+        ("mark_price", None),
+        ("security_name", None),
+        ("price_bound", None),
+    ],
+)
+def test_review_1bee_bad_projection_is_local(tmp_path, runner, resources, field, value):
+    bad = dataclasses.replace(
+        _features("600000", Decimal("60"), Decimal("0.20"), signal_date=date(2026, 11, 24)),
+        **{field: value},
+    )
+    seam, result, signals, _ = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        feature_override={"600000": bad},
+        extra_entries=("600001",),
+    )
+    assert result.publishable, result.diagnostics
+    assert {s.security_code for s in signals} == {"600001"}
+    assert {d.security_code for d in seam.entries} == {"600001"}
+    assert {e["security_code"] for e in seam.excluded} == {"600000"}
+    assert any(field in e["member_or_field"] for e in seam.excluded)
+    _p12_loader()(result.package.decision_sets[0].to_dict())
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("security_code", "999999"),
+        ("signal_date", date(2026, 11, 23)),
+        ("mark_price", Decimal("999")),
+        ("industry_id", "forged-industry"),
+        ("listing_sessions", 199),
+    ],
+)
+def test_review_1bee_invalid_held_features_keep_known_base_exit(
+    tmp_path,
+    runner,
+    resources,
+    field,
+    value,
+):
+    held = HeldPositionFacts(
+        40,
+        Decimal("0.05"),
+        0,
+        position_facts_evidence(
+            unit_id="held-reviewed",
+            holding_sessions=40,
+            marked_return=Decimal("0.05"),
+            prior_strategy_reduction_count=0,
+        ),
+    )
+    bad = dataclasses.replace(
+        _features("600001", Decimal("60"), Decimal("0.20"), signal_date=date(2026, 11, 24)),
+        **{field: value},
+    )
+    seam, result, _, held_signals = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        trigger=False,
+        held={"600001": held},
+        feature_override={"600001": bad},
+    )
+    assert result.publishable, result.diagnostics
+    assert held_signals[0].security_code == "600001"
+    assert seam.held_decisions[0].security_code == "600001"
+    assert seam.held_decisions[0].action == "exit"
+    assert any(e["security_code"] == "600001" for e in seam.excluded)
+    assert seam.held_decisions[0].features.rsi14 is None
+
+
+def test_review_1bee_held_audit_is_nonempty(tmp_path, runner, resources):
+    held = HeldPositionFacts(
+        40,
+        Decimal("0.05"),
+        0,
+        position_facts_evidence(
+            unit_id="held-audit",
+            holding_sessions=40,
+            marked_return=Decimal("0.05"),
+            prior_strategy_reduction_count=0,
+        ),
+    )
+    _, result, _, _ = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        trigger=False,
+        held={"600001": held},
+    )
+    audit = result.package.decision_sets[0].audit
+    assert audit.admission_disposition != "empty_advice"
+    assert audit.empty_reason is None
+
+
+def test_review_1bee_day_block_reason_survives(tmp_path, runner, resources):
+    _, result, _, _ = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        run_override={"shared_prereq_ok": False, "shared_prereq_reason": "named_shared_failure"},
+    )
+    assert result.package is None
+    assert any(d["reason"] == "named_shared_failure" for d in result.diagnostics)
+
+
+def test_review_1bee_producer_version_mismatch_blocks(tmp_path, runner, resources):
+    _, result, _, _ = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        policy_override={"producer_version": "9.9.9"},
+    )
+    assert result.package is None
+    assert any(d["reason"] == "producer_version_mismatch" for d in result.diagnostics)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"window_ref": "other-declared-window"},
+        {"expires_at": datetime(2026, 11, 25, 14, 59, tzinfo=SHANGHAI)},
+    ],
+)
+def test_review_1bee_receipt_binds_execution_window(tmp_path, runner, resources, change):
+    _, before, _, _ = _forward_chain(tmp_path, runner, resources)
+    _, after, _, _ = _forward_chain(tmp_path, runner, resources, policy_override=change)
+    first = before.package.decision_sets[0].audit.evaluation_receipt
+    second = after.package.decision_sets[0].audit.evaluation_receipt
+    assert first["binding_digest"] != second["binding_digest"]
+
+
+def test_review_1bee_run_closure_carries_provenance_and_versioned_no_trend(
+    tmp_path, runner, resources
+):
+    held = HeldPositionFacts(
+        40,
+        Decimal("0.05"),
+        0,
+        position_facts_evidence(
+            unit_id="held-provenance",
+            holding_sessions=40,
+            marked_return=Decimal("0.05"),
+            prior_strategy_reduction_count=0,
+        ),
+    )
+    output = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        trigger=False,
+        held={"600001": held},
+        return_output=True,
+    )
+    closure = output.source_closure
+    assert closure["code_provenance"]["source_reference_commit"]
+    assert closure["code_provenance"]["source_tree"]
+    assert closure["code_provenance"]["code_content_digest"].startswith("sha256:")
+    assert closure["source_policy_digest"].startswith("sha256:")
+    assert closure["split_policy_digest"].startswith("sha256:")
+    assert closure["consumer"]["source_commit"] == "9de1cdb999f692d6cc1cd5be13b53116600ab4bf"
+    assert closure["policy"]["window_ref"]
+    assert closure["policy"]["eligible_at"] and closure["policy"]["expires_at"]
+    assert (
+        output.receipt.producer_version
+        == output.result.package.decision_sets[0].audit.producer_version
+    )
+    assert output.receipt.source_closure_digest == sha256_digest(closure)
+    no_trend = closure["held_decisions"][0]["trend_context"]
+    assert no_trend["schema_version"] == "quanthus.p11.held-no-trend-context.v1"
+    assert no_trend["assessment_requested"] is False
+    assert any(
+        e.digest == sha256_digest(no_trend)
+        for s in output.seam.held_decisions[0].decision.action.scoring_outputs
+        for e in s.evidence
+    )
+    assert all(
+        s.applicability.name == "ABSTAINED"
+        for s in output.seam.held_decisions[0].decision.action.scoring_outputs
+    )
+
+
+def test_review_1bee_consumer_version_mismatch_refuses_loader(tmp_path):
+    import shutil
+
+    from quanthus.product_daily.recommendation.runtime_identity import (
+        consumer_identity,
+        resolve_p12_test_root,
+    )
+
+    source = resolve_p12_test_root(ROOT)
+    identity = consumer_identity(ROOT)
+    for name in identity["source_files_sha256"]:
+        dst = tmp_path / name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / name, dst)
+    path = next(iter(identity["source_files_sha256"]))
+    (tmp_path / path).write_text("# changed consumer source\n")
+    with pytest.raises(ProductDailyError, match="consumer source differs"):
+        resolve_p12_test_root(ROOT, str(tmp_path))

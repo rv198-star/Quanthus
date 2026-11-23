@@ -2,17 +2,18 @@
 # Nightly P12 daily advice run for the isolated 8791 paper account.
 #
 # Resolves the market date from the bound base24 pointer's DATES index (the
-# latest qualified daily) unless P12_MARKET_DATE is pinned, and derives the
-# next session by skipping weekend days.  A trading-calendar edge (holiday)
-# is an operator-pinned P12_NEXT_SESSION; the job still records whichever
-# value it ran with inside the receipt.
+# latest qualified daily) unless P12_MARKET_DATE is pinned, and derives a
+# next-session candidate.  The job itself refuses a next_session that the
+# governed calendar member does not confirm (M2 F2): a manifest without the
+# calendar member is a whole-day block, never a calendar-day-plus-one guess.
 set -euo pipefail
 
-JOB_ROOT="$""{QUANTHUS_P12_DAILY_JOB_ROOT:-/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5}"
-STATE_DIR="$""{P12_STATE_DIR:-/var/lib/quanthus-p12-isolated}"
-ACCOUNT="$""{P12_ACCOUNT:-SYN-PAPER-A}"
-MARKET_DATE="$""{P12_MARKET_DATE:-}"
-NEXT_SESSION="$""{P12_NEXT_SESSION:-}"
+JOB_ROOT="${QUANTHUS_P12_DAILY_JOB_ROOT:-/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5}"
+STATE_DIR="${QUANTHUS_P12_DAILY_STATE_DIR:-${P12_STATE_DIR:-/var/lib/quanthus-p12-isolated}}"
+ACCOUNT="${P12_ACCOUNT:-SYN-PAPER-A}"
+MARKET_DATE="${P12_MARKET_DATE:-}"
+NEXT_SESSION="${P12_NEXT_SESSION:-}"
+DECISION_CUTOFF="${QUANTHUS_P12_DECISION_CUTOFF:-}"
 
 if [ -z "$MARKET_DATE" ]; then
   MARKET_DATE="$(python3 - "$JOB_ROOT" <<'PY'
@@ -39,9 +40,16 @@ PY
 )"
 fi
 
-exec python3 -m quanthus.p12_daily.daily_job \
-    --state-dir "$STATE_DIR" \
-    --job-root "$JOB_ROOT" \
-    --account "$ACCOUNT" \
-    --market-date "$MARKET_DATE" \
+args=(
+    --state-dir "$STATE_DIR"
+    --job-root "$JOB_ROOT"
+    --account "$ACCOUNT"
+    --market-date "$MARKET_DATE"
     --next-session "$NEXT_SESSION"
+)
+if [ -n "$DECISION_CUTOFF" ]; then
+    args+=(--decision-cutoff "${MARKET_DATE}T${DECISION_CUTOFF}")
+fi
+
+exec python3 -m quanthus.p12_daily.daily_job "${args[@]}"
+

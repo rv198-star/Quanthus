@@ -5,15 +5,28 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+DynamicUser=yes
+User=quanthus-p12-isolated
+StateDirectory=quanthus-p12-isolated
+StateDirectoryMode=0700
+UMask=0077
 # The job root binds the CN02 base24 daily-cycle pointer; the state dir holds
 # the isolated paper ledger, published packages and run receipts.
 Environment=QUANTHUS_P12_DAILY_JOB_ROOT=/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5
-Environment=PYTHONPATH=/opt/quanthus/p12-acceptance/current
-ExecStart=/usr/bin/python3 -m quanthus.p12_daily.daily_job \
-    --state-dir /var/lib/quanthus-p12-isolated \
-    --account SYN-PAPER-A \
-    --market-date %E{P12_MARKET_DATE} \
-    --next-session %E{P12_NEXT_SESSION}
-# Market dates are supplied by the wrapper ops/bin/p12-daily-run (computes the
-# latest completed session and the next trading day) or by a drop-in env file.
+Environment=QUANTHUS_P12_DAILY_STATE_DIR=/var/lib/quanthus-p12-isolated
+Environment=PYTHONPATH=/opt/quanthus/p12-acceptance/current/src
+# The configured per-use decision cutoff (forward-day-1 22:30+08).  The job
+# blocks the whole day when this is absent; completed_at or a file mtime is
+# never substituted for it.
+Environment=QUANTHUS_P12_DECISION_CUTOFF=22:30:00+08:00
+ExecStart=/opt/quanthus/p12-acceptance/current/ops/bin/p12-daily-run
 TimeoutStartSec=1800
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/quanthus-p12-isolated
+
+[Install]
+WantedBy=multi-user.target
+

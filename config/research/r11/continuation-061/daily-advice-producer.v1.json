@@ -1,0 +1,32 @@
+{
+  "schema": "quanthus.r11.continuation-proposal.v1",
+  "id": "R11-DAILY-ADVICE-PRODUCER-061",
+  "version": "0.1.0",
+  "work_item": "P11-R11-USE-002",
+  "issue": 700,
+  "status": "proposal_not_adopted",
+  "scope": "synthetic engineering only; no real market rows, account binding, or publication",
+  "producer": {
+    "module": "quanthus.product_daily.recommendation",
+    "package_schema": "quanthus.r11.daily-advice.v1",
+    "decision_set_shape": "p12 MarketDecisionSet/MarketDecision/EntryIntent/Explanation",
+    "stages": ["entry_plan", "waiting", "holding", "exit_plan", "input_blocked", "ended"],
+    "contract_reason_codes": ["NEW_ENTRY_SIGNAL", "INPUT_NOT_READY"]
+  },
+  "rules": {
+    "cutoff": "declared in AdvicePolicy before produce; never inferred from member times",
+    "per_member_clock": "each member needs a concrete consumer-visible available_at <= decision_cutoff",
+    "required_missing": "INPUT_NOT_READY; no formal package is emitted",
+    "empty_advice": "only when all required members are admitted and no candidate was injected",
+    "published_at": "injected real publish instant; never backfilled; must not precede cutoff",
+    "append_only": "same market_date rewrite refused; extension requires version bump preserving prior digests"
+  },
+  "does_not_grant": [
+    "real signal production",
+    "FormalStrategyRunner full real adaptation",
+    "decide_entry account-fact mapping",
+    "P12 configuration_binding registration",
+    "real or public publication",
+    "U06/U07/U08 progression"
+  ]
+}

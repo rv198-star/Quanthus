@@ -1,0 +1,69 @@
+{
+  "schema_version": "quanthus.p11-d1b.machine-policy.v1",
+  "invalidations": [
+    {
+      "field": "price_limit_or_halt_unavailable",
+      "value": "block",
+      "type": "boolean",
+      "unit": "flag",
+      "observed_at": "T+1 pre-open",
+      "timezone": "Asia/Shanghai",
+      "applies_to_actions": [
+        "new_entry",
+        "confirm"
+      ],
+      "reason": "T+1 suspension/native price limit not yet a named qualified source",
+      "veto": true
+    },
+    {
+      "field": "auction_snapshot_unavailable",
+      "value": "unavailable",
+      "type": "enum",
+      "unit": "state",
+      "observed_at": "T+1 09:00-09:25",
+      "timezone": "Asia/Shanghai",
+      "applies_to_actions": [
+        "confirm"
+      ],
+      "reason": "no named auction semantic snapshot; zero-volume/last_price not a substitute",
+      "veto": false
+    }
+  ],
+  "position_caps": [
+    {
+      "field": "single_security_fraction",
+      "value": "from card position_and_execution base_trial_position_fraction",
+      "denominator": "account_equity",
+      "priority": "expert_ceiling",
+      "veto": false,
+      "note": "NOT the historical 4/8/20 research caps; those are not adopted values"
+    },
+    {
+      "field": "per_industry_max",
+      "value": "EntryLimits.max_active_or_reserved_per_industry",
+      "denominator": "active_or_reserved_count",
+      "priority": "entry_limit",
+      "veto": false
+    },
+    {
+      "field": "new_buckets_per_day",
+      "value": "EntryLimits.max_new_buckets_per_day",
+      "denominator": "buckets",
+      "priority": "entry_limit",
+      "veto": false
+    },
+    {
+      "field": "total_position",
+      "value": "quantity_limits.total",
+      "denominator": "account_equity",
+      "priority": "capacity",
+      "veto": false
+    }
+  ],
+  "veto_precedence": [
+    "force_liquidate_veto",
+    "reduce_only_veto",
+    "block_new"
+  ],
+  "expert_veto": "system/position guardian + scorer; a veto always suppresses executable entry"
+}

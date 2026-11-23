@@ -111,7 +111,7 @@ engineering receipt and reported at handoff.
 
 The first focused run found a cross-cutoff withdrawal interval incorrectly falling back to
 the old version. Selection now keeps that interval explicitly blocked; the failing probe is
-retained. Routine format/type repairs are included. This reuses the repository's established
+retained. A second probe retains an old cutoff snapshot when a withdrawal is known to have been published only after that cutoff, even if its channel visibility is still unknown. The original failing probe and fix are retained. Routine format/type repairs are included. This reuses the repository's established
 exclusive-link/fsync pattern and stays outside existing publisher/runtime modules.
 
 Blueprint DATA is reviewed with no facet change: a metadata engineering candidate does not
@@ -119,4 +119,3 @@ qualify new data or change research quality/value/admission. The finite request 
 found no related DATA conclusions. Old research and #701 remain parked; #727 still waits for
 pool/fields/window. Remaining: independent code review, final field/pool binding, real timing
 evidence, isolated node acceptance and any separately authorized adapter deployment.
-

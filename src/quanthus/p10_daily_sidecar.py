@@ -602,6 +602,11 @@ def select_as_of(
         assert receipt is not None
         result = assess(record, config, receipt, previous=previous)
         heads[key] = record
+        published = record["publication"]["published_at"]
+        if published is not None and _instant(published["start"]) > at:
+            # A later publication cannot have been visible before its own lower bound.
+            # Keep the visibility field unknown; do not manufacture an available_at.
+            continue
         visible = record["publication"]["visible_at"]
         if visible is None:
             visibility_gaps.add("EVENT_VISIBILITY_UNKNOWN")

@@ -501,6 +501,16 @@ def test_no_payload_reads_are_needed_for_same_identity_verification(tmp_path, mo
     assert assess(record, cfg, receipt).disposition == "CLOCKS_COMPLETE_FOR_CONSUMER_REVIEW"
 
 
+def test_known_late_publication_with_unknown_visibility_cannot_revoke_past_snapshot():
+    old, cfg, receipt = specimen()
+    late = withdraw(old)
+    late["publication"]["published_at"] = clock("23:00:00", "publication_commit", "published")
+    late["publication"]["visible_at"] = None
+    seal(late)
+    result = select([old, late], cfg, {old["record_id"]: receipt, late["record_id"]: receipt})
+    assert result.record_id == old["record_id"]
+
+
 def test_source_after_observation_close_can_meet_explicit_evening_deadline():
     record, cfg, receipt = specimen()
     assert record["binding"]["observation_end"] == "2026-11-24T15:00:00+08:00"

@@ -612,3 +612,59 @@ def test_migration_rehearsal_preserves_ledger_surfaces(tmp_path):
     assert report.consistent is True
     assert all(report.surfaces.values())
 
+
+
+def test_trend_observation_bound_to_package_and_receipt(tmp_path):
+    """M2 F10: a P11 trend observation lands on the decision and the receipt."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    cand = one_candidate(
+        trend_observation={
+            "observation_digest": "sha256:trend-1",
+            "applicability": "APPLIED",
+            "raw_value": "0.83",
+        }
+    )
+    runner = SyntheticRuleRunner(candidates=(cand,))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    obs = receipt["trend_observations"][0]
+    assert obs["observation_digest"] == "sha256:trend-1"
+    stored = DailyPackageStore(state).package_for(MARKET_DATE)
+    loaded = load_decision_set_dict(stored.decision_set, mode="synthetic")
+    codes = [e.code for d in loaded.decisions for e in d.explanations]
+    assert "TREND_OBSERVATION" in codes
+
+
+def test_abstained_trend_observation_kept(tmp_path):
+    """An abstained observation is still recorded and bound, not dropped."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    cand = one_candidate(
+        trend_observation={
+            "observation_digest": "sha256:trend-abstained",
+            "applicability": "ABSTAINED",
+            "raw_value": None,
+        }
+    )
+    runner = SyntheticRuleRunner(candidates=(cand,))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        holdings=(),
+    )
+    obs = receipt["trend_observations"][0]
+    assert obs["applicability"] == "ABSTAINED"
+    assert obs["raw_value"] is None
+    assert obs["observation_digest"] == "sha256:trend-abstained"
+

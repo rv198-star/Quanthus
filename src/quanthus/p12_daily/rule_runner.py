@@ -150,6 +150,28 @@ def _no_op_decision(component_ref: VersionRef, market_date: date) -> MarketDecis
     )
 
 
+def _trend_explanations(item: dict, component_ref: VersionRef) -> tuple:
+    # M2 F10: a P11 evaluate_trend_stability observation bound to this event is
+    # recorded on the emitted decision verbatim - digest, applicability and
+    # raw_value (kept even when the observation abstained).
+    obs = item.get("trend_observation")
+    if not isinstance(obs, dict) or not obs.get("observation_digest"):
+        return ()
+    text = (
+        "trend_observation digest=" + str(obs["observation_digest"])
+        + " applicability=" + str(obs.get("applicability", "ABSTAINED"))
+        + " raw_value=" + ("None" if obs.get("raw_value") is None else str(obs["raw_value"]))
+    )
+    return (
+        Explanation(
+            "TREND_OBSERVATION",
+            ExplanationUse.EXPLANATION,
+            f"{component_ref.ref_id}@{component_ref.version}",
+            text,
+        ),
+    )
+
+
 class SyntheticRuleRunner:
     '''Batch-A synthetic runner: a fixed, labelled replay rule over the snapshot.
 
@@ -255,7 +277,8 @@ class SyntheticRuleRunner:
                             "qualified daily-core snapshot; account sizing is solved by "
                             "the P12 risk path before confirmation",
                         ),
-                    ),
+                    )
+                    + _trend_explanations(item, self._ref),
                     next_observation=None,
                     chart=chart,
                     entry=entry,

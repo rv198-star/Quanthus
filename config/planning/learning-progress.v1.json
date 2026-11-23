@@ -15256,6 +15256,41 @@
       "reviewed_modules": [
         "DATA"
       ]
+    },
+    {
+      "id": "CP-726-20261123T225631402868Z",
+      "recorded_at": "2026-11-23T22:56:31.402868+00:00",
+      "actor": "P10 Owner session propagation after binding repair",
+      "work_item": "P10-DATA-P12-DAILY-001",
+      "outcome": "no_module_change",
+      "summary": "Propagate policy/M0 and immutable retry/resource/API repair to session metadata; new combined configv2.2 with legacy formats preserved pending.",
+      "evidence": [
+        {
+          "id": "SESSION-BINDING-REPAIR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-sidecar-binding-repair-004/FOCUSED-SESSION-v2.json",
+          "sha256": "d0a8dfb90bdcadedfb96aa2933446845edaa1a1567fe8ed70946b8f2f3f32396",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "114 focused, changed-file lint/type; scoped code only, not source or consumer acceptance."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Pure metadata successor only; no DATA qualification/value/admission or deployment change.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-P12-DAILY-001",
+          "number": 726,
+          "title": "[P10-DATA-P12-DAILY-001] 固定日线供给的发布、可见时点与修订撤回合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T21:06:19Z",
+          "body_sha256": "0a3fba23c3e36bf6f206d912995fe25b0c230c9529613b6770feedacca1c5f94"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
     }
   ],
   "history_imports": [

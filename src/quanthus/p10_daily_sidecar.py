@@ -15,7 +15,7 @@ import tempfile
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from pathlib import Path, PurePosixPath
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -24,7 +24,11 @@ SCHEMA = "quanthus.p10.daily-consumer-sidecar.v1"
 CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v1"
 BOUNDED_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v1.1"
 M0_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v1.2"
-RUNTIME_VERSION = "p10-daily-consumer-sidecar-runtime-v1.2"
+SESSION_SCHEMA = "quanthus.p10.daily-consumer-sidecar.v2"
+SESSION_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v2"
+SESSION_BOUNDED_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v2.1"
+M0_SESSION_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v2.2"
+RUNTIME_VERSION = "p10-daily-consumer-sidecar-runtime-v2.2"
 STORE_SCHEMA = "quanthus.p10.sidecar-verified-event-envelope.v1"
 _SHA = re.compile(r"sha256:[0-9a-f]{64}")
 _REVISION = re.compile(r"[0-9a-f]{40}")
@@ -101,6 +105,40 @@ def _path(value: Any) -> str:
 
 
 @dataclass(frozen=True)
+class MeasureRequirement:
+    """Consumer-owned measures: a publisher cannot downgrade a volume use to price-only."""
+
+    member_id: str
+    measures: tuple[str, ...]
+    volume_basis: str
+
+    def __post_init__(self) -> None:
+        _text(self.member_id, "MEMBER_ID_REQUIRED")
+        _require(
+            type(self.measures) is tuple
+            and bool(self.measures)
+            and all(
+                isinstance(m, str) and m in {"open", "high", "low", "close", "volume", "turnover"}
+                for m in self.measures
+            )
+            and len(set(self.measures)) == len(self.measures),
+            "INVALID_CONSUMED_MEASURES",
+        )
+        quantity = bool(set(self.measures) & {"volume", "turnover"})
+        _require(
+            self.volume_basis in ({"FULL_DAY", "REGULAR_ONLY"} if quantity else {"NOT_REQUESTED"}),
+            "INVALID_REQUIRED_VOLUME_BASIS",
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.member_id,
+            "measures": sorted(self.measures),
+            "volume_basis": self.volume_basis,
+        }
+
+
+@dataclass(frozen=True)
 class ResourceLimits:
     """Versioned consumer metadata budgets, never a warehouse-wide member threshold."""
 
@@ -142,6 +180,7 @@ class ConsumerConfig:
     requirements: tuple[tuple[str, bool], ...]
     resource_limits: ResourceLimits | None = None
     m0_ref: str | None = None
+    measure_requirements: tuple[MeasureRequirement, ...] = ()
 
     def __post_init__(self) -> None:
         for value in (self.config_id, self.consumer_id, self.purpose_id):
@@ -171,9 +210,22 @@ class ConsumerConfig:
             _require(isinstance(self.resource_limits, ResourceLimits), "INVALID_RESOURCE_LIMITS")
             self.resource_limits.check("max_members", len(self.requirements))
 
+        _require(type(self.measure_requirements) is tuple, "INVALID_MEASURE_REQUIREMENTS")
+        measure_ids = []
+        for measure in self.measure_requirements:
+            _require(isinstance(measure, MeasureRequirement), "INVALID_MEASURE_REQUIREMENT")
+            _require(measure.member_id in ids, "UNKNOWN_MEASURE_MEMBER")
+            measure_ids.append(measure.member_id)
+        _require(len(set(measure_ids)) == len(measure_ids), "DUPLICATE_MEASURE_MEMBER")
+
     def to_dict(self) -> dict[str, Any]:
+        schema = (
+            (SESSION_BOUNDED_CONFIG_SCHEMA if self.resource_limits else SESSION_CONFIG_SCHEMA)
+            if self.measure_requirements
+            else (BOUNDED_CONFIG_SCHEMA if self.resource_limits else CONFIG_SCHEMA)
+        )
         result: dict[str, Any] = {
-            "schema": BOUNDED_CONFIG_SCHEMA if self.resource_limits else CONFIG_SCHEMA,
+            "schema": schema,
             "config_id": self.config_id,
             "consumer_id": self.consumer_id,
             "purpose_id": self.purpose_id,
@@ -187,8 +239,14 @@ class ConsumerConfig:
         }
         if self.resource_limits:
             result["resource_limits"] = asdict(self.resource_limits)
+        if self.measure_requirements:
+            result["measure_requirements"] = [
+                m.to_dict() for m in sorted(self.measure_requirements, key=lambda m: m.member_id)
+            ]
         if self.m0_ref is not None:
-            result["schema"] = M0_CONFIG_SCHEMA
+            result["schema"] = (
+                M0_SESSION_CONFIG_SCHEMA if self.measure_requirements else M0_CONFIG_SCHEMA
+            )
             result["m0_ref"] = self.m0_ref
         return result
 
@@ -196,10 +254,15 @@ class ConsumerConfig:
     def from_dict(cls, raw: Any) -> ConsumerConfig:
         _require(isinstance(raw, Mapping), "INVALID_CONSUMER_CONFIG")
         assert isinstance(raw, Mapping)
-        explicit_m0 = raw.get("schema") == M0_CONFIG_SCHEMA
-        bounded = raw.get("schema") == BOUNDED_CONFIG_SCHEMA or (
+        explicit_m0 = raw.get("schema") in {M0_CONFIG_SCHEMA, M0_SESSION_CONFIG_SCHEMA}
+        bounded = raw.get("schema") in {BOUNDED_CONFIG_SCHEMA, SESSION_BOUNDED_CONFIG_SCHEMA} or (
             explicit_m0 and "resource_limits" in raw
         )
+        session_version = raw.get("schema") in {
+            SESSION_CONFIG_SCHEMA,
+            SESSION_BOUNDED_CONFIG_SCHEMA,
+            M0_SESSION_CONFIG_SCHEMA,
+        }
         obj = _object(
             raw,
             {
@@ -214,11 +277,20 @@ class ConsumerConfig:
                 "requirements",
             }
             | ({"resource_limits"} if bounded else set())
+            | ({"measure_requirements"} if session_version else set())
             | ({"m0_ref"} if explicit_m0 else set()),
             "INVALID_CONSUMER_CONFIG",
         )
         _require(
-            obj["schema"] in {CONFIG_SCHEMA, BOUNDED_CONFIG_SCHEMA, M0_CONFIG_SCHEMA}
+            obj["schema"]
+            in {
+                CONFIG_SCHEMA,
+                BOUNDED_CONFIG_SCHEMA,
+                M0_CONFIG_SCHEMA,
+                SESSION_CONFIG_SCHEMA,
+                SESSION_BOUNDED_CONFIG_SCHEMA,
+                M0_SESSION_CONFIG_SCHEMA,
+            }
             and isinstance(obj["requirements"], list),
             "INVALID_CONSUMER_CONFIG",
         )
@@ -228,6 +300,20 @@ class ConsumerConfig:
         for item in obj["requirements"]:
             row = _object(item, {"id", "required"}, "INVALID_REQUIREMENT")
             requirements.append((row["id"], row["required"]))
+        measures = []
+        if session_version:
+            _require(
+                isinstance(obj["measure_requirements"], list) and bool(obj["measure_requirements"]),
+                "INVALID_MEASURE_REQUIREMENTS",
+            )
+            for item in obj["measure_requirements"]:
+                row = _object(
+                    item, {"id", "measures", "volume_basis"}, "INVALID_MEASURE_REQUIREMENT"
+                )
+                _require(isinstance(row["measures"], list), "INVALID_CONSUMED_MEASURES")
+                measures.append(
+                    MeasureRequirement(row["id"], tuple(row["measures"]), row["volume_basis"])
+                )
         return cls(
             obj["config_id"],
             obj["consumer_id"],
@@ -237,8 +323,9 @@ class ConsumerConfig:
             obj["policy_sha256"],
             obj["code_revision"],
             tuple(requirements),
-            ResourceLimits.from_dict(obj["resource_limits"]) if bounded else None,
+            resource_limits=ResourceLimits.from_dict(obj["resource_limits"]) if bounded else None,
             m0_ref=obj["m0_ref"] if explicit_m0 else None,
+            measure_requirements=tuple(measures),
         )
 
     @property
@@ -272,7 +359,13 @@ _INVENTORY_FIELDS = ("id", "path", "sha256", "size_bytes", "required", "source_v
 
 def inventory_digest(members: Sequence[Mapping[str, Any]]) -> str:
     try:
-        rows = [{key: item[key] for key in _INVENTORY_FIELDS} for item in members]
+        rows = [
+            {
+                key: item[key]
+                for key in (*_INVENTORY_FIELDS, *(("session",) if "session" in item else ()))
+            }
+            for item in members
+        ]
         return digest(sorted(rows, key=lambda item: item["id"]))
     except (KeyError, TypeError) as exc:
         raise SidecarError("INVALID_INVENTORY") from exc
@@ -282,7 +375,15 @@ def input_identity(record: Mapping[str, Any], config: ConsumerConfig) -> str:
     """Complete reusable input identity, excluding later publication/channel observations."""
     try:
         rows = [
-            {key: item[key] for key in (*_INVENTORY_FIELDS, "source_available_at", "state")}
+            {
+                key: item[key]
+                for key in (
+                    *_INVENTORY_FIELDS,
+                    "source_available_at",
+                    "state",
+                    *(("session",) if record["schema"] == SESSION_SCHEMA else ()),
+                )
+            }
             for item in record["members"]
         ]
         source_proofs = [
@@ -388,6 +489,130 @@ _REVISION_FIELDS = {
 }
 
 
+_SESSION_FIELDS = {
+    "session_scope",
+    "volume_basis",
+    "official_price_close_anchor",
+    "full_day_volume_amount_observation_end",
+    "applicability",
+    "vendor_scope_evidence",
+}
+_APPLICABILITY_FIELDS = {
+    "venue_mic",
+    "board",
+    "security_scope_sha256",
+    "effective_start",
+    "effective_end",
+    "after_hours",
+    "calendar_sha256",
+    "rule_sha256",
+    "evidence",
+}
+
+
+def _metadata_ref(raw: Any) -> None:
+    ref = _object(raw, {"uri", "sha256"}, "INVALID_SESSION_EVIDENCE")
+    _text(ref["uri"], "SESSION_EVIDENCE_URI_REQUIRED")
+    _sha(ref["sha256"])
+
+
+def _session_blockers(
+    raw: Any,
+    requirement: MeasureRequirement,
+    day: date,
+    price_anchor: datetime,
+    clocks: Sequence[tuple[datetime, datetime] | None],
+) -> set[str]:
+    """Check declared, identity-bound metadata; upstream owns applicability/source truth."""
+    if raw is None:
+        return {"SESSION_METADATA_UNKNOWN"}
+    meta = _object(raw, _SESSION_FIELDS, "INVALID_SESSION_METADATA")
+    _require(
+        meta["session_scope"]
+        in {"REGULAR_AND_APPLICABLE_AFTER_HOURS", "REGULAR_ONLY", "AFTER_HOURS_ONLY", "UNKNOWN"},
+        "INVALID_SESSION_SCOPE",
+    )
+    _require(
+        meta["volume_basis"] in {"FULL_DAY", "REGULAR_ONLY", "INDEPENDENT_AFTER_HOURS", "UNKNOWN"},
+        "INVALID_VOLUME_BASIS",
+    )
+    reasons: set[str] = set()
+    if set(requirement.measures) & {"open", "high", "low", "close"}:
+        if meta["official_price_close_anchor"] is None:
+            reasons.add("PRICE_CLOSE_ANCHOR_UNKNOWN")
+        else:
+            _require(
+                _instant(meta["official_price_close_anchor"]) == price_anchor,
+                "PRICE_CLOSE_ANCHOR_MISMATCH",
+            )
+    # Price-only use is explicitly in consumer config; unknown quantity facts do not gate it.
+    if not set(requirement.measures) & {"volume", "turnover"}:
+        return reasons
+    if meta["volume_basis"] != requirement.volume_basis:
+        reasons.add("VOLUME_BASIS_NOT_" + requirement.volume_basis)
+    if meta["vendor_scope_evidence"] is None:
+        reasons.add("VENDOR_VOLUME_SCOPE_UNKNOWN")
+    else:
+        _metadata_ref(meta["vendor_scope_evidence"])
+    expected_scope = (
+        "REGULAR_AND_APPLICABLE_AFTER_HOURS"
+        if requirement.volume_basis == "FULL_DAY"
+        else "REGULAR_ONLY"
+    )
+    if meta["session_scope"] != expected_scope:
+        reasons.add("SESSION_SCOPE_INCOMPATIBLE")
+    if requirement.volume_basis != "FULL_DAY":
+        return reasons
+    # None is UNKNOWN, including on a date before an expansion. N/A needs named evidence.
+    applies = None
+    app = meta["applicability"]
+    if app is None:
+        reasons.add("AFTER_HOURS_APPLICABILITY_UNKNOWN")
+    else:
+        app = _object(app, _APPLICABILITY_FIELDS, "INVALID_SESSION_APPLICABILITY")
+        for field in ("venue_mic", "board"):
+            _text(app[field], "APPLICABILITY_IDENTITY_REQUIRED")
+        for field in ("security_scope_sha256", "calendar_sha256", "rule_sha256"):
+            _sha(app[field])
+        _metadata_ref(app["evidence"])
+        try:
+            start = date.fromisoformat(app["effective_start"])
+            end = (
+                date.fromisoformat(app["effective_end"])
+                if app["effective_end"] is not None
+                else None
+            )
+        except (TypeError, ValueError) as exc:
+            raise SidecarError("INVALID_SESSION_EFFECTIVE_RANGE") from exc
+        _require(end is None or start <= end, "INVALID_SESSION_EFFECTIVE_RANGE")
+        if not (start <= day and (end is None or day <= end)):
+            reasons.add("SESSION_EFFECTIVE_SCOPE_MISMATCH")
+        applies = app["after_hours"]
+        _require(
+            applies in {"APPLIES", "NOT_APPLICABLE", "UNKNOWN"}, "INVALID_AFTER_HOURS_APPLICABILITY"
+        )
+        if applies == "UNKNOWN":
+            reasons.add("AFTER_HOURS_APPLICABILITY_UNKNOWN")
+    volume_end_raw = meta["full_day_volume_amount_observation_end"]
+    if volume_end_raw is None:
+        reasons.add("VOLUME_OBSERVATION_END_UNKNOWN")
+    else:
+        volume_end = _instant(volume_end_raw)
+        _require(
+            volume_end.astimezone(ZoneInfo("Asia/Shanghai")).date() == day
+            and volume_end >= price_anchor,
+            "INVALID_VOLUME_OBSERVATION_END",
+        )
+        if applies == "APPLIES":
+            floor = datetime.combine(day, time(15, 30), ZoneInfo("Asia/Shanghai"))
+            if volume_end < floor:
+                reasons.add("FULL_DAY_VOLUME_WINDOW_INCOMPLETE")
+        for label, clock_value in zip(("SOURCE", "PUBLICATION", "AVAILABLE"), clocks, strict=True):
+            if clock_value is not None and clock_value[0] < volume_end:
+                reasons.add(label + "_PRECEDES_VOLUME_COMPLETENESS")
+    return reasons
+
+
 def assess(
     value: Mapping[str, Any],
     config: ConsumerConfig,
@@ -401,7 +626,11 @@ def assess(
     if limits:
         limits.check("max_record_bytes", len(raw))
     record = _object(_strict_json(raw), _TOP, "INVALID_RECORD_SCHEMA")
-    _require(record["schema"] == SCHEMA, "UNSUPPORTED_SCHEMA")
+    _require(record["schema"] in {SCHEMA, SESSION_SCHEMA}, "UNSUPPORTED_SCHEMA")
+    session_version = record["schema"] == SESSION_SCHEMA
+    _require(
+        session_version == bool(config.measure_requirements), "SESSION_CONFIG_VERSION_MISMATCH"
+    )
     _require(record["record_id"] == record_id(record), "RECORD_ID_MISMATCH")
     grade = record["evidence_grade"]
     _require(grade in {"SYNTHETIC", "HISTORICAL_METADATA_ONLY", "SOURCE_OBSERVED"}, "INVALID_GRADE")
@@ -443,10 +672,15 @@ def assess(
     if limits:
         limits.check("max_members", len(members))
     required = dict(config.requirements)
+    measures = {m.member_id: m for m in config.measure_requirements}
     found = []
     paths = []
     for item in members:
-        m = _object(item, _MEMBER_FIELDS, "INVALID_MEMBER_SCHEMA")
+        m = _object(
+            item,
+            _MEMBER_FIELDS | ({"session"} if session_version else set()),
+            "INVALID_MEMBER_SCHEMA",
+        )
         name = _text(m["id"], "MEMBER_ID_REQUIRED")
         found.append(name)
         paths.append(_path(m["path"]))
@@ -463,6 +697,8 @@ def assess(
         if m["state"] != "PRESENT":
             _text(m["unavailable_reason"], "UNAVAILABLE_REASON_REQUIRED")
         _require("5m" not in str(m["path"]).lower(), "FIVE_MINUTE_NOT_IN_SCOPE")
+        if session_version and name not in measures:
+            _require(m["session"] is None, "UNCONSUMED_SESSION_METADATA")
     _require(len(set(found)) == len(found) and len(set(paths)) == len(paths), "DUPLICATE_MEMBER")
     _require(set(found) <= required.keys(), "UNKNOWN_MEMBER")
     _require(
@@ -580,6 +816,16 @@ def assess(
             known = clock(m["source_available_at"], "source_artifact_known", {name})
             validated = clock(m["validated_at"], "validation_complete", {name})
             available = clock(m["available_at"], "consumer_channel_visible", {name})
+            if name in measures:
+                reasons.update(
+                    _session_blockers(
+                        m["session"],
+                        measures[name],
+                        day,
+                        observation_end,
+                        (known, published, available),
+                    )
+                )
             if m["validated_at"] is not None:
                 _require(m["validated_at"] == verification.clock(), "VALIDATION_CLOCK_MISMATCH")
             if known and validated:

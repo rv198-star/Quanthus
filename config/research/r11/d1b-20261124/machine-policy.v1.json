@@ -33,10 +33,10 @@
     {
       "field": "single_security_fraction",
       "value": "from card position_and_execution base_trial_position_fraction",
-      "denominator": "account_equity",
+      "denominator": "unit_notional_bucket_budget",
       "priority": "expert_ceiling",
       "veto": false,
-      "note": "NOT the historical 4/8/20 research caps; those are not adopted values"
+      "note": "base_trial_position_fraction is a fraction of the trial unit_notional/bucket budget (same bucket as the expert allowed_maximum_position ceiling); P12 sizes the actual quantity against real account equity/cash/fees. NOT the historical 4/8/20 research caps"
     },
     {
       "field": "per_industry_max",

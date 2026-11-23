@@ -722,9 +722,11 @@ class PaperAccount:
 
         Main-board A-shares (60xxxx/00xxxx) trade inside ±10%; STAR (68xxxx)
         and ChiNext (30xxxx) inside ±20%; BSE (4xxxxx/8xxxxx/920xxx) ±30%.
-        ST/*ST names carry ±5% on main board but the name flag is not part of
-        the quote contract here, so the base band is used and the audit note
-        records the limitation.  Returns None when previous_close is missing.
+        Under the rules effective 2026-07-06, main-board ST/*ST names trade
+        inside ±10% (raised from ±5%); the base band already yields that, so
+        the calculation is correct for them too.  The ST name flag is not
+        part of the quote contract here, so the audit note records the
+        limitation.  Returns None when previous_close is missing.
         """
         if quote is None or quote.previous_close is None or quote.previous_close <= 0:
             return None

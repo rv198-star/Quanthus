@@ -26,6 +26,7 @@ Frozen semantics (2026-11-24):
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -49,11 +50,6 @@ from quanthus.shared.values import VersionRef
 EXCHANGE_TZ = timezone(timedelta(hours=8))
 SESSION_OPEN = time(9, 30)
 SESSION_CLOSE = time(15, 0)
-# The full-day volume/amount set closes at the end of the 15:05-15:30
-# after-hours window.  It is a separate receipt timestamp: 15:00 marks the
-# price-close observation anchor only and never stands in for volume
-# completeness (frozen decision 2026-11-24, issue #726).
-FULL_DAY_VOLUME_AMOUNT_END = time(15, 30)
 
 RUNNER_REF = "p12.synthetic-replay-rule"
 RUNNER_VERSION = "v1"
@@ -67,6 +63,19 @@ RULE_VERSION_REJECTED = "RULE_VERSION_REJECTED"
 # The synthetic batch-A producer identity; bound only to synthetic accounts
 # in the publish-gate config, never to a live/simulation account.
 SYNTHETIC_PRODUCER_ID = "p12-synthetic-rule-producer"
+
+
+def _candidate_sort_key(item: dict) -> str:
+    '''Deterministic identity ordering for a decision/candidate record -
+    never compares dicts positionally (audit R9).'''
+
+    return json.dumps(
+        {
+            "opportunity_id": item.get("opportunity_id"),
+            "security_code": item.get("security_code"),
+        },
+        sort_keys=True,
+    )
 
 
 @dataclass(frozen=True)
@@ -115,6 +124,10 @@ class RunnerRequest:
     # and must not double-enter a held security.
     holdings: tuple[HeldPositionFact, ...]
     published_at: datetime
+    # The run identity the P12 job mints for this attempt (audit R10): the
+    # runner echoes it inside its evaluation receipt so a receipt minted by a
+    # different run can never pass the publish gate.
+    run_id: str | None = None
     # The configured decision cutoff (tz-aware): the package's knowledge_cutoff
     # is this value, not the 15:00 close anchor or the job's completed_at.
     decision_cutoff: datetime = None
@@ -166,6 +179,13 @@ class HoldingDirective:
 class RunnerOutput:
     decision_set: MarketDecisionSet
     exclusions: tuple[SecurityExclusion, ...]
+    # Publishable flag and its reason (issue #723 comment-7114642978, audit
+    # R11): the runner itself declares whether this run may publish.  When
+    # publishable is False the publish gate blocks the day and the receipt
+    # carries disposition/diagnostics verbatim.
+    publishable: bool = True
+    disposition: str | None = None
+    diagnostics: dict | None = None
     # Run-seam contract (issue #719 seam note): the evaluation coverage receipt
     # and the source closure are produced by the runner inside this same run.
     # P12 transports and validates them, never constructs, parses or rewrites
@@ -249,8 +269,24 @@ class SyntheticRuleRunner:
         exclusions: list[SecurityExclusion] = []
         trend_observations: list[TrendObservation] = []
         holding_directives: list[HoldingDirective] = []
+        # Audit R5: the port consumes the real listed-securities facts read
+        # from the verified 1d payload; a candidate whose security is not in
+        # the input's listing set is dropped with its reason recorded, never
+        # evaluated from configuration alone.
+        listed = set(snapshot.listed_securities or ())
         for item in self._candidates:
             code = str(item["security_code"])
+            if listed and code not in listed:
+                exclusions.append(
+                    SecurityExclusion(
+                        security_code=code,
+                        reason_code="INPUT_UNAVAILABLE",
+                        detail=(
+                            "security not present in the verified 1d listed facts"
+                        ),
+                    )
+                )
+                continue
             drop_reason = item.get("unqualified_reason")
             if drop_reason:
                 # Single-security input defect: drop this security's new
@@ -443,6 +479,45 @@ class SyntheticRuleRunner:
                         ),
                     )
                 )
+            elif fact.unavailable_reason:
+                # Audit R11: a holding whose own account facts are incomplete
+                # cannot be evaluated - HOLD_AND_ALERT, position stays held.
+                holding_directives.append(
+                    HoldingDirective(
+                        security_code=fact.security_code,
+                        action=HOLD_AND_ALERT,
+                        reason_code="INPUT_UNAVAILABLE",
+                        detail=(
+                            "holding evidence incomplete: "
+                            + str(fact.unavailable_reason)
+                        ),
+                    )
+                )
+                decisions.append(
+                    MarketDecision(
+                        opportunity_id="OPP-D1B-{}-{}".format(
+                            snapshot.market_date.strftime("%Y%m%d"),
+                            fact.security_code,
+                        ),
+                        security_code=fact.security_code,
+                        security_name=fact.security_code,
+                        stage=OpportunityStage.HOLDING,
+                        reason_codes=(HOLD_AND_ALERT,),
+                        explanations=(
+                            Explanation(
+                                HOLD_AND_ALERT,
+                                ExplanationUse.EXPLANATION,
+                                f"{self._ref.ref_id}@{self._ref.version}",
+                                "holding evidence incomplete; the position "
+                                "stays held and alerts",
+                            ),
+                        ),
+                        next_observation="next qualified daily input",
+                        chart=None,
+                        entry=None,
+                        component_ref=self._ref,
+                    )
+                )
         decisions.extend(
             MarketDecision(
                 opportunity_id="OPP-D1B-{}-{}".format(
@@ -522,18 +597,28 @@ class SyntheticRuleRunner:
                 "published_at": request.published_at.isoformat(),
             }
         )
+        # The receipt echoes the job-minted run identity when the job supplies
+        # one (audit R10); bound into the coverage digest so a receipt minted
+        # by a prior or different-manifest run can never pass the gate.
+        if request.run_id:
+            run_id = request.run_id
         evaluated_candidates = sorted(
-            {
+            ({
                 "opportunity_id": d.opportunity_id,
                 "security_code": d.security_code,
             }
-            for d in decision_set.decisions
+            for d in decision_set.decisions),
+            key=_candidate_sort_key,
         )
         coverage_payload = {
             "producer_id": SYNTHETIC_PRODUCER_ID,
             "producer_version": self._ref.version,
             "run_id": run_id,
             "evaluated_universe": evaluated_universe,
+            # Bind this exact input: a receipt minted over another manifest
+            # digest or scope recomputes a different coverage (audit R10).
+            "manifest_sha256": snapshot.core_manifest_sha256,
+            "package_id": snapshot.package_id,
         }
         evaluation_receipt = {
             "producer_id": SYNTHETIC_PRODUCER_ID,

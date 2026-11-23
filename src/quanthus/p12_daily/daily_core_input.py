@@ -83,11 +83,20 @@ class DailyCoreSnapshot:
     corporate_actions: dict | None = None
     # M2 v3: the volume member's scope and its declared full-day observation
     # end are carried verbatim - never inferred, never rewritten.  An UNKNOWN
-    # scope stays UNKNOWN (it is never promoted to FULL_DAY), and a missing
-    # volume end leaves the scope UNKNOWN.  The rule judges the value; P12
-    # only records it on the receipt.
+    # scope stays UNKNOWN (it is never promoted to FULL_DAY), and a declared
+    # FULL_DAY whose observation end is absent keeps FULL_DAY verbatim while
+    # separately recording the member's contract breach and evidence gap.
+    # The rule judges the value; P12 only records it on the receipt.
     volume_scope: str = "UNKNOWN"
     full_day_volume_amount_observation_end: datetime | None = None
+    # Audit R1: a declared FULL_DAY without its observation_end is a member
+    # contract breach - the scope value is preserved verbatim and the breach
+    # is recorded here, never silently degraded to UNKNOWN.
+    volume_member_breach: str | None = None
+    # Audit R5: the raw security codes actually read from the verified 1d
+    # payload (the listing facts the port consumes).  Empty when the payload
+    # cannot be read; the runner may only evaluate what is actually present.
+    listed_securities: tuple[str, ...] = ()
 
 
 VOLUME_SCOPE_FULL_DAY = "FULL_DAY"
@@ -248,6 +257,58 @@ def qualify_daily_input(
             ),
         )
 
+    # Audit R4: re-hash every member file the manifest declares, not only the
+    # descriptor fields.  A consumed member whose bytes no longer match its
+    # declared sha256 blocks the run.  The parent Base manifest is re-hashed
+    # from its own file, never trusted by description alone.
+    for member in manifest.get("files") or []:
+        rel = str(member.get("path") or "")
+        declared = str(member.get("sha256") or "")
+        if not rel or not declared.startswith("sha256:"):
+            continue
+        candidate = (core_root / rel).resolve()
+        try:
+            candidate.relative_to(core_root)
+        except ValueError:
+            return block(
+                INPUT_UNAVAILABLE,
+                "manifest member " + repr(rel) + " escapes the core root",
+                ("core/" + rel,),
+            )
+        if not candidate.is_file():
+            return block(
+                INPUT_UNAVAILABLE,
+                "manifest member " + repr(rel) + " missing",
+                ("core/" + rel,),
+            )
+        actual = _sha256_file(candidate)
+        if actual != declared:
+            return block(
+                INPUT_UNAVAILABLE,
+                "manifest member " + repr(rel) + " sha256 differs from the declared digest",
+                ("core/" + rel,),
+            )
+    # Re-hash the parent Base manifest when the manifest names its file; the
+    # declared sha must be recomputed, not only compared on description fields.
+    base_member = manifest.get("base") or {}
+    base_ref = base_member.get("path") or base_member.get("manifest")
+    if isinstance(base_ref, str) and base_ref:
+        base_path = Path(base_ref)
+        if not base_path.is_absolute():
+            base_path = (core_root / base_ref).resolve()
+        if not base_path.is_file():
+            return block(
+                INPUT_UNAVAILABLE,
+                "parent base manifest missing: " + str(base_path),
+                ("base_manifest",),
+            )
+        if _sha256_file(base_path) != str(base_member.get("manifest_sha256") or ""):
+            return block(
+                INPUT_UNAVAILABLE,
+                "parent base manifest sha256 differs from the declared digest",
+                ("base_manifest",),
+            )
+
     # 1d payload only: find the declared daily parquet and exclude 5m.
     files = manifest.get("files") or []
     daily_payload: Path | None = None
@@ -263,6 +324,22 @@ def qualify_daily_input(
                 continue
             daily_payload = candidate
             break
+    # Audit R5: read the verified 1d payload's security codes so the port
+    # receives the real listed-securities facts, not only file metadata.
+    listed_securities: tuple[str, ...] = ()
+    if daily_payload is not None and daily_payload.is_file():
+        try:
+            import pyarrow.parquet as pq
+
+            frame = pq.read_table(daily_payload)
+            for name in ("security_code", "code", "symbol"):
+                if name in frame.column_names:
+                    listed_securities = tuple(
+                        sorted({str(v) for v in frame[name].to_pylist() if v})
+                    )
+                    break
+        except Exception:  # noqa: BLE001 - unreadable payload leaves the set empty
+            listed_securities = ()
     row_counts = {
         str(k): int(v)
         for k, v in (entry.get("core_row_counts") or manifest.get("row_counts") or {}).items()
@@ -307,10 +384,17 @@ def qualify_daily_input(
     volume_end = _aware_ts(
         volume_member.get("full_day_volume_amount_observation_end")
     )
-    if volume_end is None and volume_scope == VOLUME_SCOPE_FULL_DAY:
-        # A declared FULL_DAY scope without its observation end cannot be
-        # proven: it degrades to UNKNOWN, never the reverse.
-        volume_scope = VOLUME_SCOPE_UNKNOWN
+    # Audit R1: preserve the source's volume_scope verbatim.  A declared
+    # FULL_DAY with a missing observation_end is a member contract breach and
+    # evidence gap - recorded, never rewritten to UNKNOWN and never proven by
+    # the 15:30 session anchor.  The rule then drops the affected candidate or,
+    # when the member is a hard prerequisite, blocks the day.
+    volume_member_breach = None
+    if volume_scope == VOLUME_SCOPE_FULL_DAY and volume_end is None:
+        volume_member_breach = (
+            "volume member declared FULL_DAY but full_day_volume_amount_observation_end "
+            "is absent; the full-day volume claim is unproven (member contract breach)"
+        )
     return DailyCoreSnapshot(
         pointer_path=pointer_path,
         core_root=core_root,
@@ -331,6 +415,8 @@ def qualify_daily_input(
         corporate_actions=corporate_actions,
         volume_scope=volume_scope,
         full_day_volume_amount_observation_end=volume_end,
+        volume_member_breach=volume_member_breach,
+        listed_securities=listed_securities,
     )
 
 

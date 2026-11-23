@@ -210,6 +210,40 @@ class P12DesktopApplication:
             raise FactError("POLICY_NOT_ADOPTED", "decision package mode differs from account")
         return decisions
 
+    def _skipped_plans(self) -> dict:
+        '''plan_id -> skip record from the package store's skip log (R14).'''
+
+        store = getattr(self._decisions, "_store", None)
+        skipped = getattr(store, "skipped_plans", None)
+        return skipped() if callable(skipped) else {}
+
+    def skip_plan(
+        self,
+        plan_id: str,
+        *,
+        reason: str | None = None,
+        occurred_at: datetime | None = None,
+    ) -> dict:
+        '''Record that the user skipped an actionable plan (issue #721 R14).
+
+        The skip appends one record to the package store's skip log; the plan
+        then reads SKIPPED and can no longer confirm.  It reserves no cash and
+        writes no ledger posting; the record is auditable on the records page.'''
+
+        store = getattr(self._decisions, "_store", None)
+        skip = getattr(store, "skip_plan", None)
+        if not callable(skip):
+            raise FactError(
+                "POLICY_NOT_ADOPTED",
+                "the bound decision source does not support plan skips",
+            )
+        return skip(
+            plan_id=plan_id,
+            skipped_at=occurred_at or self._now(),
+            reason=reason,
+            actor=f"desktop:{self._scope.account_id}",
+        )
+
     # ---- baseline -------------------------------------------------------------------
     def establish_baseline(
         self,
@@ -846,6 +880,20 @@ class P12DesktopApplication:
         current = projection.quantity(plan.security_code)
         reasons: list[str] = []
         linked = [r for r in history.reports if r.suggestion_id == plan.plan_id]
+        # Issue #721 R14: a skipped plan can no longer confirm.  The skip is
+        # recorded in the package store's append-only log; it reserves no cash
+        # and writes no ledger fact.
+        skipped = self._skipped_plans()
+        if plan.plan_id in skipped:
+            return PlanApplicability(
+                plan_id=plan.plan_id,
+                status="SKIPPED",
+                current_qty=current,
+                delta_qty=plan.target_qty - current,
+                account_revision=projection.revision,
+                reason_codes=(),
+                next_step="NONE",
+            )
         has_deviation = any(r.deviations for r in linked) or any(
             self._window_deviation(plan, datetime.fromisoformat(r.occurred_at))
             for r in linked
@@ -1242,9 +1290,17 @@ class P12DesktopApplication:
         )
         # Before publication only facts known then are exposed: dependent-plan states are hidden
         # and a cash-only baseline names no security (older stores recorded a candidate code).
+        # Issue #721 R14: a skipped plan reads SKIPPED on the records page; the
+        # skip reserved no cash and wrote no ledger posting, but it is
+        # auditable alongside the other plan states.
+        skipped = self._skipped_plans()
+        exposed_plans = tuple(
+            replace(p, status="SKIPPED") if p.plan_id in skipped else p
+            for p in history.plans
+        )
         exposed = replace(
             history,
-            plans=history.plans if visible else (),
+            plans=exposed_plans if visible else (),
             baseline_security_code=(
                 history.baseline_security_code if history.baseline_quantity else CASH_ONLY
             ),

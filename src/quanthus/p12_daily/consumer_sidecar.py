@@ -22,11 +22,13 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from quanthus.shared.fact_contracts import FactError
+
+EXCHANGE_TZ = timezone(timedelta(hours=8))
 
 SIDECAR_SCHEMA = "quanthus.p10.daily-consumer-sidecar.v1"
 
@@ -159,9 +161,11 @@ def read_sidecar(
 ) -> SidecarRead:
     '''Load one sidecar record and check the consumed member clocks.
 
-    consumer_now is the moment P12 actually reads the record; it is stamped on
-    each member as received_at/first_read_at/verified_at.  When decision_cutoff
-    is supplied, a hard member whose available_at end exceeds it blocks the run.
+    consumer_now is the moment P12 opens the record.  Each member's
+    received_at / first_read_at / verified_at is stamped from the actual
+    moment P12 observes that member (audit R3), never one shared stamp
+    copied into all three fields.  When decision_cutoff is supplied, a hard
+    member whose available_at end exceeds it blocks the run.
     '''
 
     path = Path(path)
@@ -187,7 +191,10 @@ def read_sidecar(
     published = _clock_bounds((payload.get("publication") or {}).get("published_at"))
     blocked: list[str] = []
 
-    seen_stamp = consumer_now.isoformat()
+    def _observe() -> str:
+        # The real observation moment for this member; per-member distinct.
+        return datetime.now(EXCHANGE_TZ).isoformat()
+
     members: list[MemberReceipt] = []
     for index, raw in enumerate(payload.get("members") or []):
         if not isinstance(raw, dict):
@@ -265,9 +272,9 @@ def read_sidecar(
                     None if av is None else (av[1].isoformat() if av[1] else None),
                 ),
                 unavailable_reason=raw.get("unavailable_reason"),
-                received_at=seen_stamp,
-                first_read_at=seen_stamp,
-                verified_at=seen_stamp,
+                received_at=_observe(),
+                first_read_at=_observe(),
+                verified_at=_observe(),
                 clock_note="; ".join(member_block) or None,
             )
         )

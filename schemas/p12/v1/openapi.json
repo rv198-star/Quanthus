@@ -543,6 +543,68 @@
      }
     ]
    }
+  },
+  "/api/p12/v1/accounts/{account_id}/plans/{plan_id}/skip": {
+   "post": {
+    "operationId": "p12.plans.skip",
+    "summary": "Skip one actionable plan; records a skip, never funds or ledger",
+    "x-quanthus-permission": "p12:report",
+    "security": [
+     {
+      "bearerAuth": []
+     }
+    ],
+    "requestBody": {
+     "required": false,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SkipPlanRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SkipPlanOutcome"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "account_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "plan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
   }
  },
  "components": {
@@ -827,7 +889,8 @@
        "NEEDS_REASSESSMENT",
        "NOT_BOUND",
        "POLICY_NOT_ADOPTED",
-       "SCHEDULED"
+       "SCHEDULED",
+       "SKIPPED"
       ]
      },
      "current_qty": {
@@ -2013,9 +2076,7 @@
     "required": [
      "market_date",
      "published_at",
-     "status",
-     "retracted",
-     "retraction_reason"
+     "status"
     ],
     "properties": {
      "market_date": {
@@ -2590,8 +2651,7 @@
      "package",
      "publication",
      "schema_version",
-     "scope",
-     "run_receipt"
+     "scope"
     ],
     "properties": {
      "account": {
@@ -3262,16 +3322,114 @@
       "minLength": 1
      },
      "metric": {
-      "anyOf": [{"type": "string"}, {"type": "null"}]
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "window_start": {
-      "anyOf": [{"type": "string"}, {"type": "null"}]
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "window_end": {
-      "anyOf": [{"type": "string"}, {"type": "null"}]
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "regime_version": {
-      "anyOf": [{"type": "string"}, {"type": "null"}]
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   },
+   "SkipPlanRequest": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   },
+   "SkipPlanOutcome": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "schema_version",
+     "skipped",
+     "record"
+    ],
+    "properties": {
+     "schema_version": {
+      "$ref": "#/components/schemas/SchemaVersion"
+     },
+     "skipped": {
+      "type": "boolean"
+     },
+     "record": {
+      "$ref": "#/components/schemas/SkipPlanRecord"
+     }
+    }
+   },
+   "SkipPlanRecord": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "plan_id",
+     "skipped_at",
+     "reason",
+     "actor"
+    ],
+    "properties": {
+     "plan_id": {
+      "type": "string",
+      "minLength": 1
+     },
+     "skipped_at": {
+      "$ref": "#/components/schemas/Timestamp"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "actor": {
+      "type": "string",
+      "minLength": 1
      }
     }
    }

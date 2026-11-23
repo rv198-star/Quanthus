@@ -27,7 +27,9 @@ from quanthus.shared.fact_contracts import FactError
 
 PACKAGES_DIR = "daily-packages"
 RETRACTIONS_FILE = "retractions.jsonl"
+SKIPS_FILE = "skipped-plans.jsonl"
 RUNS_DIR = "daily-runs"
+PUBLISHER_REGISTRY_FILE = "publisher-registry.json"
 PACKAGE_SCHEMA = "quanthus.p12.daily-package.v1"
 RETRACTION_SCHEMA = "quanthus.p12.package-retraction.v1"
 RUN_SCHEMA = "quanthus.p12.daily-run.v1"
@@ -113,6 +115,77 @@ class DailyPackageStore:
 
     def _retractions_path(self) -> Path:
         return self._packages / RETRACTIONS_FILE
+
+    def _skips_path(self) -> Path:
+        return self._packages / SKIPS_FILE
+
+    # ---- skips (issue #721 R14) ------------------------------------------------
+    def skipped_plans(self) -> dict:
+        path = self._skips_path()
+        if not path.is_file():
+            return {}
+        out = {}
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            pid = str(record.get("plan_id") or "")
+            if pid:
+                out[pid] = record
+        return out
+
+    def skip_plan(
+        self,
+        *,
+        plan_id: str,
+        skipped_at: datetime,
+        reason: str | None = None,
+        actor: str = "operator",
+    ) -> dict:
+        record = {
+            "schema_version": "quanthus.p12.plan-skip.v1",
+            "plan_id": str(plan_id),
+            "skipped_at": skipped_at.isoformat(),
+            "reason": reason,
+            "actor": actor,
+        }
+        path = self._skips_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        return record
+
+
+    def _registry_path(self) -> Path:
+        return self._root / PUBLISHER_REGISTRY_FILE
+
+    def publisher_registry(self) -> dict[str, str]:
+        '''The trusted publisher ledger: source_id -> registered package digest.
+
+        Written only by the publish gate's own write path.  Readers must not
+        serve a package whose source_id is absent or whose digest differs.'''
+
+        path = self._registry_path()
+        if not path.is_file():
+            return {}
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return {str(k): str(v) for k, v in (raw.get("sources") or {}).items()}
+
+    def register_source(self, source_id: str, package_digest: str) -> None:
+        '''Record a package digest under its source_id in the publish ledger.'''
+
+        registry = self.publisher_registry()
+        registry[str(source_id)] = str(package_digest)
+        _write_atomic(self._registry_path(), {"sources": registry})
 
     def retractions(self) -> tuple[dict, ...]:
         path = self._retractions_path()
@@ -202,7 +275,14 @@ class DailyPackageStore:
                 "retraction instead of replacing it",
             )
         _write_atomic(path, body)
-        return PublishOutcome("published", self._load_package_file(path), None)
+        stored = self._load_package_file(path)
+        # Audit R13: the publish gate writes the trusted publisher ledger.
+        # The registered source_id is bound to this package's digest; a
+        # package whose source_id is unregistered can never be read back.
+        source_id = str(decision_set.get("source_id") or "")
+        if source_id:
+            self.register_source(source_id, stored.file_sha256)
+        return PublishOutcome("published", stored, None)
 
     def retract(
         self,

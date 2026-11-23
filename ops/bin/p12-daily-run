@@ -29,13 +29,22 @@ PY
 fi
 
 if [ -z "$NEXT_SESSION" ]; then
-  NEXT_SESSION="$(python3 - "$MARKET_DATE" <<'PY'
-import sys
-from datetime import date, timedelta
-day = date.fromisoformat(sys.argv[1]) + timedelta(days=1)
-while day.weekday() >= 5:
-    day += timedelta(days=1)
-print(day.isoformat())
+  # Audit R6: read the governed calendar's declared next_session from the
+  # bound manifest, never a calendar-day-plus-one guess.  A manifest without
+  # the calendar member leaves this empty and the job blocks whole-day.
+  NEXT_SESSION="$(python3 - "$JOB_ROOT" "$MARKET_DATE" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1]); day = sys.argv[2]
+try:
+    pointer = json.loads((root / "CURRENT_DAILY_CORE_BASE24.json").read_text())
+    core = Path(pointer["entry"]["core"])
+    if not core.is_absolute():
+        core = root / core
+    manifest = json.loads((core / "manifest.json").read_text())
+    print((manifest.get("calendar") or {}).get("next_session") or "")
+except Exception:
+    print("")
 PY
 )"
 fi
@@ -45,8 +54,10 @@ args=(
     --job-root "$JOB_ROOT"
     --account "$ACCOUNT"
     --market-date "$MARKET_DATE"
-    --next-session "$NEXT_SESSION"
 )
+if [ -n "$NEXT_SESSION" ]; then
+    args+=(--next-session "$NEXT_SESSION")
+fi
 if [ -n "$DECISION_CUTOFF" ]; then
     args+=(--decision-cutoff "${MARKET_DATE}T${DECISION_CUTOFF}")
 fi

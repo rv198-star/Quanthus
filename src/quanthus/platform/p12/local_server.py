@@ -111,10 +111,26 @@ def build_local_kernel(
             paper_replay_fixture, system_clock
         )
     elif daily_packages:
-        from quanthus.p12_daily.package_source import PublishedPackageSource
+        import os
+        from pathlib import Path
+
+        from quanthus.p12_daily.package_source import (
+            PublishedPackageSource,
+            calendar_next_session_provider,
+        )
 
         paper_decisions = PublishedPackageSource(
-            state_dir, system_clock, mode="synthetic"
+            state_dir,
+            system_clock,
+            mode="synthetic",
+            next_session_provider=calendar_next_session_provider(
+                Path(
+                    os.environ.get(
+                        "QUANTHUS_P12_DAILY_JOB_ROOT",
+                        "/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5",
+                    )
+                )
+            ),
         )
     paper_app = build_paper_application(
         state_dir=state_dir,

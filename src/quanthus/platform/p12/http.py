@@ -124,6 +124,30 @@ class P12Endpoints:
 
         return self._run(request_id, call)
 
+    def skip_plan(
+        self,
+        principal: AuthenticatedPrincipal,
+        account_id: str,
+        plan_id: str,
+        body: dict[str, Any],
+        request_id: str,
+        query_string: str = "",
+    ) -> Result:
+        def call(runtime: P12Runtime) -> dict[str, Any]:
+            binding = runtime.binding_for(principal, account_id)
+            self._scope_query(binding, query_string)
+            app = binding.application
+            record = app.skip_plan(
+                plan_id,
+                reason=(body or {}).get("reason"),
+                occurred_at=None,
+            )
+            if not record.get("plan_id"):
+                record["plan_id"] = plan_id
+            return _transport().skip_plan_outcome_dto(record)
+
+        return self._run(request_id, call)
+
     def _read(
         self,
         principal: AuthenticatedPrincipal,

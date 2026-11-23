@@ -79,11 +79,16 @@ def _check(schema: dict[str, Any], value: Any, path: str) -> None:
         if not isinstance(value, dict):
             raise ContractViolation(path, "must be an object")
         expected = set(schema["required"])
+        # Optional fields are declared in properties but absent from required:
+        # they may be present (and are then checked) or omitted (the default).
+        allowed = set(schema.get("properties", {}))
         missing = sorted(expected.difference(value))
-        extra = sorted(set(value).difference(expected))
+        extra = sorted(set(value).difference(allowed))
         if missing or extra:
             raise ContractViolation(path, f"missing={missing} unexpected={extra}")
         for key, child in schema["properties"].items():
+            if key not in value:
+                continue
             _check(child, value[key], f"{path}.{key}")
     elif "enum" in schema and value not in schema["enum"]:
         raise ContractViolation(path, "not an admitted value")

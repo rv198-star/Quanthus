@@ -140,7 +140,7 @@ def env(tmp_path):
 def test_publish_and_idempotent_rerun(env):
     prod, state, _ = env
     runner = SyntheticRuleRunner(candidates=(one_candidate(),))
-    now = datetime(2026, 11, 20, 20, 0, tzinfo=TZ)
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
     r1 = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
@@ -163,7 +163,7 @@ def test_publish_and_idempotent_rerun(env):
 def test_same_day_different_content_refused(env):
     prod, state, _ = env
     runner = SyntheticRuleRunner(candidates=(one_candidate(),))
-    now = datetime(2026, 11, 20, 20, 0, tzinfo=TZ)
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
     run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
@@ -187,7 +187,7 @@ def test_input_blocked_writes_receipt_only(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -221,7 +221,7 @@ def test_wrong_kind_blocked(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -235,7 +235,7 @@ def test_no_qualified_candidate_is_noop_package(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -268,7 +268,7 @@ def test_single_security_exclusion(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -283,7 +283,7 @@ def test_held_security_not_reentered(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(HeldPositionFact(security_code="600000", quantity=500),),
     )
@@ -293,7 +293,7 @@ def test_held_security_not_reentered(env):
 def test_package_source_and_retraction(env):
     prod, state, _ = env
     runner = SyntheticRuleRunner(candidates=(one_candidate(),))
-    now = datetime(2026, 11, 20, 20, 0, tzinfo=TZ)
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
     run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
@@ -302,7 +302,12 @@ def test_package_source_and_retraction(env):
     )
     def clock():
         return datetime(2026, 11, 21, 10, 0, tzinfo=TZ)
-    source = PublishedPackageSource(state, clock, mode="synthetic")
+    source = PublishedPackageSource(
+        state,
+        clock,
+        mode="synthetic",
+        next_session_provider=lambda _today: NEXT_SESSION,
+    )
     scope = AccountScope("SYN-PAPER-A", "synthetic")
     current = source.current(scope)
     assert current.market_date == MARKET_DATE
@@ -351,7 +356,7 @@ def test_wire_dict_loads_through_same_loader(env):
     run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -364,8 +369,13 @@ def test_wire_dict_loads_through_same_loader(env):
 def test_pending_source_when_no_package(tmp_path):
     state = tmp_path / "state"
     def clock():
-        return datetime(2026, 11, 20, 20, 0, tzinfo=TZ)
-    source = PublishedPackageSource(state, clock, mode="synthetic")
+        return datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
+    source = PublishedPackageSource(
+        state,
+        clock,
+        mode="synthetic",
+        next_session_provider=lambda _today: NEXT_SESSION,
+    )
     scope = AccountScope("SYN-PAPER-A", "synthetic")
     pending = source.current(scope)
     assert pending.source_ref.version == "v1"
@@ -398,7 +408,7 @@ def test_history_gate_failure_blocks(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -428,7 +438,7 @@ def test_missing_calendar_blocks(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -458,7 +468,7 @@ def test_missing_corporate_actions_blocks(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -491,7 +501,7 @@ def test_sidecar_publish_records_consumer_stamps(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(), sidecar_path=sidecar,
     )
@@ -516,7 +526,7 @@ def test_sidecar_absent_published_at_null(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -538,7 +548,7 @@ def test_sidecar_withdraw_does_not_replace(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(), sidecar_path=sidecar,
     )
@@ -575,7 +585,7 @@ def test_migration_rehearsal_preserves_ledger_surfaces(tmp_path):
         find_project_root() / "config/p12/synthetic-desktop.v1.json"
     )
     auth = SyntheticRuntimeAuthorization("local-paper:test", frozenset({PAPER_ACCOUNT_ID}))
-    now = lambda: datetime(2026, 11, 20, 20, 0, tzinfo=TZ)  # noqa: E731
+    now = lambda: datetime(2026, 11, 20, 22, 31, tzinfo=TZ)  # noqa: E731
 
     # Build the account on the legacy empty paper-decisions source and buy.
     src_dir = tmp_path / "src_state"
@@ -613,6 +623,7 @@ def test_migration_rehearsal_preserves_ledger_surfaces(tmp_path):
             decision_source=PublishedPackageSource(
                 pkg_state, now, mode="synthetic",
                 account_ids=frozenset({PAPER_ACCOUNT_ID}),
+                next_session_provider=lambda _today: NEXT_SESSION,
             ),
         )
 
@@ -649,7 +660,7 @@ def test_trend_observation_bound_to_package_and_receipt(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -681,7 +692,7 @@ def test_abstained_trend_observation_kept(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
     )
@@ -702,7 +713,7 @@ def test_missing_decision_cutoff_blocks(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         holdings=(), decision_cutoff=None,
     )
     assert receipt["status"] == "INPUT_BLOCKED"
@@ -735,7 +746,7 @@ def test_source_completed_after_close_still_publishes(tmp_path):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         holdings=(), decision_cutoff=CUTOFF,
     )
     assert receipt["status"] == "PUBLISHED"
@@ -779,7 +790,7 @@ def test_volume_scope_verbatim_full_day(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF, holdings=(),
     )
     assert receipt["status"] == "PUBLISHED"
@@ -801,7 +812,7 @@ def test_volume_scope_unknown_never_promoted(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF, holdings=(),
     )
     assert receipt["status"] == "PUBLISHED"
@@ -810,21 +821,25 @@ def test_volume_scope_unknown_never_promoted(env):
     assert timing["full_day_volume_amount_observation_end"] is None
 
 
-def test_volume_scope_full_day_without_end_degrades_to_unknown(env):
-    """A FULL_DAY declaration without its observation end cannot be proven -
-    it stays UNKNOWN, never the reverse."""
+def test_volume_scope_full_day_without_end_keeps_scope_and_flags_breach(env):
+    """Audit R1: a declared FULL_DAY scope stays verbatim even when its
+    observation end is missing - the breach and evidence gap are recorded
+    separately, the scope is never rewritten to UNKNOWN and never proven by
+    the 15:30 anchor."""
     prod, state, meta = env
     _write_volume_member(meta, {"volume_scope": "FULL_DAY"})
     runner = SyntheticRuleRunner(candidates=(one_candidate(),))
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF, holdings=(),
     )
     timing = receipt["input_timing"]
-    assert timing["volume_scope"] == "UNKNOWN"
+    assert timing["volume_scope"] == "FULL_DAY"
     assert timing["full_day_volume_amount_observation_end"] is None
+    assert timing["volume_member_breach"] is not None
+    assert "FULL_DAY" in timing["volume_member_breach"]
 
 
 def test_run_seam_evaluation_receipt_transported(env):
@@ -836,7 +851,7 @@ def test_run_seam_evaluation_receipt_transported(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF, holdings=(), account_mode="synthetic",
     )
     assert receipt["status"] == "PUBLISHED"
@@ -859,7 +874,7 @@ def test_publish_gate_blocks_untrusted_producer_mode(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF, holdings=(), account_mode="simulation",
     )
     assert receipt["status"] == "INPUT_BLOCKED"
@@ -891,7 +906,7 @@ def test_publish_gate_blocks_forged_coverage(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF, holdings=(), account_mode="synthetic",
     )
     assert receipt["status"] == "INPUT_BLOCKED"
@@ -926,7 +941,7 @@ def test_volume_boundary_exclusion_keeps_p11_evidence(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF, holdings=(),
     )
     assert receipt["status"] == "PUBLISHED"
@@ -950,7 +965,7 @@ def test_volume_boundary_without_signal_is_hold_and_alert(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(HeldPositionFact(security_code="600000", quantity=500),),
     )
@@ -995,7 +1010,7 @@ def test_volume_boundary_with_price_exit_still_sells(env):
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
         market_date=MARKET_DATE, next_session=NEXT_SESSION,
-        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(HeldPositionFact(security_code="600000", quantity=500),),
     )

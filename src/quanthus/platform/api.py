@@ -674,6 +674,12 @@ class PlatformHttpApp:
             self._p12_submit_order_event,
         )
         self._add(
+            "p12.plans.skip",
+            "/api/p12/v1/accounts/<account_id>/plans/<plan_id>/skip",
+            "POST",
+            self._p12_skip_plan,
+        )
+        self._add(
             "p12.funding.configure",
             "/api/p12/v1/accounts/<account_id>/funding-rules",
             "POST",
@@ -810,6 +816,20 @@ class PlatformHttpApp:
         status, payload = self._p12.submit_order_event(
             principal,
             params["account_id"],
+            observed_request.json_object(),
+            observed_request.request_id,
+            observed_request.query_string,
+        )
+        return _json_response(payload, status)
+
+    def _p12_skip_plan(
+        self, observed_request: HttpRequest, params: Mapping[str, str]
+    ) -> HttpResponse:
+        principal = _principal(self._identity, observed_request, "p12:report")
+        status, payload = self._p12.skip_plan(
+            principal,
+            params["account_id"],
+            params["plan_id"],
             observed_request.json_object(),
             observed_request.request_id,
             observed_request.query_string,

@@ -43,12 +43,12 @@ from quanthus.p12_daily.package_store import (
     DailyPackageStore,
 )
 from quanthus.p12_daily.rule_runner import (
-    FULL_DAY_VOLUME_AMOUNT_END,
     SESSION_CLOSE,
     HeldPositionFact,
     RunnerOutput,
     RunnerRequest,
     StrategyRuleRunner,
+    _candidate_sort_key,
 )
 from quanthus.shared.fact_contracts import FactError, digest
 
@@ -56,6 +56,9 @@ STATUS_PUBLISHED = "PUBLISHED"
 STATUS_ALREADY_PUBLISHED = "ALREADY_PUBLISHED"
 STATUS_INPUT_BLOCKED = "INPUT_BLOCKED"
 STATUS_FAILED = "FAILED"
+# A run before the configured decision cutoff is a readiness precheck only:
+# it writes a run receipt, never a package (issue #719 publish-time note).
+STATUS_PRECHECK = "PRECHECK"
 
 DEFAULT_JOB_ROOT = "/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5"
 ZERO_QUALIFIED_TABLES = ("dwd_security_bar",)
@@ -88,19 +91,52 @@ def _publish_gate_block(
     output: RunnerOutput,
     *,
     trusted_ids: tuple[str, ...],
+    expected_run_id: str,
+    expected_manifest_sha256: str,
 ) -> tuple[str, dict] | None:
     '''Run-seam publish gate (issue #719): publish only when all three hold.
 
     1. coverage summary consistent with this run (receipt recomputes its own
-       coverage digest over producer/run/evaluated-universe and matches);
+       coverage digest over producer/run/evaluated-universe and this exact
+       manifest scope, bound to the job-minted run_id);
     2. producer_id inside the account mode's trusted list;
-    3. decisions correspond one-to-one with the receipt's evaluated candidates.
+    3. decisions correspond one-to-one with the receipt's evaluated candidates;
+    4. the runner declares the run publishable and supplies a non-empty,
+       matching source closure.
 
     Returns (reason_code, detail) on any breach, else None.'''
 
+    # The runner's own publishable declaration leads: a non-publishable run
+    # never reaches the package even when every other check holds (audit R11).
+    if output.publishable is False:
+        return (
+            "run_not_publishable",
+            {
+                "disposition": output.disposition,
+                "diagnostics": output.diagnostics,
+            },
+        )
     receipt = output.evaluation_receipt
     if not isinstance(receipt, dict):
         return ("evaluation_receipt_missing", {"detail": "runner produced no evaluation receipt"})
+    # The receipt must echo the run identity this job minted; a receipt
+    # minted by a prior or different run can never pass (audit R10).
+    if receipt.get("run_id") != expected_run_id:
+        return (
+            "candidate_evaluation_run_mismatch",
+            {"expected_run_id": expected_run_id, "actual_run_id": receipt.get("run_id")},
+        )
+    closure = output.source_closure
+    if not isinstance(closure, dict) or not closure:
+        return ("source_closure_missing", {"detail": "runner produced no source closure"})
+    if closure.get("core_manifest_sha256") != expected_manifest_sha256:
+        return (
+            "source_closure_manifest_mismatch",
+            {
+                "expected": expected_manifest_sha256,
+                "actual": closure.get("core_manifest_sha256"),
+            },
+        )
     # 2. trusted producer for this account mode.
     producer_id = receipt.get("producer_id")
     if not producer_id or (trusted_ids and producer_id not in trusted_ids):
@@ -121,6 +157,8 @@ def _publish_gate_block(
         "producer_version": receipt.get("producer_version"),
         "run_id": receipt.get("run_id"),
         "evaluated_universe": sorted(receipt.get("evaluated_universe") or ()),
+        "manifest_sha256": expected_manifest_sha256,
+        "package_id": closure.get("package_id"),
     }
     if receipt.get("coverage_digest") != digest(coverage_payload):
         return (
@@ -130,19 +168,21 @@ def _publish_gate_block(
     # 3. decisions correspond one-to-one with the receipt's evaluated
     #    candidates (opportunity_id + security_code identity).
     emitted = sorted(
-        {
+        ({
             "opportunity_id": d.opportunity_id,
             "security_code": d.security_code,
         }
-        for d in output.decision_set.decisions
+        for d in output.decision_set.decisions),
+        key=_candidate_sort_key,
     )
     claimed = sorted(
-        {
+        ({
             "opportunity_id": c.get("opportunity_id"),
             "security_code": c.get("security_code"),
         }
         for c in (receipt.get("evaluated_candidates") or ())
-        if isinstance(c, dict)
+        if isinstance(c, dict)),
+        key=_candidate_sort_key,
     )
     if emitted != claimed:
         return (
@@ -249,7 +289,7 @@ def run_daily(
     job_root: Path,
     runner: StrategyRuleRunner,
     market_date: date,
-    next_session: date,
+    next_session: date | None,
     account_id: str,
     account_mode: str = "synthetic",
     now: datetime | None = None,
@@ -267,7 +307,7 @@ def run_daily(
         "schema_version": RUN_SCHEMA,
         "run_id": _run_id(moment),
         "market_date": market_date.isoformat(),
-        "next_session": next_session.isoformat(),
+        "next_session": next_session.isoformat() if next_session else None,
         "decision_cutoff": (
             decision_cutoff.isoformat() if decision_cutoff is not None else None
         ),
@@ -313,6 +353,23 @@ def run_daily(
             market_date=market_date,
             missing_members=["decision_cutoff"],
         )
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
+
+    # Publish-time rule (issue #719 comment-7114915793, audit R2): a run before
+    # the configured decision cutoff is a readiness precheck only.  It may
+    # qualify the input and stage a receipt, but it never writes the publish
+    # directory or produces a package.  Only a run at or after the cutoff
+    # publishes; the package's published_at is the real publish moment, never
+    # earlier than the cutoff.
+    if moment < decision_cutoff:
+        receipt["status"] = STATUS_PRECHECK
+        receipt["precheck"] = {
+            "reason": "run before configured decision cutoff; readiness only",
+            "decision_cutoff": decision_cutoff.isoformat(),
+            "earliest_publish_at": decision_cutoff.isoformat(),
+        }
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt
@@ -393,9 +450,19 @@ def run_daily(
         "price_close_anchor": datetime.combine(
             snapshot.market_date, SESSION_CLOSE, tzinfo=EXCHANGE_TZ
         ).isoformat(),
-        "full_day_volume_amount_end": datetime.combine(
-            snapshot.market_date, FULL_DAY_VOLUME_AMOUNT_END, tzinfo=EXCHANGE_TZ
-        ).isoformat(),
+        # Audit R1: 15:30 is not asserted as a fact; only the supplier's own
+        # declared observation_end counts.  Absent that declaration the end
+        # stays null with its reason, never filled by the session anchor.
+        "full_day_volume_amount_end": (
+            snapshot.full_day_volume_amount_observation_end.isoformat()
+            if snapshot.full_day_volume_amount_observation_end
+            else None
+        ),
+        "full_day_volume_amount_end_note": (
+            None
+            if snapshot.full_day_volume_amount_observation_end
+            else "supplier did not declare a full_day_volume_amount_observation_end"
+        ),
         # M2 v3: the source-declared volume scope and observation end carried
         # verbatim; the 15:30 constant above is the session clock anchor, this
         # is what the input actually declared.  UNKNOWN stays UNKNOWN - it is
@@ -406,6 +473,7 @@ def run_daily(
             if snapshot.full_day_volume_amount_observation_end
             else None
         ),
+        "volume_member_breach": snapshot.volume_member_breach,
         "completed_at": (
             snapshot.completed_at.isoformat() if snapshot.completed_at else None
         ),
@@ -420,6 +488,36 @@ def run_daily(
             else "source did not declare a tz-aware knowledge_cutoff"
         ),
     }
+
+    # Publish-time rule (issue #719 comment-7114915793): a hard required
+    # member whose source knowledge clock lands after the configured decision
+    # cutoff was not visible at the cutoff - the whole day is blocked rather
+    # than published with post-cutoff information.
+    if (
+        snapshot.knowledge_cutoff is not None
+        and snapshot.knowledge_cutoff > decision_cutoff
+    ):
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail=(
+                    "source knowledge_cutoff "
+                    + snapshot.knowledge_cutoff.isoformat()
+                    + " is after the configured decision cutoff "
+                    + decision_cutoff.isoformat()
+                    + "; input not visible at the cutoff"
+                ),
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=snapshot.market_date,
+            ),
+            market_date=market_date,
+            missing_members=["source_knowledge_cutoff"],
+        )
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
 
     # M2 section 3: the three history floors are checked separately.  A floor
     # the qualified input cannot prove is a whole-day block, never a pass.
@@ -466,17 +564,28 @@ def run_daily(
         for g in snapshot.history_gates
     ]
 
-    # M2 F11: corporate-action / adjustment fields must all be present and
-    # mappable; a missing or unmappable field blocks the input, it is never
-    # defaulted or converted.
+    # M2 F11 / audit R7: each declared corporate-action / adjustment field is
+    # checked individually against the input - never trusted by the
+    # fields_complete flag alone.  A missing or unmappable field blocks.
     ca = snapshot.corporate_actions
-    ca_missing = ca is None or not ca.get("fields_complete", False)
-    if ca_missing:
+    required_ca_fields = (
+        "cash_dividend_per_share",
+        "bonus_share_ratio",
+        "exceptions",
+    )
+    ca_missing_fields = []
+    if ca is None:
+        ca_missing_fields = list(required_ca_fields)
+    else:
+        for field in required_ca_fields:
+            if field not in ca or ca.get(field) is None:
+                ca_missing_fields.append(field)
+        for field in ca.get("unmapped_fields") or ():
+            ca_missing_fields.append(str(field))
+    if ca_missing_fields:
         detail = (
-            "corporate-action/adjustment fields absent from the daily input"
-            if ca is None
-            else "corporate-action/adjustment fields not completely mappable: "
-            + ", ".join(sorted(str(x) for x in ca.get("unmapped_fields", ("unknown",))))
+            "corporate-action/adjustment fields absent from the daily input: "
+            + ", ".join(sorted(set(ca_missing_fields)))
         )
         t = stage("corporate_actions", t, result="blocked")
         _blocked_receipt(
@@ -520,7 +629,7 @@ def run_daily(
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt
-    if next_session != snapshot.authoritative_next_session:
+    if next_session is not None and next_session != snapshot.authoritative_next_session:
         t = stage("calendar", t, result="blocked", caller=next_session.isoformat())
         _blocked_receipt(
             receipt,
@@ -618,6 +727,9 @@ def run_daily(
                 next_session=next_session,
                 holdings=resolved_holdings,
                 published_at=moment,
+                # The job mints this run's identity; the runner echoes it in
+                # its evaluation receipt so the gate binds this exact run.
+                run_id=receipt["run_id"],
                 decision_cutoff=decision_cutoff,
             )
         )
@@ -671,7 +783,12 @@ def run_daily(
     # the package publishes; any breach is a whole-day block, receipt only.
     gate_config = publish_gate_config or PUBLISH_GATE_CONFIG
     trusted_ids = _trusted_producer_ids(gate_config, account_mode)
-    gate_block = _publish_gate_block(output, trusted_ids=trusted_ids)
+    gate_block = _publish_gate_block(
+        output,
+        trusted_ids=trusted_ids,
+        expected_run_id=receipt["run_id"],
+        expected_manifest_sha256=snapshot.core_manifest_sha256,
+    )
     if gate_block is not None:
         reason_code, detail = gate_block
         t = stage("publish_gate", t, result="blocked", reason_code=reason_code)
@@ -688,6 +805,12 @@ def run_daily(
             missing_members=["evaluation_receipt"],
         )
         receipt["publish_gate"] = {"reason_code": reason_code, **detail}
+        # Audit R11: carry the runner's own disposition and diagnostics
+        # verbatim onto the P12 run receipt when the gate refuses the run.
+        if output.disposition is not None:
+            receipt["disposition"] = output.disposition
+        if output.diagnostics is not None:
+            receipt["diagnostics"] = output.diagnostics
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt
@@ -798,7 +921,12 @@ def main(argv: list[str] | None = None) -> int:
         help="account mode binding the trusted producer list (synthetic|simulation|live)",
     )
     parser.add_argument("--market-date", type=date.fromisoformat, required=True)
-    parser.add_argument("--next-session", type=date.fromisoformat, required=True)
+    parser.add_argument(
+        "--next-session",
+        type=date.fromisoformat,
+        default=None,
+        help="optional; the governed calendar decides next_session (M2 F2)",
+    )
     parser.add_argument("--runner", default="synthetic-replay")
     parser.add_argument("--candidates", type=Path)
     parser.add_argument(

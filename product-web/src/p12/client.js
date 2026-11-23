@@ -13,9 +13,12 @@ export class P12Error extends Error {
   }
 }
 
-async function call (operationId, accountId, body) {
+async function call (operationId, accountId, body, params) {
   const spec = OPERATIONS[operationId]
-  const path = spec.path.replace('{account_id}', encodeURIComponent(accountId || ''))
+  let path = spec.path.replace('{account_id}', encodeURIComponent(accountId || ''))
+  for (const [key, val] of Object.entries(params || {})) {
+    path = path.replace('{' + key + '}', encodeURIComponent(val || ''))
+  }
   const session = loadSession()
   const headers = { Accept: 'application/json' }
   if (session) headers.Authorization = `Bearer ${session.token}`
@@ -48,6 +51,8 @@ export const loadFundingRules = accountId => call('p12.funding.read', accountId)
 export const submitFill = (accountId, fill) => call('p12.reports.submit', accountId, fill)
 export const correctFill = (accountId, correction) => call('p12.facts.correct', accountId, correction)
 export const submitOrderEvent = (accountId, event) => call('p12.order_events.submit', accountId, event)
+export const skipPlan = (accountId, planId, body) =>
+  call('p12.plans.skip', accountId, body || {}, { plan_id: planId })
 
 async function callPaper (operationId, params = {}, body = null) {
   const spec = PAPER_OPERATIONS[operationId]

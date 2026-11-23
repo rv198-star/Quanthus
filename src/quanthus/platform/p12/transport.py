@@ -177,13 +177,18 @@ def _package(value: PublishedPackage) -> dict[str, Any]:
 
 
 def _publication(value: PublicationStatus) -> dict[str, Any]:
-    return {
+    # Optional-by-contract fields (audit R18): retracted/retraction_reason are
+    # only emitted when a retraction is actually recorded, so the pre-
+    # publication response keeps its earlier shape.
+    out = {
         "status": value.status,
         "market_date": value.market_date.isoformat(),
         "published_at": _ts(value.published_at),
-        "retracted": value.retracted,
-        "retraction_reason": value.retraction_reason,
     }
+    if value.retracted:
+        out["retracted"] = True
+        out["retraction_reason"] = value.retraction_reason
+    return out
 
 
 def _opportunity(value: OpportunityView) -> dict[str, Any]:
@@ -303,9 +308,7 @@ def _run_receipt(value: dict | None) -> dict | None:
 
 
 def workbench_dto(value: WorkbenchView) -> dict[str, Any]:
-    return _out(
-        "Workbench",
-        {
+    payload = {
             "schema_version": SCHEMA_VERSION,
             "scope": _scope(value.scope),
             "package": None if value.package is None else _package(value.package),
@@ -334,9 +337,12 @@ def workbench_dto(value: WorkbenchView) -> dict[str, Any]:
                 for o in value.orders
             ],
             "action_blockers": list(value.action_blockers),
-            "run_receipt": _run_receipt(value.run_receipt),
-        },
-    )
+        }
+    # Optional-by-contract (audit R18): run_receipt is emitted only when a run
+    # receipt exists, so the pre-run response keeps its earlier shape.
+    if value.run_receipt is not None:
+        payload["run_receipt"] = _run_receipt(value.run_receipt)
+    return _out("Workbench", payload)
 
 
 def records_dto(value: RecordsView) -> dict[str, Any]:
@@ -579,6 +585,22 @@ def outcome_dto(value: FactOutcome) -> dict[str, Any]:
             "cash_delta": _money_or_none(value.cash_delta),
             "quantity_delta": value.quantity_delta,
             "current_fact_revision": value.current_fact_revision,
+        },
+    )
+
+
+def skip_plan_outcome_dto(record: dict[str, Any]) -> dict[str, Any]:
+    return _out(
+        "SkipPlanOutcome",
+        {
+            "schema_version": SCHEMA_VERSION,
+            "skipped": True,
+            "record": {
+                "plan_id": str(record.get("plan_id") or ""),
+                "skipped_at": str(record.get("skipped_at") or ""),
+                "reason": record.get("reason"),
+                "actor": str(record.get("actor") or ""),
+            },
         },
     )
 

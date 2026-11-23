@@ -53,8 +53,14 @@ def _check_keywords(name: str, schema: dict[str, Any]) -> None:
     if schema.get("type") == "object":
         if schema.get("additionalProperties") is not False:
             raise SystemExit(f"{name}: objects must be closed")
-        if sorted(schema.get("required", [])) != sorted(schema.get("properties", {})):
-            raise SystemExit(f"{name}: every property must be required (use null for unknown)")
+        # Optional fields are allowed: required must be a subset of properties.
+        # An omitted optional property carries its documented default; present
+        # properties are always validated (audit R18 contract compatibility).
+        missing_required = set(schema.get("required", [])).difference(
+            schema.get("properties", {})
+        )
+        if missing_required:
+            raise SystemExit(f"{name}: required fields not declared {sorted(missing_required)}")
     for key, child in schema.get("properties", {}).items():
         _check_keywords(f"{name}.{key}", child)
     if "items" in schema:

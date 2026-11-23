@@ -55,7 +55,7 @@ export interface Applicability {
   next_step: "EXECUTE_AND_REPORT" | "NONE" | "REASSESS_AFFECTED_PLANS" | "REASSESS_PLAN" | "RECONCILE_FACTS" | "RESOLVE_CONFLICT" | "WAIT_FOR_ADOPTION" | "WAIT_FOR_WINDOW"
   plan_id: string
   reason_codes: Array<ReasonCode>
-  status: "ACTIONABLE" | "EXPIRED" | "NEEDS_REASSESSMENT" | "NOT_BOUND" | "POLICY_NOT_ADOPTED" | "SCHEDULED"
+  status: "ACTIONABLE" | "EXPIRED" | "NEEDS_REASSESSMENT" | "NOT_BOUND" | "POLICY_NOT_ADOPTED" | "SCHEDULED" | "SKIPPED"
 }
 
 export interface Baseline {
@@ -451,6 +451,23 @@ export type SchemaVersion = "p12.desktop.v1"
 export interface Scope {
   account_id: string
   mode: Mode
+}
+
+export interface SkipPlanOutcome {
+  record: SkipPlanRecord
+  schema_version: SchemaVersion
+  skipped: boolean
+}
+
+export interface SkipPlanRecord {
+  actor: string
+  plan_id: string
+  reason: string | null
+  skipped_at: Timestamp
+}
+
+export interface SkipPlanRequest {
+  reason: string | null
 }
 
 export interface SubmitFillRequest {

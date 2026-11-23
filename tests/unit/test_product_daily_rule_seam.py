@@ -870,6 +870,7 @@ def _forward_chain(
     omit_features=(),
     extra_entries=(),
     run_override=None,
+    row_transform=None,
     return_output=False,
 ):
     """Run the real prospective seam -> producer chain and return (result, produced)."""
@@ -940,6 +941,8 @@ def _forward_chain(
                     turnover=Decimal("100"),
                 )
             )
+    if row_transform is not None:
+        rows = row_transform(rows)
     facts, policy, account = _producer_inputs(
         datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
         market_date=target,
@@ -1311,6 +1314,54 @@ def test_review_1bee_bad_projection_is_local(tmp_path, runner, resources, field,
     assert {d.security_code for d in seam.entries} == {"600001"}
     assert {e["security_code"] for e in seam.excluded} == {"600000"}
     assert any(field in e["member_or_field"] for e in seam.excluded)
+    _p12_loader()(result.package.decision_sets[0].to_dict())
+
+
+@pytest.mark.parametrize("mark", [Decimal("0.005"), Decimal("0.0099"), Decimal("0.01")])
+def test_review_c2_entry_price_floor_is_local(tmp_path, runner, resources, mark):
+    target = date(2026, 11, 24)
+    features = dataclasses.replace(
+        _features("600000", Decimal("60"), Decimal("0.20"), signal_date=target),
+        mark_price=mark,
+    )
+
+    def matching_source_price(rows):
+        return [
+            dataclasses.replace(
+                row,
+                open_price=mark,
+                high_price=mark * Decimal("1.02"),
+                low_price=mark,
+                close_price=mark,
+            )
+            if row.listing_code == "600000" and row.session_date == target
+            else row
+            for row in rows
+        ]
+
+    seam, result, signals, _ = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        feature_override={"600000": features},
+        extra_entries=("600001",),
+        row_transform=matching_source_price,
+    )
+    assert result.publishable, result.diagnostics
+    expected = {"600001"}
+    if mark < Decimal("0.01"):
+        assert any(
+            e["security_code"] == "600000" and "mark_price" in e["member_or_field"]
+            for e in seam.excluded
+        )
+    else:
+        expected.add("600000")
+        assert not seam.excluded
+    assert {s.security_code for s in signals} == expected
+    assert {d.security_code for d in seam.entries} == expected
+    receipt = result.package.decision_sets[0].audit.evaluation_receipt
+    assert receipt["evaluated_count"] == 2
+    assert receipt["qualified_count"] == len(expected)
     _p12_loader()(result.package.decision_sets[0].to_dict())
 
 

@@ -603,6 +603,8 @@ def _projection_issues(
     if features.mark_price is None or features.mark_price <= 0:
         fields.append("mark_price")
     if entry:
+        if features.mark_price is not None and features.mark_price < Decimal("0.01"):
+            fields.append("mark_price")
         for name in ("security_name", "industry_id"):
             value = getattr(features, name)
             if not isinstance(value, str) or not value.strip():

@@ -1531,6 +1531,7 @@ def test_review_1bee_run_closure_carries_provenance_and_versioned_no_trend(
 
 
 def test_review_1bee_consumer_version_mismatch_refuses_loader(tmp_path):
+    import os
     import shutil
 
     from quanthus.product_daily.recommendation.runtime_identity import (
@@ -1538,7 +1539,7 @@ def test_review_1bee_consumer_version_mismatch_refuses_loader(tmp_path):
         resolve_p12_test_root,
     )
 
-    source = resolve_p12_test_root(ROOT)
+    source = resolve_p12_test_root(ROOT, os.environ.get("QUANTHUS_P12_WORKTREE_ROOT"))
     identity = consumer_identity(ROOT)
     for name in identity["source_files_sha256"]:
         dst = tmp_path / name

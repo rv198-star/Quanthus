@@ -225,15 +225,39 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ISO8601",
         help="start the replay clock at this timeline instant",
     )
+    parser.add_argument(
+        "--user",
+        action="append",
+        default=None,
+        metavar="USERNAME:ROLE:PASSWORD",
+        help=(
+            "seed one local user; repeat to seed several. When at least one "
+            "--user is given it replaces the default p12-demo/p12-viewer/"
+            "p12-other seed set. ROLE must be a registered platform role."
+        ),
+    )
     args = parser.parse_args(argv)
     if args.host not in {"127.0.0.1", "localhost", "::1"}:
         raise SystemExit("the synthetic local server binds to loopback only")
     web_dist = args.web_dist or find_project_root() / "product-web" / "dist"
-    users = {
-        "p12-demo": ("operator", secrets.token_urlsafe(12)),
-        "p12-viewer": ("viewer", secrets.token_urlsafe(12)),
-        "p12-other": ("operator", secrets.token_urlsafe(12)),
-    }
+    if args.user:
+        users = {}
+        for spec in args.user:
+            parts = spec.split(":", 2)
+            if len(parts) != 3 or not all(parts):
+                raise SystemExit(
+                    "--user expects USERNAME:ROLE:PASSWORD with non-empty fields"
+                )
+            username, role, password = parts
+            if username in users:
+                raise SystemExit(f"--user duplicates username {username!r}")
+            users[username] = (role, password)
+    else:
+        users = {
+            "p12-demo": ("operator", secrets.token_urlsafe(12)),
+            "p12-viewer": ("viewer", secrets.token_urlsafe(12)),
+            "p12-other": ("operator", secrets.token_urlsafe(12)),
+        }
     replay_tape = None
     if args.replay_tape is not None:
         if not args.replay_day:

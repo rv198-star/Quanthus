@@ -15151,6 +15151,45 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-20261124T030000000000Z",
+      "recorded_at": "2026-11-24T03:00:00+08:00",
+      "actor": "Codex SWE-2 (exec-B) on Owner 2026-11-24 dispatch P11-D1B-20261124-01",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "恢复新 main 缺失的 #700 work_items 映射并为固定规则三件套批（P11-D1B-20261124-01）登记准备；未触碰共享采用/里程碑，未授予 daily_adopted，未重跑历史研究。",
+      "evidence": [
+        {
+          "id": "blueprint-mapping-commit",
+          "kind": "authority",
+          "location": "git",
+          "revision": "9aef4fc10c978302fdd2e1ebc37925b87c0c5d3c",
+          "path": "config/planning/learning-blueprint.v1.json",
+          "sha256": "3d6a3dc0624b1195123bae73cbe02d24dc84f9779557e7c04e69dad63af43a78",
+          "claim_ceiling": "仅登记 P11-R11-USE-002/#700 单条 work_items 映射；不签工程或用途通过。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "纯登记恢复：新 main 缺 #700 映射导致 context 失败；本 checkpoint 只把单条 work_items 映射与真实 issue 观察入账，updates=[]，不评估/不提升任何模块 facet，不改既有 module 状态，不授予采用。",
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T19:06:23Z",
+          "body_sha256": "dd5ece10537bbe99063041b9d220462bed22200aeb2b9d8541133a69fa4b33ff"
+        }
+      ]
     }
   ],
   "history_imports": [

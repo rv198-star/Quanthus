@@ -266,9 +266,8 @@ def _p12_loader():
         from quanthus.platform.adapters.p12_synthetic_fixture import (
             load_synthetic_fixture,
         )
-        from quanthus.shared.values import VersionRef
-
         from quanthus.shared.fact_contracts import digest as p12_digest
+        from quanthus.shared.values import VersionRef
     except ImportError as exc:  # pragma: no cover - depends on sibling tree
         pytest.fail(f"P12 modules unavailable: {exc}")
 
@@ -1041,9 +1040,8 @@ def test_publish_receipt_carries_p12_binding_digest(tmp_path: Path):
     def loader(raw: dict):
         decision = validate_raw(raw["decisions"][0], raw)
         from quanthus.capabilities.decision_access import MarketDecisionSet
-        from quanthus.shared.values import VersionRef
-
         from quanthus.shared.fact_contracts import digest as p12_digest
+        from quanthus.shared.values import VersionRef
 
         return MarketDecisionSet(
             source_ref=VersionRef(raw["source_id"], raw["version"], p12_digest(raw)),

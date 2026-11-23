@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -19,12 +18,13 @@ from quanthus.expert_strategy.runner import FormalStrategyRunner
 from quanthus.policy import find_project_root
 from quanthus.product_daily.recommendation.rule_seam import (
     SecurityFeatureFacts,
-    SeamDisposition,
     evaluate_day,
 )
 
 ROOT = find_project_root()
-CARD = load_candidate_rule_card(ROOT / "config" / "p4-candidate-price-volume-transition.research.v1.json")
+CARD = load_candidate_rule_card(
+    ROOT / "config" / "p4-candidate-price-volume-transition.research.v1.json"
+)
 SPLIT = load_split_policy(ROOT / "config" / "p4-event-split-policy.research.v1.json")
 SOURCE = load_event_scan_source_policy(
     ROOT / "config" / "p4-event-scan-source.research.v1.json",
@@ -50,7 +50,9 @@ TRADING_DATES = _weekdays(date(2012, 1, 1), date(2021, 12, 31))
 CUTOFF = datetime(2020, 1, 6, 14, 59, tzinfo=SHANGHAI)
 
 
-def _row(*, security: str, session_date: date, range_fraction: Decimal, turnover: Decimal) -> CandidateDailyInput:
+def _row(
+    *, security: str, session_date: date, range_fraction: Decimal, turnover: Decimal
+) -> CandidateDailyInput:
     open_price = Decimal("100.00")
     return CandidateDailyInput(
         security_id=f"security-{security}",
@@ -71,7 +73,9 @@ def _row(*, security: str, session_date: date, range_fraction: Decimal, turnover
         is_tradable=True,
         listing_sessions=200,
         adjustment_effective=False,
-        source_evidence_digest=sha256_digest({"security": security, "date": session_date.isoformat()}),
+        source_evidence_digest=sha256_digest(
+            {"security": security, "date": session_date.isoformat()}
+        ),
     )
 
 
@@ -86,13 +90,19 @@ def _series(security: str, signal: int, *, trigger: bool) -> list[CandidateDaily
             rf, tv = Decimal("0.02"), Decimal("200.00")
         else:
             rf, tv = Decimal("0.01"), Decimal("100.00")
-        rows.append(_row(security=security, session_date=TRADING_DATES[index], range_fraction=rf, turnover=tv))
+        rows.append(
+            _row(
+                security=security, session_date=TRADING_DATES[index], range_fraction=rf, turnover=tv
+            )
+        )
     return rows
 
 
 @pytest.fixture(scope="module")
 def runner() -> FormalStrategyRunner:
-    return FormalStrategyRunner(ExpertStrategyRegistry(ROOT).card, ExpertStrategyRegistry(ROOT).topology_manifest.digest)
+    return FormalStrategyRunner(
+        ExpertStrategyRegistry(ROOT).card, ExpertStrategyRegistry(ROOT).topology_manifest.digest
+    )
 
 
 def _features(code: str, rsi: Decimal | None, vol: Decimal | None) -> SecurityFeatureFacts:
@@ -111,13 +121,21 @@ def test_bar_change_changes_real_event_output(runner):
     sig = 100
     trig = scan_forward_candidates(
         _series("600000", sig, trigger=True),
-        trading_dates=TRADING_DATES, snapshot_id=SNAPSHOT_ID, snapshot_manifest_digest=SNAPSHOT_MANIFEST,
-        card=CARD, split_policy=SPLIT, source_policy=SOURCE,
+        trading_dates=TRADING_DATES,
+        snapshot_id=SNAPSHOT_ID,
+        snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+        card=CARD,
+        split_policy=SPLIT,
+        source_policy=SOURCE,
     )
     flat = scan_forward_candidates(
         _series("600000", sig, trigger=False),
-        trading_dates=TRADING_DATES, snapshot_id=SNAPSHOT_ID, snapshot_manifest_digest=SNAPSHOT_MANIFEST,
-        card=CARD, split_policy=SPLIT, source_policy=SOURCE,
+        trading_dates=TRADING_DATES,
+        snapshot_id=SNAPSHOT_ID,
+        snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+        card=CARD,
+        split_policy=SPLIT,
+        source_policy=SOURCE,
     )
     assert trig.counters.candidate_events >= 1
     assert flat.counters.candidate_events == 0
@@ -131,10 +149,17 @@ def test_real_expert_veto_blocks_entry(runner):
     rows = _series("600000", sig, trigger=True)
     feats = {"600000": _features("600000", Decimal("76"), Decimal("0.20"))}  # rsi above max
     result = evaluate_day(
-        runner=runner, rows=rows, trading_dates=TRADING_DATES,
-        snapshot_id=SNAPSHOT_ID, snapshot_manifest_digest=SNAPSHOT_MANIFEST,
-        card=CARD, split_policy=SPLIT, source_policy=SOURCE,
-        features_by_security=feats, knowledge_cutoff=CUTOFF, trend_state="stable",
+        runner=runner,
+        rows=rows,
+        trading_dates=TRADING_DATES,
+        snapshot_id=SNAPSHOT_ID,
+        snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+        card=CARD,
+        split_policy=SPLIT,
+        source_policy=SOURCE,
+        features_by_security=feats,
+        knowledge_cutoff=CUTOFF,
+        trend_state="stable",
     )
     assert not result.day_blocked
     assert result.entries == ()  # veto -> no executable entry
@@ -145,10 +170,17 @@ def test_real_expert_entry_allowed_on_in_range_features(runner):
     rows = _series("600000", sig, trigger=True)
     feats = {"600000": _features("600000", Decimal("60"), Decimal("0.20"))}
     result = evaluate_day(
-        runner=runner, rows=rows, trading_dates=TRADING_DATES,
-        snapshot_id=SNAPSHOT_ID, snapshot_manifest_digest=SNAPSHOT_MANIFEST,
-        card=CARD, split_policy=SPLIT, source_policy=SOURCE,
-        features_by_security=feats, knowledge_cutoff=CUTOFF, trend_state="stable",
+        runner=runner,
+        rows=rows,
+        trading_dates=TRADING_DATES,
+        snapshot_id=SNAPSHOT_ID,
+        snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+        card=CARD,
+        split_policy=SPLIT,
+        source_policy=SOURCE,
+        features_by_security=feats,
+        knowledge_cutoff=CUTOFF,
+        trend_state="stable",
     )
     assert not result.day_blocked
     assert len(result.entries) >= 1
@@ -167,10 +199,17 @@ def test_single_security_exclusion(runner):
         # 600001 missing entirely -> excluded
     }
     result = evaluate_day(
-        runner=runner, rows=rows, trading_dates=TRADING_DATES,
-        snapshot_id=SNAPSHOT_ID, snapshot_manifest_digest=SNAPSHOT_MANIFEST,
-        card=CARD, split_policy=SPLIT, source_policy=SOURCE,
-        features_by_security=feats, knowledge_cutoff=CUTOFF, trend_state="stable",
+        runner=runner,
+        rows=rows,
+        trading_dates=TRADING_DATES,
+        snapshot_id=SNAPSHOT_ID,
+        snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+        card=CARD,
+        split_policy=SPLIT,
+        source_policy=SOURCE,
+        features_by_security=feats,
+        knowledge_cutoff=CUTOFF,
+        trend_state="stable",
     )
     assert not result.day_blocked
     assert {e["security_code"] for e in result.excluded} == {"600001"}
@@ -181,12 +220,19 @@ def test_whole_day_block(runner):
     """A shared hard prerequisite failure produces a whole-day block, no package."""
 
     result = evaluate_day(
-        runner=runner, rows=_series("600000", 100, trigger=True), trading_dates=TRADING_DATES,
-        snapshot_id=SNAPSHOT_ID, snapshot_manifest_digest=SNAPSHOT_MANIFEST,
-        card=CARD, split_policy=SPLIT, source_policy=SOURCE,
+        runner=runner,
+        rows=_series("600000", 100, trigger=True),
+        trading_dates=TRADING_DATES,
+        snapshot_id=SNAPSHOT_ID,
+        snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+        card=CARD,
+        split_policy=SPLIT,
+        source_policy=SOURCE,
         features_by_security={"600000": _features("600000", Decimal("60"), Decimal("0.20"))},
-        knowledge_cutoff=CUTOFF, trend_state="stable",
-        shared_prereq_ok=False, shared_prereq_reason="calendar_or_identity_missing",
+        knowledge_cutoff=CUTOFF,
+        trend_state="stable",
+        shared_prereq_ok=False,
+        shared_prereq_reason="calendar_or_identity_missing",
     )
     assert result.day_blocked
     assert result.day_block_reason == "calendar_or_identity_missing"

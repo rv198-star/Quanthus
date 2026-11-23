@@ -26,6 +26,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from quanthus.capabilities.decision_access import OpportunityStage
 from quanthus.p12_daily.consumer_sidecar import (
     DISPOSITION_INPUT_OR_CLOCK_BLOCKED,
     SidecarError,
@@ -165,17 +166,21 @@ def _publish_gate_block(
             "candidate_evaluation_coverage_mismatch",
             {"expected": digest(coverage_payload), "actual": receipt.get("coverage_digest")},
         )
-    # 3. decisions correspond one-to-one with the receipt's evaluated
-    #    candidates (opportunity_id + security_code identity).
-    emitted = sorted(
+    # 3. buy decisions correspond one-to-one with the receipt's qualified
+    #    candidates; hold and exit decisions correspond one-to-one with the
+    #    receipt's holding signals.  A holdings-only package has an empty
+    #    candidate list but a real holding binding and still publishes
+    #    (issue #723).
+    emitted_buys = sorted(
         ({
             "opportunity_id": d.opportunity_id,
             "security_code": d.security_code,
         }
-        for d in output.decision_set.decisions),
+        for d in output.decision_set.decisions
+        if d.entry is not None),
         key=_candidate_sort_key,
     )
-    claimed = sorted(
+    claimed_candidates = sorted(
         ({
             "opportunity_id": c.get("opportunity_id"),
             "security_code": c.get("security_code"),
@@ -184,10 +189,34 @@ def _publish_gate_block(
         if isinstance(c, dict)),
         key=_candidate_sort_key,
     )
-    if emitted != claimed:
+    if emitted_buys != claimed_candidates:
         return (
             "candidate_evaluation_binding_mismatch",
-            {"emitted": emitted, "claimed": claimed},
+            {"emitted": emitted_buys, "claimed": claimed_candidates},
+        )
+    emitted_holds = sorted(
+        ({
+            "opportunity_id": d.opportunity_id,
+            "security_code": d.security_code,
+        }
+        for d in output.decision_set.decisions
+        if d.entry is None
+        and d.stage is not OpportunityStage.ENDED),
+        key=_candidate_sort_key,
+    )
+    claimed_signals = sorted(
+        ({
+            "opportunity_id": c.get("opportunity_id"),
+            "security_code": c.get("security_code"),
+        }
+        for c in (receipt.get("holding_signals") or ())
+        if isinstance(c, dict)),
+        key=_candidate_sort_key,
+    )
+    if emitted_holds != claimed_signals:
+        return (
+            "holding_signal_binding_mismatch",
+            {"emitted": emitted_holds, "claimed": claimed_signals},
         )
     return None
 
@@ -849,6 +878,19 @@ def run_daily(
         STATUS_PUBLISHED if outcome.status == "published" else STATUS_ALREADY_PUBLISHED
     )
     entry_plans = sum(1 for item in decisions.decisions if item.entry is not None)
+    # Issue #723 count semantics (R10/R11): a package that holds live
+    # positions but adds no new buy is publishable and is NOT an empty
+    # advice.  ``empty_advice`` is reserved for the package whose only record
+    # is the G1 no-qualified-candidate noop (no live decision at all); a
+    # holdings-only package reads ``holdings_only`` so the workbench shows
+    # "今天无新买入，持仓继续持有" rather than "今天无须下单".
+    live = [d for d in decisions.decisions if d.stage is not OpportunityStage.ENDED]
+    if entry_plans:
+        disposition = "publishable"
+    elif live:
+        disposition = "holdings_only"
+    else:
+        disposition = "empty_advice"
     # F10: P11-bound trend observations carried verbatim into the receipt;
     # abstained observations are kept, not dropped.
     if output.trend_observations:
@@ -866,7 +908,7 @@ def run_daily(
         "file_sha256": outcome.package.file_sha256,
         "decision_count": len(decisions.decisions),
         "entry_plan_count": entry_plans,
-        "admission_disposition": "empty_advice" if entry_plans == 0 else "publishable",
+        "admission_disposition": disposition,
         "decision_set_digest": digest(decision_set),
     }
     # The receipt's own publish time is the run moment P12 committed the

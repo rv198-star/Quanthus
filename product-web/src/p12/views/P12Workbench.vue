@@ -662,6 +662,7 @@
               </p>
               <p v-else-if="selected.stage === 'exit_plan' && selected.status_code === 'ENDED'" data-testid="p12-ended-note">{{ actionSentence }}</p>
               <p v-else-if="selected.stage === 'exit_plan'" data-testid="p12-sell-note">{{ actionSentence }}</p>
+              <p v-if="selected.stage === 'exit_plan'" class="p12-precheck-warn" data-testid="p12-sell-unverified-note">无法核验停牌或跌停，委托可能无法成交；卖出确认照常放行。</p>
               <p v-else>{{ selected.next_observation || '今天无需执行操作，继续按条件观察' }}</p>
               <small v-if="workbench.package">最近盘后检查：{{ workbench.package.market_date }} 收盘</small>
             </div>
@@ -945,6 +946,11 @@ export default {
     },
     isEmptyAdvice () {
       return this.workbench?.run_receipt?.package?.admission_disposition === 'empty_advice'
+    },
+    isHoldingsOnly () {
+      // Issue #723: a package that only holds positions and adds no new buy
+      // is publishable, not an empty advice; it shows its own line.
+      return this.workbench?.run_receipt?.package?.admission_disposition === 'holdings_only'
     },
     isEmptyPaperPackage () {
       return Boolean(
@@ -1298,6 +1304,9 @@ export default {
       }
       if (this.workbench.publication?.retracted) {
         return '本日盘后建议已被撤回：未确认计划不可再确认，已成交事实保留；下一份可执行建议为下一交易日盘后包。'
+      }
+      if (this.isHoldingsOnly && this.workbench.package) {
+        return '今天无新买入，持仓继续持有。' + (this.nextCheckText ? ' ' + this.nextCheckText : '')
       }
       if (this.isEmptyAdvice && this.workbench.package) {
         return '今天无须下单：已评估无合格新增候选；持仓与委托按计划窗口继续。' + (this.nextCheckText ? ' ' + this.nextCheckText : '')

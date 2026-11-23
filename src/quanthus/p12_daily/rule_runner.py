@@ -602,12 +602,30 @@ class SyntheticRuleRunner:
         # by a prior or different-manifest run can never pass the gate.
         if request.run_id:
             run_id = request.run_id
+        # Issue #723 count/binding semantics (R10/R11): ``evaluated_candidates``
+        # carries only the new-buy candidates (a decision carrying an entry);
+        # hold and exit decisions bind to ``holding_signals`` instead, so a
+        # package that only holds positions still publishes with a real,
+        # non-empty candidate/ signal binding and is never treated as an
+        # empty advice.
         evaluated_candidates = sorted(
             ({
                 "opportunity_id": d.opportunity_id,
                 "security_code": d.security_code,
             }
-            for d in decision_set.decisions),
+            for d in decision_set.decisions
+            if d.entry is not None),
+            key=_candidate_sort_key,
+        )
+        holding_signal_bindings = sorted(
+            ({
+                "opportunity_id": d.opportunity_id,
+                "security_code": d.security_code,
+                "stage": str(d.stage.value if hasattr(d.stage, "value") else d.stage),
+            }
+            for d in decision_set.decisions
+            if d.entry is None
+            and d.stage is not OpportunityStage.ENDED),
             key=_candidate_sort_key,
         )
         coverage_payload = {
@@ -632,6 +650,7 @@ class SyntheticRuleRunner:
             ),
             "evaluated_universe": evaluated_universe,
             "evaluated_candidates": evaluated_candidates,
+            "holding_signals": holding_signal_bindings,
         }
         source_closure = {
             "package_id": snapshot.package_id,

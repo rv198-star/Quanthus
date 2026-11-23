@@ -64,3 +64,9 @@ for6h; top-page incremental observations and the independent feed/PDF queue cont
 access workaround or alternate source purchase was attempted. The tiered PDF mechanism is
 unchanged. Old runtime and full-check evidence remain fixed as bf8c7a0b; next source patch
 has its own code/tests/receipt. Initial finite source probe budget now11/12 requests.
+
+The first unreviewed conclusion proposal in0839b197 referenced a no-facet-change checkpoint;
+the repository validator rejected that link. A new scoped DATA engineering/partial runtime
+checkpoint now records the actual extension (preserving prior fixed128 acceptance); the
+proposal reference is corrected before PR handoff. Existing accepted ledger entries are
+byte-preserved and0839 remains in Git history. Quality/value/admission are unchanged.

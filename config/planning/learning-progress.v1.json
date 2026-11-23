@@ -15221,6 +15221,51 @@
       "reviewed_modules": [
         "DATA"
       ]
+    },
+    {
+      "id": "CP-735-20261123T222256285992Z",
+      "recorded_at": "2026-11-23T22:22:56.285992+00:00",
+      "actor": "P10 Owner actual raw-trial runtime checkpoint",
+      "work_item": "P10-DATA-NEWS-FWD-001",
+      "outcome": "progress",
+      "summary": "New forward capture engineering is partially running:300 news/30 unique disclosures/6 verified archived PDFs; source pagination gap remains.",
+      "evidence": [
+        {
+          "id": "ACTUAL-RAW-TRIAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-news/ENGINEERING-CHECKPOINT-v2.json",
+          "sha256": "b9db63531e5bea39bbbd5b11aa91814782985d2c4ee0bbf8c518a212b965982e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual bounded partial trial; no all-A/source/consumer qualification."
+        }
+      ],
+      "updates": [
+        {
+          "module": "DATA",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Forward news extension only: immutable raw capture/local tiered extraction/cloud PDF byte verification actually ran. Prior fixed128 acceptance remains within its old scope.",
+          "remaining": "CNINFO supplier pagination/all-A census, continuous corrected runtime, trialweek volume/table assessment and downstream binding. No quality/value/admission change.",
+          "next_action": "Continue independent working sources with repeated-page stop; bounded protocol/source evidence, week receipt and separate Base2.7 module design.",
+          "supersedes": "CP-566-PREFIX128-20261027T130854Z",
+          "evidence": [
+            "ACTUAL-RAW-TRIAL"
+          ]
+        }
+      ],
+      "no_change_reason": "All quality/value/admission facets remain as previously recorded.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-NEWS-FWD-001",
+          "number": 735,
+          "title": "[P10-DATA-NEWS-FWD-001] 2026-11-24起公告新闻前向采集与隔离试运行",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:03:37Z",
+          "body_sha256": "2190f1e381e782e71cf6bf65a50e17e6082c3776daef9c248308f124b7cfb2af"
+        }
+      ]
     }
   ],
   "history_imports": [

@@ -15403,6 +15403,72 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-20261123T234642409903Z",
+      "recorded_at": "2026-11-23T23:46:42.409903+00:00",
+      "actor": "P11-root-node-compatibility-repair",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "6359local independent pass retained;1892Nodefull failed9527/25/8/35.24environment failures proven onbase;9introducedR7file-binding errors fixed by sealed-runner restoration andP11typing adapter. Sourcea725 targeted177Node/124local pass; independentreview and integratedfull pending.",
+      "evidence": [
+        {
+          "id": "P11-6359-INDEPENDENT-PASS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/6359bf9c-c2/RESULT.json",
+          "sha256": "42ccbbd85ac0369932ece06fba3981777a0e895bf890131ab7fc870985e95a89",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "LocalM1 synthetic pass; originalverdict scope retained."
+        },
+        {
+          "id": "P11-1892-NODE-FULL-FAILED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/cn02-6359-followup/FULL-1892-RESULT.json",
+          "sha256": "8e8812c7c3f442b8644604ac19af628efdd3211ad71e96a814505bf762894266",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual full9527passed25failed8errors35skipped,exit2; not a pass."
+        },
+        {
+          "id": "P11-A725-COMPAT-SOURCE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/runner-compat-1892/SUBMISSION-SOURCE-A725.json",
+          "sha256": "093007444ad610f8912ee4887eb2e91059987e7f6cbf1e171e66ec9176ff1d88",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Narrow originalbyte restoration andP11boundary adapter; newfixed review candidate, globalfullpending."
+        },
+        {
+          "id": "P11-A725-NODE-TARGETED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/runner-compat-1892/CN02-A725-VERIFIED.json",
+          "sha256": "3e89d29761c92375ed1a5d15ca53341c3e2a31ebf38f84d4e61d675e5ecafad9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Verified-head177Node tests/strict9pass only."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "No module/use promotion. Preserve all failed revisions and frozenR7 request, scientific/PIT/adoption gates. Latest global full result remains failed; next whole-suite belongs to final integratedM2 closure.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:13:04Z",
+          "body_sha256": "2baef3b07ed7915497029f300ca3e4f362de93a099a919173d05096aa55dbdf5"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

@@ -23,7 +23,8 @@ from zoneinfo import ZoneInfo
 SCHEMA = "quanthus.p10.daily-consumer-sidecar.v1"
 CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v1"
 BOUNDED_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v1.1"
-RUNTIME_VERSION = "p10-daily-consumer-sidecar-runtime-v1.1"
+M0_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v1.2"
+RUNTIME_VERSION = "p10-daily-consumer-sidecar-runtime-v1.2"
 STORE_SCHEMA = "quanthus.p10.sidecar-verified-event-envelope.v1"
 _SHA = re.compile(r"sha256:[0-9a-f]{64}")
 _REVISION = re.compile(r"[0-9a-f]{40}")
@@ -140,11 +141,13 @@ class ConsumerConfig:
     code_revision: str
     requirements: tuple[tuple[str, bool], ...]
     resource_limits: ResourceLimits | None = None
+    m0_ref: str | None = None
 
     def __post_init__(self) -> None:
         for value in (self.config_id, self.consumer_id, self.purpose_id):
             _text(value, "CONFIG_IDENTITY_REQUIRED")
-        for sha in (self.field_spec_sha256, self.universe_sha256, self.policy_sha256):
+        _sha(self.policy_sha256)
+        for sha in (self.field_spec_sha256, self.universe_sha256, self.m0_ref):
             if sha is not None:
                 _sha(sha)
         _require(
@@ -184,11 +187,19 @@ class ConsumerConfig:
         }
         if self.resource_limits:
             result["resource_limits"] = asdict(self.resource_limits)
+        if self.m0_ref is not None:
+            result["schema"] = M0_CONFIG_SCHEMA
+            result["m0_ref"] = self.m0_ref
         return result
 
     @classmethod
-    def from_dict(cls, raw: Mapping[str, Any]) -> ConsumerConfig:
-        bounded = raw.get("schema") == BOUNDED_CONFIG_SCHEMA
+    def from_dict(cls, raw: Any) -> ConsumerConfig:
+        _require(isinstance(raw, Mapping), "INVALID_CONSUMER_CONFIG")
+        assert isinstance(raw, Mapping)
+        explicit_m0 = raw.get("schema") == M0_CONFIG_SCHEMA
+        bounded = raw.get("schema") == BOUNDED_CONFIG_SCHEMA or (
+            explicit_m0 and "resource_limits" in raw
+        )
         obj = _object(
             raw,
             {
@@ -202,14 +213,17 @@ class ConsumerConfig:
                 "code_revision",
                 "requirements",
             }
-            | ({"resource_limits"} if bounded else set()),
+            | ({"resource_limits"} if bounded else set())
+            | ({"m0_ref"} if explicit_m0 else set()),
             "INVALID_CONSUMER_CONFIG",
         )
         _require(
-            obj["schema"] in {CONFIG_SCHEMA, BOUNDED_CONFIG_SCHEMA}
+            obj["schema"] in {CONFIG_SCHEMA, BOUNDED_CONFIG_SCHEMA, M0_CONFIG_SCHEMA}
             and isinstance(obj["requirements"], list),
             "INVALID_CONSUMER_CONFIG",
         )
+        if explicit_m0:
+            _sha(obj["m0_ref"])
         requirements = []
         for item in obj["requirements"]:
             row = _object(item, {"id", "required"}, "INVALID_REQUIREMENT")
@@ -224,6 +238,7 @@ class ConsumerConfig:
             obj["code_revision"],
             tuple(requirements),
             ResourceLimits.from_dict(obj["resource_limits"]) if bounded else None,
+            m0_ref=obj["m0_ref"] if explicit_m0 else None,
         )
 
     @property
@@ -232,7 +247,11 @@ class ConsumerConfig:
 
     @property
     def binding_complete(self) -> bool:
-        return self.field_spec_sha256 is not None and self.universe_sha256 is not None
+        return (
+            self.field_spec_sha256 is not None
+            and self.universe_sha256 is not None
+            and self.m0_ref is not None
+        )
 
 
 _MEMBER_FIELDS = {
@@ -404,11 +423,13 @@ def assess(
         "OBSERVATION_WINDOW_MISMATCH",
     )
     _require(
-        binding["consumer_id"] == config.consumer_id
-        and binding["purpose_id"] == config.purpose_id
-        and binding["m0_ref"] == config.identity,
+        binding["consumer_id"] == config.consumer_id and binding["purpose_id"] == config.purpose_id,
         "CONSUMER_CONFIG_MISMATCH",
     )
+    if binding["m0_ref"] is not None:
+        _sha(binding["m0_ref"])
+        if config.m0_ref is not None:
+            _require(binding["m0_ref"] == config.m0_ref, "M0_REFERENCE_MISMATCH")
     _require(
         record["scope"] == {"intervals": ["1d"], "references": "required_only"}, "INVALID_SCOPE"
     )
@@ -532,7 +553,11 @@ def assess(
         ]
         if any(uri.lower().startswith(("fixture:", "synthetic:", "test:")) for uri in refs):
             blockers.add("NON_OBSERVED_REFERENCE")
-    if not config.binding_complete:
+    if binding["m0_ref"] is None:
+        blockers.add("M0_NOT_BOUND")
+    if config.m0_ref is None and binding["m0_ref"] is not None:
+        blockers.add("M0_REFERENCE_UNCONFIGURED")
+    if not config.binding_complete or binding["m0_ref"] is None:
         blockers.add("CONSUMER_CLOSURE_PENDING")
     if not pub["publisher"] or not pub["channel"] or published is None:
         blockers.add("PUBLICATION_UNKNOWN")
@@ -656,6 +681,7 @@ class Selection:
     record_id: str | None
     disposition: str
     blockers: tuple[str, ...]
+    boundary_notes: tuple[str, ...] = ()
 
 
 def select_as_of(
@@ -669,6 +695,12 @@ def select_as_of(
     """Use actual event visibility and every member clock, never file mtime or append order."""
     if config.resource_limits:
         config.resource_limits.check("max_events", len(records))
+    notes = tuple(
+        "UNCONFIGURED_RESOURCE_BOUND:" + name
+        for name in ResourceLimits.__dataclass_fields__
+        if name != "policy_id"
+        and (config.resource_limits is None or getattr(config.resource_limits, name) is None)
+    )
     at = _instant(cutoff)
     try:
         date.fromisoformat(market_date)
@@ -702,9 +734,9 @@ def select_as_of(
         if _instant(visible["end"]) <= at:
             eligible.append((record, result))
     if visibility_gaps:
-        return Selection(None, "INPUT_OR_CLOCK_BLOCKED", tuple(sorted(visibility_gaps)))
+        return Selection(None, "INPUT_OR_CLOCK_BLOCKED", tuple(sorted(visibility_gaps)), notes)
     if not eligible:
-        return Selection(None, "INPUT_OR_CLOCK_BLOCKED", ("NO_VISIBLE_VERSION",))
+        return Selection(None, "INPUT_OR_CLOCK_BLOCKED", ("NO_VISIBLE_VERSION",), notes)
     record, result = eligible[-1]
     # A member or event must also be available at the requested as-of, which may precede
     # the delivery's registered decision cutoff.
@@ -714,10 +746,14 @@ def select_as_of(
         for field in ("source_available_at", "validated_at", "available_at"):
             c = item[field]
             if c is None or _instant(c["end"]) > at:
-                return Selection(None, "INPUT_OR_CLOCK_BLOCKED", ("MEMBER_NOT_VISIBLE_AS_OF",))
+                return Selection(
+                    None, "INPUT_OR_CLOCK_BLOCKED", ("MEMBER_NOT_VISIBLE_AS_OF",), notes
+                )
     if record["event"] == "WITHDRAW":
-        return Selection(None, "INPUT_OR_CLOCK_BLOCKED", ("WITHDRAWN_VERSION",))
-    return Selection(record["record_id"], result.disposition, result.blockers)
+        return Selection(None, "INPUT_OR_CLOCK_BLOCKED", ("WITHDRAWN_VERSION",), notes)
+    return Selection(
+        record["record_id"], result.disposition, result.blockers, result.boundary_notes
+    )
 
 
 def _strict_json(raw: bytes) -> dict[str, Any]:
@@ -813,6 +849,9 @@ class SidecarStore:
         paths = []
         total_bytes = 0
         for path in (self.root / "records").iterdir():
+            _require(not path.is_symlink(), "STORE_SYMLINK")
+            if path.name.startswith(".pending-"):
+                continue
             paths.append(path)
             if limits:
                 limits.check("max_files", len(paths))
@@ -873,8 +912,11 @@ class SidecarStore:
             same = [r for r in records if r["record_id"] == record.get("record_id")]
             if same:
                 _require(canonical(same[0]) == canonical(record), "IMMUTABLE_EVENT_CONFLICT")
-                # Reuse still checks the supplied identity/receipt rather than trusting the ID.
+                # Retry cannot replace any part of the originally committed verification.
                 position = records.index(same[0])
+                path = self.root / "records" / f"{position + 1:08d}-{record['record_id'][7:]}.json"
+                original = _strict_json(path.read_bytes())["verification"]
+                _require(original == asdict(verification), "IMMUTABLE_VERIFICATION_CONFLICT")
                 prior = next(
                     (
                         r
@@ -905,7 +947,7 @@ class SidecarStore:
             limits = self.config.resource_limits
             if limits:
                 limits.check("max_events", len(records) + 1)
-                limits.check("max_files", len(list((self.root / "records").iterdir())) + 1)
+                limits.check("max_files", len(records) + 1)
                 limits.check("max_record_bytes", len(raw))
                 used = sum(
                     p.stat().st_size

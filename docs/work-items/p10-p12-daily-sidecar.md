@@ -7,7 +7,7 @@
 | Design status | approved for the bounded metadata scope accepted by P11 |
 | Delivery gate | open; isolated candidate, independent review and consumer binding pending |
 | Baseline | origin/main b995967655cb7ed2265f6eca1a1e2c27fb84f3e3 |
-| Runtime | p10-daily-consumer-sidecar-runtime-v1.1, src/quanthus/p10_daily_sidecar.py |
+| Runtime | p10-daily-consumer-sidecar-runtime-v1.2, src/quanthus/p10_daily_sidecar.py |
 | Tests | tests/unit/test_p10_daily_sidecar.py |
 | Request | [finite engineering request](../../config/pipelines/p10-daily-sidecar-engineering.v1.json) |
 
@@ -168,3 +168,27 @@ Independent source/publisher loading, P11/P12 actual receipts and consumer quali
 node acceptance and any production deployment remain the next scoped integration steps.
 Focused repair probes and full exact-closure check receipts are retained externally under
 quanthus-p10-sidecar-audit-repair-003; no market-row read or new source endpoint is involved.
+
+## Second narrow binding and retry repair (305 audit)
+
+Exact task base30503b92, prior fixed artifacts and independent CHANGES_REQUIRED are retained.
+Ten fail-first probes reproduce the two binding defects and four P2 API/recovery defects.
+policy_sha256 is now always a valid required SHA. Nullable field/pool facts stay pending.
+M0 is a separately configured **external document content SHA** (`m0_ref=sha256:...`),
+independent of the complete config digest and policy identity. Configv1.2 serializes that
+explicit M0; v1/v1.1 without it keep their exact wire serialization but remain pending.
+An honest null record M0 is assessed as M0_NOT_BOUND/CONSUMER_CLOSURE_PENDING. A configured
+M0 must match the record reference; an unconfigured caller reference remains blocked.
+This declarative binding never opens SOURCE_QUALIFICATION_UNBOUND or loads a real M0/source.
+
+Exact retries compare every persisted InputVerification field, including original times,
+before returning idempotent reuse. Committed file caps count committed event envelopes;
+`.pending-*` crash files are retained, skipped for committed caps and never interpreted as
+records. Their disk reclamation/retention is outside this library's committed-store budget.
+Selection preserves resource boundary_notes on successful and blocked/no-visible outcomes.
+Nonmapping config inputs consistently raise SidecarError(INVALID_CONSUMER_CONFIG).
+
+Focused closure83 includes the original66 plus the new pending/external-M0/policy, exact
+retry, orphan-file, boundary-note and nonmapping probes. Full check, fixed Git/tree and
+CN02 formal command results are recorded separately. The prior regulation/session successor
+stays fixed until these repairs are propagated in an independently versioned successor.

@@ -202,6 +202,7 @@ def config(*, pending=False, optional=False):
         sha("c"),
         "d" * 40,
         (("bars", True), ("calendar", not optional)),
+        m0_ref=None if pending else sha("0"),
     )
 
 
@@ -279,7 +280,7 @@ def specimen(cfg=None, *, grade="SYNTHETIC"):
             "observation_end": "2026-11-24T15:00:00+08:00",
             "decision_cutoff": "2026-11-24T22:30:00+08:00",
             "consumer_id": cfg.consumer_id,
-            "m0_ref": cfg.identity,
+            "m0_ref": cfg.m0_ref,
         },
         "scope": {"intervals": ["1d"], "references": "required_only"},
         "source": {
@@ -420,7 +421,7 @@ def test_old_verification_cannot_cover_changed_source_identity(field):
 def test_old_verification_cannot_cover_changed_pool():
     record, cfg, receipt = specimen()
     cfg = replace(cfg, universe_sha256=sha("9"))
-    record["binding"]["m0_ref"] = cfg.identity
+    record["binding"]["m0_ref"] = cfg.m0_ref
     seal(record)
     with pytest.raises(SidecarError, match="VERIFICATION_IDENTITY_MISMATCH"):
         assess(record, cfg, receipt)
@@ -734,3 +735,127 @@ def test_partial_clock_still_rejects_known_impossible_causality():
     seal(record)
     with pytest.raises(SidecarError, match="MEMBER_CAUSALITY"):
         assess(record, cfg, receipt)
+
+
+def test_policy_identity_cannot_be_null_in_constructor_or_parser():
+    with pytest.raises(SidecarError):
+        replace(config(), policy_sha256=None)
+    raw = config().to_dict()
+    raw["policy_sha256"] = None
+    with pytest.raises(SidecarError):
+        ConsumerConfig.from_dict(raw)
+
+
+def test_honest_pending_null_m0_is_reported_as_closure_blocker():
+    cfg = config(pending=True)
+    record, _, receipt = specimen(cfg)
+    record["binding"]["m0_ref"] = None
+    seal(record)
+    result = assess(record, cfg, verification(record, cfg))
+    assert "M0_NOT_BOUND" in result.blockers
+    assert "CONSUMER_CLOSURE_PENDING" in result.blockers
+
+
+def test_exact_retry_cannot_replace_original_verification_time(tmp_path):
+    record, cfg, _ = specimen()
+    for member in record["members"]:
+        member["validated_at"] = None
+    seal(record)
+    receipt = verification(record, cfg)
+    store = SidecarStore(tmp_path / "strict-retry", cfg, protected_roots=[])
+    store.append(record, receipt)
+    changed = replace(receipt, start="2026-11-24T18:31:00+08:00", end="2026-11-24T18:31:00+08:00")
+    with pytest.raises(SidecarError, match="IMMUTABLE_VERIFICATION_CONFLICT"):
+        store.append(record, changed)
+
+
+def test_orphan_pending_file_does_not_consume_committed_file_cap(tmp_path):
+    cfg = replace(config(), resource_limits=ResourceLimits("single-commit", max_files=1))
+    record, _, receipt = specimen(cfg)
+    store = SidecarStore(tmp_path / "pending-orphan", cfg, protected_roots=[])
+    store.read()
+    (store.root / "records" / ".pending-crash").write_bytes(b"incomplete")
+    assert store.append(record, receipt)
+    assert not store.append(record, receipt)
+    assert store.read() == [record]
+
+
+def test_selection_retains_unconfigured_resource_boundary_notes():
+    record, cfg, receipt = specimen()
+    result = select_as_of(
+        [record],
+        cfg,
+        {record["record_id"]: receipt},
+        market_date="2026-11-24",
+        cutoff="2026-11-24T22:30:00+08:00",
+    )
+    assert "UNCONFIGURED_RESOURCE_BOUND:max_members" in result.boundary_notes
+
+
+@pytest.mark.parametrize("raw", [None, [], True, 1, "string"])
+def test_nonmapping_consumer_config_has_stable_error(raw):
+    with pytest.raises(SidecarError, match="INVALID_CONSUMER_CONFIG"):
+        ConsumerConfig.from_dict(raw)
+
+
+def test_external_content_addressed_m0_is_independent_from_config_digest():
+    cfg = replace(config(), m0_ref=sha("9"))
+    assert cfg.m0_ref != cfg.identity and cfg.binding_complete
+    assert cfg.to_dict()["schema"].endswith(".v1.2")
+    assert ConsumerConfig.from_dict(cfg.to_dict()) == cfg
+    record, _, receipt = specimen(cfg)
+    assert record["binding"]["m0_ref"] == sha("9")
+    assert not assess(record, cfg, receipt).blockers
+
+
+def test_complete_config_with_pending_record_stays_blocked():
+    record, cfg, _ = specimen()
+    record["binding"]["m0_ref"] = None
+    seal(record)
+    result = assess(record, cfg, verification(record, cfg))
+    assert "M0_NOT_BOUND" in result.blockers and "CONSUMER_CLOSURE_PENDING" in result.blockers
+
+
+def test_config_digest_alias_cannot_qualify_unconfigured_m0():
+    cfg = replace(config(), m0_ref=None)
+    record, _, _ = specimen(cfg)
+    record["binding"]["m0_ref"] = cfg.identity
+    seal(record)
+    result = assess(record, cfg, verification(record, cfg))
+    assert not cfg.binding_complete
+    assert "M0_REFERENCE_UNCONFIGURED" in result.blockers
+
+
+def test_wrong_external_m0_is_rejected_even_with_new_verification():
+    record, cfg, _ = specimen()
+    record["binding"]["m0_ref"] = sha("9")
+    seal(record)
+    with pytest.raises(SidecarError, match="M0_REFERENCE_MISMATCH"):
+        assess(record, cfg, verification(record, cfg))
+
+
+def test_policy_change_invalidates_verification_without_changing_m0():
+    record, cfg, receipt = specimen()
+    updated = replace(cfg, policy_sha256=sha("9"))
+    assert updated.m0_ref == cfg.m0_ref and updated.identity != cfg.identity
+    with pytest.raises(SidecarError, match="VERIFICATION_IDENTITY_MISMATCH"):
+        assess(record, updated, receipt)
+
+
+def test_legacy_config_without_m0_remains_parseable_pending_and_byte_compatible():
+    cfg = replace(config(), m0_ref=None)
+    raw = cfg.to_dict()
+    assert raw["schema"].endswith(".v1") and "m0_ref" not in raw
+    assert ConsumerConfig.from_dict(raw).to_dict() == raw
+    assert not ConsumerConfig.from_dict(raw).binding_complete
+    wrong = {**raw, "schema": "quanthus.p10.daily-consumer-config.v1.2", "m0_ref": None}
+    with pytest.raises(SidecarError):
+        ConsumerConfig.from_dict(wrong)
+
+
+def test_selection_without_visible_records_still_retains_resource_notes():
+    result = select_as_of(
+        [], config(), {}, market_date="2026-11-24", cutoff="2026-11-24T22:30:00+08:00"
+    )
+    assert "NO_VISIBLE_VERSION" in result.blockers
+    assert "UNCONFIGURED_RESOURCE_BOUND:max_members" in result.boundary_notes

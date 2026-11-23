@@ -15221,6 +15221,41 @@
       "reviewed_modules": [
         "DATA"
       ]
+    },
+    {
+      "id": "CP-726-20261123T223427094539Z",
+      "recorded_at": "2026-11-23T22:34:27.094539+00:00",
+      "actor": "P10 Owner after305 independent audit",
+      "work_item": "P10-DATA-P12-DAILY-001",
+      "outcome": "no_module_change",
+      "summary": "Second narrow metadata repair: mandatory policy and separate M0 reference, immutable retry verification, committed resource recovery and stable boundary API.",
+      "evidence": [
+        {
+          "id": "BINDING-REPAIR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-sidecar-binding-repair-004/FOCUSED-RESULTS.json",
+          "sha256": "f64db3e706043e512e2b4ace486d028fb7662e687e7f77e66cbc44c03b730059",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "10 fail-first at305;83 focused after fix; changed-file Ruff/type. Real source adapter and publisher unimplemented."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "No DATA quality/value/admission or production/source qualification change; metadata engineering rereview only.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-P12-DAILY-001",
+          "number": 726,
+          "title": "[P10-DATA-P12-DAILY-001] 固定日线供给的发布、可见时点与修订撤回合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T21:06:19Z",
+          "body_sha256": "0a3fba23c3e36bf6f206d912995fe25b0c230c9529613b6770feedacca1c5f94"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
     }
   ],
   "history_imports": [

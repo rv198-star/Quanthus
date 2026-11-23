@@ -15151,6 +15151,41 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-P10-726-METADATA-ENGINEERING-001",
+      "recorded_at": "2026-11-23T19:50:17.327989+00:00",
+      "actor": "P10 current Owner; #726 isolated candidate",
+      "work_item": "P10-DATA-P12-DAILY-001",
+      "outcome": "no_module_change",
+      "summary": "Configurable daily-sidecar metadata validation, append-only crash/retry events and as-of probes; M2v2 source mapping candidate. Source and consumer admission pending.",
+      "evidence": [
+        {
+          "id": "P10-726-FOCUSED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-sidecar-engineering-001/FOCUSED-RESULTS.json",
+          "sha256": "e08db64ed25935c9b58edb3001e254e9e7c98ec1ee576c144b42413f983a519d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "46 synthetic metadata unit probes, changed-file lint/type/maintenance; actual source data, node runtime and consumer admission not assessed."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "DATA facets remain at their prior scope: these synthetic metadata engineering checks do not qualify source facts, resolve historical PIT or admit a daily consumer.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-P12-DAILY-001",
+          "number": 726,
+          "title": "[P10-DATA-P12-DAILY-001] 固定日线供给的发布、可见时点与修订撤回合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T19:29:34Z",
+          "body_sha256": "0a3fba23c3e36bf6f206d912995fe25b0c230c9529613b6770feedacca1c5f94"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
     }
   ],
   "history_imports": [

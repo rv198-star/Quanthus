@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import sys
@@ -11,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from quanthus.event_library.contracts import EventContractError
 from quanthus.product_daily.contracts import ProductDailyError
 from quanthus.product_daily.recommendation import (
     AccountFactsView,
@@ -169,18 +171,20 @@ def _receipt(
 ) -> CandidateEvaluationReceipt:
     facts = facts or _facts(_full_members())
     policy = policy or _policy()
-    return CandidateEvaluationReceipt(
+    receipt = CandidateEvaluationReceipt(
         producer_id="r11-candidate-producer",
         producer_version="1.0.0",
         run_id="run-20261120",
         completed_at=completed_at,
-        coverage_digest="sha256:" + "d" * 64,
+        coverage_digest="sha256:" + "0" * 64,  # replaced below with the run-bound digest
         evaluated_count=evaluated if evaluated is not None else max(len(candidates), 1),
         qualified_count=qualified,
         binding_digest=CandidateEvaluationReceipt.expected_binding_digest(
             facts, policy, candidates
         ),
+        evaluated_universe=tuple(sorted({c.security_code for c in candidates})) or ("000000",),
     )
+    return dataclasses.replace(receipt, coverage_digest=receipt.expected_coverage_digest())
 
 
 def producer() -> DailyAdviceProducer:
@@ -577,6 +581,109 @@ def test_receipt_binding_mismatch_fails_closed():
     assert result.diagnostics[0]["reason"] == "candidate_evaluation_binding_mismatch"
 
 
+def _binding_tamper_case(mutate_facts):
+    """A receipt bound to facts A must fail closed when the produce() call sees mutated
+    facts B: the recomputed binding diverges from the receipt's declared binding."""
+
+    facts_a = _facts(_full_members())
+    facts_b = _facts(mutate_facts())
+    policy = _policy()
+    cand = _candidate(facts=facts_a, policy=policy)
+    receipt = _receipt(facts_a, policy, (cand,), qualified=1)
+    result = _produced((cand,), facts=facts_b, policy=policy, receipt=receipt)
+    assert not result.publishable
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_binding_mismatch"
+
+
+def test_member_digest_tamper_invalidates_binding():
+    members = _full_members()
+    object.__setattr__(members[0], "digest", "sha256:" + "f" * 64)
+    _binding_tamper_case(lambda: members)
+
+
+def test_member_available_at_tamper_invalidates_binding():
+    members = _full_members()
+    object.__setattr__(members[0], "available_at", datetime(2026, 11, 20, 12, 0, tzinfo=TZ))
+    _binding_tamper_case(lambda: members)
+
+
+def test_required_member_set_tamper_invalidates_binding():
+    # required set change must alter the binding even with identical member payloads
+    facts_a = _facts(_full_members(), required=["daily-bars", "calendar", "industry-map"])
+    facts_b = _facts(_full_members(), required=["daily-bars"])
+    policy = _policy()
+    cand = _candidate(facts=facts_a, policy=policy)
+    receipt = _receipt(facts_a, policy, (cand,), qualified=1)
+    result = _produced((cand,), facts=facts_b, policy=policy, receipt=receipt)
+    assert not result.publishable
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_binding_mismatch"
+
+
+def test_intake_clock_tamper_invalidates_binding():
+    facts_a = _facts(_full_members())
+    facts_b = _facts(
+        _full_members(),
+        verified=datetime(2026, 11, 20, 18, 30, tzinfo=TZ),
+    )
+    policy = _policy()
+    cand = _candidate(facts=facts_a, policy=policy)
+    receipt = _receipt(facts_a, policy, (cand,), qualified=1)
+    result = _produced((cand,), facts=facts_b, policy=policy, receipt=receipt)
+    assert not result.publishable
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_binding_mismatch"
+
+
+def test_calendar_or_price_tamper_invalidates_binding():
+    facts_a = _facts(_full_members())
+    facts_b = _facts(_full_members())
+    object.__setattr__(facts_b, "price_basis", "adjusted")
+    policy = _policy()
+    cand = _candidate(facts=facts_a, policy=policy)
+    receipt = _receipt(facts_a, policy, (cand,), qualified=1)
+    result = _produced((cand,), facts=facts_b, policy=policy, receipt=receipt)
+    assert not result.publishable
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_binding_mismatch"
+
+
+def test_free_form_coverage_digest_fails_closed():
+    """A coverage digest that is a valid sha256 string but not bound to this run's
+    evaluated universe must be refused; it cannot be invented post-hoc."""
+
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    receipt = _receipt(facts, policy, (cand,), qualified=1)
+    object.__setattr__(receipt, "coverage_digest", "sha256:" + "9" * 64)
+    result = _produced((cand,), facts=facts, policy=policy, receipt=receipt)
+    assert not result.publishable
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_coverage_mismatch"
+
+
+def test_non_digest_coverage_string_fails_closed():
+    with pytest.raises(EventContractError):
+        CandidateEvaluationReceipt(
+            producer_id="p",
+            producer_version="1",
+            run_id="r",
+            completed_at=datetime(2026, 11, 20, 19, 0, tzinfo=TZ),
+            coverage_digest="not-a-sha256-digest",
+            evaluated_count=1,
+            qualified_count=1,
+            binding_digest="sha256:" + "0" * 64,
+        )
+
+
+def test_evaluated_universe_tamper_changes_coverage():
+    facts = _facts(_full_members())
+    policy = _policy()
+    cand = _candidate(facts=facts, policy=policy)
+    receipt = _receipt(facts, policy, (cand,), qualified=1)
+    object.__setattr__(receipt, "evaluated_universe", ("000001", "000002"))
+    result = _produced((cand,), facts=facts, policy=policy, receipt=receipt)
+    assert not result.publishable
+    assert result.diagnostics[0]["reason"] == "candidate_evaluation_coverage_mismatch"
+
+
 def test_receipt_after_cutoff_fails_closed():
     facts = _facts(_full_members())
     policy = _policy()
@@ -602,6 +709,15 @@ def test_intake_verified_after_cutoff_fails_closed():
     result = _produced((cand,), facts=facts)
     assert not result.publishable
     assert result.diagnostics[0]["reason"] == "intake_verified_after_cutoff"
+
+
+def test_intake_first_read_after_cutoff_fails_closed():
+    facts = _facts(_full_members())
+    object.__setattr__(facts, "intake_first_read_at", datetime(2026, 11, 20, 23, 0, tzinfo=TZ))
+    cand = _candidate(facts=facts)
+    result = _produced((cand,), facts=facts)
+    assert not result.publishable
+    assert result.diagnostics[0]["reason"] == "intake_first_read_after_cutoff"
 
 
 def test_intake_received_after_cutoff_fails_closed():

@@ -24,6 +24,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from quanthus.event_library.contracts import require_sha256_digest
 from quanthus.product_daily.contracts import (
     ProductDailyError,
     require_aware,
@@ -164,6 +165,7 @@ class CandidateEvaluationReceipt:
     evaluated_count: int
     qualified_count: int
     binding_digest: str
+    evaluated_universe: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for name in (
@@ -179,6 +181,10 @@ class CandidateEvaluationReceipt:
         require_nonnegative_int(self.qualified_count, "qualified_count")
         if self.qualified_count > self.evaluated_count:
             raise ProductDailyError("invalid_receipt", "qualified_count exceeds evaluated_count")
+        require_sha256_digest(self.coverage_digest, "coverage_digest")
+        if self.evaluated_universe:
+            for code in self.evaluated_universe:
+                require_text(code, "evaluated_universe[]")
 
     @staticmethod
     def _candidate_payload(candidates: tuple[CandidateSignal, ...]) -> list[dict[str, Any]]:
@@ -215,6 +221,13 @@ class CandidateEvaluationReceipt:
         The digest covers the full injected candidate payload, not only ids: changing a
         candidate's component, security, marks, prices, reasons, or explanations changes the
         expected binding and makes a mismatched receipt fail closed.
+
+        The binding also covers the exact member set (id, version, digest, available_at,
+        required flag), the required-member set, the intake received/first-read/verified
+        clocks, the calendar and price basis, the market and next-session dates, and the
+        evaluated-universe identity the receipt claims to have covered.  Changing any member
+        digest, any member's available clock, the required set, the calendar, or the price
+        basis changes the expected binding and fails the receipt closed.
         """
 
         return _json_digest(
@@ -223,11 +236,50 @@ class CandidateEvaluationReceipt:
                 "intake_receipt_id": facts.intake_receipt_id,
                 "source_id": facts.source_id,
                 "source_version": facts.source_version,
+                "calendar_version": facts.calendar_version,
+                "price_basis": facts.price_basis,
+                "market_date": facts.market_date.isoformat(),
+                "next_session": facts.next_session.isoformat(),
+                "members": [
+                    {
+                        "member_id": member.member_id,
+                        "version": member.version,
+                        "digest": member.digest,
+                        "available_at": member.available_at.isoformat(),
+                        "required": member.required,
+                    }
+                    for member in sorted(facts.members, key=lambda item: item.member_id)
+                ],
+                "required_member_ids": sorted(facts.required_member_ids),
+                "intake_received_at": facts.intake_received_at.isoformat(),
+                "intake_first_read_at": (
+                    None
+                    if facts.intake_first_read_at is None
+                    else facts.intake_first_read_at.isoformat()
+                ),
+                "intake_verified_at": facts.intake_verified_at.isoformat(),
                 "policy_id": policy.policy_id,
                 "policy_version": policy.version,
                 "candidate_rule_digest": policy.candidate_rule_digest,
                 "decision_cutoff": policy.decision_cutoff.isoformat(),
                 "candidates": CandidateEvaluationReceipt._candidate_payload(candidates),
+            }
+        )
+
+    def expected_coverage_digest(self) -> str:
+        """The coverage digest the receipt must carry for this exact run.
+
+        It binds the evaluated-universe identity, the producer identity, and the run id so a
+        free-form 'not-a-digest-and-not-bound-to-a-universe' string can never pass.  The
+        producer recomputes it and refuses any mismatch.
+        """
+
+        return _json_digest(
+            {
+                "producer_id": self.producer_id,
+                "producer_version": self.producer_version,
+                "run_id": self.run_id,
+                "evaluated_universe": sorted(self.evaluated_universe),
             }
         )
 
@@ -527,6 +579,20 @@ class DailyAdviceProducer:
                     "decision_cutoff": policy.decision_cutoff.isoformat(),
                 },
             )
+        if (
+            facts.intake_first_read_at is not None
+            and facts.intake_first_read_at > policy.decision_cutoff
+        ):
+            return self._block(
+                diagnostics=diagnostics,
+                assessment=assessment,
+                disposition=AdmissionDisposition.INPUT_NOT_READY,
+                reason="intake_first_read_after_cutoff",
+                detail={
+                    "intake_first_read_at": facts.intake_first_read_at.isoformat(),
+                    "decision_cutoff": policy.decision_cutoff.isoformat(),
+                },
+            )
 
         # The candidate evaluation receipt is mandatory on every path: a non-empty
         # candidate list is unverifiable without it, and an empty one is "not run".
@@ -586,6 +652,20 @@ class DailyAdviceProducer:
                 detail={
                     "expected": expected_binding,
                     "actual": evaluation_receipt.binding_digest,
+                },
+            )
+        # The coverage digest must be the run-bound identity the producer recomputes: a
+        # free-form or unbound coverage string can never pass as a real evaluated universe.
+        expected_coverage = evaluation_receipt.expected_coverage_digest()
+        if evaluation_receipt.coverage_digest != expected_coverage:
+            return self._block(
+                diagnostics=diagnostics,
+                assessment=assessment,
+                disposition=AdmissionDisposition.INPUT_NOT_READY,
+                reason="candidate_evaluation_coverage_mismatch",
+                detail={
+                    "expected": expected_coverage,
+                    "actual": evaluation_receipt.coverage_digest,
                 },
             )
 

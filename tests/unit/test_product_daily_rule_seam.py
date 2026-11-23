@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -463,11 +464,13 @@ def test_forged_component_rejected_by_producer(runner, resources):
         producer_version="1.0.0",
         run_id="run-1",
         completed_at=CUTOFF,
-        coverage_digest="sha256:" + "d" * 64,
+        coverage_digest="sha256:" + "0" * 64,  # replaced with run-bound digest below
         evaluated_count=1,
         qualified_count=1,
         binding_digest=CandidateEvaluationReceipt.expected_binding_digest(facts, policy, (forged,)),
+        evaluated_universe=(forged.security_code,),
     )
+    receipt = dataclasses.replace(receipt, coverage_digest=receipt.expected_coverage_digest())
     produced = DailyAdviceProducer().produce(
         facts=facts,
         account=account,

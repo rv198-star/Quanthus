@@ -21,18 +21,25 @@ account limit.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
-from types import SimpleNamespace
+from time import perf_counter
 from typing import Any
 
 from quanthus.backtest.baseline_research import (
     BaselineFeaturePanelReport,
     BaselineFeatureRow,
 )
+from quanthus.event_library.contracts import (
+    EventIdentity,
+    EventRecord,
+    prospective_clock,
+    sha256_digest,
+)
+from quanthus.event_library.rule_card import CandidateRuleCard
 from quanthus.event_library.scan import (
     CandidateDailyInput,
     ScannedCandidate,
@@ -41,11 +48,13 @@ from quanthus.event_library.scan import (
 from quanthus.expert_evaluation.contracts import ExpertEvaluationSpec
 from quanthus.expert_evaluation.experts.trend_stability import (
     TrendStabilityConfig,
+    classify_trend_stability,
     evaluate_trend_stability,
 )
 from quanthus.expert_protocols import (
     RequiredAction,
 )
+from quanthus.expert_strategy.context import ExpertDecisionSubject
 from quanthus.expert_strategy.position_risk import HeldPositionFacts
 from quanthus.expert_strategy.runner import (
     FormalStrategyDecision,
@@ -53,6 +62,7 @@ from quanthus.expert_strategy.runner import (
     build_formal_expert_context,
 )
 from quanthus.feature_registry import FeatureRegistry
+from quanthus.policy import find_project_root
 from quanthus.product_daily.contracts import (
     ProductDailyError,
     require_aware,
@@ -66,10 +76,14 @@ from quanthus.product_daily.recommendation.contracts import (
     DailyFactsView,
 )
 from quanthus.product_daily.recommendation.producer import (
+    AccountFactsView,
     AdvicePolicy,
+    CandidateEvaluationReceipt,
     CandidateSignal,
+    DailyAdviceProducer,
     ExpertBundle,
     HeldSignal,
+    ProducerResult,
 )
 from quanthus.product_daily.risk import ExpertEntryEligibility
 
@@ -188,6 +202,8 @@ class SeamResult:
     decisions: tuple[SeamDecision, ...]
     excluded: tuple[dict[str, str], ...]
     held_decisions: tuple[HeldDecision, ...] = ()
+    experts: ExpertBundle | None = None
+    evaluated_universe: tuple[str, ...] = ()
 
     @property
     def entries(self) -> tuple[SeamDecision, ...]:
@@ -209,6 +225,40 @@ class SeamResources:
     trend_config: TrendStabilityConfig
     trend_spec: ExpertEvaluationSpec
 
+    def __post_init__(self) -> None:
+        if (
+            self.feature_registry.digest != self.panel_report.feature_registry_digest
+            or self.feature_registry.digest != self.trend_config.feature_registry_digest
+        ):
+            raise ProductDailyError(
+                "feature_registry_binding_mismatch", "registry identity differs"
+            )
+
+
+@dataclass(frozen=True)
+class HeldReviewSubject:
+    """A daily position review identity, independent of any new-entry signal."""
+
+    identity: EventIdentity
+    knowledge_cutoff: datetime
+    signal_close: datetime
+    decision_at: datetime
+    source_evidence_digest: str
+
+    @property
+    def event_id(self) -> str:
+        return "held-review:" + sha256_digest(self.to_dict()).removeprefix("sha256:")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": "quanthus.p11-held-review.v1",
+            "identity": self.identity.to_dict(),
+            "knowledge_cutoff": self.knowledge_cutoff.isoformat(),
+            "signal_close": self.signal_close.isoformat(),
+            "decision_at": self.decision_at.isoformat(),
+            "source_evidence_digest": self.source_evidence_digest,
+        }
+
 
 class RuleSeamAdapter:
     """Run the real scan + expert path for one already-qualified daily batch.
@@ -224,8 +274,9 @@ class RuleSeamAdapter:
     def _baseline_feature(
         self,
         *,
-        candidate: ScannedCandidate,
+        candidate: ScannedCandidate | None,
         features: SecurityFeatureFacts,
+        security_id: str | None = None,
     ) -> BaselineFeatureRow:
         """Project the injected SecurityFeatureFacts onto the panel row shape.
 
@@ -242,7 +293,9 @@ class RuleSeamAdapter:
             )
         return BaselineFeatureRow(
             market_date=features.signal_date,
-            security_id=candidate.record.identity.security_id,
+            security_id=(
+                candidate.record.identity.security_id if candidate is not None else str(security_id)
+            ),
             close_price=features.mark_price,
             total_return_index=features.total_return_index,
             sma20=features.sma20,
@@ -271,43 +324,43 @@ class RuleSeamAdapter:
             and features.realized_volatility20 is not None,
         )
 
-    @staticmethod
-    def _feature_event(event: Any) -> Any:
-        """The event as the feature/observation path sees it.
-
-        A prospective EventRecord keeps the source-publication instant in
-        knowledge_cutoff (18:01+08 after the close), which is > signal_close and would
-        trip ExpertObservation's knowledge_cutoff <= observation_anchor.  The feature
-        data itself is visible at the T close, so the observation/feature cutoff is the
-        earlier of the two: min(knowledge_cutoff, signal_close).  identity/event_id and
-        decision_at are unchanged; the returned object is a view, not a new EventRecord.
-        """
-
-        feature_cutoff = min(event.knowledge_cutoff, event.signal_close)
-        if feature_cutoff == event.knowledge_cutoff:
-            return event
-        view = SimpleNamespace(
-            event_id=event.event_id,
-            identity=event.identity,
-            signal_close=event.signal_close,
-            knowledge_cutoff=feature_cutoff,
-            decision_at=event.decision_at,
-            split_assignment=event.split_assignment,
-        )
-        if hasattr(event, "to_dict"):
-            view.to_dict = event.to_dict
-        return view
-
     def _evaluate_trend(
         self,
         *,
-        event: Any,
+        event: EventRecord,
         feature: BaselineFeatureRow | None,
     ) -> tuple[str | None, str]:
         """Run the real trend producer; return (trend_state, observation_digest)."""
 
+        if event.prospective_clock_json is not None:
+            # The original opportunity assessment anchors at T close and cannot describe
+            # an evening source. Reuse its pure classification, with a separately versioned
+            # daily domain evidence envelope; never rewrite source time to satisfy it.
+            if (
+                self.resources.trend_spec.assessment_id != self.resources.trend_config.expert_id
+                or self.resources.trend_spec.assessment_version
+                != self.resources.trend_config.expert_version
+            ):
+                raise ProductDailyError("producer_binding_mismatch", "trend spec differs")
+            state, reason = classify_trend_stability(feature, self.resources.trend_config)
+            return state, sha256_digest(
+                {
+                    "schema_version": "quanthus.p11-prospective-trend-evidence.v1",
+                    "event": event.to_dict(),
+                    "feature": None
+                    if feature is None
+                    else {
+                        key: str(value) if isinstance(value, (date, Decimal)) else value
+                        for key, value in dataclasses.asdict(feature).items()
+                    },
+                    "config": self.resources.trend_config.semantic_digest,
+                    "assessment_binding": self.resources.trend_spec.assessment_binding_digest,
+                    "state": state,
+                    "reason": reason,
+                }
+            )
         observation = evaluate_trend_stability(
-            event=self._feature_event(event),
+            event=event,
             feature=feature,
             config=self.resources.trend_config,
             spec=self.resources.trend_spec,
@@ -332,7 +385,7 @@ class RuleSeamAdapter:
         feature = self._baseline_feature(candidate=candidate, features=features)
         trend_state, trend_digest = self._evaluate_trend(event=event, feature=feature)
         ctx = build_formal_expert_context(
-            event=self._feature_event(event),
+            event=event,
             feature=feature,
             feature_registry=self.resources.feature_registry,
             panel_report=self.resources.panel_report,
@@ -361,20 +414,22 @@ class RuleSeamAdapter:
             decision=decision,
             features=features,
             signal_close=event.signal_close,
-            knowledge_cutoff=knowledge_cutoff,
+            knowledge_cutoff=event.knowledge_cutoff,
             decision_at=event.decision_at,
         )
 
     def evaluate_held(
         self,
         *,
-        candidate: ScannedCandidate,
+        candidate: ScannedCandidate | None = None,
+        review: HeldReviewSubject | None = None,
         features: SecurityFeatureFacts,
         position_facts: HeldPositionFacts | None,
         knowledge_cutoff: datetime,
-        base_required_action: Any = None,
+        base_required_action: RequiredAction | None = None,
         base_reason_code: str = "base_position_management_clear",
         position_state: str = "trial",
+        prior_deterioration_sessions: int | None = None,
     ) -> HeldDecision:
         """Run the real evaluate_held for one held security.
 
@@ -383,53 +438,114 @@ class RuleSeamAdapter:
         """
 
         require_aware(knowledge_cutoff, "knowledge_cutoff")
-        event = candidate.record
-        feature = self._baseline_feature(candidate=candidate, features=features)
-        _, trend_digest = self._evaluate_trend(event=event, feature=feature)
+        event: ExpertDecisionSubject
+        if candidate is not None:
+            event = candidate.record
+            signal_close, decision_at = candidate.record.signal_close, candidate.record.decision_at
+        elif review is not None:
+            event = review
+            signal_close, decision_at = review.signal_close, review.decision_at
+        else:
+            raise ProductDailyError("invalid_held_review", "held review subject is required")
+        feature = (
+            None
+            if features.mark_price is None
+            else self._baseline_feature(
+                candidate=candidate,
+                features=features,
+                security_id=event.identity.security_id,
+            )
+        )
         if position_facts is None:
             # hold + alert: report, never force a sale on missing data.
             return HeldDecision(
-                security_code=candidate.listing_code,
+                security_code=features.security_code,
                 action="hold_alert",
                 target_maximum_position=None,
                 decision_digest=None,
                 reason="position_facts_unavailable_hold_alert",
                 decision=None,
+                features=features,
+                signal_close=signal_close,
+                knowledge_cutoff=event.knowledge_cutoff,
+                decision_at=decision_at,
             )
+        base = self.runner.card.semantic_sections["position_and_execution"][
+            "base_position_management"
+        ]
+        base_unknown = False
+        if base_required_action is None:
+            base_required_action = RequiredAction.NONE
+            if position_facts.holding_sessions >= int(base["maximum_holding_sessions"]):
+                base_required_action = RequiredAction.FORCE_LIQUIDATE
+                base_reason_code = "base_maximum_holding_exit"
+            elif (
+                position_facts.marked_return is not None
+                and position_facts.marked_return <= -Decimal(str(base["constraint_stop_loss"]))
+            ):
+                base_required_action = RequiredAction.FORCE_LIQUIDATE
+                base_reason_code = "base_constraint_stop_exit"
+            elif (
+                features.total_return_index is None
+                or features.sma20 is None
+                or features.sma60 is None
+            ):
+                base_unknown = True
+            elif features.total_return_index < features.sma60 and features.sma20 <= features.sma60:
+                if prior_deterioration_sessions is None:
+                    base_unknown = True
+                elif position_facts.holding_sessions >= int(
+                    base["minimum_holding_sessions"]
+                ) and prior_deterioration_sessions + 1 >= int(base["deterioration_sessions"]):
+                    base_required_action = RequiredAction.FORCE_LIQUIDATE
+                    base_reason_code = "base_structural_deterioration_exit"
         ctx = build_formal_expert_context(
-            event=self._feature_event(event),
+            event=event,
             feature=feature,
             feature_registry=self.resources.feature_registry,
             panel_report=self.resources.panel_report,
             position_state=position_state,
-            trend_observation_digest=trend_digest,
+            trend_observation_digest=sha256_digest(
+                {
+                    "held_review": event.event_id,
+                    "trend": "not_requested",
+                }
+            ),
             position_facts=position_facts,
         )
         decision = self.runner.evaluate_held(
             event_id=event.event_id,
             context=ctx,
             position_facts=position_facts,
-            base_required_action=(
-                base_required_action if base_required_action is not None else RequiredAction.NONE
-            ),
+            base_required_action=base_required_action,
             base_reason_code=base_reason_code,
         )
         action_value = decision.action.final_action.value
         return HeldDecision(
-            security_code=candidate.listing_code,
+            security_code=features.security_code,
             action=(
                 "exit"
                 if action_value in {"full_exit", "force_liquidate"}
-                else ("reduce" if "reduce" in action_value else "held")
+                else (
+                    "reduce"
+                    if "reduce" in action_value
+                    else (
+                        "hold_alert"
+                        if base_unknown
+                        or features.rsi14 is None
+                        or features.realized_volatility20 is None
+                        else "held"
+                    )
+                )
             ),
             target_maximum_position=decision.target_maximum_position,
             decision_digest=decision.digest,
             reason=action_value,
             decision=decision,
             features=features,
-            signal_close=event.signal_close,
-            knowledge_cutoff=knowledge_cutoff,
-            decision_at=event.decision_at,
+            signal_close=signal_close,
+            knowledge_cutoff=event.knowledge_cutoff,
+            decision_at=decision_at,
         )
 
 
@@ -453,6 +569,7 @@ def evaluate_day(
     features_by_security: Mapping[str, SecurityFeatureFacts],
     knowledge_cutoff: datetime,
     held_facts_by_security: Mapping[str, HeldPositionFacts] | None = None,
+    prior_deterioration_sessions_by_security: Mapping[str, int] | None = None,
     shared_prereq_ok: bool = True,
     shared_prereq_reason: str | None = None,
     position_state: str = "empty",
@@ -494,6 +611,9 @@ def evaluate_day(
     excluded: list[dict[str, str]] = []
     for candidate in scan.candidates:
         code = candidate.listing_code
+        if held_facts_by_security is not None and code in held_facts_by_security:
+            # An existing position has its own daily review, not a second entry plan.
+            continue
         facts = features_by_security.get(code)
         if facts is None or facts.rsi14 is None or facts.realized_volatility20 is None:
             excluded.append(
@@ -517,32 +637,55 @@ def evaluate_day(
         )
     held_decisions: list[HeldDecision] = []
     if held_facts_by_security is not None:
-        held_candidates = {item.listing_code: item for item in scan.candidates}
         for code in sorted(held_facts_by_security):
             position_facts = held_facts_by_security[code]
-            held_candidate = held_candidates.get(code)
             facts = features_by_security.get(code)
-            if held_candidate is None or facts is None:
+            review_rows = [
+                row
+                for row in rows
+                if row.listing_code == code
+                and facts is not None
+                and row.session_date == facts.signal_date
+                and row.knowledge_cutoff <= knowledge_cutoff
+            ]
+            if len(review_rows) != 1 or facts is None:
                 held_decisions.append(
                     HeldDecision(
                         security_code=code,
                         action="hold_alert",
                         target_maximum_position=None,
                         decision_digest=None,
-                        reason="no_scanned_event_or_feature_facts_hold_alert",
+                        reason="held_source_identity_or_feature_facts_unavailable_hold_alert",
                         decision=None,
                         features=facts,
                         knowledge_cutoff=knowledge_cutoff,
                     )
                 )
                 continue
+            row = review_rows[0]
+            review = HeldReviewSubject(
+                identity=EventIdentity(
+                    row.security_id,
+                    row.session_date,
+                    "p11.daily-held-review",
+                    "1.0.0",
+                    snapshot_id,
+                ),
+                knowledge_cutoff=row.knowledge_cutoff,
+                signal_close=row.close_at,
+                decision_at=knowledge_cutoff,
+                source_evidence_digest=row.source_evidence_digest,
+            )
             held_decisions.append(
                 adapter.evaluate_held(
-                    candidate=held_candidate,
+                    review=review,
                     features=facts,
                     position_facts=position_facts,
                     knowledge_cutoff=knowledge_cutoff,
                     position_state="trial",
+                    prior_deterioration_sessions=(
+                        prior_deterioration_sessions_by_security or {}
+                    ).get(code),
                 )
             )
     return SeamResult(
@@ -551,6 +694,10 @@ def evaluate_day(
         decisions=tuple(decisions),
         excluded=tuple(excluded),
         held_decisions=tuple(held_decisions),
+        experts=ExpertBundle.from_runner(runner),
+        evaluated_universe=tuple(
+            sorted({row.listing_code for row in rows} | set(held_facts_by_security or {}))
+        ),
     )
 
 
@@ -577,17 +724,21 @@ def seam_to_candidates(
 
     require_aware(eligible_at, "eligible_at")
     require_aware(expires_at, "expires_at")
+    if experts != result.experts:
+        return (), ()
     signals: list[CandidateSignal] = []
     held_signals: list[HeldSignal] = []
     for item in result.entries:
-        if item.decision is None or item.event_id is None:
+        if type(item.decision) is not FormalStrategyDecision or item.event_id is None:
             continue
         # The ExpertBundle digest must equal the topology digest the real runner stamped on
         # this decision; a registered component name with an arbitrary bundle digest cannot
         # pass without having actually run this runner on this event.
         if (
-            getattr(item.decision, "topology_digest", None) is not None
-            and item.decision.topology_digest != experts.digest
+            item.decision.topology_digest != experts.digest
+            or item.expert_decision_digest != item.decision.digest
+            or item.event_id != item.decision.event_id
+            or item.knowledge_cutoff != item.decision.governance.knowledge_cutoff
         ):
             continue
         features = item.features
@@ -637,31 +788,31 @@ def seam_to_candidates(
             depends_on_member_ids=features.depends_on_member_ids,
             # The producer verifies these against the canonical batch/policy/opportunity
             # binding; the real runner digest travels in the explanations audit text.
-            expert_decision_digest=None,
-            risk_decision_digest=None,
+            expert_decision_digest=item.decision.digest,
+            risk_decision_digest=item.decision.digest,
+            formal_decision=item.decision,
+            signal_close=item.signal_close,
+            knowledge_cutoff=item.knowledge_cutoff,
+            decision_at=item.decision_at,
         )
-        signals.append(
-            dataclasses.replace(
-                candidate,
-                expert_decision_digest=candidate.expected_expert_digest(facts, policy),
-                risk_decision_digest=candidate.expected_risk_digest(facts, policy),
-            )
-        )
+        signals.append(candidate)
     for held in result.held_decisions:
-        if held.features is None:
-            continue
-        if (
-            held.decision is not None
-            and getattr(held.decision, "topology_digest", None) is not None
-            and held.decision.topology_digest != experts.digest
+        if held.decision is not None and (
+            type(held.decision) is not FormalStrategyDecision
+            or held.decision.topology_digest != experts.digest
+            or held.decision_digest != held.decision.digest
         ):
             continue
         features = held.features
         held_signal = HeldSignal(
-            opportunity_id=f"held-{held.security_code}",
+            opportunity_id=(
+                held.decision.event_id
+                if held.decision is not None
+                else f"held-{held.security_code}"
+            ),
             security_code=held.security_code,
-            security_name=features.security_name or held.security_code,
-            industry_id=features.industry_id or "industry-unbound",
+            security_name=(features.security_name if features else None) or held.security_code,
+            industry_id=(features.industry_id if features else None) or "industry-unbound",
             action=held.action,
             target_maximum_position=held.target_maximum_position,
             component_ref_id=experts.ref_id,
@@ -680,21 +831,256 @@ def seam_to_candidates(
                 },
             ),
             next_observation=f"next session after {held.security_code} close",
-            depends_on_member_ids=features.depends_on_member_ids,
-            expert_decision_digest=None,
-            risk_decision_digest=None,
+            depends_on_member_ids=features.depends_on_member_ids if features else (),
+            expert_decision_digest=held.decision_digest,
+            risk_decision_digest=held.decision_digest,
+            formal_decision=held.decision,
             signal_close=held.signal_close,
             knowledge_cutoff=held.knowledge_cutoff,
             decision_at=held.decision_at,
         )
-        held_signals.append(
-            dataclasses.replace(
-                held_signal,
-                expert_decision_digest=held_signal.expected_expert_digest(facts, policy),
-                risk_decision_digest=held_signal.expected_risk_digest(facts, policy),
-            )
-        )
+        held_signals.append(held_signal)
     return tuple(signals), tuple(held_signals)
+
+
+RULE_DAY_PRODUCER_ID = "p11.fixed-rule-day"
+RULE_DAY_PRODUCER_VERSION = "1.1.0"
+
+
+@dataclass(frozen=True)
+class RuleDayOutput:
+    seam: SeamResult
+    candidates: tuple[CandidateSignal, ...]
+    held_signals: tuple[HeldSignal, ...]
+    receipt: CandidateEvaluationReceipt | None
+    result: ProducerResult
+    source_closure: dict[str, Any]
+    stage_metrics: tuple[dict[str, Any], ...]
+
+
+def run_daily_advice(
+    *,
+    runner: FormalStrategyRunner,
+    resources: SeamResources,
+    rows: Sequence[CandidateDailyInput],
+    trading_dates: Sequence[date],
+    snapshot_id: str,
+    snapshot_manifest_digest: str,
+    card: Any,
+    split_policy: Any,
+    source_policy: Any,
+    features_by_security: Mapping[str, SecurityFeatureFacts],
+    facts: DailyFactsView,
+    policy: AdvicePolicy,
+    account: AccountFactsView,
+    run_id: str,
+    held_facts_by_security: Mapping[str, HeldPositionFacts] | None = None,
+    prior_deterioration_sessions_by_security: Mapping[str, int] | None = None,
+    shared_prereq_ok: bool = True,
+    shared_prereq_reason: str | None = None,
+    clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+) -> RuleDayOutput:
+    """Run domain evaluation and issue its receipt in one job, before package assembly.
+
+    P12 supplies already-read inputs and a predeclared policy, never candidate decisions
+    or a rule receipt. Prepared feature inputs are still the M1 boundary; the M2 raw-row
+    adapter plugs in before this function. This entry makes no account binding or writes.
+    """
+    if policy.evidence_mode != "formal_runner" or type(runner) is not FormalStrategyRunner:
+        raise ProductDailyError("invalid_rule_runtime", "fixed FormalStrategyRunner required")
+    if (
+        type(card) is not CandidateRuleCard
+        or card.semantic_digest != card.computed_semantic_digest
+        or policy.candidate_rule_digest != card.semantic_digest
+        or card.semantic_digest
+        != runner.card.semantic_sections["population"]["candidate_generator"]["digest"]
+    ):
+        raise ProductDailyError("rule_card_binding_mismatch", "candidate rule identity differs")
+    clock_json = getattr(source_policy, "prospective_clock_json", None)
+    if not isinstance(clock_json, str):
+        raise ProductDailyError("prospective_clock_required", "daily entry requires its clock")
+    decision_clock = prospective_clock(clock_json)
+    if (
+        decision_clock.market_date != facts.market_date
+        or decision_clock.decision_at != policy.decision_cutoff
+        or decision_clock.next_session_open != policy.eligible_at
+    ):
+        raise ProductDailyError("daily_clock_binding_mismatch", "daily clock identity differs")
+    require_text(run_id, "run_id")
+    started_at = clock()
+    require_aware(started_at, "evaluation_started_at")
+    stage_start = perf_counter()
+    current_rows = tuple(row for row in rows if row.session_date <= facts.market_date)
+    seam = evaluate_day(
+        runner=runner,
+        resources=resources,
+        rows=current_rows,
+        trading_dates=trading_dates,
+        snapshot_id=snapshot_id,
+        snapshot_manifest_digest=snapshot_manifest_digest,
+        card=card,
+        split_policy=split_policy,
+        source_policy=source_policy,
+        features_by_security=features_by_security,
+        knowledge_cutoff=policy.decision_cutoff,
+        held_facts_by_security=held_facts_by_security,
+        prior_deterioration_sessions_by_security=prior_deterioration_sessions_by_security,
+        shared_prereq_ok=shared_prereq_ok,
+        shared_prereq_reason=shared_prereq_reason,
+    )
+    evaluation_elapsed = perf_counter() - stage_start
+    assembly_start = perf_counter()
+    experts = ExpertBundle.from_runner(runner)
+    candidates, held = seam_to_candidates(
+        seam,
+        experts=experts,
+        facts=facts,
+        policy=policy,
+        eligible_at=policy.eligible_at,
+        expires_at=policy.expires_at,
+    )
+    completed_at = clock()
+    require_aware(completed_at, "evaluation_completed_at")
+    source_closure = {
+        "schema_version": "quanthus.p11-rule-source-closure.v1",
+        "snapshot_id": snapshot_id,
+        "snapshot_manifest_digest": snapshot_manifest_digest,
+        "raw_inputs_digest": sha256_digest(
+            [
+                {
+                    key: str(value) if isinstance(value, (date, Decimal)) else value
+                    for key, value in dataclasses.asdict(row).items()
+                }
+                for row in sorted(
+                    current_rows,
+                    key=lambda row: (row.listing_code, row.session_date),
+                )
+            ]
+        ),
+        "feature_inputs_digest": sha256_digest(
+            [
+                {
+                    key: str(value) if isinstance(value, (date, Decimal)) else value
+                    for key, value in dataclasses.asdict(features_by_security[code]).items()
+                }
+                for code in sorted(features_by_security)
+            ]
+        ),
+        "batch_id": facts.batch_id,
+        "market_date": facts.market_date.isoformat(),
+        "next_session": facts.next_session.isoformat(),
+        "source_id": facts.source_id,
+        "source_version": facts.source_version,
+        "calendar_version": facts.calendar_version,
+        "price_basis": facts.price_basis,
+        "required_member_ids": sorted(facts.required_member_ids),
+        "intake_receipt_id": facts.intake_receipt_id,
+        "intake_received_at": facts.intake_received_at.isoformat(),
+        "intake_first_read_at": facts.intake_first_read_at.isoformat(),
+        "intake_verified_at": facts.intake_verified_at.isoformat(),
+        "policy_id": policy.policy_id,
+        "policy_version": policy.version,
+        "decision_cutoff": policy.decision_cutoff.isoformat(),
+        "candidate_rule_digest": policy.candidate_rule_digest,
+        "members": [m.to_dict() for m in sorted(facts.members, key=lambda m: m.member_id)],
+        "feature_registry_digest": resources.feature_registry.digest,
+        "feature_panel_report_digest": resources.panel_report.digest,
+        "topology_digest": runner.topology_digest,
+        "evaluated_universe": list(seam.evaluated_universe),
+        "exclusions": list(seam.excluded),
+        "entry_decisions": [
+            {
+                "security_code": d.security_code,
+                "disposition": d.disposition.value,
+                "decision_digest": d.expert_decision_digest,
+                "reason": d.reason,
+            }
+            for d in seam.decisions
+        ],
+        "held_decisions": [
+            {
+                "security_code": d.security_code,
+                "action": d.action,
+                "decision_digest": d.decision_digest,
+                "reason": d.reason,
+            }
+            for d in seam.held_decisions
+        ],
+    }
+    closure_digest = sha256_digest(source_closure)
+    receipt = None
+    if not seam.day_blocked and len(candidates) == len(seam.entries):
+        identity: dict[str, object] = {
+            "producer_id": RULE_DAY_PRODUCER_ID,
+            "producer_version": RULE_DAY_PRODUCER_VERSION,
+            "run_id": run_id,
+            "evaluated_universe": sorted(seam.evaluated_universe),
+            "source_closure_digest": closure_digest,
+            "evaluation_started_at": started_at.isoformat(),
+            "completed_at": completed_at.isoformat(),
+            "evaluated_count": len(seam.evaluated_universe),
+            "qualified_count": len(candidates),
+        }
+        receipt = CandidateEvaluationReceipt(
+            producer_id=RULE_DAY_PRODUCER_ID,
+            producer_version=RULE_DAY_PRODUCER_VERSION,
+            run_id=run_id,
+            completed_at=completed_at,
+            evaluation_started_at=started_at,
+            source_closure_digest=closure_digest,
+            evaluated_universe=seam.evaluated_universe,
+            evaluated_count=len(seam.evaluated_universe),
+            qualified_count=len(candidates),
+            coverage_digest="sha256:" + "0" * 64,
+            binding_digest=CandidateEvaluationReceipt.expected_binding_digest(
+                facts,
+                policy,
+                candidates,
+                receipt_identity=identity,
+                held_signals=held,
+            ),
+        )
+        receipt = dataclasses.replace(receipt, coverage_digest=receipt.expected_coverage_digest())
+    result = DailyAdviceProducer(repo_root=find_project_root())._assemble(
+        facts=facts,
+        account=account,
+        policy=policy,
+        experts=experts,
+        candidates=candidates,
+        held_signals=held,
+        evaluation_receipt=receipt,
+    )
+    return RuleDayOutput(
+        seam,
+        candidates,
+        held,
+        receipt,
+        result,
+        source_closure,
+        (
+            {
+                "stage": "prepared_features",
+                "disposition": "reuse_supplied_job_local",
+                "rows": len(features_by_security),
+                "bytes": None,
+                "elapsed_seconds": None,
+            },
+            {
+                "stage": "scan_and_expert_evaluation",
+                "disposition": "built_once_TMP",
+                "rows": len(current_rows),
+                "bytes": None,
+                "elapsed_seconds": evaluation_elapsed,
+            },
+            {
+                "stage": "receipt_and_package",
+                "disposition": "built_once_TMP",
+                "rows": len(candidates) + len(held),
+                "bytes": None,
+                "elapsed_seconds": perf_counter() - assembly_start,
+            },
+        ),
+    )
 
 
 # --- three-piece set: per-action receipt + machine policy + release manifest -------------

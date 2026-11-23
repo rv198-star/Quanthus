@@ -140,7 +140,9 @@ def resources() -> SeamResources:
     panel_report = BaselineFeaturePanelReport(
         evaluator_version="p11-d1b-seam",
         feature_registry_version="p3-baseline-features-research-v1",
-        feature_registry_digest="sha256:" + "0" * 64,
+        feature_registry_digest=load_feature_registry(
+            ROOT / "config" / "p3-baseline-features.research.v1.json"
+        ).digest,
         bundle_snapshot_id=SNAPSHOT_ID,
         bundle_digest=SNAPSHOT_MANIFEST,
         scope_start=TRADING_DATES[0],
@@ -363,7 +365,8 @@ def _producer_inputs(
         window_ref="window-test",
         eligible_at=datetime.combine(next_session, time(9, 30), SHANGHAI),
         expires_at=datetime.combine(next_session, time(15, 0), SHANGHAI),
-        candidate_rule_digest="sha256:" + "b" * 64,
+        candidate_rule_digest=CARD.semantic_digest,
+        trusted_producer_ids=("p11.seam",),
     )
     account = AccountFactsView(
         account_id="acct-test",
@@ -396,7 +399,7 @@ def test_seam_to_candidates_locks_component_to_expert_bundle(runner, resources):
         features_by_security=feats,
         knowledge_cutoff=CUTOFF,
     )
-    experts = ExpertBundle(ref_id="p11.expert", version="1.0.0", digest=runner.topology_digest)
+    experts = ExpertBundle.from_runner(runner)
     facts, policy, _account = _producer_inputs(CUTOFF)
     signals, _held = seam_to_candidates(
         result,
@@ -408,8 +411,8 @@ def test_seam_to_candidates_locks_component_to_expert_bundle(runner, resources):
     )
     assert len(signals) >= 1
     for s in signals:
-        assert s.component_ref_id == "p11.expert"
-        assert s.component_version == "1.0.0"
+        assert s.component_ref_id == "candidate.p4-trend-risk"
+        assert s.component_version == runner.card.strategy_version
         assert s.expert_decision_digest.startswith("sha256:")
         assert s.risk_decision_digest.startswith("sha256:")
         assert s.expert_decision_digest.startswith("sha256:")
@@ -464,7 +467,7 @@ def test_forged_component_rejected_by_producer(runner, resources):
         features_by_security=feats,
         knowledge_cutoff=CUTOFF,
     )
-    experts = ExpertBundle(ref_id="p11.expert", version="1.0.0", digest=runner.topology_digest)
+    experts = ExpertBundle.from_runner(runner)
     facts, policy, _account = _producer_inputs(CUTOFF)
     signals, _held = seam_to_candidates(
         result,
@@ -761,7 +764,7 @@ def test_pc8_full_seam_producer_chain_prospective(runner, resources):
         },
         knowledge_cutoff=datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
     )
-    experts = ExpertBundle(ref_id="p11.expert", version="1.0.0", digest=runner.topology_digest)
+    experts = ExpertBundle.from_runner(runner)
     facts, policy, _account = _producer_inputs(CUTOFF)
     signals, _held = seam_to_candidates(
         result,
@@ -773,7 +776,7 @@ def test_pc8_full_seam_producer_chain_prospective(runner, resources):
     )
     if signals:
         for s in signals:
-            assert s.component_ref_id == "p11.expert"
+            assert s.component_ref_id == "candidate.p4-trend-risk"
             assert s.expert_decision_digest.startswith("sha256:")
 
 
@@ -850,7 +853,17 @@ def _p12_loader():
     return validate_raw_package
 
 
-def _forward_chain(tmp_path, runner_, resources_, *, held=None):
+def _forward_chain(
+    tmp_path,
+    runner_,
+    resources_,
+    *,
+    held=None,
+    trigger=True,
+    feature_override=None,
+    policy_override=None,
+    omit_features=(),
+):
     """Run the real prospective seam -> producer chain and return (result, produced)."""
     target = date(2026, 11, 24)
     next_open = datetime(2026, 11, 25, 9, 30, tzinfo=SHANGHAI)
@@ -864,6 +877,11 @@ def _forward_chain(tmp_path, runner_, resources_, *, held=None):
     days = _weekdays_ending(target, 22)
     rows = _prospective_series(days, cutoff_hour=18, cutoff_minute=1)
     trading_dates = (*days, next_open.date())
+    if not trigger:
+        rows = [
+            dataclasses.replace(row, high_price=Decimal("101"), turnover=Decimal("100"))
+            for row in rows
+        ]
     features = {
         "600000": _features("600000", Decimal("60"), Decimal("0.20"), signal_date=target),
     }
@@ -872,7 +890,41 @@ def _forward_chain(tmp_path, runner_, resources_, *, held=None):
             features.setdefault(
                 code, _features(code, Decimal("60"), Decimal("0.20"), signal_date=target)
             )
-    result = evaluate_day(
+    from quanthus.product_daily.recommendation.rule_seam import (
+        RULE_DAY_PRODUCER_ID,
+        run_daily_advice,
+    )
+
+    if feature_override:
+        features.update(feature_override)
+    for code in omit_features:
+        features.pop(code, None)
+
+    # Held securities have independent quiet daily rows; none needs an entry transition.
+    for code in held or {}:
+        if code == "600000":
+            continue
+        for row in _prospective_series(days, cutoff_hour=18, cutoff_minute=1):
+            rows.append(
+                dataclasses.replace(
+                    row,
+                    security_id=f"security-{code}",
+                    listing_id=f"listing-{code}",
+                    listing_code=code,
+                    company_id=f"company-{code}",
+                    high_price=Decimal("101"),
+                    turnover=Decimal("100"),
+                )
+            )
+    facts, policy, account = _producer_inputs(
+        datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
+        market_date=target,
+        next_session=next_open.date(),
+    )
+    policy = dataclasses.replace(policy, trusted_producer_ids=(RULE_DAY_PRODUCER_ID,))
+    if policy_override:
+        policy = dataclasses.replace(policy, **policy_override)
+    output = run_daily_advice(
         runner=runner_,
         resources=resources_,
         rows=rows,
@@ -883,56 +935,14 @@ def _forward_chain(tmp_path, runner_, resources_, *, held=None):
         split_policy=split,
         source_policy=source,
         features_by_security=features,
-        knowledge_cutoff=datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
-        held_facts_by_security=held,
-    )
-    experts = ExpertBundle(ref_id="p11.expert", version="1.0.0", digest=runner_.topology_digest)
-    facts, policy, account = _producer_inputs(
-        datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
-        market_date=target,
-        next_session=next_open.date(),
-    )
-    signals, held_signals = seam_to_candidates(
-        result,
-        experts=experts,
         facts=facts,
         policy=policy,
-        eligible_at=datetime(2026, 11, 25, 9, 30, tzinfo=SHANGHAI),
-        expires_at=datetime(2026, 11, 25, 15, 0, tzinfo=SHANGHAI),
-    )
-    universe = tuple(
-        sorted({s.security_code for s in signals} | {h.security_code for h in held_signals})
-    ) or ("000000",)
-    identity = {
-        "producer_id": "p11.seam",
-        "producer_version": "1.0.0",
-        "run_id": "run-pc9",
-        "evaluated_universe": sorted(universe),
-    }
-    receipt = CandidateEvaluationReceipt(
-        producer_id=identity["producer_id"],
-        producer_version=identity["producer_version"],
-        run_id=identity["run_id"],
-        completed_at=datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
-        coverage_digest="sha256:" + "0" * 64,
-        evaluated_count=len(signals) + len(held_signals) or 1,
-        qualified_count=len(signals),
-        binding_digest=CandidateEvaluationReceipt.expected_binding_digest(
-            facts, policy, signals, receipt_identity=identity
-        ),
-        evaluated_universe=universe,
-    )
-    receipt = dataclasses.replace(receipt, coverage_digest=receipt.expected_coverage_digest())
-    produced = DailyAdviceProducer().produce(
-        facts=facts,
         account=account,
-        policy=policy,
-        experts=experts,
-        candidates=signals,
-        held_signals=held_signals,
-        evaluation_receipt=receipt,
+        run_id="run-pc9",
+        held_facts_by_security=held,
+        clock=lambda: policy.decision_cutoff,
     )
-    return result, produced, signals, held_signals
+    return output.seam, output.result, output.candidates, output.held_signals
 
 
 def test_pc9_forward_seam_producer_p12_publishable(tmp_path, runner, resources):
@@ -954,7 +964,7 @@ def test_pc9_forward_seam_producer_p12_publishable(tmp_path, runner, resources):
         assert entry.reason_codes == ("NEW_ENTRY_SIGNAL",)
         assert any(x.get("use") == "action" for x in entry.explanations)
         assert entry.security_name != ""
-        assert entry.component_ref_id == "p11.expert"
+        assert entry.component_ref_id == "candidate.p4-trend-risk"
     # held positions travel the same set when present
     if held_signals:
         held_stages = {
@@ -989,7 +999,7 @@ def test_pc9_forward_held_only_no_entry_still_publishable(tmp_path, runner, reso
         )
     }
     _result, produced, signals, held_signals = _forward_chain(
-        tmp_path, runner, resources, held=held_facts
+        tmp_path, runner, resources, held=held_facts, trigger=False
     )
     assert produced.package is not None
     assert produced.publishable is True
@@ -999,4 +1009,245 @@ def test_pc9_forward_held_only_no_entry_still_publishable(tmp_path, runner, reso
         for d in ds.decisions
         if d.stage in {"holding", "exit_plan"}
     ]
+    assert not signals
     assert held_decisions, "held position must reach the decision set, not be dropped"
+    assert _result.held_decisions[0].decision is not None
+    assert _result.held_decisions[0].action == "exit"
+    assert held_signals[0].formal_decision is _result.held_decisions[0].decision
+    assert held_decisions[0].stage == "exit_plan"
+    _p12_loader()(produced.package.decision_sets[0].to_dict())
+
+
+def test_core_real_decision_digest_survives_mapping_and_audit(tmp_path, runner, resources):
+    result, produced, signals, _ = _forward_chain(tmp_path, runner, resources)
+    assert signals and produced.package is not None
+    assert signals[0].expert_decision_digest == result.entries[0].decision.digest
+    assert signals[0].risk_decision_digest == result.entries[0].decision.digest
+    audit = produced.package.decision_sets[0].audit.to_dict()
+    assert result.entries[0].decision.digest in str(audit)
+
+
+def test_core_fake_namespace_is_not_a_runner_decision(tmp_path, runner, resources):
+    from types import SimpleNamespace
+
+    result, _, _, _ = _forward_chain(tmp_path, runner, resources)
+    real = result.entries[0]
+    fake = dataclasses.replace(
+        real,
+        decision=SimpleNamespace(
+            topology_digest=runner.topology_digest, digest=real.decision.digest
+        ),
+    )
+    facts, policy, _ = _producer_inputs(
+        datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
+        market_date=date(2026, 11, 24),
+        next_session=date(2026, 11, 25),
+    )
+    signals, _ = seam_to_candidates(
+        dataclasses.replace(result, decisions=(fake,)),
+        experts=ExpertBundle.from_runner(runner),
+        facts=facts,
+        policy=policy,
+        eligible_at=policy.eligible_at,
+        expires_at=policy.expires_at,
+    )
+    assert not signals
+
+
+def test_core_held_risk_exit_without_new_entry_event(runner, resources):
+    held = HeldPositionFacts(
+        holding_sessions=10,
+        marked_return=Decimal("-0.04"),
+        prior_strategy_reduction_count=1,
+        evidence=position_facts_evidence(
+            unit_id="held-no-entry",
+            holding_sessions=10,
+            marked_return=Decimal("-0.04"),
+            prior_strategy_reduction_count=1,
+        ),
+    )
+    result = evaluate_day(
+        runner=runner,
+        resources=resources,
+        rows=_series("600000", 100, trigger=False),
+        trading_dates=TRADING_DATES,
+        snapshot_id=SNAPSHOT_ID,
+        snapshot_manifest_digest=SNAPSHOT_MANIFEST,
+        card=CARD,
+        split_policy=SPLIT,
+        source_policy=SOURCE,
+        features_by_security={"600000": _features("600000", Decimal("90"), Decimal("0.80"))},
+        knowledge_cutoff=CUTOFF,
+        held_facts_by_security={"600000": held},
+    )
+    assert not result.entries
+    assert len(result.held_decisions) == 1
+    reviewed = result.held_decisions[0]
+    assert reviewed.decision is not None, "held review must run without an entry event"
+    assert reviewed.decision_digest == reviewed.decision.digest
+    assert reviewed.action == "exit"
+
+
+def test_core_source_cutoff_is_preserved(tmp_path, runner, resources):
+    result, _, signals, _ = _forward_chain(tmp_path, runner, resources)
+    source_cutoff = datetime(2026, 11, 24, 18, 1, tzinfo=SHANGHAI)
+    assert result.entries[0].knowledge_cutoff == source_cutoff
+    assert signals[0].knowledge_cutoff == source_cutoff
+    assert result.entries[0].decision.governance.knowledge_cutoff == source_cutoff
+
+
+@pytest.mark.parametrize(
+    "sessions,marked_return,rsi,vol,expected",
+    [
+        (10, "-0.04", "60", "0.20", "reduce"),
+        (40, "0.05", None, None, "exit"),
+        (10, "-0.09", None, None, "exit"),
+        (10, "0.05", None, None, "hold_alert"),
+    ],
+)
+def test_core_held_without_entry_uses_real_policy(
+    tmp_path,
+    runner,
+    resources,
+    sessions,
+    marked_return,
+    rsi,
+    vol,
+    expected,
+):
+    value = Decimal(marked_return)
+    held = HeldPositionFacts(
+        sessions,
+        value,
+        0,
+        position_facts_evidence(
+            unit_id="held-policy",
+            holding_sessions=sessions,
+            marked_return=value,
+            prior_strategy_reduction_count=0,
+        ),
+    )
+    features = _features(
+        "600001",
+        None if rsi is None else Decimal(rsi),
+        None if vol is None else Decimal(vol),
+        signal_date=date(2026, 11, 24),
+    )
+    seam, produced, entries, held_signals = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        held={"600001": held},
+        trigger=False,
+        feature_override={"600001": features},
+    )
+    assert not entries
+    assert produced.publishable, produced.diagnostics
+    review = seam.held_decisions[0]
+    assert review.decision is not None
+    assert review.action == expected
+    assert held_signals[0].expert_decision_digest == review.decision.digest
+    assert produced.package.decision_sets[0].decisions[0].stage == (
+        "exit_plan" if expected in {"reduce", "exit"} else "holding"
+    )
+    _p12_loader()(produced.package.decision_sets[0].to_dict())
+
+
+def test_core_forged_component_with_real_topology_is_not_mapped(tmp_path, runner, resources):
+    seam, _, _, _ = _forward_chain(tmp_path, runner, resources)
+    facts, policy, _ = _producer_inputs(datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI))
+    signals, held = seam_to_candidates(
+        seam,
+        experts=ExpertBundle("forged.component", "9.9.9", runner.topology_digest),
+        facts=facts,
+        policy=policy,
+        eligible_at=policy.eligible_at,
+        expires_at=policy.expires_at,
+    )
+    assert not signals and not held
+
+
+def test_core_public_injection_cannot_issue_formal_receipt(tmp_path, runner, resources):
+    _, produced, signals, _ = _forward_chain(tmp_path, runner, resources)
+    from quanthus.product_daily.recommendation.rule_seam import RULE_DAY_PRODUCER_ID
+
+    facts, policy, account = _producer_inputs(
+        datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
+        market_date=date(2026, 11, 24),
+        next_session=date(2026, 11, 25),
+    )
+    policy = dataclasses.replace(policy, trusted_producer_ids=(RULE_DAY_PRODUCER_ID,))
+    raw = produced.package.decision_sets[0].audit.evaluation_receipt
+    receipt = CandidateEvaluationReceipt(
+        **{
+            **raw,
+            "completed_at": datetime.fromisoformat(raw["completed_at"]),
+            "evaluation_started_at": datetime.fromisoformat(raw["evaluation_started_at"]),
+            "evaluated_universe": tuple(raw["evaluated_universe"]),
+        }
+    )
+    # Even a known producer name + real decision copied from another output is not the
+    # domain entry point. The fixed runner must execute in this invocation.
+    result = DailyAdviceProducer().produce(
+        facts=facts,
+        policy=policy,
+        account=account,
+        experts=ExpertBundle.from_runner(runner),
+        candidates=signals,
+        evaluation_receipt=receipt,
+    )
+    assert result.package is None
+    assert result.diagnostics[0]["reason"] == "same_job_rule_entry_required"
+    assert produced.package.decision_sets[0].audit.evidence_grade == "SYNTHETIC_FIXED_RUNNER"
+
+
+def test_core_missing_held_features_is_explicit_holding_alert(tmp_path, runner, resources):
+    held = HeldPositionFacts(
+        10,
+        Decimal("0.05"),
+        0,
+        position_facts_evidence(
+            unit_id="held-missing",
+            holding_sessions=10,
+            marked_return=Decimal("0.05"),
+            prior_strategy_reduction_count=0,
+        ),
+    )
+    seam, result, entries, held_signals = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        trigger=False,
+        held={"600001": held},
+        omit_features=("600001",),
+    )
+    assert not entries and len(held_signals) == 1
+    assert seam.held_decisions[0].action == "hold_alert"
+    assert seam.held_decisions[0].decision is None
+    assert result.publishable
+    decision = result.package.decision_sets[0].decisions[0]
+    assert decision.stage == "holding" and decision.entry is None
+    assert "unavailable" in decision.explanations[0]["text"]
+
+
+def test_core_empty_trust_configuration_fails_closed(tmp_path, runner, resources):
+    _, result, _, _ = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        policy_override={"trusted_producer_ids": ()},
+    )
+    assert result.package is None
+    assert result.diagnostics[0]["reason"] == "untrusted_evaluation_producer"
+
+
+def test_core_empty_advice_requires_an_actual_scan(tmp_path, runner, resources):
+    seam, result, entries, held = _forward_chain(tmp_path, runner, resources, trigger=False)
+    assert not entries and not held
+    assert seam.evaluated_universe == ("600000",)
+    assert result.publishable
+    receipt = result.package.decision_sets[0].audit.evaluation_receipt
+    assert receipt["evaluated_count"] == 1 and receipt["qualified_count"] == 0
+    assert receipt["evaluation_started_at"] is not None
+    assert receipt["source_closure_digest"].startswith("sha256:")
+    assert result.package.decision_sets[0].decisions[0].stage == "ended"

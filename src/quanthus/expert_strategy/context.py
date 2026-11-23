@@ -3,12 +3,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Protocol
 
+from quanthus.event_library.contracts import EventIdentity
 from quanthus.expert_protocols import (
     ExpertContext,
     ExpertEvidenceRef,
     ExpertProtocolError,
 )
+
+
+class ExpertDecisionSubject(Protocol):
+    """PIT identity shared by an entry opportunity and an independent held review."""
+
+    @property
+    def identity(self) -> EventIdentity: ...
+
+    @property
+    def knowledge_cutoff(self) -> datetime: ...
+
+    @property
+    def event_id(self) -> str: ...
+
+    def to_dict(self) -> dict[str, Any]: ...
 
 
 @dataclass(frozen=True)

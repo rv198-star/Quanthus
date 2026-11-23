@@ -25,6 +25,9 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.event_library.contracts import require_sha256_digest
+from quanthus.expert_strategy.registry import ExpertStrategyRegistry
+from quanthus.expert_strategy.runner import FormalStrategyDecision, FormalStrategyRunner
+from quanthus.policy import find_project_root
 from quanthus.product_daily.contracts import (
     ProductDailyError,
     require_aware,
@@ -82,14 +85,73 @@ def _evidence_digest(*parts: str) -> str:
     return _json_digest({"evidence": list(parts)})
 
 
+def _signal_evidence_payload(item: CandidateSignal | HeldSignal) -> dict[str, Any]:
+    return {
+        "expert_decision_digest": item.expert_decision_digest,
+        "risk_decision_digest": item.risk_decision_digest,
+        "formal_decision": (
+            item.formal_decision.to_dict()
+            if type(item.formal_decision) is FormalStrategyDecision
+            else None
+        ),
+        **{
+            name: None if getattr(item, name) is None else getattr(item, name).isoformat()
+            for name in ("signal_close", "knowledge_cutoff", "decision_at")
+        },
+    }
+
+
+def _formal_signal_is_valid(
+    signal: CandidateSignal | HeldSignal, experts: ExpertBundle, policy: AdvicePolicy
+) -> bool:
+    """Check the actual unified expert/guardian/constraint result, never a label hash.
+
+    This validates in-process domain output. The public JSON digest helpers are content
+    identities, not authentication of an external process. The daily entry point runs the
+    fixed runner itself; callers do not issue a rule receipt on its behalf.
+    """
+    decision = signal.formal_decision
+    if type(decision) is not FormalStrategyDecision:
+        return False
+    if (
+        (signal.component_ref_id, signal.component_version) != (experts.ref_id, experts.version)
+        or decision.topology_digest != experts.digest
+        or signal.expert_decision_digest != decision.digest
+        or signal.risk_decision_digest != decision.digest
+        or signal.opportunity_id != decision.event_id
+        or decision.action.governance_digest != decision.governance.digest
+        or signal.knowledge_cutoff != decision.governance.knowledge_cutoff
+        or signal.decision_at is None
+        or signal.signal_close is None
+        or signal.knowledge_cutoff is None
+        or signal.knowledge_cutoff > signal.decision_at
+        or signal.decision_at > policy.decision_cutoff
+        or signal.signal_close > signal.decision_at
+    ):
+        return False
+    if isinstance(signal, CandidateSignal):
+        return (
+            decision.action.final_action.value == "trial_entry"
+            and decision.target_maximum_position == signal.fraction
+        )
+    expected_action = {
+        "full_exit": "exit",
+        "reduce": "reduce",
+        "no_action": "held",
+    }.get(decision.action.final_action.value)
+    return (
+        signal.action == expected_action
+        or (signal.action == "hold_alert" and expected_action == "held")
+    ) and (signal.target_maximum_position == decision.target_maximum_position)
+
+
 @dataclass(frozen=True)
 class CandidateSignal:
     """One injected candidate already qualified by an upstream decision.
 
-    expert_decision_digest and risk_decision_digest are not free-form labels: the
-    producer requires them to equal the canonical digest of the evidence claim bound to this
-    batch, policy, candidate rule, and opportunity id.  Any other string is treated as an
-    unverifiable claim and the candidate is emitted input_blocked.
+    The normal path carries the actual FormalStrategyDecision and its digest, with the
+    source and decision clocks. The original public expected_* helpers describe only G1
+    structural fixture labels; the fixed-rule path never treats them as expert evidence.
     """
 
     opportunity_id: str
@@ -108,6 +170,10 @@ class CandidateSignal:
     depends_on_member_ids: tuple[str, ...]
     expert_decision_digest: str | None = None
     risk_decision_digest: str | None = None
+    formal_decision: FormalStrategyDecision | None = None
+    signal_close: datetime | None = None
+    knowledge_cutoff: datetime | None = None
+    decision_at: datetime | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -125,6 +191,10 @@ class CandidateSignal:
             value = getattr(self, name)
             if value is not None:
                 require_text(value, name)
+        for name in ("signal_close", "knowledge_cutoff", "decision_at"):
+            value = getattr(self, name)
+            if value is not None:
+                require_aware(value, name)
 
     def expected_expert_digest(self, facts: DailyFactsView, policy: AdvicePolicy) -> str:
         return _evidence_digest(
@@ -176,6 +246,7 @@ class HeldSignal:
     signal_close: datetime | None = None
     knowledge_cutoff: datetime | None = None
     decision_at: datetime | None = None
+    formal_decision: FormalStrategyDecision | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -224,12 +295,12 @@ class HeldSignal:
 
 @dataclass(frozen=True)
 class CandidateEvaluationReceipt:
-    """Positive proof that the upstream candidate producer ran to completion for this batch.
+    """Content identity and coverage of one evaluation.
 
     The receipt is bound to the exact facts batch, intake receipt, policy, cutoff, and the
-    injected candidate identity set through binding_digest; the producer recomputes that
-    digest and refuses any mismatch.  Without it a zero-candidate input is "not run", never a
-    real empty advice day, and a non-empty candidate list is unverifiable.
+    injected candidate identity set through binding_digest. Public digest helpers verify
+    content integrity; they do not attest that a process ran. run_daily_advice executes the
+    fixed runner and issues the normal receipt inside that invocation.
     """
 
     producer_id: str
@@ -241,6 +312,8 @@ class CandidateEvaluationReceipt:
     qualified_count: int
     binding_digest: str
     evaluated_universe: tuple[str, ...] = ()
+    evaluation_started_at: datetime | None = None
+    source_closure_digest: str | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -252,6 +325,10 @@ class CandidateEvaluationReceipt:
         ):
             require_text(getattr(self, name), name)
         require_aware(self.completed_at, "completed_at")
+        if self.evaluation_started_at is not None:
+            require_aware(self.evaluation_started_at, "evaluation_started_at")
+        if self.source_closure_digest is not None:
+            require_sha256_digest(self.source_closure_digest, "source_closure_digest")
         require_nonnegative_int(self.evaluated_count, "evaluated_count")
         require_nonnegative_int(self.qualified_count, "qualified_count")
         if self.qualified_count > self.evaluated_count:
@@ -267,6 +344,7 @@ class CandidateEvaluationReceipt:
 
         return [
             {
+                **_signal_evidence_payload(item),
                 "opportunity_id": item.opportunity_id,
                 "security_code": item.security_code,
                 "security_name": item.security_name,
@@ -291,6 +369,7 @@ class CandidateEvaluationReceipt:
         policy: AdvicePolicy,
         candidates: tuple[CandidateSignal, ...],
         receipt_identity: dict[str, object] | None = None,
+        held_signals: tuple[HeldSignal, ...] = (),
     ) -> str:
         """Digest the receipt must carry to be valid for this produce() call.
 
@@ -335,6 +414,24 @@ class CandidateEvaluationReceipt:
                 "candidate_rule_digest": policy.candidate_rule_digest,
                 "decision_cutoff": policy.decision_cutoff.isoformat(),
                 "candidates": CandidateEvaluationReceipt._candidate_payload(candidates),
+                "held_signals": [
+                    _signal_evidence_payload(item)
+                    | {
+                        "opportunity_id": item.opportunity_id,
+                        "security_code": item.security_code,
+                        "security_name": item.security_name,
+                        "industry_id": item.industry_id,
+                        "action": item.action,
+                        "target_maximum_position": str(item.target_maximum_position),
+                        "component_ref_id": item.component_ref_id,
+                        "component_version": item.component_version,
+                        "reason_codes": list(item.reason_codes),
+                        "explanations": item.explanations,
+                        "next_observation": item.next_observation,
+                        "depends_on_member_ids": sorted(item.depends_on_member_ids),
+                    }
+                    for item in sorted(held_signals, key=lambda item: item.opportunity_id)
+                ],
                 # The run identity the receipt claims (producer, version, run id, evaluated
                 # universe): binding it makes a self-minted receipt for a different run or
                 # universe fail closed even when the field-level digests are recomputed.
@@ -367,6 +464,13 @@ class CandidateEvaluationReceipt:
             "completed_at": self.completed_at.isoformat(),
             "coverage_digest": self.coverage_digest,
             "evaluated_count": self.evaluated_count,
+            "evaluated_universe": list(self.evaluated_universe),
+            "evaluation_started_at": (
+                None
+                if self.evaluation_started_at is None
+                else self.evaluation_started_at.isoformat()
+            ),
+            "source_closure_digest": self.source_closure_digest,
             "qualified_count": self.qualified_count,
             "binding_digest": self.binding_digest,
         }
@@ -402,10 +506,12 @@ class AdvicePolicy:
     expires_at: datetime
     candidate_rule_digest: str
     producer_version: str = PACKAGE_VERSION
-    # The producer identities this policy trusts to have actually run the candidate
-    # evaluation in this job.  A receipt from any other producer_id is refused, so a
-    # caller cannot mint a self-consistent receipt for a run that never happened.
+    # Runtime configuration must name accepted producers. An empty set admits none;
+    # allowlisting is separate from execution, which run_daily_advice owns.
     trusted_producer_ids: tuple[str, ...] = ()
+    # Public label hashes are retained only for the original synthetic G1 fixture tests.
+    # The normal path requires the actual fixed-runner object and its canonical digest.
+    evidence_mode: str = "formal_runner"
 
     def __post_init__(self) -> None:
         for name in (
@@ -418,6 +524,8 @@ class AdvicePolicy:
             require_text(getattr(self, name), name)
         for pid in self.trusted_producer_ids:
             require_text(pid, "trusted_producer_ids[]")
+        if self.evidence_mode not in {"formal_runner", "structural_fixture"}:
+            raise ProductDailyError("invalid_policy", "unknown evidence mode")
         require_aware(self.decision_cutoff, "decision_cutoff")
         require_aware(self.published_at, "published_at")
         require_aware(self.eligible_at, "eligible_at")
@@ -449,6 +557,10 @@ class ExpertBundle:
     def __post_init__(self) -> None:
         for name in ("ref_id", "version", "digest"):
             require_text(getattr(self, name), name)
+
+    @classmethod
+    def from_runner(cls, runner: FormalStrategyRunner) -> ExpertBundle:
+        return cls(runner.card.strategy_id, runner.card.strategy_version, runner.topology_digest)
 
 
 @dataclass(frozen=True)
@@ -520,6 +632,7 @@ class DailyAdviceProducer:
         admission_disposition: str,
         empty_reason: str | None,
         per_member_clock: tuple[tuple[str, str], ...],
+        signals: tuple[CandidateSignal | HeldSignal, ...] = (),
     ) -> AuditBlock:
         return AuditBlock(
             producer_version=policy.producer_version,
@@ -534,6 +647,15 @@ class DailyAdviceProducer:
             git_revision=git_revision,
             intake_receipt_id=facts.intake_receipt_id,
             evaluation_receipt=None if receipt is None else receipt.to_dict(),
+            evidence_grade=(
+                "TEST_ONLY_STRUCTURAL"
+                if policy.evidence_mode == "structural_fixture"
+                else "SYNTHETIC_FIXED_RUNNER"
+            ),
+            decision_evidence=tuple(
+                {"opportunity_id": item.opportunity_id, **_signal_evidence_payload(item)}
+                for item in signals
+            ),
         )
 
     def _blocked_decision(
@@ -577,6 +699,41 @@ class DailyAdviceProducer:
         )
 
     def produce(
+        self,
+        *,
+        facts: DailyFactsView,
+        account: AccountFactsView,
+        policy: AdvicePolicy,
+        experts: ExpertBundle,
+        candidates: tuple[CandidateSignal, ...],
+        held_signals: tuple[HeldSignal, ...] = (),
+        evaluation_receipt: CandidateEvaluationReceipt | None = None,
+    ) -> ProducerResult:
+        """Injected G1 fixture API; the fixed-runner API is run_daily_advice.
+
+        A producer name or a self-consistent content hash is not a completed run.
+        The daily API accepts source inputs and executes the domain path itself.
+        """
+        if policy.evidence_mode != "structural_fixture":
+            assessment = assess_members(facts.members, policy.decision_cutoff)
+            return self._block(
+                diagnostics=[],
+                assessment=assessment,
+                disposition=AdmissionDisposition.INPUT_NOT_READY,
+                reason="same_job_rule_entry_required",
+                detail={},
+            )
+        return self._assemble(
+            facts=facts,
+            account=account,
+            policy=policy,
+            experts=experts,
+            candidates=candidates,
+            held_signals=held_signals,
+            evaluation_receipt=evaluation_receipt,
+        )
+
+    def _assemble(
         self,
         *,
         facts: DailyFactsView,
@@ -725,10 +882,7 @@ class DailyAdviceProducer:
         # The receipt must come from a producer this policy actually trusts to have run
         # the evaluation in this job; a self-consistent receipt for a run that never ran
         # is refused before any field check.
-        if (
-            policy.trusted_producer_ids
-            and evaluation_receipt.producer_id not in policy.trusted_producer_ids
-        ):
+        if evaluation_receipt.producer_id not in policy.trusted_producer_ids:
             return self._block(
                 diagnostics=diagnostics,
                 assessment=assessment,
@@ -748,7 +902,23 @@ class DailyAdviceProducer:
                 "producer_version": evaluation_receipt.producer_version,
                 "run_id": evaluation_receipt.run_id,
                 "evaluated_universe": sorted(evaluation_receipt.evaluated_universe),
+                **(
+                    {
+                        "source_closure_digest": evaluation_receipt.source_closure_digest,
+                        "evaluation_started_at": (
+                            None
+                            if evaluation_receipt.evaluation_started_at is None
+                            else evaluation_receipt.evaluation_started_at.isoformat()
+                        ),
+                        "completed_at": evaluation_receipt.completed_at.isoformat(),
+                        "evaluated_count": evaluation_receipt.evaluated_count,
+                        "qualified_count": evaluation_receipt.qualified_count,
+                    }
+                    if policy.evidence_mode == "formal_runner"
+                    else {}
+                ),
             },
+            held_signals=held_signals,
         )
         if evaluation_receipt.binding_digest != expected_binding:
             return self._block(
@@ -775,6 +945,70 @@ class DailyAdviceProducer:
                     "actual": evaluation_receipt.coverage_digest,
                 },
             )
+
+        if policy.evidence_mode == "formal_runner":
+            run_signals: tuple[CandidateSignal | HeldSignal, ...] = (*candidates, *held_signals)
+            if (
+                evaluation_receipt.evaluation_started_at is None
+                or evaluation_receipt.source_closure_digest is None
+                or evaluation_receipt.evaluation_started_at < facts.intake_verified_at
+                or evaluation_receipt.completed_at < evaluation_receipt.evaluation_started_at
+                or any(
+                    m.required and m.available_at > evaluation_receipt.evaluation_started_at
+                    for m in facts.members
+                )
+            ):
+                return self._block(
+                    diagnostics=diagnostics,
+                    assessment=assessment,
+                    disposition=AdmissionDisposition.INPUT_NOT_READY,
+                    reason="evaluation_run_clock_mismatch",
+                    detail={},
+                )
+            registry = ExpertStrategyRegistry(self._repo_root or find_project_root())
+            if experts != ExpertBundle(
+                registry.card.strategy_id,
+                registry.card.strategy_version,
+                registry.topology_manifest.digest,
+            ):
+                return self._block(
+                    diagnostics=diagnostics,
+                    assessment=assessment,
+                    disposition=AdmissionDisposition.INPUT_NOT_READY,
+                    reason="unregistered_expert_bundle",
+                    detail={},
+                )
+            if len(
+                set(evaluation_receipt.evaluated_universe)
+            ) != evaluation_receipt.evaluated_count or not {
+                s.security_code for s in run_signals
+            } <= set(evaluation_receipt.evaluated_universe):
+                return self._block(
+                    diagnostics=diagnostics,
+                    assessment=assessment,
+                    disposition=AdmissionDisposition.INPUT_NOT_READY,
+                    reason="evaluation_scope_mismatch",
+                    detail={},
+                )
+            for signal in run_signals:
+                # Missing held facts are an explicit non-action, never a synthetic sale.
+                if (
+                    isinstance(signal, HeldSignal)
+                    and signal.action == "hold_alert"
+                    and signal.formal_decision is None
+                    and signal.expert_decision_digest is None
+                    and signal.risk_decision_digest is None
+                    and signal.target_maximum_position is None
+                ):
+                    continue
+                if not _formal_signal_is_valid(signal, experts, policy):
+                    return self._block(
+                        diagnostics=diagnostics,
+                        assessment=assessment,
+                        disposition=AdmissionDisposition.INPUT_NOT_READY,
+                        reason="qualification_evidence_mismatch",
+                        detail={"opportunity_id": signal.opportunity_id},
+                    )
 
         # --- member clocks --------------------------------------------------------------
         if not assessment.publishable:
@@ -910,7 +1144,7 @@ class DailyAdviceProducer:
 
             expected_expert = signal.expected_expert_digest(facts, policy)
             expected_risk = signal.expected_risk_digest(facts, policy)
-            if (
+            if policy.evidence_mode == "structural_fixture" and (
                 signal.expert_decision_digest != expected_expert
                 or signal.risk_decision_digest != expected_risk
             ):
@@ -1022,7 +1256,7 @@ class DailyAdviceProducer:
                 continue
             expected_expert = held.expected_expert_digest(facts, policy)
             expected_risk = held.expected_risk_digest(facts, policy)
-            if (
+            if policy.evidence_mode == "structural_fixture" and (
                 held.expert_decision_digest is not None
                 and held.risk_decision_digest is not None
                 and (
@@ -1115,6 +1349,7 @@ class DailyAdviceProducer:
                 else "no qualified entry candidate"
             ),
             per_member_clock=per_member_clock,
+            signals=(*candidates, *held_signals),
         )
         decision_set = DecisionSet(
             source_id=facts.source_id,

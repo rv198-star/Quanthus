@@ -341,6 +341,8 @@ class AuditBlock:
     git_revision: str | None
     intake_receipt_id: str | None = None
     evaluation_receipt: dict[str, Any] | None = None
+    evidence_grade: str = "TEST_ONLY_STRUCTURAL"
+    decision_evidence: tuple[dict[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         for name in (
@@ -368,6 +370,8 @@ class AuditBlock:
             "git_revision": self.git_revision,
             "intake_receipt_id": self.intake_receipt_id,
             "evaluation_receipt": self.evaluation_receipt,
+            "evidence_grade": self.evidence_grade,
+            "decision_evidence": list(self.decision_evidence),
         }
 
 

@@ -89,6 +89,7 @@ def _policy() -> AdvicePolicy:
         expires_at=datetime(2026, 11, 23, 15, 0, tzinfo=TZ),
         candidate_rule_digest="sha256:" + "b" * 64,
         trusted_producer_ids=("r11-candidate-producer",),
+        evidence_mode="structural_fixture",
     )
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -220,17 +221,24 @@ def _p12_loader():
     """Return the real P12 parser/validator plus the fixture loader, or fail the case.
 
     The continuation branch does not vendor P12's platform/adapters; these integration cases
-    only run when the sibling P12 worktree is on disk and its modules import.  An absent tree
-    is reported as a failed precondition (not-run surfaced as fail), never skipped silently.
+    only run when the sibling P12 worktree is on disk and its modules import.  Point
+    `QUANTHUS_P12_WORKTREE_ROOT` at the P12 checkout/release root when it is not the
+    local development sibling; an absent tree is reported as a failed precondition
+    (not-run surfaced as fail), never skipped silently.
     """
 
-    p12_src = Path(
-        "/Users/william/Projects/Github/Quanthus/artifacts/worktrees/p12-paper-integration-20261120/src"
+    p12_root = Path(
+        os.environ.get(
+            "QUANTHUS_P12_WORKTREE_ROOT",
+            "/Users/william/Projects/Github/Quanthus/artifacts/worktrees/p12-paper-integration-20261120",
+        )
     )
+    p12_src = p12_root / "src"
     if not p12_src.is_dir():
         pytest.fail(
-            "P12 integration loader unavailable: sibling worktree missing; "
-            "this case requires the P12 checkout and cannot run"
+            "P12 integration loader unavailable: sibling worktree missing at "
+            f"{p12_src}; set QUANTHUS_P12_WORKTREE_ROOT to the P12 release root "
+            "(this case requires the P12 checkout and cannot run)"
         )
     quanthus_pkg = sys.modules.get("quanthus")
     if quanthus_pkg is None:

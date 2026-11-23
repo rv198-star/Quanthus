@@ -1,0 +1,106 @@
+{
+  "schema": "quanthus.p10.forward-news-capture-policy.v1",
+  "dataset_id": "P10-FORWARD-NEWS-TRIAL-20261124",
+  "policy_version": "forward-news-private-trial-v1",
+  "scope": "raw source captures only, P11 research parked/#739, possible future P12 display; no admission",
+  "poll_seconds": 300,
+  "min_host_interval_seconds": 2,
+  "allowed_hosts": [
+    "zhibo.sina.com.cn",
+    "www.cninfo.com.cn",
+    "static.cninfo.com.cn"
+  ],
+  "news_max_pages": 4,
+  "ann_max_pages": 60,
+  "pdf_per_run": 6,
+  "budgets": {
+    "max_requests": 70,
+    "max_wall_seconds": 240,
+    "request_timeout_seconds": 15,
+    "max_wire_bytes": 2097152,
+    "max_entity_bytes": 8388608,
+    "max_pdf_bytes": 8388608,
+    "max_run_bytes": 67108864
+  },
+  "case": {
+    "case_id": "VAL-NVDA-20261123",
+    "input_cutoff": "2026-11-24T09:15:00+08:00",
+    "definition_body_sha256": "e01e8c60277b81f8394edfe51acd70a6a6157055f95036ad9da225d1fe73a362",
+    "match_terms": [
+      "300308",
+      "300502",
+      "300394",
+      "002463",
+      "300476",
+      "601138",
+      "000977",
+      "002916",
+      "002436",
+      "002837",
+      "688256",
+      "688041",
+      "399006",
+      "000300",
+      "英伟达",
+      "黄仁勋",
+      "NVDA",
+      "NVIDIA",
+      "Jensen Huang"
+    ]
+  },
+  "period_policy": {
+    "trial": "2026-11-24..2026-11-30; separate identity and retained",
+    "formal_candidate": "source events2026-12-01 onward require separate Base2.7 admission; never autoBase publish",
+    "Base2_6": "no change/no new news"
+  },
+  "source_scope_caveat": "CNINFO complete pagination is provider result completeness; A-share universe/PIT identity qualification is separate and pending; no invented IDs",
+  "result_blindness": "No result values/titles in runtime logs; case result files later sealed with declared-step read log. No metrics/training/feature selection or threshold tuning.",
+  "budget_rationale": "Blank-stock source result has1274 current-day announcements; finite60-page bound also supports provider page-size clamping. Configured complete-day pagination replaces5000 per-code queries; max70requests/240s, host interval2s. PDF queue independent2/run. PDF6/run max, background<=2 after priorities; separate64 bounded cloud calls,512MiB/256file staging plus1GiB free floor; all-forward archive authorized after actual27.31TB free capacity report. After initial scan, incremental top-page overlap every5min plus full provider rescan6h; older-page revisions visible at next rescan.",
+  "pdftotext": "/usr/bin/pdftotext",
+  "pdf_background_per_run": 2,
+  "pdf_storage": {
+    "archive_scope": "ALL_NEW_FORWARD_DISCLOSURES_PRIORITY_FIRST",
+    "folder_id": "1E9vA71wqRBAD9Ey7V0iHLpM-L_rSfnIu",
+    "folder_name": "quanthus-news-announcements-pdf",
+    "existing_rclone_config": "/srv/agentdock/.config/quanthus-p10/gdrive-rclone-a7/rclone.conf",
+    "staging_max_bytes": 536870912,
+    "staging_max_files": 256,
+    "free_floor_bytes": 1073741824,
+    "max_requests_per_run": 64,
+    "background_pause_fraction": 0.8,
+    "deletion_policy": "ONLY_AFTER_DURABLE_REMOTE_READBACK_SHA_AND_SIZE_RECEIPT",
+    "authority": "Owner #735 comment7115182288; all-forward PDFs in two priorities; no history"
+  },
+  "text_extractor_version": "poppler22.02.0-layout+rapidocr1.4.4-b486a5a8+zh-lines-v1",
+  "pdftotext_version_line": "pdftotext version 22.02.0",
+  "pdf_text_evaluation": {
+    "sample_limit": 200,
+    "selection": "first200 priority PDF content identities actually observed during11-24..30; no history",
+    "candidate_comparison": "pdftotext baseline vs pymupdf4llm or pypdfium2+pdfplumber after isolated dependency/version probes",
+    "ocr": "local failed pages only; RapidOCR/PaddleOCR candidate not installed; otherwise explicit failed; zero LLM/vision API",
+    "cache_key": [
+      "PDF_SHA256",
+      "extractor_version"
+    ],
+    "metrics": [
+      "wall_seconds",
+      "bytes",
+      "failed_pages",
+      "Chinese_line_breaks",
+      "repeated_margins",
+      "Markdown_bytes",
+      "cache_hits"
+    ],
+    "authority": "Owner #735 comment7115223191"
+  },
+  "ann_full_scan_seconds": 21600,
+  "ocr": {
+    "python": "/srv/agentdock/quanthus-ops/p10-news-venv/bin/python",
+    "engine_version": "rapidocr-onnxruntime==1.4.4",
+    "models_sha256": "b486a5a81ecd267655574b726c5e6d5c22690eae036283b57f710eb1fa5e230a",
+    "max_pages_per_pdf": 4,
+    "timeout_seconds": 60,
+    "policy": "only pages failing text checks; remaining failures explicit; zero LLM/vision API"
+  },
+  "trial_mechanism_frozen_through": "2026-11-30"
+}

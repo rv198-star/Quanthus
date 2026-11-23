@@ -1,0 +1,55 @@
+# P10-DATA-NEWS-FWD-001 / #735
+
+| Field | Value |
+|---|---|
+| Parent | #478, [source design](../design/lld/12-forward-news-capture.md) |
+| Design status | approved bounded Owner collection scope |
+| Delivery gate | open; isolated trial and source gaps |
+| Exact task base | 63eaa6531e4ed49a0f4ec348ffcccad173b1839e |
+| Source proposal | `config/pipelines/p10-news-forward-bootstrap.v1.json` |
+| Source runtime | `forward_news_capture.py`, policy v1, focused unit tests |
+
+Owner/P12's actual messages and PR734 archived reference authorize collection today. The
+PRD's claimed ACCEPTED does not own any acceptance. Its GAP1/3/4/5 inform source needs;
+P11 algorithms, model API choice and consumer gates stay outside this task.
+
+First actual source probe began2026-11-24T05:12:04+08, before case#737 was frozen05:15:58.
+The original gzip wire bytes and measured receipt intervals were preserved. An initial
+JSON decode failed because transport compression had not been decoded; bounded gzip
+decoding recovered100 Sina items and30 CNINFO rows from the same retained bytes. The
+provider reported1274 disclosures and hasMore=true; one page was not claimed complete.
+All30 announcement clocks were midnight/date-only and remain null precise timestamps.
+
+The case's three overseas anchor snapshots were actually received05:22+08, before09:15,
+with no numeric values printed. Reuters/AP/reference reprint returned401/403; original
+responses remain explicit unavailable evidence and no access workaround was attempted.
+Case #736's initial six-stock proposal is superseded by frozen#737. Current window/role
+is in `config/pipelines/p10-nvda-validation-source.v1.json`.
+
+Maintenance methods: source scope and cost are product-specific under ADR0016; configured
+budget and immutable evidence are reused. Q-RECOVERY-COMPAT is not a lane-recovery task here.
+No legacy source, existing timer, Base or history is modified. Focused tests cover gzip
+bounds, precise/date-only/timezone clocks, identity unknowns, UTF8 bounds, duplicates,
+revision/cutoff isolation, policy identity, independent source failure and HTTP access holds.
+
+Raw trial status, actual runtime/partial source coverage and remaining mapping/body gaps
+are recorded in the external fixed receipts. Blueprint DATA has no qualification/admission
+facet change. The first execution/loop is verified separately from configuration and local
+tests. Preserve the isolated branch and data receipts until review/runtime succession.
+
+Owner storage decisions (comments7114851166/7115182288/7115223191/7115271620) are now
+bound: all-forward PDFs, priority+background, CN02 existing credential/transport, dedicated
+Drive namespace,512MiB bounded retry staging and cloud SHA readback before local deletion.
+The first quota attempt returned exit1 when run with an unmatched container UID; matching
+the existing config UID998 made the next bounded query succeed. The command channel timed
+out just after printing success; a separate read verified the durable quota receipt SHA.
+This is actual observed storage evidence, not an inferred account quota. A first dependency
+log path was root-owned; the isolated installer used its own writable log without changing
+permissions. Runtime Poppler22.02.0/RapidOCR1.4.4 and model/dependency identities are pinned.
+
+Maintenance applicability: cost-bounded source capture under ADR0016, immutable closure,
+real clock preservation and crash retry were applied. No sealed lane recovery is involved.
+PDF regressions test upload failure retention, retry reuse, crash-after-delete recovery,
+staging pauses, background no-text, revision queue preservation and wrong cloud SHA.
+The layered mechanism stays fixed through11-30;200 extraction/20 table assessments and daily
+layer/cloud throughput are measured from actual trial output, with unresolved samples explicit.

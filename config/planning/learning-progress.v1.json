@@ -15151,6 +15151,41 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-735-20261123T220930188514Z",
+      "recorded_at": "2026-11-23T22:09:30.188514+00:00",
+      "actor": "Quanthus P10 Owner",
+      "work_item": "P10-DATA-NEWS-FWD-001",
+      "outcome": "no_module_change",
+      "summary": "New isolated raw forward capture, cloud-only PDF archival and local tiered extraction fixed for runtime startup; no DATA use qualification change.",
+      "evidence": [
+        {
+          "id": "RAW-NEWS-BOOTSTRAP",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-news/ENGINEERING-CHECKPOINT-v1.json",
+          "sha256": "d516ff8109fad4d0c2d1901366233baffa33f9ed933c4af91378bc4de21474ff",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "27 local focused and lint/type; actual finite source probes, node quota/runtime available; full check and continuous source job tracked separately."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Raw engineering candidate only; actual full source loop and independent source/PIT/consumer qualification remain separate. DATA facets retain prior state.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-NEWS-FWD-001",
+          "number": 735,
+          "title": "[P10-DATA-NEWS-FWD-001] 2026-11-24起公告新闻前向采集与隔离试运行",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:03:37Z",
+          "body_sha256": "2190f1e381e782e71cf6bf65a50e17e6082c3776daef9c248308f124b7cfb2af"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
     }
   ],
   "history_imports": [

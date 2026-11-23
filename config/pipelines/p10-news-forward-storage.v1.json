@@ -1,0 +1,42 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "P10-NEWS-FWD-STORAGE-20261124-002",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "p10-forward-news-capture",
+  "work_item": "P10-DATA-NEWS-FWD-001",
+  "modules": [
+    "DATA"
+  ],
+  "question": "Can existing/free public announcement and news sources preserve real first-seen clocks and immutable source identities in an isolated forward trial from today?",
+  "consumer": "P11 sentiment research candidate not started; possible P12 display only, no current admission",
+  "scope": "Owner-authorized forward trial11-24..30 with all-PDF priority/background cloud archival and local text/failed-page OCR; frozen mechanism through11-30. Case#737 frozen pool and#736 approved11-05..11-25US window are separate; no historical PDF backfill in#735.",
+  "deliverable": "Isolated actual source loop, bounded PDF cloud-readback/deletion pipeline, real trial measurements and week-end receipt",
+  "decision_if_pass": "Continue independently logged forward trial and report actual per-source coverage/gaps; no consumer activation",
+  "decision_if_fail": "Retain partial source captures, truthful blockers and next finite recovery; do not delay other working sources or invent publication times",
+  "acceptance": [
+    "Immutable raw HTTP/doc SHA and source ID/version plus real acquisition/storage/channel clocks",
+    "Unknown publication/identity stays null+reason; exact PIT mapping reused when available, no invented IDs",
+    "Versioned dedup/revisions/coverage, rate bounded retries, isolated stores/schedules and all Base2.6 invariants",
+    "Actual startup/run receipts; priority Markdown below32KiB with explicit truncation/extraction status; no model or strategy activation"
+  ],
+  "stop_conditions": [
+    "Per-source/runtime/cloud/staging/process limits fixed in capture policy; source access hold without bypass",
+    "No Base2.6 modification;12-01-onward candidate only for separate2.7 ODS/DWD package group; no ADM in Base",
+    "Mechanism fixed through11-30; no LLM/vision calls; no historical PDF backfill"
+  ],
+  "memory_sha256": "7ea37a64fd1c9719615de95c9ef7c87a14730a3c0cfc0aa5961bba48188def8f",
+  "prior_reviews": [],
+  "budget": {
+    "wall_seconds": 7200,
+    "network_requests": 12,
+    "max_new_bytes": 10485760,
+    "accounting_owner": "Initial bootstrap probe budget; actual completed8 probe requests retained. Newly authorized operating trial uses explicit per-run policy limits plus measured elapsed/bytes/cloud and daily counts. Dependency/GitHub/control costs separate."
+  },
+  "cumulative_cost_review": "Initial probes8 requests,130 first-page records plus42 anchor rows; source disclosure count1274. Quota/pinned-runtime/isolated-code work retained; no paid data/model calls; cumulative human/model cost unknown.",
+  "base_revision": "63eaa6531e4ed49a0f4ec348ffcccad173b1839e",
+  "owner_authority": "P12 original human messages and Owner section in main archive PR734; broader source collection today explicitly authorized",
+  "case_issue": 736,
+  "runtime_authority_boundary": "Owner explicitly authorized P10 forward source collection from today in a separate trial pipeline; no source procurement, Base2.6 changes, model/strategy activation or case-specific history/overseas quotes before window/pool confirmation."
+}

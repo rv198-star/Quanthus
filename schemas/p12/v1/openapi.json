@@ -2105,6 +2105,9 @@
         "type": "null"
        }
       ]
+     },
+     "next_check_at": {
+      "$ref": "#/components/schemas/Timestamp"
      }
     }
    },

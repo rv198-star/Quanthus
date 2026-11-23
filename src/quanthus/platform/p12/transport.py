@@ -185,6 +185,11 @@ def _publication(value: PublicationStatus) -> dict[str, Any]:
         "market_date": value.market_date.isoformat(),
         "published_at": _ts(value.published_at),
     }
+    # Issue #721 R15: next-check time, an optional contract field emitted
+    # only when an authoritative next session is known.
+    next_check = getattr(value, "next_check_at", None)
+    if next_check is not None:
+        out["next_check_at"] = _ts(next_check)
     if value.retracted:
         out["retracted"] = True
         out["retraction_reason"] = value.retraction_reason

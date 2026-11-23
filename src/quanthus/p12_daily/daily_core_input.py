@@ -468,4 +468,3 @@ def _history_gates(node) -> tuple:
         gate(HISTORY_GATE_FEATURE_WARMUP, "feature_warmup_sessions", 61),
         gate(HISTORY_GATE_LISTING_FLOOR, "listing_sessions", 120),
     )
-

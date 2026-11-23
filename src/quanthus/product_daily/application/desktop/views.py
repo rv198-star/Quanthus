@@ -70,6 +70,11 @@ class PublicationStatus:
     published_at: datetime
     retracted: bool = False
     retraction_reason: str | None = None
+    # Issue #721 R15: the next scheduled publish/check point, from the
+    # authoritative calendar (next_session) and the publish configuration
+    # carried on the decision set.  Optional contract field; None when no
+    # authoritative next session is known.
+    next_check_at: datetime | None = None
 
 
 @dataclass(frozen=True)

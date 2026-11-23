@@ -1023,4 +1023,3 @@ def test_volume_boundary_with_price_exit_still_sells(env):
     loaded = load_decision_set_dict(stored.decision_set, mode="synthetic")
     exits = [d for d in loaded.decisions if d.stage.value == "exit_plan"]
     assert exits and exits[0].security_code == "600000"
-

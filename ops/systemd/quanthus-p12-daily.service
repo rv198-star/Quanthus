@@ -29,4 +29,3 @@ ReadWritePaths=/var/lib/quanthus-p12-isolated
 
 [Install]
 WantedBy=multi-user.target
-

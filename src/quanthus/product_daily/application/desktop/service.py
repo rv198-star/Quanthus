@@ -465,12 +465,23 @@ class P12DesktopApplication:
         read = getattr(self._decisions, "retraction_for", None)
         if callable(read):
             retraction = read(decisions.market_date)
+        next_check_at = None
+        next_session = getattr(decisions, "next_session", None)
+        if next_session is not None:
+            # Issue #721 R15: the next check is the publish point of the next
+            # authoritative session, taken from the governed calendar and the
+            # configured publish time-of-day carried on the decision set.
+            pub = decisions.published_at
+            next_check_at = datetime.combine(
+                next_session, pub.timetz() if hasattr(pub, "timetz") else pub.time()
+            )
         return PublicationStatus(
             status="PUBLISHED" if self._visible(decisions, now) else "NOT_YET_PUBLISHED",
             market_date=decisions.market_date,
             published_at=decisions.published_at,
             retracted=retraction is not None,
             retraction_reason=None if retraction is None else str(retraction.get("reason")),
+            next_check_at=next_check_at,
         )
 
     # ---- package publication ----------------------------------------------------------

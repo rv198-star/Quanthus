@@ -96,6 +96,27 @@
         </div>
       </div>
 
+      <div v-if="runBlocked" class="p12-banner-note warning" data-testid="p12-input-blocked-banner">
+        <div>
+          <strong>数据缺失，今日建议暂停</strong>
+          <p>{{ runReceipt.input_block.detail }}；缺失成员：{{ (runReceipt.input_block.missing_members || []).join('、') }}。影响范围：{{ inputBlockScopeText }}；恢复条件：{{ runReceipt.input_block.recovery_condition }}。已有持仓照常显示持有，不因缺数生成卖出。</p>
+        </div>
+      </div>
+
+      <div v-if="runFailed" class="p12-banner-note danger" data-testid="p12-run-failed">
+        <div>
+          <strong>今日建议生成失败</strong>
+          <p>系统盘后任务运行失败{{ runReceipt?.status === 'TIMED_OUT' ? '（超时）' : '' }}，未能产出建议包；可在运行回执查看失败原因，恢复后按发布配置重新出包。</p>
+        </div>
+      </div>
+
+      <div v-else-if="runOverdue" class="p12-banner-note warning" data-testid="p12-run-overdue">
+        <div>
+          <strong>今日建议已逾发布时间仍未生成</strong>
+          <p>系统计划本应在 {{ time(workbench.publication.published_at) }} 发布，当前既无建议包也无缺数暂停回执；请按运行回执核查任务状态。</p>
+        </div>
+      </div>
+
       <div v-for="item in volumeBoundaryExclusions" :key="item.security_code" class="p12-banner-note warning" :data-testid="'p12-volume-boundary-' + item.security_code">
         <div>
           <strong>{{ item.security_code }}：量能数据跨交易规则调整，暂不评估新增</strong>
@@ -105,11 +126,7 @@
 
       <section v-if="!workbench.package && !customWatchItems.length && !extraHoldingItems.length" class="panel p12-unpublished" data-testid="p12-unpublished">
         <div class="p12-unpublished-inner">
-          <div v-if="runBlocked" data-testid="p12-input-blocked">
-            <h2>数据缺失，今日建议暂停</h2>
-            <p>{{ runReceipt.input_block.detail }}；缺失成员：{{ (runReceipt.input_block.missing_members || []).join('、') }}。影响范围：{{ inputBlockScopeText }}；恢复条件：{{ runReceipt.input_block.recovery_condition }}。已有持仓照常显示持有，不因缺数生成卖出。</p>
-          </div>
-          <div v-else data-testid="p12-not-yet-generated">
+          <div v-if="!runBlocked" data-testid="p12-not-yet-generated">
             <h2>今日建议尚未生成</h2>
             <p>{{ workbench.publication.market_date }} 收盘后的系统计划将于 {{ time(workbench.publication.published_at) }} 发布。发布前系统不展示未定稿的策略推荐；你可以直接查询真实 A 股行情并进行自主模拟操作。</p>
           </div>
@@ -400,6 +417,13 @@
                 data-testid="p12-confirm-plan"
                 @click="confirmPlan"
               >确认建议并提交模拟委托</a-button>
+              <a-button
+                type="default"
+                :loading="simSubmitting"
+                :disabled="planConfirmDisabled"
+                data-testid="p12-skip-plan"
+                @click="skipSuggestedPlan"
+              >跳过此建议</a-button>
             </div>
 
             <!-- Simulated Order Outcome Receipt (placed at top of ticket so always visible above fold) -->
@@ -784,7 +808,8 @@ import {
   newClientId,
   submitFill,
   submitOrderEvent,
-  submitSimOrder
+  submitSimOrder,
+  skipPlan
 } from '../client.js'
 import {
   calcQuoteChange,
@@ -883,6 +908,28 @@ export default {
     },
     runBlocked () {
       return this.runReceipt?.status === 'INPUT_BLOCKED' && Boolean(this.runReceipt?.input_block)
+    },
+    runFailed () {
+      // Issue #721 R16: a failed or timed-out run is a distinct, prominent
+      // alert, never collapsed into the neutral "尚未生成" waiting state.
+      const status = this.runReceipt?.status
+      return status === 'FAILED' || status === 'TIMED_OUT'
+    },
+    runOverdue () {
+      // Issue #721 R16: past the publish point with no package and no blocked
+      // receipt is an overdue run, surfaced separately from "尚未生成".
+      if (this.workbench?.package || this.runBlocked || this.runFailed) return false
+      const publishedAt = this.workbench?.publication?.published_at
+      if (!publishedAt) return false
+      const now = this.workbench?.clock || new Date().toISOString()
+      return new Date(now) > new Date(publishedAt)
+    },
+    nextCheckText () {
+      // Issue #721 R15: the next scheduled publish/check point, shown on the
+      // "no order today" and "input blocked" pages so the reader knows when
+      // the system will next produce advice.
+      const next = this.workbench?.publication?.next_check_at
+      return next ? `下一次建议预计 ${this.time(next)} 发布` : ''
     },
     volumeBoundaryExclusions () {
       // Frozen mapping (issue #719): the P11 VOLUME_REGIME_BOUNDARY evidence is
@@ -1247,13 +1294,13 @@ export default {
         return `今日无可执行待办（原 ${expiredCount} 项建仓计划执行窗口已过，不再引导买入）。`
       }
       if (this.runBlocked) {
-        return '今日建议暂停：日线输入未通过资格校验，新增买入暂不评估；已有持仓照常显示，不因缺数卖出。'
+        return '今日建议暂停：日线输入未通过资格校验，新增买入暂不评估；已有持仓照常显示，不因缺数卖出。' + (this.nextCheckText ? ' ' + this.nextCheckText : '')
       }
       if (this.workbench.publication?.retracted) {
         return '本日盘后建议已被撤回：未确认计划不可再确认，已成交事实保留；下一份可执行建议为下一交易日盘后包。'
       }
       if (this.isEmptyAdvice && this.workbench.package) {
-        return '今天无须下单：已评估无合格新增候选；持仓与委托按计划窗口继续。'
+        return '今天无须下单：已评估无合格新增候选；持仓与委托按计划窗口继续。' + (this.nextCheckText ? ' ' + this.nextCheckText : '')
       }
       if (this.workbench.action_blockers.length) {
         return '今日无系统推荐操作（日常策略准入待放行）；你可以自主查询真实股票并提交模拟限价委托。'
@@ -1951,6 +1998,30 @@ export default {
         this.$nextTick(() => { this.suppressSelectionReset = false })
       } catch (error) {
         this.simError = error.detail ? `${reasonText(error.reasonCode)}（${error.detail}）` : (reasonText(error.reasonCode) || '模拟委托提交失败')
+      } finally {
+        this.simSubmitting = false
+      }
+    },
+    async skipSuggestedPlan () {
+      const plan = this.confirmablePlan
+      if (!plan || this.simSubmitting) return
+      this.simError = ''
+      this.simSubmitting = true
+      const targetCode = plan.security_code
+      try {
+        await skipPlan(this.accountId, plan.plan_id, { reason: null })
+        const [wb, simRes] = await Promise.all([
+          loadWorkbench(this.accountId),
+          listSimOrders(this.accountId)
+        ])
+        this.suppressSelectionReset = true
+        this.workbench = wb
+        this.simOrders = simRes.orders
+        this.simOrdersAvailable = simRes.available
+        if (!this.isRehearsal) await this.resolveKnownRealIdentities()
+        this.$nextTick(() => { this.suppressSelectionReset = false })
+      } catch (error) {
+        this.simError = error.detail ? `${reasonText(error.reasonCode)}（${error.detail}）` : (reasonText(error.reasonCode) || '跳过建议失败')
       } finally {
         this.simSubmitting = false
       }

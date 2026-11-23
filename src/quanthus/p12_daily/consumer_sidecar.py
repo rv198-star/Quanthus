@@ -301,4 +301,3 @@ def read_sidecar(
         members=tuple(members),
         blocked_reasons=tuple(blocked),
     )
-

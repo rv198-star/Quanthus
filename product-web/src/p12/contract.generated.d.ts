@@ -323,6 +323,7 @@ export interface PriceBar {
 
 export interface PublicationStatus {
   market_date: MarketDate
+  next_check_at: Timestamp
   published_at: Timestamp
   retracted: boolean
   retraction_reason: string | null

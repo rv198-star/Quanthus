@@ -401,6 +401,19 @@
   background: #fffaf0;
 }
 
+.p12-banner-note.danger {
+  border-color: #e8b4b4;
+  background: #fdecec;
+}
+
+.p12-banner-note.danger strong {
+  color: #9c1f1f;
+}
+
+.p12-banner-note.danger p {
+  color: #7a3535;
+}
+
 .p12-banner-note strong {
   display: block;
   color: #7c4d0b;

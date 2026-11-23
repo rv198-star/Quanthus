@@ -76,7 +76,11 @@ def _holdings_from_ledger(state_dir: Path, account_id: str) -> tuple[HeldPositio
     '''
 
     store_path = Path(state_dir) / "p12-paper-facts.sqlite"
-    if not store_path.is_file():
+    try:
+        if not store_path.is_file():
+            return ()
+    except OSError:
+        # An unreadable store path must not fabricate holdings.
         return ()
     try:
         from quanthus.capabilities.execution import SyntheticContext

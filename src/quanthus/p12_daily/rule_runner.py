@@ -49,6 +49,11 @@ from quanthus.shared.values import VersionRef
 EXCHANGE_TZ = timezone(timedelta(hours=8))
 SESSION_OPEN = time(9, 30)
 SESSION_CLOSE = time(15, 0)
+# The full-day volume/amount set closes at the end of the 15:05-15:30
+# after-hours window.  It is a separate receipt timestamp: 15:00 marks the
+# price-close observation anchor only and never stands in for volume
+# completeness (frozen decision 2026-11-24, issue #726).
+FULL_DAY_VOLUME_AMOUNT_END = time(15, 30)
 
 RUNNER_REF = "p12.synthetic-replay-rule"
 RUNNER_VERSION = "v1"
@@ -109,7 +114,42 @@ class RunnerRequest:
 
 @dataclass(frozen=True)
 class SecurityExclusion:
+    '''One security dropped from new-candidate evaluation, with the P11-side
+    evidence carried verbatim (frozen single-security drop path).
+
+    reason_code maps to the existing INPUT_UNAVAILABLE transport reason; the
+    P12 receipt adds no new reason codes of its own.'''
+
     security_code: str
+    reason_code: str
+    detail: str
+    metric: str | None = None
+    window_start: str | None = None
+    window_end: str | None = None
+    regime_version: str | None = None
+
+
+# P11 internal evidence codes P12 must transport verbatim on the receipt; they
+# are not P12 reason codes and never widen the P12 reason-code contract.
+_EXCLUSION_EVIDENCE_KEYS = ("metric", "window_start", "window_end", "regime_version")
+
+VOLUME_REGIME_BOUNDARY = "VOLUME_REGIME_BOUNDARY"
+HOLD_AND_ALERT = "HOLD_AND_ALERT"
+EXIT_SIGNAL = "EXIT_SIGNAL"
+
+
+@dataclass(frozen=True)
+class HoldingDirective:
+    '''The rule's disposition for one open position (frozen cross-regime rule).
+
+    HOLD_AND_ALERT is reserved for a holding whose evaluation depends on the
+    missing volume/amount input.  When a qualified volume-independent exit or
+    reduction signal already exists (price or risk evidence, base exit), the
+    rule emits EXIT instead; the volume-boundary reason is still recorded on
+    the receipt, it never rewrites a qualified signal into a hold.'''
+
+    security_code: str
+    action: str  # HOLD_AND_ALERT | EXIT_SIGNAL | HOLD
     reason_code: str
     detail: str
 
@@ -118,6 +158,9 @@ class SecurityExclusion:
 class RunnerOutput:
     decision_set: MarketDecisionSet
     exclusions: tuple[SecurityExclusion, ...]
+    # Per-holding dispositions (volume-boundary HOLD_AND_ALERT vs qualified
+    # exits); recorded on the run receipt, never inside the published package.
+    holding_directives: tuple[HoldingDirective, ...] = ()
     # M2 F10: P11-bound trend observations carried verbatim, abstentions kept.
     trend_observations: tuple[TrendObservation, ...] = ()
     # M2 section 3: the three independent history floors evaluated for this run.
@@ -191,6 +234,7 @@ class SyntheticRuleRunner:
         decisions: list[MarketDecision] = []
         exclusions: list[SecurityExclusion] = []
         trend_observations: list[TrendObservation] = []
+        holding_directives: list[HoldingDirective] = []
         for item in self._candidates:
             code = str(item["security_code"])
             drop_reason = item.get("unqualified_reason")
@@ -202,6 +246,14 @@ class SyntheticRuleRunner:
                         security_code=code,
                         reason_code=str(drop_reason.get("reason_code", "INPUT_UNAVAILABLE")),
                         detail=str(drop_reason.get("detail", "candidate input not qualified")),
+                        **{
+                            key: (
+                                None
+                                if drop_reason.get(key) is None
+                                else str(drop_reason[key])
+                            )
+                            for key in _EXCLUSION_EVIDENCE_KEYS
+                        },
                     )
                 )
                 continue
@@ -292,6 +344,119 @@ class SyntheticRuleRunner:
                     raw_value=None if obs.get("raw_value") is None else str(obs["raw_value"]),
                 )
             )
+        # Frozen cross-regime rule (issue #719 comment-7112561800): a holding
+        # whose evaluation depends on the missing volume/amount input yields
+        # HOLD_AND_ALERT.  A qualified volume-independent exit or reduction
+        # signal (price/risk evidence, base exit) still emits EXIT - the
+        # boundary reason is recorded, it never rewrites the signal into a hold.
+        volume_boundary = {
+            item.security_code
+            for item in exclusions
+            if item.reason_code == VOLUME_REGIME_BOUNDARY
+        }
+        holding_signals = {
+            str(item["security_code"]): item
+            for item in self._candidates
+            if item.get("holding_signal")
+        }
+        for fact in request.holdings:
+            if fact.quantity <= 0:
+                continue
+            signal = holding_signals.get(fact.security_code)
+            if signal is not None:
+                action = str(signal.get("action", EXIT_SIGNAL))
+                if action == "EXIT":
+                    action = EXIT_SIGNAL
+                holding_directives.append(
+                    HoldingDirective(
+                        security_code=fact.security_code,
+                        action=action,
+                        reason_code=str(signal.get("reason_code", EXIT_SIGNAL)),
+                        detail=str(
+                            signal.get(
+                                "detail",
+                                "qualified volume-independent exit/reduction signal",
+                            )
+                        ),
+                    )
+                )
+                if action == EXIT_SIGNAL:
+                    # A qualified volume-independent exit/reduction signal
+                    # still publishes; the boundary reason is recorded on the
+                    # receipt, it never rewrites the signal into a hold.
+                    decisions.append(
+                        MarketDecision(
+                            opportunity_id="OPP-D1B-{}-{}".format(
+                                snapshot.market_date.strftime("%Y%m%d"),
+                                fact.security_code,
+                            ),
+                            security_code=fact.security_code,
+                            security_name=str(
+                                signal.get("security_name", fact.security_code)
+                            ),
+                            stage=OpportunityStage.EXIT_PLAN,
+                            reason_codes=(EXIT_SIGNAL,),
+                            explanations=(
+                                Explanation(
+                                    EXIT_SIGNAL,
+                                    ExplanationUse.ACTION,
+                                    f"{self._ref.ref_id}@{self._ref.version}",
+                                    str(
+                                        signal.get(
+                                            "detail",
+                                            "qualified volume-independent "
+                                            "exit/reduction signal",
+                                        )
+                                    ),
+                                ),
+                            ),
+                            next_observation="next session after close",
+                            chart=None,
+                            entry=None,
+                            component_ref=self._ref,
+                        )
+                    )
+            elif fact.security_code in volume_boundary:
+                holding_directives.append(
+                    HoldingDirective(
+                        security_code=fact.security_code,
+                        action=HOLD_AND_ALERT,
+                        reason_code=VOLUME_REGIME_BOUNDARY,
+                        detail=(
+                            "volume/amount input crosses a trading-rule regime "
+                            "boundary; the holding evaluation that depends on "
+                            "it is deferred, the position is kept"
+                        ),
+                    )
+                )
+        decisions.extend(
+            MarketDecision(
+                opportunity_id="OPP-D1B-{}-{}".format(
+                    snapshot.market_date.strftime("%Y%m%d"), fact.security_code
+                ),
+                security_code=fact.security_code,
+                security_name=fact.security_code,
+                stage=OpportunityStage.HOLDING,
+                reason_codes=(HOLD_AND_ALERT,),
+                explanations=(
+                    Explanation(
+                        HOLD_AND_ALERT,
+                        ExplanationUse.EXPLANATION,
+                        f"{self._ref.ref_id}@{self._ref.version}",
+                        "volume regime boundary defers the holding evaluation; "
+                        "the position stays held and alerts",
+                    ),
+                ),
+                next_observation="next qualified daily input",
+                chart=None,
+                entry=None,
+                component_ref=self._ref,
+            )
+            for fact in request.holdings
+            if fact.quantity > 0
+            and fact.security_code in volume_boundary
+            and fact.security_code not in holding_signals
+        )
         if not decisions:
             decisions.append(_no_op_decision(self._ref, snapshot.market_date))
         decision_set = validate_decision_set(
@@ -320,6 +485,7 @@ class SyntheticRuleRunner:
         return RunnerOutput(
             decision_set=decision_set,
             exclusions=tuple(exclusions),
+            holding_directives=tuple(holding_directives),
             trend_observations=tuple(trend_observations),
             history_gates=tuple(snapshot.history_gates),
         )

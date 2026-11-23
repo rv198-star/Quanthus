@@ -749,3 +749,190 @@ def test_source_completed_after_close_still_publishes(tmp_path):
     assert loaded.knowledge_cutoff == CUTOFF
     assert loaded.published_at >= loaded.knowledge_cutoff
 
+
+def _write_volume_member(meta, volume_member):
+    """Attach a volume member to the core manifest and rebind its hashes."""
+    manifest_path = meta["core"] / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["volume"] = volume_member
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True))
+    core_sha = _sha(manifest_path.read_bytes())
+    prod = meta["core"].parent.parent
+    index = json.loads((prod / "DATES.json").read_text())
+    index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
+    (prod / "DATES.json").write_text(json.dumps(index, sort_keys=True))
+    pointer = json.loads((prod / "CURRENT_DAILY_CORE_BASE24.json").read_text())
+    pointer["index_sha256"] = _sha((prod / "DATES.json").read_bytes())
+    pointer["entry"]["core_manifest_sha256"] = core_sha
+    (prod / "CURRENT_DAILY_CORE_BASE24.json").write_text(json.dumps(pointer))
+
+
+def test_volume_scope_verbatim_full_day(env):
+    """M2 v3: a declared FULL_DAY scope with its observation end is carried
+    verbatim onto the receipt - the rule judges it, P12 does not rewrite it."""
+    prod, state, meta = env
+    _write_volume_member(meta, {
+        "volume_scope": "FULL_DAY",
+        "full_day_volume_amount_observation_end": "2026-11-20T15:30:00+08:00",
+    })
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    timing = receipt["input_timing"]
+    assert timing["volume_scope"] == "FULL_DAY"
+    assert timing["full_day_volume_amount_observation_end"] == "2026-11-20T15:30:00+08:00"
+    # The 15:30 session anchor and the source-declared observation end are
+    # separate fields; 15:00 stays only the price-close anchor.
+    assert timing["price_close_anchor"].endswith("T15:00:00+08:00")
+    assert timing["full_day_volume_amount_end"].endswith("T15:30:00+08:00")
+
+
+def test_volume_scope_unknown_never_promoted(env):
+    """M2 v3: an UNKNOWN scope and a missing observation end stay UNKNOWN;
+    P12 does not promote it and hands the verdict to the rule."""
+    prod, state, meta = env
+    _write_volume_member(meta, {"volume_scope": "UNKNOWN"})
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    timing = receipt["input_timing"]
+    assert timing["volume_scope"] == "UNKNOWN"
+    assert timing["full_day_volume_amount_observation_end"] is None
+
+
+def test_volume_scope_full_day_without_end_degrades_to_unknown(env):
+    """A FULL_DAY declaration without its observation end cannot be proven -
+    it stays UNKNOWN, never the reverse."""
+    prod, state, meta = env
+    _write_volume_member(meta, {"volume_scope": "FULL_DAY"})
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(),
+    )
+    timing = receipt["input_timing"]
+    assert timing["volume_scope"] == "UNKNOWN"
+    assert timing["full_day_volume_amount_observation_end"] is None
+
+
+def _volume_boundary_candidate(code):
+    return one_candidate(
+        security_code=code,
+        security_name=code,
+        unqualified_reason={
+            "reason_code": "VOLUME_REGIME_BOUNDARY",
+            "detail": "volume input crosses the 2026-07-06 trading-rule regime",
+            "metric": "volume_amount",
+            "window_start": "2026-06-30",
+            "window_end": "2026-07-06",
+            "regime_version": "st-band-2026-07-06.v1",
+        },
+    )
+
+
+def test_volume_boundary_exclusion_keeps_p11_evidence(env):
+    """Single-security drop: the receipt keeps the P11 evidence verbatim -
+    security, metric, window bounds and regime version - and still publishes
+    the rest of the package."""
+    prod, state, _ = env
+    runner = SyntheticRuleRunner(
+        candidates=(one_candidate(), _volume_boundary_candidate("000001"))
+    )
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    assert receipt["package"]["entry_plan_count"] == 1
+    exclusion = receipt["exclusions"][0]
+    assert exclusion["security_code"] == "000001"
+    assert exclusion["reason_code"] == "VOLUME_REGIME_BOUNDARY"
+    assert exclusion["metric"] == "volume_amount"
+    assert exclusion["window_start"] == "2026-06-30"
+    assert exclusion["window_end"] == "2026-07-06"
+    assert exclusion["regime_version"] == "st-band-2026-07-06.v1"
+
+
+def test_volume_boundary_without_signal_is_hold_and_alert(env):
+    """A held security whose evaluation depends on the missing volume input is
+    HOLD_AND_ALERT: the position stays held and alerts, no sale is generated."""
+    prod, state, _ = env
+    runner = SyntheticRuleRunner(
+        candidates=(_volume_boundary_candidate("600000"),)
+    )
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(HeldPositionFact(security_code="600000", quantity=500),),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    directive = receipt["holding_directives"][0]
+    assert directive["security_code"] == "600000"
+    assert directive["action"] == "HOLD_AND_ALERT"
+    assert directive["reason_code"] == "VOLUME_REGIME_BOUNDARY"
+    stored = DailyPackageStore(state).package_for(MARKET_DATE)
+    loaded = load_decision_set_dict(stored.decision_set, mode="synthetic")
+    held = [d for d in loaded.decisions if d.security_code == "600000"]
+    assert held and held[0].stage.value == "holding"
+    assert "HOLD_AND_ALERT" in held[0].reason_codes
+
+
+def test_volume_boundary_with_price_exit_still_sells(env):
+    """A qualified volume-independent exit signal is never rewritten into a
+    hold by the volume boundary: the EXIT_PLAN publishes and the boundary
+    reason is recorded on the receipt."""
+    prod, state, _ = env
+    runner = SyntheticRuleRunner(
+        candidates=(
+            one_candidate(
+                security_code="600000",
+                security_name="浦发银行",
+                unqualified_reason={
+                    "reason_code": "VOLUME_REGIME_BOUNDARY",
+                    "detail": "volume input crosses the 2026-07-06 trading-rule regime",
+                    "metric": "volume_amount",
+                    "window_start": "2026-06-30",
+                    "window_end": "2026-07-06",
+                    "regime_version": "st-band-2026-07-06.v1",
+                },
+                holding_signal={
+                    "action": "EXIT",
+                    "reason_code": "EXIT_SIGNAL",
+                    "detail": "price exit signal qualified independently of volume",
+                },
+            ),
+        )
+    )
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 20, 0, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(HeldPositionFact(security_code="600000", quantity=500),),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    assert receipt["exclusions"][0]["reason_code"] == "VOLUME_REGIME_BOUNDARY"
+    directive = receipt["holding_directives"][0]
+    assert directive["action"] == "EXIT_SIGNAL"
+    assert directive["reason_code"] == "EXIT_SIGNAL"
+    stored = DailyPackageStore(state).package_for(MARKET_DATE)
+    loaded = load_decision_set_dict(stored.decision_set, mode="synthetic")
+    exits = [d for d in loaded.decisions if d.stage.value == "exit_plan"]
+    assert exits and exits[0].security_code == "600000"
+

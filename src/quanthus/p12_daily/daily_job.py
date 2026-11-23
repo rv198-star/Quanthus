@@ -43,6 +43,8 @@ from quanthus.p12_daily.package_store import (
     DailyPackageStore,
 )
 from quanthus.p12_daily.rule_runner import (
+    FULL_DAY_VOLUME_AMOUNT_END,
+    SESSION_CLOSE,
     HeldPositionFact,
     RunnerOutput,
     RunnerRequest,
@@ -294,6 +296,27 @@ def run_daily(
     # carried verbatim on the receipt.  Neither is used as a cutoff; a missing
     # source cutoff stays null with its reason recorded.
     receipt["input_timing"] = {
+        # Frozen receipt timing fields (issue #719 comment-7112514921,
+        # task #726): the price-close anchor (15:00), the full-day
+        # volume/amount end (15:30), the source's real clock and the
+        # pre-configured consumer cutoff are separate values.  15:00 never
+        # stands in for volume completeness, and no two volume sets are spliced.
+        "price_close_anchor": datetime.combine(
+            snapshot.market_date, SESSION_CLOSE, tzinfo=EXCHANGE_TZ
+        ).isoformat(),
+        "full_day_volume_amount_end": datetime.combine(
+            snapshot.market_date, FULL_DAY_VOLUME_AMOUNT_END, tzinfo=EXCHANGE_TZ
+        ).isoformat(),
+        # M2 v3: the source-declared volume scope and observation end carried
+        # verbatim; the 15:30 constant above is the session clock anchor, this
+        # is what the input actually declared.  UNKNOWN stays UNKNOWN - it is
+        # never promoted, and a missing end never becomes FULL_DAY.
+        "volume_scope": snapshot.volume_scope,
+        "full_day_volume_amount_observation_end": (
+            snapshot.full_day_volume_amount_observation_end.isoformat()
+            if snapshot.full_day_volume_amount_observation_end
+            else None
+        ),
         "completed_at": (
             snapshot.completed_at.isoformat() if snapshot.completed_at else None
         ),
@@ -530,8 +553,26 @@ def run_daily(
                 "security_code": item.security_code,
                 "reason_code": item.reason_code,
                 "detail": item.detail,
+                "metric": item.metric,
+                "window_start": item.window_start,
+                "window_end": item.window_end,
+                "regime_version": item.regime_version,
             }
             for item in output.exclusions
+        ]
+    # Frozen cross-regime dispositions for open positions: HOLD_AND_ALERT only
+    # where the holding evaluation depends on the missing volume input; a
+    # qualified volume-independent exit still publishes its EXIT_PLAN while
+    # the boundary reason is recorded here verbatim.
+    if output.holding_directives:
+        receipt["holding_directives"] = [
+            {
+                "security_code": item.security_code,
+                "action": item.action,
+                "reason_code": item.reason_code,
+                "detail": item.detail,
+            }
+            for item in output.holding_directives
         ]
 
     decision_set = decision_set_to_dict(decisions)

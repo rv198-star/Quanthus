@@ -415,8 +415,12 @@ export interface RunReceipt {
 
 export interface RunReceiptExclusion {
   detail: string
+  metric: string | null
   reason_code: string
+  regime_version: string | null
   security_code: string
+  window_end: string | null
+  window_start: string | null
 }
 
 export interface RunReceiptInputBlock {

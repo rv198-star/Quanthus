@@ -96,6 +96,13 @@
         </div>
       </div>
 
+      <div v-for="item in volumeBoundaryExclusions" :key="item.security_code" class="p12-banner-note warning" :data-testid="'p12-volume-boundary-' + item.security_code">
+        <div>
+          <strong>{{ item.security_code }}：量能数据跨交易规则调整，暂不评估新增</strong>
+          <p>该证券今日的新增建仓候选暂不评估{{ item.window_start && item.window_end ? '（窗口 ' + item.window_start + ' 至 ' + item.window_end + '）' : '' }}；已有持仓继续持有并提醒，其余证券照常出包。</p>
+        </div>
+      </div>
+
       <section v-if="!workbench.package && !customWatchItems.length && !extraHoldingItems.length" class="panel p12-unpublished" data-testid="p12-unpublished">
         <div class="p12-unpublished-inner">
           <div v-if="runBlocked" data-testid="p12-input-blocked">
@@ -876,6 +883,14 @@ export default {
     },
     runBlocked () {
       return this.runReceipt?.status === 'INPUT_BLOCKED' && Boolean(this.runReceipt?.input_block)
+    },
+    volumeBoundaryExclusions () {
+      // Frozen mapping (issue #719): the P11 VOLUME_REGIME_BOUNDARY evidence is
+      // transported verbatim on the receipt and mapped to the existing
+      // INPUT_UNAVAILABLE surface; P12 adds no new reason codes.
+      return (this.runReceipt?.exclusions || []).filter(
+        item => item.reason_code === 'VOLUME_REGIME_BOUNDARY'
+      )
     },
     inputBlockScopeText () {
       const scope = this.runReceipt?.input_block?.affected_scope

@@ -81,6 +81,23 @@ class DailyCoreSnapshot:
     authoritative_next_session: date | None = None
     history_gates: tuple = ()
     corporate_actions: dict | None = None
+    # M2 v3: the volume member's scope and its declared full-day observation
+    # end are carried verbatim - never inferred, never rewritten.  An UNKNOWN
+    # scope stays UNKNOWN (it is never promoted to FULL_DAY), and a missing
+    # volume end leaves the scope UNKNOWN.  The rule judges the value; P12
+    # only records it on the receipt.
+    volume_scope: str = "UNKNOWN"
+    full_day_volume_amount_observation_end: datetime | None = None
+
+
+VOLUME_SCOPE_FULL_DAY = "FULL_DAY"
+VOLUME_SCOPE_REGULAR_ONLY = "REGULAR_ONLY"
+VOLUME_SCOPE_UNKNOWN = "UNKNOWN"
+VOLUME_SCOPES = (
+    VOLUME_SCOPE_FULL_DAY,
+    VOLUME_SCOPE_REGULAR_ONLY,
+    VOLUME_SCOPE_UNKNOWN,
+)
 
 
 def _read_json(path: Path) -> dict:
@@ -275,6 +292,25 @@ def qualify_daily_input(
     corporate_actions = manifest.get("corporate_actions")
     if corporate_actions is not None and not isinstance(corporate_actions, dict):
         corporate_actions = None
+    # M2 v3: read the volume member verbatim from the manifest (or entry).
+    # volume_scope is one of FULL_DAY / REGULAR_ONLY / UNKNOWN; any other or
+    # absent value reads as UNKNOWN and is never promoted.  The declared
+    # full-day observation end is carried as its own tz-aware value; a missing
+    # end keeps the scope UNKNOWN - P12 never derives completeness from 15:00.
+    volume_member = (
+        manifest.get("volume") if isinstance(manifest.get("volume"), dict)
+        else entry.get("volume") if isinstance(entry.get("volume"), dict)
+        else {}
+    )
+    volume_scope_raw = str(volume_member.get("volume_scope") or "UNKNOWN")
+    volume_scope = volume_scope_raw if volume_scope_raw in VOLUME_SCOPES else "UNKNOWN"
+    volume_end = _aware_ts(
+        volume_member.get("full_day_volume_amount_observation_end")
+    )
+    if volume_end is None and volume_scope == VOLUME_SCOPE_FULL_DAY:
+        # A declared FULL_DAY scope without its observation end cannot be
+        # proven: it degrades to UNKNOWN, never the reverse.
+        volume_scope = VOLUME_SCOPE_UNKNOWN
     return DailyCoreSnapshot(
         pointer_path=pointer_path,
         core_root=core_root,
@@ -293,6 +329,8 @@ def qualify_daily_input(
         authoritative_next_session=authoritative_next_session,
         history_gates=history_gates,
         corporate_actions=corporate_actions,
+        volume_scope=volume_scope,
+        full_day_volume_amount_observation_end=volume_end,
     )
 
 

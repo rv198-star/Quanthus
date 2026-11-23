@@ -292,6 +292,10 @@ def _run_receipt(value: dict | None) -> dict | None:
                 "security_code": str(item.get("security_code") or ""),
                 "reason_code": str(item.get("reason_code") or ""),
                 "detail": str(item.get("detail") or ""),
+                "metric": item.get("metric"),
+                "window_start": item.get("window_start"),
+                "window_end": item.get("window_end"),
+                "regime_version": item.get("regime_version"),
             }
             for item in value.get("exclusions") or ()
         ],

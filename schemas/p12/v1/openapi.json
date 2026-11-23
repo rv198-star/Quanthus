@@ -3242,7 +3242,11 @@
     "required": [
      "security_code",
      "reason_code",
-     "detail"
+     "detail",
+     "metric",
+     "window_start",
+     "window_end",
+     "regime_version"
     ],
     "properties": {
      "security_code": {
@@ -3256,6 +3260,18 @@
      "detail": {
       "type": "string",
       "minLength": 1
+     },
+     "metric": {
+      "anyOf": [{"type": "string"}, {"type": "null"}]
+     },
+     "window_start": {
+      "anyOf": [{"type": "string"}, {"type": "null"}]
+     },
+     "window_end": {
+      "anyOf": [{"type": "string"}, {"type": "null"}]
+     },
+     "regime_version": {
+      "anyOf": [{"type": "string"}, {"type": "null"}]
      }
     }
    }

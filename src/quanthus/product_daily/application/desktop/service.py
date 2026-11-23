@@ -8,6 +8,7 @@ read models.  Fact registration is never blocked by an expired or unadopted sugg
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import json
 from collections.abc import Callable, Iterable, Mapping
@@ -272,14 +273,49 @@ class P12DesktopApplication:
         # dependent plans the store opened with, and they never change on a
         # later publication.
         published = self._decisions.history(self._scope)
-        decisions = published[0] if published else self._current_decisions()
-        first = (
-            security_code
-            or (decisions.decisions[0].security_code if decisions.decisions else "CASH")
-        )
+        if published:
+            decisions = published[0]
+            first = (
+                security_code
+                or (decisions.decisions[0].security_code if decisions.decisions else "CASH")
+            )
+            baseline_plan_ids = plan_ids(decisions)
+        else:
+            try:
+                decisions = self._current_decisions()
+            except FactError as exc:
+                # A source whose not-yet-published placeholder cannot be
+                # served (no authoritative next_session on this host) must
+                # not keep the account store from opening: bind the baseline
+                # to an empty plan set; the first real package still owns
+                # the recorded binding.
+                if exc.reason_code != "INPUT_UNAVAILABLE" or not self._pending_blocked():
+                    raise
+                decisions = None
+            if decisions is not None:
+                first = (
+                    security_code
+                    or (decisions.decisions[0].security_code if decisions.decisions else "CASH")
+                )
+                baseline_plan_ids = plan_ids(decisions)
+            else:
+                first = security_code or "CASH"
+                baseline_plan_ids = ()
         return self._facts.establish_baseline(
-            Baseline(self._context, request_id, cash, quantity, first, 0, plan_ids(decisions))
+            Baseline(self._context, request_id, cash, quantity, first, 0, baseline_plan_ids)
         )
+
+    def _pending_blocked(self) -> bool:
+        '''True when the bound source serves no published package and its
+        placeholder is blocked (INPUT_UNAVAILABLE) - only meaningful for the
+        daily PublishedPackageSource; other sources return False.'''
+        current_stored = getattr(self._decisions, "current_stored", None)
+        if not callable(current_stored):
+            return False
+        try:
+            return current_stored() is None
+        except Exception:  # noqa: BLE001 - a store read failure is not pending-blocked
+            return False
 
     def bind_configuration(self) -> ConfigurationBinding:
         """Bind this account store to one composition and decision source, once.
@@ -292,13 +328,32 @@ class P12DesktopApplication:
         publishes.
         """
 
-        decisions = self._current_decisions()
+        try:
+            decisions = self._current_decisions()
+        except FactError as exc:
+            # The not-yet-published placeholder of the daily package source
+            # can be unservable on a host without an authoritative calendar
+            # (INPUT_UNAVAILABLE).  The store still binds - to the pending
+            # source identity with an empty package set - so the account can
+            # open and the workbench surfaces the blocked run receipt.
+            if exc.reason_code != "INPUT_UNAVAILABLE" or not self._pending_blocked():
+                raise
+            decisions = None
         # The binding covers the full content of every package the source has
         # released, not only the source ref: re-opening with the same version
         # whose package content was edited is refused, while a brand-new dated
         # release (a new package, not an edited one) still opens the store.
-        source_ref = decisions.source_ref
         published = self._decisions.history(self._scope)
+        if decisions is not None:
+            source_ref = decisions.source_ref
+        else:
+            pending_ref = getattr(self._decisions, "pending_source_ref", None)
+            if not callable(pending_ref):
+                raise FactError(
+                    "INPUT_UNAVAILABLE",
+                    "decision source blocked and does not expose a pending identity",
+                )
+            source_ref = pending_ref()
         # Each bound package is fingerprinted over its full validated
         # content (entry bounds, charts, reasons), so editing any field under
         # the same version changes the digest and is refused on reopen.
@@ -321,7 +376,11 @@ class P12DesktopApplication:
         existing = self._facts.configuration_binding(self._context)
         if existing is None:
             snapshot = self._facts.snapshot(self._context)
-            plans = {p.plan_id: p for p in self._publish(decisions, snapshot.history).plans}
+            plans = (
+                {p.plan_id: p for p in self._publish(decisions, snapshot.history).plans}
+                if decisions is not None
+                else {}
+            )
             for report in snapshot.history.reports:
                 if report.suggestion_id is None:
                     continue
@@ -367,9 +426,23 @@ class P12DesktopApplication:
         takes this path - a same-source call is a plain rebind.
         '''
 
-        decisions = self._current_decisions()
-        source_ref = decisions.source_ref
+        try:
+            decisions = self._current_decisions()
+        except FactError as exc:
+            if exc.reason_code != "INPUT_UNAVAILABLE" or not self._pending_blocked():
+                raise
+            decisions = None
         published = self._decisions.history(self._scope)
+        if decisions is not None:
+            source_ref = decisions.source_ref
+        else:
+            pending_ref = getattr(self._decisions, "pending_source_ref", None)
+            if not callable(pending_ref):
+                raise FactError(
+                    "INPUT_UNAVAILABLE",
+                    "decision source blocked and does not expose a pending identity",
+                )
+            source_ref = pending_ref()
         package_digests = {
             item.market_date.isoformat(): digest(_package_content(item))
             for item in published
@@ -744,13 +817,21 @@ class P12DesktopApplication:
         self,
         projection: AccountProjection,
         history: FactHistory,
-        decisions: MarketDecisionSet,
+        decisions: MarketDecisionSet | None,
         funding: FundingView,
         now: datetime,
     ) -> AccountSummary:
         # Closing prices are market facts known at the cutoff; plan links wait for publication.
-        market = decisions if now >= decisions.knowledge_cutoff else None
-        linked = decisions if self._visible(decisions, now) else None
+        market = (
+            decisions
+            if (decisions is not None and now >= decisions.knowledge_cutoff)
+            else None
+        )
+        linked = (
+            decisions
+            if (decisions is not None and self._visible(decisions, now))
+            else None
+        )
         principal: dict[str, MaybeDecimal] = {}
         for fact in history.facts:
             known = principal.get(fact.security_code, MaybeDecimal.known(Decimal("0")))
@@ -793,7 +874,11 @@ class P12DesktopApplication:
             valuation_ref=valuation_ref,
             cost_principal=principal,
         )
-        names = {item.security_code: item.security_name for item in (market or decisions).decisions}
+        names_source = market if market is not None else decisions
+        names = {
+            item.security_code: item.security_name
+            for item in (names_source.decisions if names_source is not None else ())
+        }
         opportunities = {
             item.security_code: item.opportunity_id for item in (linked.decisions if linked else ())
         }
@@ -1149,7 +1234,12 @@ class P12DesktopApplication:
     def workbench(self, scope: AccountScope) -> WorkbenchView:
         self._require(scope)
         self._maintain()
-        decisions, history, projection, package, funding, now = self._state()
+        try:
+            decisions, history, projection, package, funding, now = self._state()
+        except FactError as exc:
+            if exc.reason_code != "INPUT_UNAVAILABLE" or not self._pending_blocked():
+                raise
+            return self._blocked_workbench(scope, exc)
         account = self._account(projection, history, decisions, funding, now)
         blockers = self._policy.missing_for_action(scope.mode)
         visible = self._visible(decisions, now)
@@ -1232,6 +1322,49 @@ class P12DesktopApplication:
             clock_kind=self._clock_kind,
             account=account,
             opportunities=tuple(items),
+            orders=history.orders,
+            action_blockers=blockers,
+            run_receipt=run_receipt,
+        )
+
+    def _blocked_workbench(self, scope: AccountScope, exc: FactError) -> WorkbenchView:
+        '''Workbench rendered when the daily source has no published package
+        and its placeholder is unservable (no authoritative next_session).
+
+        The page surfaces the run receipt (INPUT_BLOCKED / FAILED) plus a
+        NOT_YET_PUBLISHED status instead of failing the whole request, so a
+        blocked day reads as "advice not generated" - never as a fake
+        package.  Account facts (positions, cash, ledger) stay readable.'''
+        now = self._now()
+        snapshot = self._facts.snapshot(self._context)
+        history, projection = snapshot.history, snapshot.projection
+        funding = self._funding(history, projection.revision)
+        run_receipt = None
+        latest_run = getattr(self._decisions, "latest_run", None)
+        if callable(latest_run):
+            run_receipt = latest_run()
+        market_date = now.date()
+        if run_receipt and run_receipt.get("market_date"):
+            with contextlib.suppress(ValueError):
+                market_date = type(market_date).fromisoformat(str(run_receipt["market_date"]))
+        blockers = self._policy.missing_for_action(scope.mode)
+        account = self._account(projection, history, None, funding, now)
+        blockers = tuple(dict.fromkeys((*blockers, "INPUT_UNAVAILABLE")))
+        return WorkbenchView(
+            scope=scope,
+            package=None,
+            publication=PublicationStatus(
+                status="NOT_YET_PUBLISHED",
+                market_date=market_date,
+                published_at=now,
+                retracted=False,
+                retraction_reason=None,
+                next_check_at=None,
+            ),
+            clock=now,
+            clock_kind=self._clock_kind,
+            account=account,
+            opportunities=(),
             orders=history.orders,
             action_blockers=blockers,
             run_receipt=run_receipt,

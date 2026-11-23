@@ -740,6 +740,60 @@ def test_migration_rehearsal_preserves_ledger_surfaces(tmp_path):
     assert all(report.surfaces.values())
 
 
+def test_blocked_pending_placeholder_keeps_account_open(tmp_path):
+    '''A daily source with no package and no authoritative calendar must not
+    keep the paper account from opening.
+
+    The real base24 product publishes no calendar.next_session member; on a
+    host where the governed calendar cannot be resolved, _pending_set fails
+    closed with INPUT_UNAVAILABLE.  bind_configuration / establish_baseline
+    then bind to the pending source identity with an empty package set, and
+    workbench renders a NOT_YET_PUBLISHED page plus the run receipt instead
+    of crashing the whole server.
+    '''
+    from quanthus.platform.adapters.p12_synthetic_fixture import (
+        load_synthetic_fixture,
+    )
+    from quanthus.platform.p12.paper_fixture import (
+        PAPER_ACCOUNT_ID,
+        build_paper_application,
+    )
+    from quanthus.policy import find_project_root
+    from quanthus.product_daily.application.models import (
+        SyntheticRuntimeAuthorization,
+    )
+
+    fixture = load_synthetic_fixture(
+        find_project_root() / "config/p12/synthetic-desktop.v1.json"
+    )
+    auth = SyntheticRuntimeAuthorization("local-paper:test", frozenset({PAPER_ACCOUNT_ID}))
+    now = lambda: datetime(2026, 11, 24, 10, 0, tzinfo=TZ)  # noqa: E731
+
+    pkg_state = tmp_path / "pkg_state"
+    DailyPackageStore(pkg_state)
+    # No next_session_provider: the real CN02 manifest carries no
+    # calendar.next_session, so the placeholder cannot resolve a session.
+    source = PublishedPackageSource(pkg_state, now, mode="synthetic")
+
+    app_dir = tmp_path / "app_state"
+    app_dir.mkdir()
+    app = build_paper_application(
+        state_dir=app_dir,
+        policy=fixture.policy,
+        authorization=auth,
+        now=now,
+        decision_source=source,
+    )
+    binding = app.bind_configuration()
+    assert binding.binding["decision_source"]["ref_id"] == "p12-daily-advice"
+
+    scope = AccountScope(PAPER_ACCOUNT_ID, "synthetic")
+    view = app.workbench(scope)
+    assert view.package is None
+    assert view.publication.status == "NOT_YET_PUBLISHED"
+    assert "INPUT_UNAVAILABLE" in view.action_blockers
+
+
 
 def test_trend_observation_bound_to_package_and_receipt(tmp_path):
     """M2 F10: a P11 trend observation lands on the decision and the receipt."""

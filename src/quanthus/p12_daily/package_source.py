@@ -45,7 +45,50 @@ def calendar_next_session_provider(job_root: Path):
                 core = Path(job_root) / core
             manifest = json.loads((core / "manifest.json").read_text())
             raw = (manifest.get("calendar") or {}).get("next_session")
-            return date.fromisoformat(str(raw)) if raw else None
+            if raw:
+                return date.fromisoformat(str(raw))
+            # Audit R6/R12: fall back to the authoritative trading-calendar
+            # member (dwd_trading_calendar) the real product publishes; the
+            # next session is the smallest session date strictly after today.
+            for member in manifest.get("files") or ():
+                rel = str(member.get("path") or "")
+                if "dwd_trading_calendar" not in rel:
+                    continue
+                candidate = (core / rel).resolve()
+                try:
+                    candidate.relative_to(core)
+                except ValueError:
+                    continue
+                if not candidate.is_file():
+                    continue
+                try:
+                    import pyarrow.parquet as pq
+
+                    frame = pq.read_table(candidate)
+                    col = next(
+                        (
+                            name
+                            for name in (
+                                "session",
+                                "trade_date",
+                                "trading_date",
+                                "market_date",
+                                "session_date",
+                            )
+                            if name in frame.column_names
+                        ),
+                        None,
+                    )
+                    if col is None:
+                        return None
+                    sessions = sorted(
+                        {date.fromisoformat(str(v)[:10]) for v in frame[col].to_pylist() if v}
+                    )
+                    later = [s for s in sessions if s > today]
+                    return later[0] if later else None
+                except Exception:  # noqa: BLE001
+                    return None
+            return None
         except (OSError, ValueError, KeyError):
             return None
 
@@ -131,6 +174,20 @@ class PublishedPackageSource:
 
     def latest_run(self) -> dict | None:
         return self._store.latest_run()
+
+    def pending_source_ref(self) -> VersionRef:
+        '''Identity of the not-yet-published placeholder.
+
+        Used by binders that must record a source identity even when the
+        placeholder itself cannot be served (no authoritative next_session
+        resolvable on this host - e.g. the governed calendar member is
+        absent).  The account then binds to the pending identity and the
+        first real package still migrates the binding normally.'''
+        return VersionRef(
+            PENDING_REF_ID,
+            PENDING_VERSION,
+            digest({"ref": PENDING_REF_ID, "pending": "unresolved"}),
+        )
 
     def _pending_set(self) -> MarketDecisionSet:
         # A not-yet-published placeholder: the workbench reads it as "today's

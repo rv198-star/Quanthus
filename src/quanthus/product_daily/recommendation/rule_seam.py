@@ -127,6 +127,18 @@ class SecurityFeatureFacts:
     price_bound: Decimal | None = None
     invalidations: tuple[str, ...] = ()
     depends_on_member_ids: tuple[str, ...] = ()
+    # Guard rails mirroring the feature panel: volume/amount ratios, prior high,
+    # readiness and the entry/exception/continuity gates.  None means not evaluated
+    # for this row; they are never silently treated as clean.
+    volume_ratio20: Decimal | None = None
+    average_amount20: Decimal | None = None
+    daily_total_return: Decimal | None = None
+    prior_high20: Decimal | None = None
+    feature_ready: bool | None = None
+    entry_eligible: bool | None = None
+    exception_active: bool | None = None
+    unexplained_price_transition: bool | None = None
+    scope_continuity_excluded: bool | None = None
 
     def __post_init__(self) -> None:
         require_text(self.security_code, "security_code")
@@ -142,7 +154,14 @@ class SecurityFeatureFacts:
                 require_decimal(value, name)
         if self.listing_sessions < 0:
             raise ProductDailyError("invalid_feature_facts", "listing_sessions must be >= 0")
-        for name, value in (("mark_price", self.mark_price), ("price_bound", self.price_bound)):
+        for name, value in (
+            ("mark_price", self.mark_price),
+            ("price_bound", self.price_bound),
+            ("volume_ratio20", self.volume_ratio20),
+            ("average_amount20", self.average_amount20),
+            ("daily_total_return", self.daily_total_return),
+            ("prior_high20", self.prior_high20),
+        ):
             if value is not None:
                 require_decimal(value, name)
         for item in self.invalidations:
@@ -326,27 +345,34 @@ class RuleSeamAdapter:
             sma20=features.sma20,
             sma60=features.sma60,
             momentum20=features.momentum20,
-            prior_high20=None,
+            prior_high20=features.prior_high20,
             rsi14=features.rsi14,
             rsi14_previous=None,
-            volume_ratio20=None,
+            volume_ratio20=features.volume_ratio20,
             realized_volatility20=features.realized_volatility20,
-            daily_total_return=None,
-            average_amount20=None,
+            daily_total_return=features.daily_total_return,
+            average_amount20=features.average_amount20,
             listing_sessions=features.listing_sessions,
-            feature_ready=all(
-                value is not None
-                for value in (
-                    features.rsi14,
-                    features.realized_volatility20,
-                    features.total_return_index,
-                    features.sma20,
-                    features.sma60,
-                    features.momentum20,
+            feature_ready=(
+                features.feature_ready
+                if features.feature_ready is not None
+                else all(
+                    value is not None
+                    for value in (
+                        features.rsi14,
+                        features.realized_volatility20,
+                        features.total_return_index,
+                        features.sma20,
+                        features.sma60,
+                        features.momentum20,
+                    )
                 )
             ),
-            entry_eligible=features.rsi14 is not None
-            and features.realized_volatility20 is not None,
+            entry_eligible=(
+                features.entry_eligible
+                if features.entry_eligible is not None
+                else (features.rsi14 is not None and features.realized_volatility20 is not None)
+            ),
         )
 
     def _evaluate_trend(
@@ -417,13 +443,20 @@ class RuleSeamAdapter:
             position_state=position_state,
             trend_observation_digest=trend_digest,
         )
+        # The real panel row's feature_ready/entry_eligible are the M2 admission: a
+        # feature_ready=True but entry_eligible=False row (e.g. a limit/tradable gate)
+        # must not produce an entry.  When the row was not evaluated (None) fall back
+        # to the rsi14/vol20 presence floor; missing is still not-ready, never a grant.
+        evidence_ready = (
+            (features.feature_ready and features.entry_eligible)
+            if features.feature_ready is not None or features.entry_eligible is not None
+            else (features.rsi14 is not None and features.realized_volatility20 is not None)
+        )
         decision = self.runner.evaluate_entry(
             event_id=event.event_id,
             context=ctx,
             trend_state=trend_state,
-            entry_evidence_ready=(
-                features.rsi14 is not None and features.realized_volatility20 is not None
-            ),
+            entry_evidence_ready=bool(evidence_ready),
         )
         eligibility = ExpertEntryEligibility.from_formal_strategy_decision(decision)
         return SeamDecision(

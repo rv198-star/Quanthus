@@ -881,6 +881,30 @@ def load_release_manifest(path: Any) -> dict[str, Any]:
         raise ProductDailyError(
             "invalid_three_piece", "release-manifest must keep daily_adopted=false"
         )
+    # The code entry must carry a real commit/tree identity for the exact closure under
+    # review; an absent code_commit is not a bound release.
+    code_entry = raw.get("code_entry")
+    if not isinstance(code_entry, dict) or not code_entry.get("code_commit"):
+        raise ProductDailyError(
+            "invalid_three_piece", "release-manifest code_entry.code_commit required"
+        )
+    # industry_mapping must be either a real sha256 binding or an explicit pending /
+    # blocked state; a pending-named sha256 string is a disguised placeholder and fails.
+    industry = closure.get("industry_mapping")
+    if isinstance(industry, dict):
+        sha = industry.get("sha256")
+        state = industry.get("binding_state")
+        if isinstance(sha, str) and sha.startswith("sha256:pending"):
+            raise ProductDailyError(
+                "invalid_three_piece",
+                "industry_mapping sha256 must be a real digest or an explicit pending "
+                "binding_state, never a pending-named placeholder",
+            )
+        if sha is None and state not in {"pending", "blocked"}:
+            raise ProductDailyError(
+                "invalid_three_piece",
+                "industry_mapping without a sha256 must declare binding_state pending/blocked",
+            )
     return raw
 
 

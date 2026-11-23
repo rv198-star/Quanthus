@@ -535,7 +535,8 @@ class Capture:
         count = new = 0
         ids: set[str] = set()
         totals: set[int] = set()
-        end = overlap = False
+        end = overlap = repeated_page = False
+        page_keys: set[str] = set()
         db.execute("CREATE TABLE IF NOT EXISTS scan_state(id TEXT PRIMARY KEY,value TEXT)")
         prior = db.execute("SELECT value FROM scan_state WHERE id='ann-full'").fetchone()
         prior_state = json.loads(prior[0]) if prior else {}
@@ -572,6 +573,15 @@ class Capture:
             if not isinstance(rows, list) or "hasMore" not in obj:
                 raise ValueError("CNINFO_INVALID_ROWS")
             totals.add(int(obj["totalAnnouncement"]))
+            page_key = sha(
+                encoded(
+                    sorted(str(x.get("announcementId")) + "@" + str(x.get("secCode")) for x in rows)
+                )
+            )
+            if rows and page_key in page_keys:
+                repeated_page = True
+                break
+            page_keys.add(page_key)
             seen = False
             for row in rows:
                 item = normalize_announcement(row)
@@ -589,14 +599,27 @@ class Capture:
             if not rows:
                 break
         complete = end and len(totals) == 1 and len(ids) >= next(iter(totals))
-        if complete:
+        if complete or repeated_page:
             db.execute(
                 "INSERT OR REPLACE INTO scan_state VALUES('ann-full',?)",
-                [encoded({"day": day, "at": time.time()}).decode()],
+                [
+                    encoded(
+                        {
+                            "day": day,
+                            "at": time.time(),
+                            "complete": complete,
+                            "reason": "PROVIDER_REPEATED_PAGE" if repeated_page else None,
+                        }
+                    ).decode()
+                ],
             )
             db.commit()
         return {
             "source": "cninfo-announcements",
+            "status": "PARTIAL_SOURCE_COVERAGE"
+            if repeated_page or (full_scan and not complete)
+            else "CAPTURED",
+            "pagination_blocker": "PROVIDER_REPEATED_PAGE" if repeated_page else None,
             "rows_seen": count,
             "unique_source_rows": len(ids),
             "provider_totals": sorted(totals),

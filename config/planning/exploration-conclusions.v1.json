@@ -2817,6 +2817,59 @@
         "CP-690-R11-FINAL-ACCEPTED-20261116"
       ],
       "supersedes": "CON-R11-LIMITED-SYNTHETIC-PARK-20261116"
+    },
+    {
+      "id": "CON-P10-NEWS-FWD-TRIAL-20261124-001",
+      "recorded_at": "2026-11-23T22:21:24.119367+00:00",
+      "actor": "Quanthus P10 Owner",
+      "question_id": "P10-NEWS-FWD-STORAGE-20261124-002",
+      "family": "p10-forward-news-capture",
+      "work_item": "P10-DATA-NEWS-FWD-001",
+      "modules": [
+        "DATA"
+      ],
+      "question": "Can existing/free sources preserve actual first-seen source clocks and immutable news/PDF identity in an isolated forward trial?",
+      "consumer": "P11 parked sentiment research / possible future P12 display",
+      "scope": "First actual11-24 forward raw trial and unchanged tiered PDF mechanism; no Base2.6 or source/consumer admission.",
+      "execution_status": "completed",
+      "verdict": "inconclusive",
+      "disposition": "investigate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "300 news,30 unique provider disclosures,6 full cloud PDF readbacks; supplier paging coverage remains partial.",
+      "decision_effect": "Retain actual independent feed/PDF captures and continue bounded trial. Correct repeated paging to stop on second duplicate and cool6h; no repeated60page scan or new source procurement.",
+      "reopen_conditions": [
+        "Material provider page/scope evidence or a separately bounded approved existing-source recovery proposal resolves all-A census; retain current raw use until then.",
+        "Trialweek actual200 priority extraction/20 table reviews and measured cost determine later extractor or package decision."
+      ],
+      "retained_assets": [
+        "Fixed bf8c7a0b runtime/result and raw source receipts; independent news/PDF store, verified cloud namespace and quota.",
+        "27 original focused plus2 paging regressions; bounded local OCR, content/extractor cache and staged retry with receipt-first deletion.",
+        "Original repeated page failure cost,3 protocol probes and explicit source publication/identity gaps."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Actual first run177.306s/69source requests/1,539,637B (includes repeated60page attempt);36cloud calls/1,285,811B upload;4 text docs0.029–0.046s and2 OCR5.56/6.80s. Bootstrap probes11/12. Local full check283.42s and model/control/dependency costs separately retained/unknown. No paid data or model API.",
+      "attempt_refs": [
+        "CN02-FIRST-RUN-RAW.json",
+        "CN02-FIRST-PDF-RECEIPTS.json",
+        "storage/CN02-GDRIVE-QUOTA.json",
+        "MAKE-CHECK-BOOTSTRAP.log"
+      ],
+      "evidence": [
+        {
+          "id": "ACTUAL-RAW-TRIAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-news/ENGINEERING-CHECKPOINT-v2.json",
+          "sha256": "b9db63531e5bea39bbbd5b11aa91814782985d2c4ee0bbf8c518a212b965982e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual bounded partial trial; no all-A/source/consumer qualification."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-735-20261123T221930796295Z"
+      ],
+      "supersedes": null
     }
   ]
 }

@@ -15186,6 +15186,41 @@
       "reviewed_modules": [
         "DATA"
       ]
+    },
+    {
+      "id": "CP-735-20261123T221930796295Z",
+      "recorded_at": "2026-11-23T22:19:30.796295+00:00",
+      "actor": "P10 Owner after first actual source run",
+      "work_item": "P10-DATA-NEWS-FWD-001",
+      "outcome": "no_module_change",
+      "summary": "Raw trial actually captured300 news/30 unique disclosures and6 verified cloud PDFs; bounded repeated-source paging correction.",
+      "evidence": [
+        {
+          "id": "ACTUAL-RAW-TRIAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-news/ENGINEERING-CHECKPOINT-v2.json",
+          "sha256": "b9db63531e5bea39bbbd5b11aa91814782985d2c4ee0bbf8c518a212b965982e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual bounded partial trial; no all-A/source/consumer qualification."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "RAW_TRIAL_ONLY. Full universe/PIT clock/source/consumer qualification unchanged; source pagination partial.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-NEWS-FWD-001",
+          "number": 735,
+          "title": "[P10-DATA-NEWS-FWD-001] 2026-11-24起公告新闻前向采集与隔离试运行",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:03:37Z",
+          "body_sha256": "2190f1e381e782e71cf6bf65a50e17e6082c3776daef9c248308f124b7cfb2af"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
     }
   ],
   "history_imports": [

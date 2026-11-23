@@ -53,3 +53,14 @@ PDF regressions test upload failure retention, retry reuse, crash-after-delete r
 staging pauses, background no-text, revision queue preservation and wrong cloud SHA.
 The layered mechanism stays fixed through11-30;200 extraction/20 table assessments and daily
 layer/cloud throughput are measured from actual trial output, with unresolved samples explicit.
+
+First fixed runtime bf8c7a0b executed on CN02 at06:13:15+08:300 Sina records,30 unique
+CNINFO entries,6 PDFs archived/readback-verified,0 failed/0 staged. The intended60-page
+provider scan returned the same30 CNINFO IDs on every page(1800 row occurrences). Its
+provider_pagination_complete stayed false. Three bounded protocol probes (form Content-Type,
+GET, explicit POST query) preserved the same-ID/GET500 evidence; paging remains unqualified.
+The correction detects a repeated page on the second request and cools full-scan attempts
+for6h; top-page incremental observations and the independent feed/PDF queue continue. No
+access workaround or alternate source purchase was attempted. The tiered PDF mechanism is
+unchanged. Old runtime and full-check evidence remain fixed as bf8c7a0b; next source patch
+has its own code/tests/receipt. Initial finite source probe budget now11/12 requests.

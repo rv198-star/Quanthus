@@ -415,3 +415,45 @@ def test_exact_cutoff_is_result_side_not_frozen_input(tmp_path):
     worker.item(db(), normalize_news(news(), "+0800"), evidence("2026-11-24T09:15:00+08:00"))
     assert not (tmp_path / "objects" / "case-input").exists()
     assert list((tmp_path / "objects" / "case-result-capture").glob("*/*"))
+
+
+def test_repeated_provider_page_is_bounded_partial_and_next_run_incremental(tmp_path, monkeypatch):
+    worker = Capture(tmp_path, cfg(), "b" * 40)
+    conn = db()
+    calls = []
+
+    def page(*args, **kwargs):
+        calls.append(args)
+        return encoded(
+            {"announcements": [ann()], "totalAnnouncement": 1274, "hasMore": True}
+        ), evidence()
+
+    monkeypatch.setattr(worker, "fetch", page)
+    result = worker.announcements(conn)
+    assert len(calls) == 2 and result["unique_source_rows"] == 1
+    assert result["pagination_blocker"] == "PROVIDER_REPEATED_PAGE"
+    assert result["status"] == "PARTIAL_SOURCE_COVERAGE"
+    assert result["provider_pagination_complete"] is False
+    calls.clear()
+    assert worker.announcements(conn)["scan_mode"] == "INCREMENTAL"
+    assert len(calls) == 1
+
+
+def test_distinct_provider_pages_complete_only_after_unique_census(tmp_path, monkeypatch):
+    worker = Capture(tmp_path, cfg(), "b" * 40)
+    conn = db()
+    calls = []
+
+    def page(*args, **kwargs):
+        index = len(calls)
+        calls.append(index)
+        item = ann()
+        item["announcementId"] = str(index)
+        return encoded(
+            {"announcements": [item], "totalAnnouncement": 2, "hasMore": index == 0}
+        ), evidence()
+
+    monkeypatch.setattr(worker, "fetch", page)
+    result = worker.announcements(conn)
+    assert result["provider_pagination_complete"] is True
+    assert result["unique_source_rows"] == 2 and result["pagination_blocker"] is None

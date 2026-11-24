@@ -44,6 +44,11 @@ SUPPORTED_DECISION_SET_SCHEMAS = frozenset(
     {DECISION_SET_SCHEMA_V1, DECISION_SET_SCHEMA_V2}
 )
 _V2_ONLY_FIELDS = ("exit_kind", "target_position_fraction")
+# Decimal-string shape admitted on the wire: optional minus, digits, optional
+# fractional part.  A JSON number (0.5), exponent form ("5e-1"), a bare "." or
+# a non-string token would still coerce through Decimal, so the v2 reader
+# rejects them up front to keep wire and emitted schema aligned (issue #723).
+_DECIMAL_WIRE_CHARS = frozenset("-0123456789.")
 
 def _aware(value: Any, field: str) -> datetime:
     try:
@@ -63,6 +68,37 @@ def _decimal(value: Any, field: str) -> Decimal:
     if not out.is_finite():
         raise FactError("INVALID_PACKAGE", f"decision_set {field} must be finite")
     return out
+
+
+def _wire_decimal(value: Any, field: str) -> Decimal:
+    r"""Parse a Decimal that must arrive as a plain JSON string.
+
+    The v2 schema types target_position_fraction as a string matching
+    ``^-?[0-9]+(\.[0-9]+)?$``.  A bare JSON number, exponent notation or a
+    non-string token would still coerce through ``Decimal``; this guard
+    refuses them so the wire stays a plain decimal string.
+    """
+
+    if not isinstance(value, str):
+        raise FactError(
+            "INVALID_PACKAGE",
+            f"decision_set {field} must be a decimal string, not "
+            f"{type(value).__name__}",
+        )
+    body = value.lstrip("-")
+    if (
+        not value
+        or not set(value) <= _DECIMAL_WIRE_CHARS
+        or value.count(".") > 1
+        or body in ("", ".")
+        or body.startswith(".")
+        or body.endswith(".")
+    ):
+        raise FactError(
+            "INVALID_PACKAGE",
+            f"decision_set {field} is not a plain decimal string",
+        )
+    return _decimal(value, field)
 
 
 def _chart(raw: Any) -> ChartEvidence | None:
@@ -143,7 +179,9 @@ def _decision(raw: dict[str, Any]) -> MarketDecision:
         target_position_fraction=(
             None
             if target_fraction is None
-            else _decimal(target_fraction, "decisions[].target_position_fraction")
+            else _wire_decimal(
+                target_fraction, "decisions[].target_position_fraction"
+            )
         ),
     )
 
@@ -181,6 +219,16 @@ def load_decision_set_dict(
             "INVALID_PACKAGE",
             f"decision_set_schema {declared!r} is not admitted by this reader",
         )
+    # A bare set that smuggles a v2-only field is a version breach: the legacy
+    # reader must refuse it outright rather than silently drop the new
+    # fields.  Key presence decides, matching the version-aware loader.
+    leaked = [f for f in _V2_ONLY_FIELDS if _any_decision_has(raw, f)]
+    if leaked:
+        raise FactError(
+            "INVALID_PACKAGE",
+            "decision_set carries v2-only fields "
+            f"{tuple(leaked)!r} without decision_set_schema",
+        )
     return validate_decision_set(
         MarketDecisionSet(
             source_ref=VersionRef(
@@ -203,7 +251,7 @@ def load_decision_set(
     raw: dict[str, Any],
     *,
     expected_schema: str,
-    mode: str,
+    mode: str | None = None,
     source_digest: str | None = None,
 ) -> tuple[MarketDecisionSet, str]:
     '''Version-pinned decision_set reader (issue #723 first step).
@@ -222,6 +270,15 @@ def load_decision_set(
       regardless of the pin.
     * ``expected_schema="p12.decision-set.v1"`` admits only a bare (unmarked)
       set; a declared v2 set is refused, never downgraded.
+
+    ``mode`` is optional.  When it is ``None`` (the frozen call signature) the
+    set is loaded without an account-mode binding: ``MarketDecisionSet.mode``
+    falls back to the wire ``mode`` field, or ``"simulation"`` when the wire
+    carries none.  When ``mode`` is supplied it is the account-side admitted
+    mode and is enforced against a wire ``mode`` field exactly as the v1
+    reader does.  The published-package entry point always passes the account
+    mode, so wire/account isolation is enforced for v1 and v2 alike at the
+    package boundary - never silently relaxed here (issue #723 second step).
     '''
 
     if not isinstance(raw, dict):
@@ -249,7 +306,7 @@ def load_decision_set(
                 "INVALID_PACKAGE",
                 "expected a v2 decision_set but the schema marker is absent",
             )
-        value = load_decision_set_dict(raw, mode=mode, source_digest=source_digest)
+        value = _load_marked(raw, mode=mode, source_digest=source_digest)
         return value, digest(raw)
 
     declared = str(declared)
@@ -260,31 +317,100 @@ def load_decision_set(
             f"{expected_schema!r}",
         )
     if declared == DECISION_SET_SCHEMA_V2:
-        # v2 requires every exit_plan decision to declare its exit kind.
+        # v2 requires every exit_plan decision to declare its exit kind, and
+        # the kind binds the target: a reduce must carry a Decimal-string
+        # target in (0, 1) so the reduction has a usable denominator, while a
+        # full exit must leave the target null.  A missing target on reduce
+        # makes the reduction unusable and is refused up front (issue #723).
         for item in raw.get("decisions") or ():
-            if str(item.get("stage")) == "exit_plan" and item.get("exit_kind") is None:
+            if str(item.get("stage")) != "exit_plan":
+                continue
+            kind = item.get("exit_kind")
+            if kind is None:
                 raise FactError(
                     "INVALID_PACKAGE",
                     "a v2 exit_plan decision must carry exit_kind",
+                )
+            target = item.get("target_position_fraction")
+            if kind == "reduce":
+                if target is None:
+                    raise FactError(
+                        "INVALID_PACKAGE",
+                        "a v2 reduce exit_plan must carry "
+                        "target_position_fraction",
+                    )
+                parsed = _wire_decimal(
+                    target, "decisions[].target_position_fraction"
+                )
+                if not (Decimal("0") < parsed < Decimal("1")):
+                    raise FactError(
+                        "INVALID_PACKAGE",
+                        "a v2 reduce target_position_fraction must be in (0, 1)",
+                    )
+            elif kind == "full" and target is not None:
+                raise FactError(
+                    "INVALID_PACKAGE",
+                    "a v2 full exit_plan must leave "
+                    "target_position_fraction null",
                 )
     value = _load_marked(raw, mode=mode, source_digest=source_digest)
     return value, digest(raw)
 
 
 def _any_decision_has(raw: dict[str, Any], field: str) -> bool:
-    for item in raw.get("decisions") or ():
-        if isinstance(item, dict) and item.get(field) is not None:
-            return True
-    return False
+    # Key presence decides the version breach, not the value: an explicit
+    # null ``exit_kind`` / ``target_position_fraction`` still marks the set as
+    # v2-shaped and is refused without the schema marker (issue #723).
+    return any(
+        isinstance(item, dict) and field in item
+        for item in raw.get("decisions") or ()
+    )
+
+
+def _effective_mode(raw: dict[str, Any], admitted: str | None) -> str:
+    """Resolve the account mode a decision_set binds to.
+
+    A supplied ``admitted`` mode is the caller's account-side binding; a wire
+    ``mode`` field must then agree with it.  When ``admitted`` is ``None`` (the
+    frozen reader signature) no account binding is asserted, so the set adopts
+    the wire ``mode`` and defaults to ``"simulation"`` when the wire carries
+    none.  The published-package entry always supplies its account mode.
+    """
+
+    wire_mode = raw.get("mode")
+    if admitted is not None:
+        if admitted not in ADMITTED_MODES:
+            raise FactError("POLICY_NOT_ADOPTED", "unknown decision mode")
+        if wire_mode is not None and str(wire_mode) != admitted:
+            raise FactError(
+                "POLICY_NOT_ADOPTED",
+                f"decision_set wire mode {wire_mode!r} cannot serve mode "
+                f"{admitted!r}",
+            )
+        return admitted
+    if wire_mode is not None:
+        if str(wire_mode) not in ADMITTED_MODES:
+            raise FactError(
+                "POLICY_NOT_ADOPTED",
+                f"decision_set wire mode {wire_mode!r} is not admitted",
+            )
+        return str(wire_mode)
+    return "simulation"
 
 
 def _load_marked(
     raw: dict[str, Any],
     *,
-    mode: str,
+    mode: str | None,
     source_digest: str | None,
 ) -> MarketDecisionSet:
-    '''Validate a set that declared a recognized decision_set_schema.'''
+    """Validate a set that declared a recognized decision_set_schema.
+
+    ``mode=None`` means no account binding is asserted here: the set adopts the
+    wire ``mode`` field, or ``"simulation"`` when absent.  A supplied ``mode``
+    is the account-admitted mode and must agree with a wire ``mode`` field.
+    """
+    effective = _effective_mode(raw, mode)
     return validate_decision_set(
         MarketDecisionSet(
             source_ref=VersionRef(
@@ -292,8 +418,8 @@ def _load_marked(
                 str(raw["version"]),
                 source_digest or digest(raw),
             ),
-            mode=mode,
-            synthetic=(mode == "synthetic"),
+            mode=effective,
+            synthetic=(effective == "synthetic"),
             market_date=date.fromisoformat(str(raw["market_date"])),
             knowledge_cutoff=_aware(raw["knowledge_cutoff"], "knowledge_cutoff"),
             published_at=_aware(raw["published_at"], "published_at"),

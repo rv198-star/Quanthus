@@ -36,6 +36,13 @@ PUBLISHER_REGISTRY_FILE = "publisher-registry.json"
 PACKAGE_SCHEMA = "quanthus.p12.daily-package.v2"
 PACKAGE_SCHEMA_V1 = "quanthus.p12.daily-package.v1"
 READABLE_PACKAGE_SCHEMAS = frozenset({PACKAGE_SCHEMA, PACKAGE_SCHEMA_V1})
+# Inner decision_set schema markers the envelope may carry (issue #723 second
+# step).  A v2 inner set may only ship inside the v2 envelope; a v1 envelope
+# must never wrap a v2 inner set, and the legacy v1 reader must refuse that
+# mix rather than silently drop the new fields.  A v2 envelope may carry a
+# bare v1 inner set for back-compat.
+DECISION_SET_SCHEMA_V2 = "p12.decision-set.v2"
+ENVELOPE_INNER_MISMATCH = "ENVELOPE_INNER_MISMATCH"
 RETRACTION_SCHEMA = "quanthus.p12.package-retraction.v1"
 RUN_SCHEMA = "quanthus.p12.daily-run.v1"
 
@@ -253,6 +260,20 @@ class DailyPackageStore:
         raw = _read_json(path)
         if raw.get("schema_version") not in READABLE_PACKAGE_SCHEMAS:
             raise FactError("INVALID_PACKAGE", "daily package schema differs")
+        # Envelope/inner version consistency (issue #723 second step): a v1
+        # envelope must never carry a v2 decision_set - the legacy reader
+        # would silently drop the new exit fields.  Refuse the mix outright
+        # rather than serve a downgraded package.
+        inner_schema = (raw.get("decision_set") or {}).get("decision_set_schema")
+        if (
+            raw["schema_version"] == PACKAGE_SCHEMA_V1
+            and inner_schema is not None
+            and str(inner_schema) == DECISION_SET_SCHEMA_V2
+        ):
+            raise FactError(
+                ENVELOPE_INNER_MISMATCH,
+                "a v1 package envelope cannot carry a v2 decision_set",
+            )
         market_date = date.fromisoformat(str(raw["market_date"]))
         retraction = self.retraction_for(market_date)
         return StoredPackage(
@@ -299,6 +320,17 @@ class DailyPackageStore:
         errors after publication go through retraction, not replacement.
         '''
 
+        inner_schema = decision_set.get("decision_set_schema")
+        if (
+            inner_schema is not None
+            and str(inner_schema) == DECISION_SET_SCHEMA_V2
+            and PACKAGE_SCHEMA != "quanthus.p12.daily-package.v2"
+        ):
+            raise FactError(
+                ENVELOPE_INNER_MISMATCH,
+                "a v2 decision_set cannot be wrapped in a "
+                f"{PACKAGE_SCHEMA!r} envelope",
+            )
         market_date = date.fromisoformat(str(decision_set["market_date"]))
         path = self.package_path(market_date)
         body = {

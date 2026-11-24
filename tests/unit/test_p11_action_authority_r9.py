@@ -16,6 +16,7 @@ import pytest
 
 from quanthus.product_daily.contracts import ProductDailyError
 from quanthus.product_daily.recommendation.paper_replay import (
+    bind_signed_manifest,
     build_replay_envelope,
     build_signed_action_authority,
     load_replay_request,
@@ -37,6 +38,10 @@ SZSE_BATCH = "2026-11-25/quanthus-p10-action-supply/szse/batch-pilots-2x15-octob
 ACCEPTED_MEMBER = (
     "2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/"
     "terms-740-897-v2/ACCEPTED-OCTOBER-ACTION-COVERAGE.v2.json"
+)
+WINDOW_INDEX_MEMBER = (
+    "2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/"
+    "terms-740-897-v2/WINDOW-USE.json"
 )
 
 SSE_ID = dict(
@@ -125,8 +130,12 @@ def _authority(
     ident: dict,
     signal_date: str,
     accepted_member: str = ACCEPTED_MEMBER,
+    index_member: str | None = None,
+    routes_sha: str | None = None,
+    bound_manifest: bool = False,
 ):
     manifest, manifest_sha, members_map = _manifest(rel)
+    acc_manifest = manifest
     batch_keys = _batch_members(manifest, batch_dir)
     # The accepted table may be pinned in this release's MANIFEST or only in
     # the shared-uses MANIFEST (B10); resolve members through whichever pins it.
@@ -139,7 +148,15 @@ def _authority(
         member_keys = batch_keys
         members = _read_members(manifest, member_keys)
         members.update(_read_members(acc_manifest, [accepted_member]))
+    if bound_manifest:
+        # #749 once-verified path: recompute the MANIFEST bytes -> bound object.
+        manifest_bytes = (READER / f"company-actions-20261125-{rel}" / "MANIFEST.json").read_bytes()
+        manifest_sha = bind_signed_manifest(manifest_bytes, manifest_sha)
     result_member = f"{batch_dir}/RESULT.json"
+    if index_member is not None:
+        # read the signed windows index bytes through whichever manifest pins it
+        idx_src = manifest if index_member in members_map else acc_manifest
+        members.update(_read_members(idx_src, [index_member]))
     return build_signed_action_authority(
         manifest=manifest,
         manifest_sha256=manifest_sha,
@@ -147,6 +164,7 @@ def _authority(
         result_member=result_member,
         members=members,
         accepted_manifest_members=acc_members,
+        index_member=index_member,
         security_code=ident["listing_code"],
         listing_code=ident["listing_code"],
         stock_code=ident["stock_code"],
@@ -154,6 +172,7 @@ def _authority(
         listing_id=ident["listing_id"],
         venue_id=ident["venue_id"],
         signal_date=signal_date,
+        routes_sha256=routes_sha,
     )
 
 
@@ -333,3 +352,92 @@ def test_r9b_verified_none_no_action_admitted():
     request = load_replay_request(req)
     _, _, wi, _ = build_replay_envelope(request, t)
     assert wi["coverage_isolated"] == 0
+
+
+# --- action-signed-48-f3a9: the two index-only signed days + bound provenance --
+
+WINDOW_INDEX_SHA = "sha256:0f98f60d69290f7d371994a0e744cced5f331ccd083a7eb1173a8d0d78e8ab13"
+ROUTES_SHA = "sha256:418dc21d79d358a123df3c070cefac4d78562714d887b008960c71bdd793231c"
+ACCEPTED_SHA = "sha256:dbb1da5c1c18e3b74dbf68293610a82832d76dc1cc99e6182c580068616bb13a"
+
+
+def test_r9c_index_000002_10_08_verified_none():
+    # 000002@10-08 is NOT in the SZSE batch security-windows member; the signed
+    # WINDOW-USE index is its authoritative window record.  Both uses are
+    # verified_none -> admitted with no action rows.
+    out = _authority(
+        "b10",
+        SZSE_BATCH,
+        SZSE_000002,
+        "2026-10-08",
+        index_member=WINDOW_INDEX_MEMBER,
+    )
+    scan = [e for e in out["window_evidence"] if e["purpose"] == "scan_two_session"][0]
+    ret = [e for e in out["window_evidence"] if e["purpose"] == "returns_61_session"][0]
+    assert scan["event_state"] == "verified_none"
+    assert ret["event_state"] == "verified_none" and ret["events"] == []
+    assert ret["sessions"][-1] == "2026-10-08"
+    # bound provenance names the real file SHAs.
+    prov = out["bound_provenance"]
+    assert prov["accepted_sha256"] == ACCEPTED_SHA
+    assert prov["windows_index_sha256"] == WINDOW_INDEX_SHA
+    assert prov["manifest_sha256"].startswith("sha256:")
+    assert prov["result_sha256"].startswith("sha256:")
+
+
+def test_r9c_index_002040_10_08_first_day_event():
+    # 002040@10-08: signed index proves ex_date 2026-07-28, cash 0.116 CNY in
+    # the first day's 61-session return interval; 07-28 is inside (first_close,
+    # last_close].
+    out = _authority(
+        "b10",
+        SZSE_BATCH,
+        SZSE_002040,
+        "2026-10-08",
+        index_member=WINDOW_INDEX_MEMBER,
+    )
+    ret = [e for e in out["window_evidence"] if e["purpose"] == "returns_61_session"][0]
+    assert ret["event_state"] == "verified_event"
+    assert ret["events"][0]["cash_gross_per_share"] == "0.116"
+    assert ret["events"][0]["register_row"] == 302
+    assert ret["events"][0]["implementation_sha256"] == (
+        "sha256:abb747706e62ec2eb393d0fc5c725d834bb7f9ebafae024dcd22d8f565fbf2cf"
+    )
+
+
+def test_r9c_index_missing_without_index_fails_closed():
+    # without the signed index the batch member alone cannot cover 10-08.
+    with pytest.raises(ProductDailyError) as exc:
+        _authority("b10", SZSE_BATCH, SZSE_000002, "2026-10-08")
+    assert str(exc.value.args[0]).startswith("action_authority_window_missing")
+
+
+def test_r9c_bound_manifest_object_and_routes():
+    # #749 once-verified path: pass the bound-manifest object (proven file sha)
+    # + the frozen ROUTES pin; the receipt carries real manifest/result/accepted
+    # + routes SHAs.
+    out = _authority(
+        "b02",
+        SSE_BATCH,
+        SSE_ID,
+        "2026-10-08",
+        routes_sha=ROUTES_SHA,
+        bound_manifest=True,
+    )
+    prov = out["bound_provenance"]
+    assert prov["manifest_sha256"] == (
+        "sha256:ad7212e95e8fffb0868c48707ab92dd55a6284d6f2d67f789b43cb237d3371ac"
+    )
+    assert prov["accepted_sha256"] == ACCEPTED_SHA
+    assert prov["routes_sha256"] == ROUTES_SHA
+    cred = out["window_evidence"][0]["credential"]
+    assert cred["manifest_sha256"] == prov["manifest_sha256"]
+    assert cred["accepted_sha256"] == ACCEPTED_SHA
+    assert cred["routes_sha256"] == ROUTES_SHA
+
+
+def test_r9c_manifest_pin_mismatch_fail_closed():
+    # A MANIFEST byte whose recomputed sha differs from the frozen pin fails.
+    with pytest.raises(ProductDailyError) as exc:
+        bind_signed_manifest(b"{}", "sha256:" + "0" * 64)
+    assert str(exc.value.args[0]).startswith("action_authority_manifest_pin_mismatch")

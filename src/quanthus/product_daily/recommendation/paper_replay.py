@@ -955,6 +955,34 @@ def _member_sha(b: bytes) -> str:
     return "sha256:" + hashlib.sha256(b).hexdigest()
 
 
+def bind_signed_manifest(
+    manifest_bytes: bytes,
+    expected_sha256: str,
+) -> dict[str, Any]:
+    """Verify real MANIFEST bytes once and return a reuse-bound object.
+
+    #749 reads the pinned release MANIFEST file once, recomputes its sha256,
+    and confirms it equals the release's frozen pin (ROUTES.json /
+    external_manifests).  This helper performs that single verification and
+    returns an object the same job can hand to build_signed_action_authority()
+    for every signed security-day - the parsed ``manifest`` plus the proven
+    ``manifest_sha256`` derived from the actual bytes, never a caller-copied
+    digest.  A byte whose recomputed hash differs from the frozen pin fails
+    closed.
+    """
+    expected = _sha256(expected_sha256, "expected_manifest_sha256")
+    actual = _member_sha(bytes(manifest_bytes))
+    if actual != expected:
+        _fail(
+            "action_authority_manifest_pin_mismatch",
+            "MANIFEST bytes sha " + actual + " != frozen pin " + expected,
+        )
+    return {
+        "manifest": _obj(json.loads(bytes(manifest_bytes).decode("utf-8")), "manifest"),
+        "manifest_sha256": actual,
+    }
+
+
 def _resolve(
     manifest_members: Mapping[str, Any],
     members: Mapping[str, bytes],
@@ -1005,11 +1033,12 @@ def _resolve(
 def build_signed_action_authority(
     *,
     manifest: Mapping[str, Any],
-    manifest_sha256: str,
+    manifest_sha256: str | Mapping[str, Any],
     accepted_member: str,
     result_member: str,
     members: Mapping[str, bytes],
     accepted_manifest_members: Mapping[str, Any] | None = None,
+    index_member: str | None = None,
     security_code: str,
     listing_code: str,
     stock_code: str,
@@ -1018,6 +1047,7 @@ def build_signed_action_authority(
     venue_id: str,
     signal_date: str,
     coverage_id: str | None = None,
+    routes_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Rebuild action_coverage for ONE signed security-day from real P10 members.
 
@@ -1038,9 +1068,18 @@ def build_signed_action_authority(
     caller could fill in.
     """
     iso = _isodate(signal_date, "signal_date").isoformat()
-    mroot = _obj(manifest, "manifest")
+    # ``manifest_sha256`` may be the bound object returned by
+    # bind_signed_manifest() (carrying the proven file sha derived from the
+    # real bytes) or the raw digest string a caller verified itself.  Both
+    # resolve to the same proven sha - never a recomputed JSON digest.
+    if isinstance(manifest_sha256, Mapping):
+        manifest_sha = _sha256(manifest_sha256.get("manifest_sha256"), "manifest_sha256")
+        mroot = _obj(manifest_sha256.get("manifest", manifest), "manifest")
+    else:
+        manifest_sha = _sha256(manifest_sha256, "manifest_sha256")
+        mroot = _obj(manifest, "manifest")
     manifest_members = _obj(mroot.get("members"), "manifest.members")
-    manifest_sha = _sha256(manifest_sha256, "manifest_sha256")
+    routes_sha = _sha256(routes_sha256, "routes_sha256") if routes_sha256 is not None else None
 
     # accepted table bytes -> the versioned Owner-signed uses table.  It may
     # live in this release's MANIFEST or in the separate MANIFEST that pins the
@@ -1048,7 +1087,7 @@ def build_signed_action_authority(
     acc_members = manifest_members
     if accepted_member not in acc_members and accepted_manifest_members is not None:
         acc_members = _obj(accepted_manifest_members, "accepted_manifest_members")
-    accepted_b, _ = _resolve(acc_members, members, accepted_member)
+    accepted_b, accepted_decl = _resolve(acc_members, members, accepted_member)
     accepted = json.loads(accepted_b.decode("utf-8"))
     # batch RESULT pointer -> which member files belong to this batch.
     pointer_b, result_decl = _resolve(manifest_members, members, result_member)
@@ -1079,6 +1118,17 @@ def build_signed_action_authority(
     events_doc = json.loads(events_b.decode("utf-8"))
     windows_doc = json.loads(windows_b.decode("utf-8"))
     coverage_doc = json.loads(coverage_b.decode("utf-8"))
+    # Optional signed windows INDEX (accepted.windows_file e.g. WINDOW-USE.json):
+    # for security-days the batch member does not cover, this signed index is
+    # the authoritative per-(code,T) window record.  Resolve it by sha too.
+    index_doc = None
+    windows_index_sha: str | None = None
+    if index_member is not None:
+        idx_members = manifest_members
+        if index_member not in idx_members and accepted_manifest_members is not None:
+            idx_members = _obj(accepted_manifest_members, "accepted_manifest_members")
+        index_b, windows_index_sha = _resolve(idx_members, members, index_member)
+        index_doc = json.loads(index_b.decode("utf-8"))
     # 2. The Owner-signed table must name this security/date and both uses.
     acc = _obj(accepted, "accepted")
     acc_codes = _obj(acc.get("accepted_codes_by_date"), "accepted.accepted_codes_by_date")
@@ -1112,6 +1162,8 @@ def build_signed_action_authority(
                 "action_authority_windows_index_sha_mismatch",
                 "signed windows index member sha != accepted.windows_sha256",
             )
+        if windows_index_sha is None and idx_b is not None:
+            windows_index_sha = acc_windows_sha
     member_map_sha = _sha256(acc.get("source_members_sha256"), "accepted.source_members_sha256")
 
     # 3. Rebuild the two windows for THIS security/T.
@@ -1123,23 +1175,80 @@ def build_signed_action_authority(
         and str(w.get("T")) == iso
     ]
 
-    def _find(use: str) -> dict[str, Any]:
+    def _find(use: str) -> dict[str, Any] | None:
         for w in rows:
             if str(w.get("use")) == use:
                 return dict(w)
-        _fail(
-            "action_authority_window_missing",
-            "no window use="
-            + repr(use)
-            + " for "
-            + listing_code
-            + " T="
-            + iso
-            + " in signed member",
-        )
+        return None
 
     scan_w = _find("scan_previous_and_T")
     returns_w = _find("61_session_total_return_and_exceptions")
+
+    # Fallback: the signed windows INDEX (WINDOW-USE.json) carries the per-
+    # (code,T) window for signed security-days the batch member does not cover.
+    # Its row names code/signal_date/security_id/listing_id/venue_id and a
+    # `scan` + `returns` sub-record; map it to the same internal shape.
+    if (scan_w is None or returns_w is None) and index_doc is not None:
+        idx_row = None
+        for x in _seq(index_doc.get("windows"), "index.windows"):
+            if (
+                isinstance(x, Mapping)
+                and str(x.get("code")) == listing_code
+                and str(x.get("signal_date")) == iso
+            ):
+                idx_row = dict(x)
+                break
+        if idx_row is not None:
+            idx_scan = idx_row.get("scan") or {}
+            idx_ret = idx_row.get("returns") or {}
+            if scan_w is None and idx_scan:
+                scan_w = {
+                    "use": "scan_previous_and_T",
+                    "event_state": _text(idx_scan.get("state"), "index.scan.state"),
+                    "session_states": [
+                        {
+                            "session": s.get("date"),
+                            "event_state": (
+                                "verified_event"
+                                if s.get("adjustment_effective")
+                                else "verified_none"
+                            ),
+                        }
+                        for s in _seq(idx_scan.get("sessions"), "index.scan.sessions")
+                    ],
+                    "sessions": [
+                        s.get("date") for s in _seq(idx_scan.get("sessions"), "index.scan.sessions")
+                    ],
+                    "security_id": idx_row.get("security_id"),
+                    "listing_id": idx_row.get("listing_id"),
+                    "venue_id": idx_row.get("venue_id"),
+                    "observed_at": (idx_row.get("original_clocks") or {}).get("observed_at"),
+                    "verified_at": (idx_row.get("original_clocks") or {}).get("verified_at"),
+                }
+            if returns_w is None and idx_ret:
+                returns_w = {
+                    "use": "61_session_total_return_and_exceptions",
+                    "event_state": _text(idx_ret.get("state"), "index.returns.state"),
+                    "sessions": [
+                        _text(d, "index.returns.sessions[]")
+                        for d in _seq(idx_ret.get("sessions"), "index.returns.sessions")
+                    ],
+                    "effective_dates_in_60_return_intervals": [
+                        e.get("ex_date")
+                        for e in _seq(idx_ret.get("events", ()), "index.returns.events")
+                    ],
+                    "_index_events": _seq(idx_ret.get("events", ()), "index.returns.events"),
+                    "security_id": idx_row.get("security_id"),
+                    "listing_id": idx_row.get("listing_id"),
+                    "venue_id": idx_row.get("venue_id"),
+                    "observed_at": (idx_row.get("original_clocks") or {}).get("observed_at"),
+                    "verified_at": (idx_row.get("original_clocks") or {}).get("verified_at"),
+                }
+    if scan_w is None or returns_w is None:
+        _fail(
+            "action_authority_window_missing",
+            "no window for " + listing_code + " T=" + iso + " in batch member or signed index",
+        )
     for w in (scan_w, returns_w):
         for key, expected in (
             ("security_id", security_id),
@@ -1181,11 +1290,18 @@ def build_signed_action_authority(
     #    SSE events carry sse_directory_positive.evidence.source_row_ordinal;
     #    SZSE events name the issuer notice_id and a version/raw implementation
     #    sha instead - both resolve to the row's register key + impl digest.
-    ev_rows = [
-        e
-        for e in _seq(events_doc.get("events"), "events.events")
-        if isinstance(e, Mapping) and str(e.get("security_code")) == listing_code
-    ]
+    # Index-sourced windows carry their own pre-normalized event rows (full
+    # terms + register_row + implementation sha) - use them directly; batch
+    # windows use the events member filtered to this security.
+    idx_events = returns_w.get("_index_events") or []
+    if idx_events:
+        ev_rows = [e for e in idx_events if isinstance(e, Mapping)]
+    else:
+        ev_rows = [
+            e
+            for e in _seq(events_doc.get("events"), "events.events")
+            if isinstance(e, Mapping) and str(e.get("security_code")) == listing_code
+        ]
     cat_rows: dict[Any, dict[str, Any]] = {}
     event_rows: list[dict[str, Any]] = []
     effective_dates = {
@@ -1204,14 +1320,20 @@ def build_signed_action_authority(
         )
         reg_row: Any = pos_e.get("source_row_ordinal")
         if reg_row is None:
-            reg_row = _text(e.get("notice_id"), "events[].notice_id")
-        # implementation digest: official_pdf.sha256 (SSE) or version / raw.sha256
+            reg_row = e.get("register_row")
+        if reg_row is None:
+            reg_row = e.get("notice_id") or e.get("notice")
+        if reg_row is None:
+            _fail("action_authority_event_no_register", "event has no register key")
+        # implementation digest: official_pdf.sha256 (SSE), version/raw.sha256
+        # (SZSE batch), or implementation_sha256 (signed-index normalized row).
         impl_raw = e.get("official_pdf")
         impl: str | None = None
         if isinstance(impl_raw, Mapping) and impl_raw.get("sha256"):
             impl = _sha256(impl_raw.get("sha256"), "events[].official_pdf.sha256")
         else:
             for cand in (
+                e.get("implementation_sha256"),
                 e.get("version"),
                 (e.get("raw") or {}).get("sha256") if isinstance(e.get("raw"), Mapping) else None,
             ):
@@ -1224,7 +1346,9 @@ def build_signed_action_authority(
             "register_row": reg_row,
             "ex_date": _text(e.get("ex_date"), "events[].ex_date"),
             "cash_gross_per_share": _text(
-                e.get("cash_dividend_per_share_gross"),
+                e.get("cash_dividend_per_share_gross")
+                if e.get("cash_dividend_per_share_gross") is not None
+                else e.get("cash_gross_per_share"),
                 "events[].cash_dividend_per_share_gross",
             ),
             "bonus_share_ratio": _text(e.get("bonus_share_ratio"), "events[].bonus_share_ratio"),
@@ -1233,7 +1357,7 @@ def build_signed_action_authority(
             ),
             "currency": _text(e.get("currency"), "events[].currency"),
             "implementation_sha256": impl,
-            "notice": _text(e.get("notice_id"), "events[].notice_id"),
+            "notice": _text(e.get("notice_id") or e.get("notice"), "events[].notice_id"),
             "security_id": str(e.get("security_id")),
             "listing_id": str(e.get("listing_id")),
             "venue_id": str(e.get("venue_id")),
@@ -1269,8 +1393,11 @@ def build_signed_action_authority(
         "batch_id": batch_id,
         "manifest_sha256": manifest_sha,
         "result_sha256": result_decl,
+        "accepted_sha256": accepted_decl,
         "reader": _SIGNED_ACTION_READER,
     }
+    if routes_sha is not None:
+        cred["routes_sha256"] = routes_sha
     catalog = {
         "coverage_id": cov_id,
         "digest": sha256_digest(
@@ -1280,6 +1407,7 @@ def build_signed_action_authority(
         "authority": {
             "manifest_sha256": manifest_sha,
             "result_sha256": result_decl,
+            "accepted_sha256": accepted_decl,
             "batch_id": batch_id,
         },
         "rows": list(cat_rows.values()),
@@ -1339,6 +1467,15 @@ def build_signed_action_authority(
             ),
         ],
         "verified_artifacts": [catalog],
+        "bound_provenance": {
+            "manifest_sha256": manifest_sha,
+            "result_sha256": result_decl,
+            "accepted_sha256": accepted_decl,
+            "source_members_sha256": member_map_sha,
+            "windows_index_sha256": windows_index_sha,
+            "routes_sha256": routes_sha,
+            "batch_id": batch_id,
+        },
         "note": (
             "derived from Owner-signed member bytes resolved through the pinned "
             "MANIFEST; caller-copied fields are not independently qualifying"

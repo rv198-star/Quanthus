@@ -13,6 +13,7 @@ refuses the stage up front.
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -101,6 +102,34 @@ def _wire_decimal(value: Any, field: str) -> Decimal:
     return _decimal(value, field)
 
 
+# The single canonical wire form for a reduce target_position_fraction
+# (issue #723 R4 successor): ``0.<digits>`` with a non-zero final digit, so
+# leading-zero (``00.5``), trailing-zero (``0.50``), exponent and bare-number
+# forms are all refused on BOTH the schema and the loader.  ``re.fullmatch``
+# anchors the whole string - a trailing newline never sneaks through.
+_TARGET_FRACTION_WIRE = re.compile(r"0\.[0-9]*[1-9]")
+
+
+def _canonical_fraction(value: Any, field: str) -> Decimal:
+    """Parse a reduce target that must be the unique canonical decimal form.
+
+    Both readers (``load_decision_set`` and ``load_decision_set_dict``) route
+    here through ``_decision``; the writer emits exactly this shape via
+    ``format(d, "f")`` + fractional-trailing-zero strip, so a round trip is
+    byte-identical and ``Decimal.normalize`` (which rounds to context
+    precision) is never used.
+    """
+
+    parsed = _wire_decimal(value, field)
+    if not isinstance(value, str) or _TARGET_FRACTION_WIRE.fullmatch(value) is None:
+        raise FactError(
+            "INVALID_PACKAGE",
+            f"decision_set {field} must be the canonical 0.<digits> "
+            "fraction ending in a non-zero digit",
+        )
+    return parsed
+
+
 def _chart(raw: Any) -> ChartEvidence | None:
     if raw is None:
         return None
@@ -179,7 +208,7 @@ def _decision(raw: dict[str, Any]) -> MarketDecision:
         target_position_fraction=(
             None
             if target_fraction is None
-            else _wire_decimal(
+            else _canonical_fraction(
                 target_fraction, "decisions[].target_position_fraction"
             )
         ),
@@ -339,7 +368,7 @@ def load_decision_set(
                         "a v2 reduce exit_plan must carry "
                         "target_position_fraction",
                     )
-                parsed = _wire_decimal(
+                parsed = _canonical_fraction(
                     target, "decisions[].target_position_fraction"
                 )
                 if not (Decimal("0") < parsed < Decimal("1")):
@@ -429,6 +458,38 @@ def _load_marked(
     )
 
 
+def _write_fraction(value: Decimal) -> str:
+    """Emit the canonical 0.<digits> form for a reduce target.
+
+    ``format(d, "f")`` keeps every significant digit with no exponent and no
+    context rounding (``normalize()`` would round a long tail to 28 digits and
+    could turn a near-one value into 1).  The fractional part's trailing
+    zeros are then stripped.  The result is re-checked against the SAME
+    canonical regex the readers use; a value that is 0, 1, outside (0, 1),
+    or that fails the canonical form is refused rather than written.
+    """
+    if not (Decimal("0") < value < Decimal("1")):
+        raise FactError(
+            "INVALID_PACKAGE",
+            "a reduce target_position_fraction must be in (0, 1); "
+            "refusing to write " + repr(value),
+        )
+    raw = format(value, "f")
+    if "." not in raw:
+        out = raw
+    else:
+        integer, fraction = raw.split(".", 1)
+        fraction = fraction.rstrip("0")
+        out = integer + "." + fraction if fraction else integer
+    if _TARGET_FRACTION_WIRE.fullmatch(out) is None:
+        raise FactError(
+            "INVALID_PACKAGE",
+            "reduce target_position_fraction " + repr(value)
+            + " cannot be written in the canonical 0.<digits> form",
+        )
+    return out
+
+
 def decision_set_to_dict(value: MarketDecisionSet) -> dict[str, Any]:
     '''Serialize a validated set back to the G1-compatible wire shape.
 
@@ -502,15 +563,17 @@ def decision_set_to_dict(value: MarketDecisionSet) -> dict[str, Any]:
             }
         if v2:
             wire["exit_kind"] = item.exit_kind
-            # Canonical decimal write form (issue #723 R4): format(...,f) after
-            # normalize() yields 0.<digits> with no trailing zero and never an
-            # exponent, so the emitted bytes match the shared (0,1) admission
-            # and read back byte-identical.  str(Decimal) would emit an
-            # exponent for very small fractions (e.g. 0.0000000001000 -> 1.000E-10).
+            # Canonical decimal write form (issue #723 R4 successor):
+            # format(d, "f") emits every significant digit with NO exponent
+            # and NO context rounding (normalize() rounds to 28-digit
+            # precision and silently dropped 0.5...01 -> 0.5).  The
+            # fractional part's trailing zeros are then stripped, yielding
+            # the unique 0.<digits> canonical form the schema and both
+            # readers admit; the emitted bytes read back byte-identical.
             wire["target_position_fraction"] = (
                 None
                 if item.target_position_fraction is None
-                else format(item.target_position_fraction.normalize(), "f")
+                else _write_fraction(item.target_position_fraction)
             )
         decisions.append(wire)
     body = {

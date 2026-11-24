@@ -1207,9 +1207,20 @@ class P12DesktopApplication:
                 )
             else:
                 is_reduce = item.opportunity_id in reduce_exit_ids
-                action, status = (
-                    ("HOLD", "READY") if is_reduce else ("SELL", "READY")
-                )
+                if is_reduce:
+                    # Issue #722 r9-1: a held reduction resolves to a held
+                    # disposition - stage, exit_kind and the sell reason are
+                    # cleared, the row reads stage=holding with a registered
+                    # hold reason, and the reduce note rides the explanation
+                    # (held_exit below), never a sell action or sell copy.
+                    stage = OpportunityStage.HOLDING
+                    action, status = "HOLD", "READY"
+                    reasons = [r for r in reasons if r != "EXIT_SIGNAL"]
+                    if "HOLD_AND_ALERT" not in reasons:
+                        reasons.append("HOLD_AND_ALERT")
+                    primary = "HOLD_AND_ALERT"
+                else:
+                    action, status = "SELL", "READY"
             # Once the position is flat the exit is complete: it no longer
             # prompts a sell.  An exit plan is sized for the whole held
             # quantity, so quantity 0 after its report marks it done — but only
@@ -2169,7 +2180,7 @@ class P12DesktopApplication:
                 return
             if sum(realized.values(), Decimal("0.00")) != missing:
                 return
-            for (bucket, (sec, _cash)) in zip(empties, sorted(realized.items())):
+            for (bucket, (sec, _cash)) in zip(empties, sorted(realized.items()), strict=False):
                 cycle_id = f"paper:{sec}:{bucket.bucket_id}"
                 # One atomic upgrade: open the cycle on the empty bucket,
                 # attribute it to the security, and anchor the floor at the

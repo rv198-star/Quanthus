@@ -684,6 +684,13 @@ def build_replay_envelope(
             filtered["limits"] = []
             filtered["close_at_by_date"] = {}
             filtered["knowledge_cutoff_by_date"] = {}
+        # Version dedup: byte-identical re-statements of the same action row
+        # (same security_code, effective_date, cash/bonus terms and known_at)
+        # collapse to ONE row so the projected actions feed the panel once.
+        # Two DISTINCT same-date rows are NOT collapsed here - they are the
+        # multiplicity conflict the coverage join isolates.
+        if filtered.get("actions"):
+            filtered["actions"] = _dedupe_action_rows(filtered["actions"])
         securities.append(filtered)
         bar_dates = {_isodate(_obj(b, "bar").get("session_date"), "bar.session_date") for b in bars}
         delivered[code] = {
@@ -821,6 +828,38 @@ def _action_coverage_ok(
     return True
 
 
+def _dedupe_action_rows(actions: Any) -> list[Any]:
+    """Collapse byte-identical action re-statements to one row per term tuple.
+
+    Rows are keyed on (security_code, effective_date, cash, bonus, known_at);
+    a re-delivered row with identical terms is the same version and feeds the
+    panel once.  DISTINCT rows on the same date are preserved verbatim - they
+    are the multiplicity conflict the coverage join isolates, not data to merge.
+    """
+    if not isinstance(actions, Sequence) or isinstance(actions, str):
+        return list(actions) if isinstance(actions, Sequence) else []
+    seen: set[tuple[Any, ...]] = set()
+    out: list[Any] = []
+    for a in actions:
+        if not isinstance(a, Mapping):
+            out.append(a)
+            continue
+        eff = a.get("effective_date")
+        eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
+        key = (
+            str(a.get("security_code")),
+            eff_iso,
+            str(a.get("cash_dividend_per_share")),
+            str(a.get("bonus_share_ratio")),
+            str(a.get("known_at")),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(a)
+    return out
+
+
 def _actions_in_window(actions: Any, code: str, window_sessions: Sequence[str]) -> bool:
     """True when any projected action has an effective_date inside the return
     window (first_close, last_close] = window_sessions[1:]."""
@@ -878,7 +917,34 @@ def _returns_events_join_actions(
             if eff_iso in window_set:
                 window_actions.setdefault(eff_iso, []).append(a)
 
+    # One-to-one binding: each in-window ex_date must have exactly ONE distinct
+    # projected action row.  Identical duplicate rows (same cash/bonus/known_at)
+    # dedupe to one by version; two DISTINCT rows on the same date (a proven
+    # 0.116 plus an unproven 0.232) are a multiplicity conflict - the real
+    # adjustment cannot be resolved to a single row, so the security isolates.
+    def _action_terms(a: Mapping[str, Any]) -> tuple[Any, ...]:
+        return (
+            _dec(a.get("cash_dividend_per_share")),
+            _dec(a.get("bonus_share_ratio")),
+            str(a.get("known_at")),
+        )
+
+    distinct_window_actions: dict[str, list[Mapping[str, Any]]] = {}
+    for eff_iso, rows in window_actions.items():
+        seen_terms: set[tuple[Any, ...]] = set()
+        deduped: list[Mapping[str, Any]] = []
+        for a in rows:
+            t = _action_terms(a)
+            if t not in seen_terms:
+                seen_terms.add(t)
+                deduped.append(a)
+        if len(deduped) != 1:
+            # Two different adjustment rows claim the same ex_date.
+            return False
+        distinct_window_actions[eff_iso] = deduped
+
     declared_dates: set[str] = set()
+    declared_terms: dict[str, tuple[Any, ...]] = {}
     for e in events or ():
         if not isinstance(e, Mapping):
             return False
@@ -887,7 +953,6 @@ def _returns_events_join_actions(
             # An event outside (first_close, last_close] does not affect these
             # returns; it is neither required nor a conflict for THIS window.
             continue
-        declared_dates.add(ex_iso)
         if str(e.get("currency")) != "CNY":
             return False
         cash = _dec(e.get("cash_gross_per_share"))
@@ -896,7 +961,15 @@ def _returns_events_join_actions(
         if cash is None or bonus is None or transfer is None:
             return False
         expected_bonus = bonus + transfer  # combined once, not double-counted
-        cands = window_actions.get(ex_iso) or []
+        # A second declared event on the same ex_date with DIFFERENT terms is a
+        # declaration conflict; identical re-declarations dedupe to one.
+        this_terms = (cash, expected_bonus)
+        prior = declared_terms.get(ex_iso)
+        if prior is not None and prior != this_terms:
+            return False
+        declared_terms[ex_iso] = this_terms
+        declared_dates.add(ex_iso)
+        cands = distinct_window_actions.get(ex_iso) or []
         matched = False
         for a in cands:
             if (
@@ -920,7 +993,7 @@ def _returns_events_join_actions(
 
     # Reverse join: every in-window projected action must be backed by a
     # declared verified event; an orphan action row is a conflict.
-    return all(eff_iso in declared_dates for eff_iso in window_actions)
+    return all(eff_iso in declared_dates for eff_iso in distinct_window_actions)
 
 
 def _session_dates(value: Any) -> list[str]:
@@ -948,12 +1021,27 @@ def _sessions_have_effective_action(scan: Mapping[str, Any]) -> bool:
     an effective 'ex_date' on a scanned session.  Any effective action on a
     scanned session blocks the new entry.
     """
+    scanned = {s.get("date") for s in scan.get("scan_sessions") or () if isinstance(s, Mapping)}
+    scanned_iso = {
+        d.isoformat() if isinstance(d, date) else str(d) for d in scanned if d is not None
+    }
     for s in scan.get("scan_sessions") or ():
         if isinstance(s, Mapping) and s.get("adjustment_effective") is True:
             return True
     for e in scan.get("events") or ():
-        if isinstance(e, Mapping) and e.get("adjustment_effective") is True:
+        if not isinstance(e, Mapping):
+            continue
+        if e.get("adjustment_effective") is True:
             return True
+        # An event row naming WHEN it applies (ex_date / effective_date /
+        # session_date / date) that lands on a scanned session is an effective
+        # adjustment on that day - the frozen gate blocks new entry on a real
+        # T-1/T ex-date even when the row spells it as a date, not a bool.
+        ex = e.get("ex_date") or e.get("effective_date") or e.get("session_date") or e.get("date")
+        if ex is not None:
+            ex_iso = ex.isoformat() if isinstance(ex, date) else str(ex)
+            if ex_iso in scanned_iso:
+                return True
     return False
 
 

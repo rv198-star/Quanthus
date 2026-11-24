@@ -1,0 +1,376 @@
+{
+  "schema_version": "p11.paper-replay-request.v1",
+  "purpose_mode": "historical_replay",
+  "permitted_account_use": "personal_simulation",
+  "scenario_id": "paper-replay-202610",
+  "package_id": "standard-base-2.5.1-8cd966be87fc",
+  "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+  "market_dates": [
+    "2026-10-08",
+    "2026-10-09",
+    "2026-10-12",
+    "2026-10-13",
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+    "2026-10-19",
+    "2026-10-20",
+    "2026-10-21",
+    "2026-10-22",
+    "2026-10-23",
+    "2026-10-26",
+    "2026-10-27",
+    "2026-10-28",
+    "2026-10-29"
+  ],
+  "open_sessions": [
+    "2026-07-07",
+    "2026-07-08",
+    "2026-07-09",
+    "2026-07-10",
+    "2026-07-13",
+    "2026-07-14",
+    "2026-07-15",
+    "2026-07-16",
+    "2026-07-17",
+    "2026-07-20",
+    "2026-07-21",
+    "2026-07-22",
+    "2026-07-23",
+    "2026-07-24",
+    "2026-07-27",
+    "2026-07-28",
+    "2026-07-29",
+    "2026-07-30",
+    "2026-07-31",
+    "2026-08-03",
+    "2026-08-04",
+    "2026-08-05",
+    "2026-08-06",
+    "2026-08-07",
+    "2026-08-10",
+    "2026-08-11",
+    "2026-08-12",
+    "2026-08-13",
+    "2026-08-14",
+    "2026-08-17",
+    "2026-08-18",
+    "2026-08-19",
+    "2026-08-20",
+    "2026-08-21",
+    "2026-08-24",
+    "2026-08-25",
+    "2026-08-26",
+    "2026-08-27",
+    "2026-08-28",
+    "2026-08-31",
+    "2026-09-01",
+    "2026-09-02",
+    "2026-09-03",
+    "2026-09-04",
+    "2026-09-07",
+    "2026-09-08",
+    "2026-09-09",
+    "2026-09-10",
+    "2026-09-11",
+    "2026-09-14",
+    "2026-09-15",
+    "2026-09-16",
+    "2026-09-17",
+    "2026-09-18",
+    "2026-09-21",
+    "2026-09-22",
+    "2026-09-23",
+    "2026-09-24",
+    "2026-09-28",
+    "2026-09-29",
+    "2026-09-30",
+    "2026-10-08",
+    "2026-10-09",
+    "2026-10-12",
+    "2026-10-13",
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+    "2026-10-19",
+    "2026-10-20",
+    "2026-10-21",
+    "2026-10-22",
+    "2026-10-23",
+    "2026-10-26",
+    "2026-10-27",
+    "2026-10-28",
+    "2026-10-29",
+    "2026-10-30"
+  ],
+  "member_evidence": [
+    {
+      "member_id": "synthetic-daily-1d",
+      "version": "synthetic.v1",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "available_at": "2026-10-09T18:01:00+08:00",
+      "required": true
+    }
+  ],
+  "required_member_ids": [
+    "synthetic-daily-1d"
+  ],
+  "source_members": [
+    {
+      "member_id": "synthetic-daily-1d",
+      "package_id": "standard-base-2.5.1-8cd966be87fc",
+      "version": "synthetic.v1",
+      "member_path": "synthetic/daily.parquet",
+      "sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "date_from": "2026-01-01",
+      "date_to": "2026-10-13",
+      "knowledge_at": "2026-10-09T18:01:00+08:00",
+      "visible_at": "2026-10-09T18:01:00+08:00"
+    }
+  ],
+  "calendar_rows": [],
+  "listing_rows": [],
+  "securities": [],
+  "exclusions": [
+    {
+      "security_code": "300308",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "300308",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "300308",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "300502",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "300502",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "300502",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "300394",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "300394",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "300394",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "002463",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "002463",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "002463",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "300476",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "300476",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "300476",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "601138",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "601138",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "601138",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "000977",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "000977",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "000977",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "002916",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "002916",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "002916",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "002436",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "002436",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "002436",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "002837",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "002837",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "002837",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "688256",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "688256",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "688256",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "688041",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "688041",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "688041",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "399006",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "399006",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "399006",
+      "session_date": "2026-11-25"
+    },
+    {
+      "security_code": "000300",
+      "session_date": "2026-11-23"
+    },
+    {
+      "security_code": "000300",
+      "session_date": "2026-11-24"
+    },
+    {
+      "security_code": "000300",
+      "session_date": "2026-11-25"
+    }
+  ],
+  "account": {
+    "account_id": "replay-paper-202610",
+    "as_of": "2026-10-09T21:30:00+08:00",
+    "cash_available": "500000",
+    "active_or_reserved_security_codes": [],
+    "active_industry_counts": [],
+    "new_buckets_today": 0,
+    "pending_commitment_total": "0"
+  },
+  "policy": {
+    "policy_id": "p11-d1b-paper-replay",
+    "version": "1.0.0",
+    "published_at": "2026-10-09T21:30:00+08:00",
+    "window_ref": "paper-replay-202610",
+    "candidate_rule_digest": "filled-by-test",
+    "trusted_producer_ids": [
+      "p11.fixed-rule-day"
+    ]
+  },
+  "facts_template": {
+    "batch_id": "replay-202610",
+    "source_id": "REPLAY-standard-base-2.5.1",
+    "source_version": "synthetic.v1",
+    "calendar_version": "replay-cal-v1",
+    "price_basis": "none",
+    "intake_receipt_id": "replay-intake-202610",
+    "intake_received_at": "2026-10-09T18:01:00+08:00",
+    "intake_first_read_at": "2026-10-09T18:30:00+08:00",
+    "intake_verified_at": "2026-10-09T19:00:00+08:00"
+  },
+  "run_id": "paper-replay-202610-r1",
+  "notes": "Synthetic engineering fixture: calendar_rows/listing_rows/securities are filled by the test builder or the real member reader; this file binds the real session/exclusion/coverage identities.  open_sessions = the 61-session warmup prefix (2026-07-07..09-30) + the 17 October sessions; market_dates = the 16 signal days 10-08..10-29; 10-30 is final_display_only.",
+  "final_day_policy": {
+    "market_date": "2026-10-30",
+    "next_session": null,
+    "disposition": "final_display_only",
+    "note": "The sealed October calendar ends 2026-10-31; no next open session exists inside the package. 10-30 is the last bound open session and replays T-only for the 10-29 signal’s execution/display; no T+1 open quote exists and none is fabricated."
+  },
+  "member_availability_gap": {
+    "status": "P10 15-minute bounded member diff in flight; this request binds only declared member identities",
+    "no_fill": true
+  },
+  "exclusions_binding": {
+    "issue": 737,
+    "source_commit": "bb4a429ffb82e42c5137213a0a072ba56fcc4642",
+    "config_path": "config/p12/replay-exclusion-737.v1.json",
+    "config_sha256": "sha256:7482a9ef837aabe2019ec5daba7132d5729e7f3e43786b6a0b1efb43e95a573e",
+    "security_count": 14,
+    "excluded_dates": [
+      "2026-11-23",
+      "2026-11-24",
+      "2026-11-25"
+    ],
+    "note": "P12 #748 frozen list; 14 codes x 3 Nov dates, zero intersection with the October signal/execution window.  Only the identity pairs are replay-bound; the list contents are never read here."
+  },
+  "p10_metadata_binding": {
+    "result_sha256": "954d9af4885bc1c030c9da9b4787791cd4071d99a6cb998a7914dc981cc9adfb",
+    "manifest_sha256": "a12928044c52c1798d263afb9b8994267d9ea5521b95f43012cd02de06ab6c37",
+    "calendar_sha256": "89b6b7ef99c34de413f5a0e3b7dd61debc104bb825e921d353dc6b02ac0a9ba3",
+    "members_sha256": "d697369359898466daa0ec1d5c41258ba7967d0402851397c6432d6a9c950e0a"
+  },
+  "signal_window": {
+    "from": "2026-10-08",
+    "through": "2026-10-29"
+  },
+  "action_coverage": {
+    "default_state": "unknown",
+    "registers": [],
+    "securities": [],
+    "window_evidence": [],
+    "note": "October corporate-action coverage is UNKNOWN unless a window_evidence record binds security_id/listing_id/venue_id x signal_date x purpose to a hashed register (P11-P10-ACTION-REGISTER-EVIDENCE-v1).  Empty arrays = no named evidence; every qualified security is new-entry isolated at the envelope.  A register is a locator, not a proof."
+  }
+}

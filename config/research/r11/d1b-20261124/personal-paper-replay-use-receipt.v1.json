@@ -1,0 +1,63 @@
+{
+  "schema_version": "quanthus.p11.personal-paper-replay-use.v1",
+  "receipt_id": "P11-PAPER-REPLAY-202610-v1",
+  "adoption_state": "proposed",
+  "purpose_mode": "historical_replay",
+  "permitted_account_use": "personal_simulation",
+  "replay_scope": {
+    "market_date_from": "2026-10-01",
+    "market_date_through": "2026-10-31",
+    "venues": [
+      "SSE",
+      "SZSE"
+    ],
+    "open_sessions_manifest_sha256": null,
+    "protected_exclusions_manifest_sha256": null,
+    "daily_bar_context_sessions": 61,
+    "input_grade": "ENGINEERING_REPLAY_AS_OBSERVED",
+    "strategy_performance_evaluation": false
+  },
+  "source_binding": {
+    "package_id": "standard-base-2.5.1-8cd966be87fc",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "member_set_sha256": null
+  },
+  "rule_binding": {
+    "code_commit": null,
+    "code_tree": null,
+    "rule_card_sha256": null,
+    "expert_topology_sha256": null,
+    "feature_registry_sha256": null,
+    "history_input_schema": "p11.raw-history-input.v1",
+    "history_entry": "quanthus.product_daily.recommendation.history_input.run_daily_advice_from_history",
+    "replay_entry": "quanthus.product_daily.recommendation.paper_replay.run_replay_request"
+  },
+  "consumer_binding": {
+    "decision_set_schema": "p12.decision-set.v2",
+    "loader_entry": "quanthus.p12_daily.decision_loader.load_decision_set",
+    "source_commit": null,
+    "source_tree": null,
+    "pin_sha256": null
+  },
+  "execution_binding": {
+    "ledger_namespace_rule": "historical-replay:{scenario_id}",
+    "model_id": "t1-next-open-v1",
+    "model_version": "1.0.0",
+    "logical_clock_separate_from_actual_time": true,
+    "new_entry": "pending_validation",
+    "holding": "pending_validation",
+    "reduce": "display_only",
+    "full_exit": "display_only"
+  },
+  "activation_requires": [
+    "adoption_state_adopted",
+    "all_required_pins_non_null_and_exactly_verified",
+    "fixed_history_and_replay_entry_independent_acceptance",
+    "real_p12_v2_loader_joint_validation",
+    "isolated_account_and_ledger",
+    "end_to_end_replay_cases_accepted"
+  ],
+  "daily_live_use": false,
+  "real_account_use": false,
+  "automatic_trading_use": false
+}

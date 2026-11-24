@@ -482,3 +482,108 @@ def test_registered_not_read_member_unused():
     assert rec and rec[0]["disposition"] == "unused"
     assert use["registered_not_read_count"] == 1
 
+
+
+# ---- C7 held-census: held not-listed single classification ----------------------
+
+
+def _delisted_held_envelope(*, with_neighbour: bool):
+    """The C7 counterexample shape: delisted held 000005 (+ valid 600000)."""
+    days = _weekdays_ending(TARGET, 200)
+    d5 = _szse_entry(
+        _trend_raw("000005"), held_membership=True, held_quantity=100
+    )
+    secs = [d5]
+    # The required core-daily-1d member stays supplied; its calendar slice is
+    # simply empty for this venue-only envelope.
+    calendar = _calendar(venue="SZSE", days=days, member_id="szse-cal")
+    listing = [
+        _listing(
+            "security-000005",
+            venue="SZSE",
+            effective_from="1990-12-09T16:00:00+08:00",
+            effective_to="2024-04-26T16:00:00+08:00",
+            member_id="szse-cal",
+            listing_id="listing-000005",
+        )
+    ]
+    members = [_member(), _member("szse-cal")]
+    if with_neighbour:
+        good = _security_entry(_trend_raw("600000"))
+        secs.append(good)
+        calendar = _calendar(venue="SSE", days=days) + calendar
+        listing.insert(
+            0,
+            _listing("security-600000", venue="SSE", effective_from=days[0].isoformat()),
+        )
+    return _envelope(secs, calendar=calendar, listing=listing, members=members)
+
+
+def test_held_not_listed_single_census_classification(runner, resources):
+    """C7-BE92-P2: a held security not listed on T is classified exactly once
+    as not_listed_on_signal_date -- one census receipt + one named exclusion,
+    never a second membership receipt and never raw_input_closure_invalid /
+    missing_signal_membership.  The hold alert still fires and the day stays
+    publishable off the account facts alone."""
+    env = _delisted_held_envelope(with_neighbour=False)
+    output = run_daily_advice_from_history(
+        env, runner=runner, resources=resources, **_run_kwargs()
+    )
+    assert output.result.package is not None
+    receipts = [
+        r for r in output.source_closure["history_receipts"] if r.get("security_code") == "000005"
+    ]
+    assert len(receipts) == 1
+    assert receipts[0]["reason"] == "not_listed_on_signal_date"
+    # Exactly one named census exclusion -- never a scan-construction failure.
+    excl = [
+        e for e in output.source_closure["exclusions"] if e["security_code"] == "000005"
+    ]
+    assert len(excl) == 1
+    assert excl[0]["reason"] == "not_listed_on_signal_date"
+    assert excl[0]["scope"] == "per_security"
+    assert "raw_input_closure_invalid" not in str(excl)
+    assert "missing_signal_membership" not in str(excl)
+    # The held review survives: a holding decision was produced for the code.
+    held = [
+        d
+        for ds in output.result.package.decision_sets
+        for d in ds.decisions
+        if d.security_code == "000005"
+    ]
+    assert held and all(d.stage == "holding" for d in held)
+
+
+def test_held_not_listed_neighbour_still_publishes(runner, resources):
+    """The held-not-listed isolation stays per-security: the legal SSE
+    neighbour keeps its full scan and publishes normally."""
+    env = _delisted_held_envelope(with_neighbour=True)
+    output = run_daily_advice_from_history(
+        env, runner=runner, resources=resources, **_run_kwargs()
+    )
+    assert output.result.package is not None
+    entries = [d for d in output.seam.decisions if d.entry_allowed]
+    assert any(d.security_code == "600000" for d in entries)
+    # 000005 still classified once; 600000 untouched by any exclusion.
+    excl_codes = [e["security_code"] for e in output.source_closure["exclusions"]]
+    assert "600000" not in excl_codes
+    assert excl_codes.count("000005") == 1
+
+
+def test_held_not_listed_projection_single_receipt():
+    """At the adapter boundary the held-not-listed security produces one
+    receipt + one scan-ineligible RawSecurityInput carrying the held facts."""
+    env = _delisted_held_envelope(with_neighbour=True)
+    from quanthus.product_daily.recommendation.history_input import load_raw_history
+
+    hist = load_raw_history(env)
+    inputs, receipts = raw_security_inputs_from_history(hist)
+    held = [i for i in inputs if i.identity.listing_code == "000005"]
+    assert len(held) == 1 and held[0].scan_eligible is False
+    assert held[0].held_membership is True and held[0].held_quantity == 100
+    r5 = [r for r in receipts if r.get("security_code") == "000005"]
+    assert len(r5) == 1
+    assert r5[0]["reason"] == "not_listed_on_signal_date"
+    # The neighbour is unaffected and remains scan-eligible.
+    nb = [i for i in inputs if i.identity.listing_code == "600000"]
+    assert nb and nb[0].scan_eligible is True and len(nb[0].universe_membership) > 0

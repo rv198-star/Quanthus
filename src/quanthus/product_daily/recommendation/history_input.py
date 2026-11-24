@@ -1023,7 +1023,13 @@ def raw_security_inputs_from_history(
             )
             if t_active is False:
                 if is_account_member:
-                    membership = ()
+                    # A held/pending position in a T-not-listed security is a
+                    # single named census receipt, not a scan input: skip the
+                    # membership derivation AND the bar/action market-parse
+                    # entirely so it is never re-derived into a contradictory
+                    # membership or a downstream missing_signal_membership.  It
+                    # still lands as an empty-fact RawSecurityInput so the held
+                    # reminder (hold_alert) fires and the audit row is non-empty.
                     receipts.append(
                         {
                             "security_code": code,
@@ -1032,6 +1038,27 @@ def raw_security_inputs_from_history(
                             "scope": "per_security",
                         }
                     )
+                    inputs.append(
+                        RawSecurityInput(
+                            identity=identity,
+                            bars=(),
+                            universe_membership=(),
+                            actions=(),
+                            exceptions=(),
+                            limits=(),
+                            close_at_by_date={},
+                            knowledge_cutoff_by_date={},
+                            position_facts=position_facts,
+                            prior_deterioration_sessions=prior_det,
+                            held_membership=held_membership,
+                            pending_kind=pending_kind,
+                            held_unavailable_reason=held_reason,
+                            held_quantity=held_qty,
+                            pending_quantity=pending_qty,
+                            scan_eligible=False,
+                        )
+                    )
+                    continue
                 else:
                     receipts.append(
                         {
@@ -1395,15 +1422,34 @@ def run_daily_advice_from_history(
     # Adapter-level exclusions are named isolations INSIDE the issued closure,
     # not appended after receipt issuance (a post-hoc dict replace would leave
     # receipt.source_closure_digest pointing at the pre-exclusion bytes).
-    adapter_exclusions = [
-        {
+    def _adapter_exclusion(receipt: Mapping[str, Any]) -> dict[str, Any]:
+        if receipt.get("status") == "excluded":
+            return {
+                "security_code": receipt["security_code"],
+                "reason": "raw_history_security_invalid",
+                "member_or_field": receipt.get("reason", "unparseable securities[] entry"),
+                "scope": "per_security",
+            }
+        # A held/pending account member provably not listed on T is a normal
+        # universe-census result, named once inside the issued closure.  The
+        # held alert and the receipt still come through; only the market scan
+        # is skipped (scan_eligible=False on its RawSecurityInput).
+        return {
             "security_code": receipt["security_code"],
-            "reason": "raw_history_security_invalid",
-            "member_or_field": receipt.get("reason", "unparseable securities[] entry"),
+            "reason": "not_listed_on_signal_date",
+            "member_or_field": "held_account_member: "
+            + receipt.get("reason", "not_listed_on_signal_date"),
             "scope": "per_security",
         }
+
+    adapter_exclusions = [
+        _adapter_exclusion(receipt)
         for receipt in receipts
         if receipt.get("status") == "excluded"
+        or (
+            receipt.get("status") == "account_member_market_unavailable"
+            and receipt.get("reason") == "not_listed_on_signal_date"
+        )
     ]
     runner_exclusions = [*(adapter_exclusions), *(kwargs.pop("input_exclusions", None) or ())]
     output = run_daily_advice_from_raw(

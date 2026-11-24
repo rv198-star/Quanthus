@@ -108,6 +108,13 @@ class RawSecurityInput:
     # unknown; a missing quantity is never silently replaced with zero.
     held_quantity: int | None = None
     pending_quantity: int | None = None
+    # False when the adapter has already classified this input out of the market
+    # scan (a held/pending account member that is provably not listed on T).
+    # The row still supplies held/pending facts to the account normalisation and
+    # stays inside the bound raw closure, but the feature/scan construction is
+    # skipped -- the named census receipt is its only classification, never a
+    # downstream missing_signal_membership / raw_input_closure_invalid.
+    scan_eligible: bool = True
 
 
 @dataclass(frozen=True)
@@ -177,6 +184,7 @@ def raw_security_input_closure(item: RawSecurityInput) -> dict[str, Any]:
         "held_unavailable_reason": item.held_unavailable_reason,
         "held_quantity": item.held_quantity,
         "pending_quantity": item.pending_quantity,
+        "scan_eligible": item.scan_eligible,
     }
 
 
@@ -410,6 +418,13 @@ def run_daily_advice_from_raw(
     for item in raw:
         code = item.identity.listing_code
         identity = item.identity
+        if not item.scan_eligible:
+            # Already classified by the adapter (held/pending member not listed
+            # on T): the row keeps its held/pending facts for the account view
+            # and its bytes stay inside the bound raw closure, but it never
+            # enters feature/scan construction, so it cannot degrade into a
+            # contradictory missing_signal_membership exclusion.
+            continue
         close_map = item.close_at_by_date or {}
         cutoff_map = item.knowledge_cutoff_by_date or {}
         try:

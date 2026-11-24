@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import math
 import os
 import time
 from datetime import date, datetime
@@ -316,6 +317,13 @@ def _account_facts(
             f"ledger store path unreadable: {exc}"
         ) from exc
     if not store_exists:
+        # Issue #722 r3-7: a path that exists but is not a regular file (a
+        # directory, a socket) is a READ FAILURE, never a fresh account -
+        # only a genuinely absent file can be FRESH_NO_BASELINE.
+        if store_path.exists():
+            raise AccountFactsUnavailable(
+                f"ledger path exists but is not a regular file: {store_path}"
+            )
         # Fresh deployment before the first baseline: empty holdings are a
         # real account state, never a read failure.
         return (), (), "FRESH_NO_BASELINE", digest({"fresh": account_id})
@@ -398,16 +406,52 @@ def _account_facts(
                     quantity=unreported if unreported > 0 else None,
                 )
             )
-    # RESERVED funding buckets: the bucket_securities binding names which
-    # security a reserved bucket is held out for.
+    # RESERVED funding buckets (issue #722 r3-7): a bucket only holds out its
+    # security while its own phase is RESERVED - a settled or closed bucket's
+    # binding no longer blocks new entries.  A funding read that FAILS is a
+    # fact read failure (ACCOUNT_FACTS_UNAVAILABLE), never a quiet empty
+    # binding.  An account with no bound partition reads as no buckets.  The
+    # phase value is read by name (never the enum import - p12_daily's
+    # admitted surface is quanthus.product_daily.application, not the funding
+    # domain internals).
     try:
         binding = facts.funding_binding(context)
-    except Exception:  # noqa: BLE001 - bindings are optional, never fatal
-        binding = None
+        funding_state_fn = getattr(facts, "funding_state", None)
+        funding_row = (
+            funding_state_fn(context) if callable(funding_state_fn) else None
+        )
+    except Exception as exc:  # noqa: BLE001 - a failed read blocks the day
+        raise AccountFactsUnavailable(
+            f"funding binding read failed: {type(exc).__name__}: {exc}"
+        ) from exc
+    reserved_bucket_ids: frozenset | None = None
+    if funding_row is not None:
+        state, _rev = funding_row
+        reserved_bucket_ids = frozenset(
+            item.bucket_id
+            for item in state.buckets
+            if getattr(item.phase, "value", item.phase) == "reserved"
+        )
     if binding:
+        # Issue #722 r3-7: the reserved-bucket pending only names a security
+        # still being acquired.  A security already materialized as a settled
+        # holding is served by the holding path, never double-listed as a
+        # pending bucket - the RESERVED binding persists across the fill.
+        held_codes = frozenset(fact.security_code for fact in holdings)
         securities = dict(binding.get("bucket_securities") or {})
         for _bucket_id, sec in securities.items():
             if sec:
+                if (
+                    reserved_bucket_ids is not None
+                    and _bucket_id not in reserved_bucket_ids
+                ):
+                    # A bucket whose current phase is not RESERVED (settled,
+                    # closed, or a binding on an unbound partition) does not
+                    # hold the security out - it never enters the pending
+                    # set, so a settled holding is not re-listed as reserved.
+                    continue
+                if str(sec) in held_codes:
+                    continue
                 # A RESERVED bucket holds out the security but does not fix a
                 # share count: quantity stays None, never a fabricated 0.
                 pending.append(
@@ -828,6 +872,18 @@ def run_daily(
             return True
         return False
 
+    def _ca_positive_finite(value) -> bool:
+        # Issue #722 r3-5: the effective adjustment factor must be a finite
+        # positive number - NaN, Inf, 0 and negatives are invalid values
+        # that block rather than pass through as a factor.
+        if not _ca_numeric(value):
+            return False
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return False
+        return math.isfinite(parsed) and parsed > 0
+
     ca_invalid_fields: list[str] = []
     ca_missing_fields: list[str] = []
     if ca is None:
@@ -835,8 +891,8 @@ def run_daily(
     else:
         # Path B: a valid effective_adjustment_factor alone satisfies F11.
         factor = ca.get("effective_adjustment_factor")
-        factor_only_ok = factor is not None and _ca_numeric(factor)
-        if factor is not None and not _ca_numeric(factor):
+        factor_only_ok = factor is not None and _ca_positive_finite(factor)
+        if factor is not None and not _ca_positive_finite(factor):
             ca_invalid_fields.append("effective_adjustment_factor")
         if not factor_only_ok:
             for field in ("cash_dividend_per_share", "bonus_share_ratio"):

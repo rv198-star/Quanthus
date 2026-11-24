@@ -104,9 +104,25 @@ def next_session(
 
     SSE and SZSE must agree verbatim; a disagreement, a null mapping, or a
     value outside the descriptor's coverage blocks the day - never a guessed
-    date.'''
+    date.  Issue #722 r3-6: the QUERY date must sit inside coverage and the
+    mapped answer must be the strict successor session - a mapping that
+    returns today or an earlier date, a non-session answer, or a skipped
+    session is a block, never a trusted date.'''
 
     key = today.isoformat()
+    if (
+        (cal.coverage_start is not None and today < cal.coverage_start)
+        or (cal.coverage_end is not None and today > cal.coverage_end)
+    ):
+        return None, CalendarBlock(
+            detail=(
+                "forward calendar query date " + key
+                + " is outside coverage "
+                + (cal.coverage_start.isoformat() if cal.coverage_start else "?")
+                + ".." + (cal.coverage_end.isoformat() if cal.coverage_end else "?")
+            ),
+            missing_member="forward_calendar",
+        )
     sse = cal.sse_next.get(key)
     szse = cal.szse_next.get(key)
     venues = cal.descriptor.get("venues") or {}
@@ -146,6 +162,35 @@ def next_session(
             ),
             missing_member="forward_calendar",
         )
+    # Strict successor: the answer must be after today, and when the venue
+    # declares its session list the answer must BE the next session in it -
+    # a regressed date or a skipped session never stands.
+    if nxt <= today:
+        return None, CalendarBlock(
+            detail=(
+                "forward calendar next_session " + nxt.isoformat()
+                + " is not after the query date " + key
+            ),
+            missing_member="forward_calendar",
+        )
+    for venue_name in ("SSE", "SZSE"):
+        venue = (cal.descriptor.get("venues") or {}).get(venue_name) or {}
+        sessions = venue.get("sessions")
+        if not isinstance(sessions, list) or not sessions:
+            continue
+        try:
+            ordered = sorted(date.fromisoformat(str(s)) for s in sessions)
+        except ValueError:
+            continue
+        followers = [s for s in ordered if s > today]
+        if not followers or followers[0] != nxt:
+            return None, CalendarBlock(
+                detail=(
+                    venue_name + " sessions name a different next session "
+                    "after " + key + " than the map's " + nxt.isoformat()
+                ),
+                missing_member="forward_calendar",
+            )
     return nxt, None
 
 

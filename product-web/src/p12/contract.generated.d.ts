@@ -326,6 +326,7 @@ export interface PublicationStatus {
   market_date: MarketDate
   next_check_at: Timestamp
   observed_at: Timestamp
+  overdue: boolean
   published_at: Timestamp | null
   retracted: boolean
   retraction_reason: string | null

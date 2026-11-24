@@ -198,6 +198,11 @@ def _publication(value: PublicationStatus) -> dict[str, Any]:
     next_check = getattr(value, "next_check_at", None)
     if next_check is not None:
         out["next_check_at"] = _ts(next_check)
+    # Issue #722 r3-3: overdue flag - emitted only when the publish deadline
+    # actually passed with no package and no successful receipt, so a normal
+    # pending day keeps the older shape.
+    if getattr(value, "overdue", False):
+        out["overdue"] = True
     if value.retracted:
         out["retracted"] = True
         out["retraction_reason"] = value.retraction_reason

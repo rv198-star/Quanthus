@@ -879,8 +879,9 @@ def test_sidecar_publish_records_consumer_stamps(tmp_path):
         holdings=(), sidecar_path=sidecar,
     )
     # The synthetic fixture's own clocks are 2000-dated; the run still records
-    # what P12 actually read (the consumer receipt), and TEST_ONLY disposition
-    # does not itself block publication of the synthetic package.
+    # what P12 actually read (the consumer receipt), and a complete synthetic
+    # evidence read does not itself block publication of the synthetic
+    # package.
     assert receipt["status"] == "PUBLISHED"
     assert receipt["consumer_receipt"] is not None
     members = receipt["consumer_receipt"]["members"]
@@ -1688,8 +1689,8 @@ def test_pending_security_blocks_fresh_entry(env):
     # Inject pending through the runner request by monkeypatching
     # _account_facts is overkill - run_daily accepts holdings only, so drive
     # the runner's pending path directly.
-    from quanthus.p12_daily.rule_runner import RunnerRequest
     from quanthus.p12_daily.daily_core_input import qualify_daily_input
+    from quanthus.p12_daily.rule_runner import RunnerRequest
 
     qualified = qualify_daily_input(
         prod / "CURRENT_DAILY_CORE_BASE24.json",
@@ -1731,3 +1732,310 @@ def test_pending_security_with_unknown_quantity_uses_none(env):
     # quantity (the commitment exists, its size is just unknown).
     blocked = {p.security_code for p in pendings}
     assert "600000" in blocked
+
+# ---- Issue #722 r3 fourth-round returns ---------------------------------
+
+
+def test_sidecar_missing_required_member_files_blocks(tmp_path):
+    """Issue #722 r3-4: a REQUIRED sidecar member whose local file cannot be
+    located blocks the whole read - it no longer rides the removed TEST_ONLY
+    pass-through.  Optional members may continue short of evidence."""
+    from quanthus.p12_daily.consumer_sidecar import (
+        DISPOSITION_CLOCKS_COMPLETE,
+        DISPOSITION_INPUT_OR_CLOCK_BLOCKED,
+        read_sidecar,
+    )
+
+    sidecar = _copy_fixture_sidecar(tmp_path, "sidecar.v1.json")
+    if sidecar is None:
+        pytest.skip("P10 sidecar fixture not present")
+    fixtures_root = sidecar.parent.parent
+    read = read_sidecar(
+        sidecar, consumer_now=CUTOFF, decision_cutoff=CUTOFF,
+        member_files_root=fixtures_root,
+    )
+    assert read.disposition == DISPOSITION_CLOCKS_COMPLETE
+    # Removing every required member's local file flips the read to blocked.
+    missing_root = tmp_path / "empty"
+    missing_root.mkdir()
+    read2 = read_sidecar(
+        sidecar, consumer_now=CUTOFF, decision_cutoff=CUTOFF,
+        member_files_root=missing_root,
+    )
+    assert read2.disposition == DISPOSITION_INPUT_OR_CLOCK_BLOCKED
+    assert any(
+        "not located" in reason or "cannot be verified" in reason
+        for reason in read2.blocked_reasons
+    )
+
+
+def test_effective_adjustment_factor_must_be_finite_positive(env):
+    """Issue #722 r3-5: NaN, Inf, 0 and negative factors are invalid values
+    that block, never pass through as an effective factor."""
+    prod, state, _ = env
+    for bad in ("NaN", "0", "-1.5", "inf"):
+        (state / "marker").unlink(missing_ok=True)
+        core = next(prod.glob("*/core"))
+        manifest = core / "manifest.json"
+        data = json.loads(manifest.read_text())
+        data["corporate_actions"] = {"effective_adjustment_factor": bad}
+        manifest.write_text(json.dumps(data))
+        # Rebind the pointer/index digests the same way alter() does.
+        index = prod / "DATES.json"
+        pointer = prod / "CURRENT_DAILY_CORE_BASE24.json"
+        ix = json.loads(index.read_text())
+        pt = json.loads(pointer.read_text())
+        msha = _sha(manifest.read_bytes())
+        pt["entry"]["core_manifest_sha256"] = msha
+        ix["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = msha
+        index.write_text(json.dumps(ix))
+        pt["index_sha256"] = _sha(index.read_bytes())
+        pointer.write_text(json.dumps(pt))
+        receipt = run_daily(
+            state_dir=state, job_root=prod,
+            runner=SyntheticRuleRunner(candidates=(one_candidate(),)),
+            market_date=MARKET_DATE, next_session=NEXT_SESSION,
+            account_id="SYN-PAPER-A",
+            now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+            decision_cutoff=CUTOFF, holdings=(),
+        )
+        assert receipt["status"] == "INPUT_BLOCKED", bad
+        assert "corporate_actions" in receipt["input_block"]["missing_members"]
+
+
+def test_forward_calendar_query_before_coverage_blocks(tmp_path):
+    """Issue #722 r3-6: a query date outside coverage is unavailable, and a
+    mapped next_session that does not move strictly forward is refused."""
+    from quanthus.p12_daily.forward_calendar import (
+        load_forward_calendar,
+        next_session,
+    )
+
+    cal_root = make_forward_calendar(
+        tmp_path / "cal",
+        next_map={
+            "2026-10-30": "2026-11-02",   # query before coverage start 11-01
+            "2026-11-20": "2026-11-19",   # regressed date
+            "2026-12-31": None,
+        },
+    )
+    cal, block, _receipt = load_forward_calendar(
+        cal_root, decision_cutoff=CUTOFF
+    )
+    assert cal is not None
+    nxt, err = next_session(cal, date(2026, 10, 30))
+    assert nxt is None and err is not None
+    assert "coverage" in err.detail
+    nxt, err = next_session(cal, date(2026, 11, 20))
+    assert nxt is None and err is not None
+    assert "not after" in err.detail
+    nxt, err = next_session(cal, date(2026, 12, 31))
+    assert nxt is None and err is not None
+
+
+def test_forward_calendar_next_session_must_be_next_session_in_list(tmp_path):
+    """Issue #722 r3-6: when the venue declares its session list, the mapped
+    answer must BE the next session in it - a skipped session is refused."""
+    import json as _json
+
+    cal_root = make_forward_calendar(
+        tmp_path / "cal",
+        next_map={"2026-11-20": "2026-11-24"},
+    )
+    desc = cal_root / "p10-calendar-test-v1" / "descriptor.json"
+    d = _json.loads(desc.read_text())
+    # Declare real sessions: 11-20 -> 11-21 is the true successor; the map
+    # claims 11-24, which skips 11-21 and must be refused.
+    sessions = ["2026-11-20", "2026-11-21", "2026-11-24"]
+    for venue in ("SSE", "SZSE"):
+        d["venues"][venue]["sessions"] = list(sessions)
+    desc.write_text(_json.dumps(d, sort_keys=True))
+    dsha = hashlib.sha256(desc.read_bytes()).hexdigest()
+    ptr = cal_root / "CURRENT_FORWARD_CALENDAR.json"
+    p = _json.loads(ptr.read_text())
+    p["descriptor_sha256"] = dsha
+    ptr.write_text(_json.dumps(p))
+    from quanthus.p12_daily.forward_calendar import (
+        load_forward_calendar,
+        next_session,
+    )
+
+    cal, _, _ = load_forward_calendar(cal_root, decision_cutoff=CUTOFF)
+    nxt, err = next_session(cal, date(2026, 11, 20))
+    assert nxt is None and err is not None
+    assert "different next session" in err.detail
+
+
+def test_ledger_path_as_directory_is_a_read_failure(env):
+    """Issue #722 r3-7: a ledger path that exists but is not a regular file
+    is a read failure, never FRESH_NO_BASELINE."""
+    from quanthus.p12_daily.daily_job import (
+        AccountFactsUnavailable,
+        _account_facts,
+    )
+
+    prod, state, _ = env
+    state_dir = Path(state)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "p12-paper-facts.sqlite").mkdir()
+    with pytest.raises(AccountFactsUnavailable):
+        _account_facts(state_dir, "SYN-PAPER-A")
+
+
+def test_funding_binding_read_failure_blocks(env):
+    """Issue #722 r3-7: a funding-binding read failure is
+    ACCOUNT_FACTS_UNAVAILABLE, never a quiet empty binding."""
+    from types import SimpleNamespace as N
+    from unittest.mock import patch
+
+    from quanthus.p12_daily.daily_job import (
+        AccountFactsUnavailable,
+        _account_facts,
+    )
+
+    prod, state, _ = env
+    state_dir = Path(state)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "p12-paper-facts.sqlite").write_bytes(b"x")
+    snapshot = N(
+        projection=N(positions=()),
+        history=N(orders=()),
+    )
+
+    def failed(_ctx):
+        raise PermissionError("fixture funding read failed")
+
+    service = N(
+        snapshot=lambda _c: snapshot,
+        funding_binding=failed,
+        funding_state=lambda _c: None,
+    )
+    with patch(
+        "quanthus.platform.adapters.product_daily_facts_sqlite."
+        "build_synthetic_fact_service",
+        return_value=service,
+    ), pytest.raises(AccountFactsUnavailable):
+        _account_facts(state_dir, "SYN-PAPER-A")
+
+
+def test_reserved_bucket_pending_skips_settled_holding_security(env):
+    """Issue #722 r3-7: a RESERVED binding for a security already materialized
+    as a settled holding is not re-listed as a reserved_bucket pending."""
+    from types import SimpleNamespace as N
+    from unittest.mock import patch
+
+    from quanthus.p12_daily.daily_job import _account_facts
+
+    prod, state, _ = env
+    state_dir = Path(state)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "p12-paper-facts.sqlite").write_bytes(b"x")
+    position = N(security_code="600000", quantity=500)
+    snapshot = N(
+        projection=N(positions=(position,)),
+        history=N(orders=()),
+    )
+    service = N(
+        snapshot=lambda _c: snapshot,
+        funding_binding=lambda _c: {"bucket_securities": {"b1": "600000"}},
+        funding_state=lambda _c: None,
+    )
+    with patch(
+        "quanthus.platform.adapters.product_daily_facts_sqlite."
+        "build_synthetic_fact_service",
+        return_value=service,
+    ):
+        holdings, pending, _st, _dg = _account_facts(state_dir, "SYN-PAPER-A")
+    assert [h.security_code for h in holdings] == ["600000"]
+    assert pending == ()
+
+
+def test_hot_cache_refuses_rewritten_file_bytes(tmp_path):
+    """Issue #722 r3-8: a hot-cache hit still re-checks the current file
+    bytes - a package file rewritten after the first read is refused."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
+    run_daily(
+        state_dir=state, job_root=prod,
+        runner=SyntheticRuleRunner(candidates=(one_candidate(),)),
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=now,
+        decision_cutoff=CUTOFF, holdings=(),
+    )
+    scope = AccountScope("SYN-PAPER-A", "synthetic")
+    def clock():
+        return now + timedelta(days=1)
+
+    source = PublishedPackageSource(state, clock)
+    assert source.current(scope).market_date == MARKET_DATE
+    # Rewrite the stored file in place: the registry digest is unchanged, so
+    # only the live-byte re-check can refuse it.
+    store = DailyPackageStore(state)
+    path = store.package_path(MARKET_DATE)
+    body = json.loads(path.read_text())
+    body["input_evidence"]["content_digest"] = "tampered-after-cache"
+    path.write_text(json.dumps(body))
+    with pytest.raises(FactError) as exc:
+        source.current(scope)
+    assert exc.value.reason_code == "POLICY_NOT_ADOPTED"
+
+
+def test_reduce_projection_binds_the_published_run(tmp_path):
+    """Issue #722 r3-1: a later INPUT_BLOCKED or precheck receipt on the same
+    market_date never rewrites the published package's held_signals - the
+    reduce projection binds the run whose status is PUBLISHED."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    holding = HeldPositionFact(security_code="600000", quantity=500)
+    runner = SyntheticRuleRunner(candidates=(
+        one_candidate(holding_signal={
+            "action": "reduce", "target_position_fraction": "0.50",
+        }),
+    ))
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=now,
+        decision_cutoff=CUTOFF, holdings=(holding,),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    # Append a later blocked receipt on the same market_date.
+    store = DailyPackageStore(state)
+    later = {
+        "schema_version": "quanthus.p12.daily-run.v1",
+        "run_id": "20261120T230000000000+0800",
+        "market_date": MARKET_DATE.isoformat(),
+        "status": "INPUT_BLOCKED",
+        "package": None,
+    }
+    store.write_run(later)
+    source = PublishedPackageSource(state, lambda: now + timedelta(days=1))
+    published = source.published_run_for(MARKET_DATE)
+    assert published is not None
+    assert published["status"] in ("PUBLISHED", "ALREADY_PUBLISHED")
+    assert published["run_id"] == receipt["run_id"]
+    assert (store.latest_run() or {})["status"] == "INPUT_BLOCKED"
+
+def test_overdue_judged_from_publish_deadline_not_next_check(tmp_path):
+    """Issue #722 r3-3: overdue is the deadline (configured publish time +
+    slot) passing with no package and no successful receipt - never
+    next_check_at, which only names the NEXT scheduled publish point."""
+    from quanthus.p12_daily.package_source import PublishedPackageSource
+
+    state = tmp_path / "state"
+    now = datetime(2026, 11, 23, 23, 1, tzinfo=TZ)
+    source = PublishedPackageSource(state, lambda: now)
+    # deadline = market_date 22:30 + 30min slot = 23:00; at 23:01 it passed.
+    deadline = source.publish_deadline(date(2026, 11, 23))
+    assert deadline == datetime(2026, 11, 23, 23, 0, tzinfo=TZ)
+    assert now > deadline
+    # A late-publish at 22:35 yesterday must not shift the configured
+    # 22:30 time-of-day used for the next session's check point.
+    assert source.publish_time().hour == 22
+    assert source.publish_time().minute == 30

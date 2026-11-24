@@ -113,7 +113,7 @@
       <div v-else-if="runOverdue" class="p12-banner-note warning" data-testid="p12-run-overdue">
         <div>
           <strong>今日建议已逾发布时间仍未生成</strong>
-          <p>系统计划本应在 {{ time(workbench.publication.next_check_at) }} 发布，当前既无建议包也无缺数暂停回执；请按运行回执核查任务状态。</p>
+          <p>{{ workbench.publication.market_date }} 盘后建议已超过应发布时间仍未生成，当前既无建议包也无缺数暂停回执；请按运行回执核查任务状态{{ workbench.publication.next_check_at ? '，下一次应发布时间 ' + time(workbench.publication.next_check_at) : '' }}。</p>
         </div>
       </div>
 
@@ -918,15 +918,13 @@ export default {
       return status === 'FAILED' || status === 'TIMED_OUT'
     },
     runOverdue () {
-      // Issue #721 R16 (r2): past the NEXT CHECK point with no package and
-      // no blocked receipt is an overdue run, surfaced separately from
-      // "尚未生成".  published_at is null until publication, so the
-      // check-point field is what the overdue clock reads.
+      // Issue #722 r3-3: overdue is the backend's own judgment - the
+      // market_date's publish deadline (configured cutoff + slot) passed
+      // with no package and no successful receipt.  It never reads
+      // next_check_at, which only names the NEXT scheduled publish point
+      // and is never shifted by a same-day late publish.
       if (this.workbench?.package || this.runBlocked || this.runFailed) return false
-      const nextCheck = this.workbench?.publication?.next_check_at
-      if (!nextCheck) return false
-      const now = this.workbench?.clock || new Date().toISOString()
-      return new Date(now) > new Date(nextCheck)
+      return this.workbench?.publication?.overdue === true
     },
     nextCheckText () {
       // Issue #721 R15: the next scheduled publish/check point, shown on the

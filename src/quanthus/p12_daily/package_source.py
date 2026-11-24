@@ -80,6 +80,7 @@ class PublishedPackageSource:
         account_ids: frozenset[str] | None = None,
         next_session_provider=None,
         publish_time: time = DEFAULT_PUBLISH_TIME,
+        publish_slot: timedelta = timedelta(minutes=30),
     ) -> None:
         self._store = DailyPackageStore(Path(state_dir))
         self._clock = clock
@@ -92,6 +93,7 @@ class PublishedPackageSource:
         # is blocked rather than fabricating a date.
         self._next_session_provider = next_session_provider
         self._publish_time = publish_time
+        self._publish_slot = publish_slot
 
     # ---- helpers --------------------------------------------------------------
     def _scope_ok(self, scope: AccountScope) -> None:
@@ -124,11 +126,19 @@ class PublishedPackageSource:
         # serves only while the registered digest for this (source_id,
         # market_date) still equals the digest this reader already
         # verified - a re-registered or deregistered entry is refused
-        # rather than replayed.  A reader that never verified the file
-        # falls through and must prove the stored bytes match the
+        # rather than replayed.  Issue #722 r3-8: the hit ALSO re-checks the
+        # current file bytes - "stored" was just re-read from disk by
+        # packages()/package_for(), whose file_sha256 is recomputed over the
+        # live bytes, so a file rewritten after the first read is refused
+        # instead of replayed from cache.  A reader that never verified the
+        # file falls through and must prove the stored bytes match the
         # registry itself, so a corrupted file is refused.
         cached = self._cache.get(stored.market_date.isoformat())
-        if cached is not None and registered == cached[0]:
+        if (
+            cached is not None
+            and registered == cached[0]
+            and registered == stored.file_sha256
+        ):
             return cached[1]
         if registered != stored.file_sha256:
             raise FactError(
@@ -157,8 +167,39 @@ class PublishedPackageSource:
         return self._store.latest_run()
 
     def publish_time(self) -> time:
-        """Configured daily publish time-of-day for the next-check display."""
+        """Configured daily publish time-of-day (default 22:30+08, overridable
+        via QUANTHUS_P12_DECISION_CUTOFF) for the next-check display."""
         return self._publish_time
+
+    def publish_deadline(self, market_date: date) -> datetime:
+        """The publish deadline for a market date (issue #722 r3-3).
+
+        The configured publish point (decision cutoff time-of-day) plus the
+        publish slot that the post-cutoff timers fill (22:35/22:45/23:00).  A
+        package absent after this moment is overdue - judged from the
+        deadline, never from next_check_at.
+        """
+        return datetime.combine(market_date, self._publish_time) + self._publish_slot
+
+    def published_run_for(self, market_date: date) -> dict | None:
+        """The run receipt that produced this date's package.
+
+        A later INPUT_BLOCKED or precheck receipt on the same market_date never
+        rewrites the published package's actions (issue #722 r3-1): the
+        workbench binds the held_signals of the run whose status is PUBLISHED
+        or ALREADY_PUBLISHED, not the newest receipt.
+        """
+        runs = getattr(self._store, "latest_run_for_date", None)
+        if not callable(runs):
+            return None
+        for candidate in self._store.runs():
+            if (
+                str(candidate.get("market_date")) == market_date.isoformat()
+                and str(candidate.get("status"))
+                in ("PUBLISHED", "ALREADY_PUBLISHED")
+            ):
+                return candidate
+        return None
 
     def pending_source_ref(self) -> VersionRef:
         '''Identity of the not-yet-published placeholder.

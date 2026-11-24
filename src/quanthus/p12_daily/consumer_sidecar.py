@@ -32,7 +32,6 @@ EXCHANGE_TZ = timezone(timedelta(hours=8))
 
 SIDECAR_SCHEMA = "quanthus.p10.daily-consumer-sidecar.v1"
 
-DISPOSITION_TEST_ONLY = "TEST_ONLY"
 DISPOSITION_INPUT_OR_CLOCK_BLOCKED = "INPUT_OR_CLOCK_BLOCKED"
 DISPOSITION_CLOCKS_COMPLETE = "CLOCKS_COMPLETE_FOR_CONSUMER_REVIEW"
 
@@ -256,19 +255,24 @@ def read_sidecar(
             except OSError:
                 member_block.append(mid + " bytes unreadable; consumer stamps null")
         else:
-            # Audit R3 (r2): no bytes could be located - stamps stay null
-            # with the reason on the note; never a fabricated time.  An
-            # unlocatable file is an evidence NOTE, not a blocking fact -
-            # the sidecar's own clock order already gates the run above.
+            # Audit R3 (r3/r2): no bytes could be located - stamps stay null
+            # with the reason on the note; never a fabricated time.  A
+            # REQUIRED member whose local file is missing blocks the day
+            # (#722 r3-4): only an optional member may continue short of
+            # evidence, and it is still recorded rather than silent.
             clock_notes.append(
                 mid + " member file not located; consumer stamps null"
             )
+            if required_member:
+                member_block.append(
+                    mid + " member file not located under the input root; "
+                    "required member bytes cannot be verified"
+                )
         # Audit R3 (r2): the member's declared sha is a CLAIM to verify
         # against P12's own recomputation; a mismatch on a located file is
-        # a block, never a copy.
-        # Audit R3 (r2): the member's declared sha is a CLAIM to verify
-        # against P12's own recomputation; a mismatch on a located file is
-        # a block, never a copy.
+        # a block, never a copy.  (r3) The same holds for a required member
+        # whose located bytes cannot be read at all - it may never proceed
+        # on the declared digest alone.
         if recomputed_sha is not None and str(raw.get("sha256") or "") != recomputed_sha:
             member_block.append(
                 mid + " declared sha256 differs from P12's recomputed digest"
@@ -347,12 +351,16 @@ def read_sidecar(
             )
         )
 
-    if blocked:
-        disposition = DISPOSITION_INPUT_OR_CLOCK_BLOCKED
-    elif evidence_grade == "SYNTHETIC":
-        disposition = DISPOSITION_TEST_ONLY
-    else:
-        disposition = DISPOSITION_CLOCKS_COMPLETE
+    # Issue #722 r3-4: the old TEST_ONLY pass-through is removed - the
+    # evidence_grade still labels the read for the receipt, but disposition
+    # no longer lets unblocked-but-synthetic evidence claim a distinct
+    # release path; every unblocked read lands on the consumer-review
+    # disposition.
+    disposition = (
+        DISPOSITION_INPUT_OR_CLOCK_BLOCKED
+        if blocked
+        else DISPOSITION_CLOCKS_COMPLETE
+    )
     return SidecarRead(
         schema=SIDECAR_SCHEMA,
         event=event,

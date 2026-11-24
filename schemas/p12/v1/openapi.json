@@ -1733,6 +1733,9 @@
      "observed_at": {
       "$ref": "#/components/schemas/Timestamp"
      },
+     "overdue": {
+      "type": "boolean"
+     },
      "published_at": {
       "anyOf": [
        {

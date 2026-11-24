@@ -602,6 +602,10 @@ class SyntheticRuleRunner:
                     # the held_signal's action does.  A reduce exit_plan
                     # surfaces as a 减仓建议 on the workbench and
                     # never becomes a full sell task in batch A.
+                    # Audit r3-2: the package's reason_codes reuse the
+                    # registered EXIT_SIGNAL - "REDUCE" is the producer's
+                    # held_signal action (carried verbatim on the run receipt),
+                    # never a desktop reason code, so it stays off the wire.
                     decisions.append(
                         MarketDecision(
                             opportunity_id=opp_id,
@@ -610,12 +614,10 @@ class SyntheticRuleRunner:
                                 signal.get("security_name", fact.security_code)
                             ),
                             stage=OpportunityStage.EXIT_PLAN,
-                            reason_codes=(
-                                EXIT_SIGNAL if action == EXIT_SIGNAL else REDUCE,
-                            ),
+                            reason_codes=(EXIT_SIGNAL,),
                             explanations=(
                                 Explanation(
-                                    EXIT_SIGNAL if action == EXIT_SIGNAL else REDUCE,
+                                    EXIT_SIGNAL,
                                     ExplanationUse.ACTION,
                                     f"{self._ref.ref_id}@{self._ref.version}",
                                     (

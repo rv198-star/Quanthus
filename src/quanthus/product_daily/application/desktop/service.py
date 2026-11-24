@@ -541,14 +541,38 @@ class P12DesktopApplication:
         next_check_at = None
         next_session = getattr(decisions, "next_session", None)
         if next_session is not None:
-            # Issue #721 R15: the next check is the publish point of the next
-            # authoritative session, taken from the governed calendar and the
-            # configured publish time-of-day carried on the decision set.
-            pub = decisions.published_at
-            next_check_at = datetime.combine(
-                next_session, pub.timetz() if hasattr(pub, "timetz") else pub.time()
-            )
+            # Issue #721 R15 + #722 r3-3: the next check is the publish point
+            # of the next authoritative session at the CONFIGURED publish
+            # time-of-day (the source's publish_time), never this package's
+            # actual published_at - a same-day late publish (22:35) does not
+            # shift tomorrow's configured 22:30.
+            pub_time = None
+            source_publish = getattr(self._decisions, "publish_time", None)
+            if callable(source_publish):
+                pub_time = source_publish()
+            if pub_time is None:
+                pub = decisions.published_at
+                pub_time = pub.timetz() if hasattr(pub, "timetz") else pub.time()
+            next_check_at = datetime.combine(next_session, pub_time)
         published = self._visible(decisions, now)
+        # Issue #722 r3-3: overdue is judged from the market_date's publish
+        # deadline (configured cutoff + publish slot), never next_check_at.
+        # The pending placeholder still has no successful receipt, so a
+        # missed deadline marks it overdue; a late publish today does not
+        # shift the configured next-session point.
+        overdue = False
+        if not published:
+            publish_deadline = getattr(self._decisions, "publish_deadline", None)
+            if callable(publish_deadline):
+                deadline = publish_deadline(decisions.market_date)
+                if deadline is not None and now > deadline:
+                    latest_run = getattr(self._decisions, "latest_run", None)
+                    run_doc = latest_run() if callable(latest_run) else None
+                    ok = (run_doc or {}).get("status") in (
+                        "PUBLISHED",
+                        "ALREADY_PUBLISHED",
+                    )
+                    overdue = not ok
         # Issue #721 R16 (r2): published_at is the REAL publish moment only -
         # null while the package is not yet visible to the reader (never the
         # request's own clock passed off as a publish).  observed_at carries
@@ -561,6 +585,7 @@ class P12DesktopApplication:
             retraction_reason=None if retraction is None else str(retraction.get("reason")),
             next_check_at=next_check_at,
             observed_at=now,
+            overdue=overdue,
         )
 
     # ---- package publication ----------------------------------------------------------
@@ -1265,12 +1290,19 @@ class P12DesktopApplication:
         account = self._account(projection, history, decisions, funding, now)
         blockers = self._policy.missing_for_action(scope.mode)
         visible = self._visible(decisions, now)
-        # Issue #723 comment-7117663809: the run receipt's held_signals carry
-        # the producer action; a "reduce" action marks the matching
-        # exit_plan as a 减仓建议 on the workbench (no full sell task in
-        # batch A).
-        latest = getattr(self._decisions, "latest_run", None)
-        run_doc = latest() if callable(latest) else None
+        # Issue #723 comment-7117663809 + #722 r3-1: the run receipt's
+        # held_signals carry the producer action; a "reduce" action marks the
+        # matching exit_plan as a 减仓建议 on the workbench.  The binding
+        # reads the receipt of the run that PUBLISHED this package
+        # (decisions.market_date, status PUBLISHED/ALREADY_PUBLISHED) - a
+        # later INPUT_BLOCKED or precheck receipt on the same date never
+        # rewrites the published package's actions.
+        published_run = getattr(self._decisions, "published_run_for", None)
+        run_doc = (
+            published_run(decisions.market_date)
+            if callable(published_run)
+            else None
+        )
         reduce_exit_ids = frozenset(
             str(sig.get("opportunity_id"))
             for sig in (run_doc or {}).get("held_signals") or ()
@@ -1412,6 +1444,19 @@ class P12DesktopApplication:
                             else candidate
                         )
                 next_check_at = datetime.combine(nxt, cutoff_time)
+        # Issue #722 r3-3: the blocked page carries the same overdue judgment -
+        # a blocked INPUT_UNAVAILABLE day is a run receipt, so a package absent
+        # past the deadline with no successful receipt is overdue.
+        overdue = False
+        publish_deadline = getattr(self._decisions, "publish_deadline", None)
+        if callable(publish_deadline):
+            deadline = publish_deadline(market_date)
+            if deadline is not None and now > deadline:
+                ok = (run_receipt or {}).get("status") in (
+                    "PUBLISHED",
+                    "ALREADY_PUBLISHED",
+                )
+                overdue = not ok
         return WorkbenchView(
             scope=scope,
             package=None,
@@ -1423,6 +1468,7 @@ class P12DesktopApplication:
                 retraction_reason=None,
                 next_check_at=next_check_at,
                 observed_at=now,
+                overdue=overdue,
             ),
             clock=now,
             clock_kind=self._clock_kind,

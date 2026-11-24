@@ -84,6 +84,12 @@ class PublicationStatus:
     # Issue #721 R16 (r2): the moment the workbench actually observed this
     # state - the reader's clock, never a fabricated publish time.
     observed_at: datetime | None = None
+    # Issue #722 r3-3: True when the publish deadline for this market_date
+    # (decision cutoff + publish slot) has passed with no package and no
+    # successful run receipt.  Overdue is judged from the deadline, never
+    # from next_check_at - a same-day late publish does not shift the
+    # configured next-session publish point.
+    overdue: bool = False
 
 
 @dataclass(frozen=True)

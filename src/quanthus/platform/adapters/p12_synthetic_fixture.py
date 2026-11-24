@@ -178,6 +178,17 @@ def _decision(raw: dict[str, Any]) -> MarketDecision:
         chart=chart,
         entry=entry,
         component_ref=VersionRef(str(component["ref_id"]), str(component["version"]), digest(raw)),
+        # p12.decision-set.v2 (issue #723 E8): the fixture loader now carries
+        # the exit fields the v2 decision-set contract declares, so a replay
+        # fixture can drive a real sell / reduction task on the workbench.
+        exit_kind=(
+            None if raw.get("exit_kind") is None else str(raw["exit_kind"])
+        ),
+        target_position_fraction=(
+            None
+            if raw.get("target_position_fraction") is None
+            else _dec(raw["target_position_fraction"], "target_position_fraction", 6)
+        ),
     )
 
 

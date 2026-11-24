@@ -54,6 +54,7 @@ from quanthus.p12_daily.package_store import (
 from quanthus.p12_daily.rule_runner import (
     SESSION_CLOSE,
     HeldPositionFact,
+    PendingSecurity,
     RunnerOutput,
     RunnerRequest,
     StrategyRuleRunner,
@@ -276,25 +277,48 @@ def _publish_gate_block(
     return None
 
 
-def _holdings_from_ledger(state_dir: Path, account_id: str) -> tuple[HeldPositionFact, ...]:
-    '''Read current positions from the paper ledger without writing any fact.
+class AccountFactsUnavailable(FactError):
+    '''Ledger read failed: the file exists but cannot be opened, a
+    permission error or a FactError was raised while materializing the
+    snapshot.  The run blocks the whole day - it never fabricates empty
+    holdings from an unreadable ledger (issue #723 comment-7119006547).'''
 
-    Returns the raw account facts (M2 F9).  The paper ledger stores
-    security_code and quantity only, so holding_sessions, marked_return and
-    prior_strategy_reduction_count stay None with unavailable_reason set; P12
-    reports account state, it does not invent it.
+    def __init__(self, detail: str):
+        super().__init__("ACCOUNT_FACTS_UNAVAILABLE", detail)
 
-    A store that has not been initialized yields no holdings so the run still
-    works on a fresh deployment before the first login.
+
+def _account_facts(
+    state_dir: Path, account_id: str
+) -> tuple[
+    tuple[HeldPositionFact, ...],
+    tuple[PendingSecurity, ...],
+    str,
+    str,
+]:
+    '''Read account facts from the paper ledger (M2 F9 + #723 pending).
+
+    Returns (holdings, pending_securities, account_state, snapshot_digest).
+
+    A ledger file that exists but cannot be read (permission, corrupt store or
+    a FactError during snapshot) is a whole-day block - it never fabricates
+    holdings.  Only a ledger file that does not exist AND an account with no
+    recorded baseline returns empty holdings, marked account_state=
+    FRESH_NO_BASELINE on the receipt.  pending_securities are the in-flight
+    commitments (open buy orders, RESERVED buckets, unconfirmed fills) read
+    separately from holdings, never merged into them.
     '''
 
     store_path = Path(state_dir) / "p12-paper-facts.sqlite"
     try:
-        if not store_path.is_file():
-            return ()
-    except OSError:
-        # An unreadable store path must not fabricate holdings.
-        return ()
+        store_exists = store_path.is_file()
+    except OSError as exc:
+        raise AccountFactsUnavailable(
+            f"ledger store path unreadable: {exc}"
+        ) from exc
+    if not store_exists:
+        # Fresh deployment before the first baseline: empty holdings are a
+        # real account state, never a read failure.
+        return (), (), "FRESH_NO_BASELINE", digest({"fresh": account_id})
     try:
         from quanthus.capabilities.execution import SyntheticContext
         from quanthus.platform.adapters.product_daily_facts_sqlite import (
@@ -318,11 +342,16 @@ def _holdings_from_ledger(state_dir: Path, account_id: str) -> tuple[HeldPositio
             clock=lambda: datetime.now(EXCHANGE_TZ),
         )
         snapshot = facts.snapshot(context)
-    except FactError:
-        return ()
-    except Exception:  # noqa: BLE001 - an unreadable ledger must not fabricate holdings
-        return ()
-    return tuple(
+    except FactError as exc:
+        raise AccountFactsUnavailable(
+            f"ledger snapshot refused: {exc}"
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 - unreadable ledger is a hard block
+        raise AccountFactsUnavailable(
+            f"ledger store unreadable: {type(exc).__name__}: {exc}"
+        ) from exc
+
+    holdings = tuple(
         HeldPositionFact(
             security_code=p.security_code,
             quantity=int(p.quantity),
@@ -335,6 +364,61 @@ def _holdings_from_ledger(state_dir: Path, account_id: str) -> tuple[HeldPositio
         for p in snapshot.projection.positions
         if int(p.quantity) > 0
     )
+
+    # In-flight commitments (issue #723): open buy orders, RESERVED funding
+    # buckets and unconfirmed fills.  Each names its security and source kind;
+    # quantities come straight from the order/bucket record.
+    pending: list[PendingSecurity] = []
+    history = snapshot.history
+    for order in getattr(history, "orders", ()) or ():
+        side = str(getattr(order, "side", "")).lower()
+        status = str(getattr(order, "status", "")).lower()
+        remaining = max(
+            0,
+            int(getattr(order, "accepted_total_qty", 0) or 0)
+            - int(getattr(order, "known_fill_qty", 0) or 0),
+        )
+        if side == "buy" and status != "terminal" and remaining > 0:
+            pending.append(
+                PendingSecurity(
+                    security_code=order.security_code,
+                    kind="open_buy_order",
+                    quantity=remaining,
+                )
+            )
+        unreported = int(getattr(order, "unreported_fill_qty", 0) or 0)
+        needs_recon = bool(getattr(order, "needs_reconciliation", False))
+        if unreported > 0 or needs_recon:
+            pending.append(
+                PendingSecurity(
+                    security_code=order.security_code,
+                    kind="unconfirmed_fill",
+                    quantity=max(unreported, remaining),
+                )
+            )
+    # RESERVED funding buckets: the bucket_securities binding names which
+    # security a reserved bucket is held out for.
+    try:
+        binding = facts.funding_binding(context)
+    except Exception:  # noqa: BLE001 - bindings are optional, never fatal
+        binding = None
+    if binding:
+        securities = dict(binding.get("bucket_securities") or {})
+        for _bucket_id, sec in securities.items():
+            if sec:
+                pending.append(
+                    PendingSecurity(
+                        security_code=str(sec),
+                        kind="reserved_bucket",
+                        quantity=0,
+                    )
+                )
+    snapshot_digest = digest({
+        "positions": [(p.security_code, int(p.quantity))
+                      for p in snapshot.projection.positions],
+        "pending": [(p.security_code, p.kind, p.quantity) for p in pending],
+    })
+    return holdings, tuple(pending), "OK", snapshot_digest
 
 
 def _blocked_receipt(
@@ -459,12 +543,52 @@ def run_daily(
         store.write_run(receipt)
         return receipt
 
-    resolved_holdings = (
-        holdings
-        if holdings is not None
-        else _holdings_from_ledger(state_dir, account_id)
+    # Account facts (issue #723 comment-7119006547): an unreadable ledger is a
+    # whole-day block, never an empty-holdings fabrication.  Only a missing
+    # ledger file AND no recorded baseline returns empty holdings, marked
+    # account_state=FRESH_NO_BASELINE.  pending_securities are the in-flight
+    # commitments reported beside holdings, never merged into them.
+    pending_securities: tuple[PendingSecurity, ...] = ()
+    account_state = "OK"
+    ledger_snapshot_digest = None
+    if holdings is not None:
+        resolved_holdings = holdings
+    else:
+        try:
+            (
+                resolved_holdings,
+                pending_securities,
+                account_state,
+                ledger_snapshot_digest,
+            ) = _account_facts(state_dir, account_id)
+        except AccountFactsUnavailable as exc:
+            _blocked_receipt(
+                receipt,
+                InputBlock(
+                    reason_code="ACCOUNT_FACTS_UNAVAILABLE",
+                    detail=str(exc),
+                    checked_at=moment,
+                    expected_market_date=market_date,
+                    observed_market_date=None,
+                ),
+                market_date=market_date,
+                missing_members=["account_facts"],
+            )
+            receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+            store.write_run(receipt)
+            return receipt
+    t = stage(
+        "holdings",
+        t,
+        positions=len(resolved_holdings),
+        pending_securities=len(pending_securities),
     )
-    t = stage("holdings", t, positions=len(resolved_holdings))
+    receipt["account_facts"] = {
+        "account_state": account_state,
+        "holdings_count": len(resolved_holdings),
+        "pending_securities_count": len(pending_securities),
+        "snapshot_digest": ledger_snapshot_digest,
+    }
 
     pointer = (
         job_root / 'CURRENT_DAILY_CORE_BASE24.json'
@@ -930,6 +1054,7 @@ def run_daily(
                 snapshot=snapshot,
                 next_session=next_session,
                 holdings=resolved_holdings,
+                pending_securities=pending_securities,
                 published_at=moment,
                 # The job mints this run's identity; the runner echoes it in
                 # its evaluation receipt so the gate binds this exact run.

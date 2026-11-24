@@ -90,6 +90,27 @@ class HeldPositionFact:
     unavailable_reason: str | None = None
 
 
+# Pending-security kinds (issue #723 comment-7119006547): a security already
+# committed by an in-flight instruction is not a fresh candidate - the runner
+# blocks it from a NEW entry, separate from an open position (holdings).
+PENDING_OPEN_BUY_ORDER = "open_buy_order"
+PENDING_RESERVED_BUCKET = "reserved_bucket"
+PENDING_UNCONFIRMED_FILL = "unconfirmed_fill"
+
+
+@dataclass(frozen=True)
+class PendingSecurity:
+    """One security held out of new-candidate evaluation by an in-flight fact.
+
+    kind names the source: an open buy order, a RESERVED funding bucket or an
+    unconfirmed fill.  It is reported beside holdings, never merged into them.
+    """
+
+    security_code: str
+    kind: str
+    quantity: int
+
+
 @dataclass(frozen=True)
 class TrendObservation:
     "A P11 evaluate_trend_stability result bound to its event (M2 F10)."
@@ -123,7 +144,12 @@ class RunnerRequest:
     # Account holdings (M2 F9): the rule binds these into HeldPositionFacts
     # and must not double-enter a held security.
     holdings: tuple[HeldPositionFact, ...]
-    published_at: datetime
+    # Securities already committed by an in-flight instruction (issue #723
+    # comment-7119006547): an open buy order, a RESERVED funding bucket or an
+    # unconfirmed fill.  The runner blocks them from a fresh entry - separate
+    # from holdings, never merged in.
+    pending_securities: tuple[PendingSecurity, ...] = ()
+    published_at: datetime = None
     # The run identity the P12 job mints for this attempt (audit R10): the
     # runner echoes it inside its evaluation receipt so a receipt minted by a
     # different run can never pass the publish gate.
@@ -293,6 +319,15 @@ class SyntheticRuleRunner:
         eligible = datetime.combine(request.next_session, SESSION_OPEN, tzinfo=EXCHANGE_TZ)
         expires = datetime.combine(request.next_session, SESSION_CLOSE, tzinfo=EXCHANGE_TZ)
         held = {fact.security_code for fact in request.holdings if fact.quantity > 0}
+        # Issue #723 comment-7119006547: a security already committed by an
+        # in-flight fact (open buy order, RESERVED bucket or unconfirmed fill)
+        # is blocked from a fresh entry.  These are reported beside holdings
+        # on the receipt, never merged into them.
+        pending = {
+            str(item.security_code)
+            for item in getattr(request, "pending_securities", ()) or ()
+        }
+        blocked_new = held | pending
         decisions: list[MarketDecision] = []
         exclusions: list[SecurityExclusion] = []
         trend_observations: list[TrendObservation] = []
@@ -405,9 +440,10 @@ class SyntheticRuleRunner:
                     )
                 )
                 continue
-            if code in held:
-                # A held security is managed by the holding/exit path, never
-                # re-entered by a fresh entry plan.
+            if code in blocked_new:
+                # A held or in-flight-committed security is managed by the
+                # holding/exit path (held) or held out of new evaluation
+                # (pending), never re-entered by a fresh entry plan.
                 continue
             mark = Decimal(str(item["mark_price"]))
             bound = Decimal(str(item["price_bound"]))

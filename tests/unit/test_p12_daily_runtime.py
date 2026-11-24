@@ -1624,3 +1624,90 @@ def test_pending_placeholder_publishes_at_configured_publish_time(tmp_path):
     next_check = datetime.combine(pending.next_session, pending.published_at.timetz())
     assert next_check == pending.published_at
     assert source.publish_time() == _time(22, 30, tzinfo=TZ)
+
+
+# ---- Issue #723 comment-7119006547: account-facts semantics ---------------
+
+
+def test_unreadable_ledger_blocks_the_whole_day(env):
+    """A ledger file that exists but cannot be opened is a whole-day block
+    (ACCOUNT_FACTS_UNAVAILABLE), never empty-holdings fabrication."""
+    prod, state, _ = env
+    state_dir = Path(state)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # Materialize a corrupt ledger file so _account_facts hits the read path.
+    (state_dir / "p12-paper-facts.sqlite").write_bytes(b"not a sqlite db")
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state_dir,
+        job_root=prod,
+        runner=runner,
+        market_date=MARKET_DATE,
+        next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A",
+        now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        # holdings=None forces a real ledger read.
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert receipt["input_block"]["reason_code"] == "ACCOUNT_FACTS_UNAVAILABLE"
+    assert "account_facts" in receipt["input_block"]["missing_members"]
+
+
+def test_fresh_deployment_yields_empty_holdings_with_marker(env):
+    """A missing ledger file with no baseline returns empty holdings, marked
+    account_state=FRESH_NO_BASELINE - a real fresh state, not a read failure."""
+    prod, state, _ = env
+    receipt = run_daily(
+        state_dir=Path(state),
+        job_root=prod,
+        runner=SyntheticRuleRunner(candidates=(one_candidate(),)),
+        market_date=MARKET_DATE,
+        next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A",
+        now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+    )
+    # The run publishes normally - fresh account, no holdings to evaluate.
+    assert receipt["status"] in ("PUBLISHED", "ALREADY_PUBLISHED")
+    assert receipt["account_facts"]["account_state"] == "FRESH_NO_BASELINE"
+    assert receipt["account_facts"]["holdings_count"] == 0
+
+
+def test_pending_security_blocks_fresh_entry(env):
+    """A security committed by an in-flight pending fact is held out of new
+    candidate evaluation (issue #723); holdings stay separate."""
+    from quanthus.p12_daily.rule_runner import PendingSecurity
+
+    prod, state, _ = env
+    # A candidate on 600000; a pending open-buy-order on the same code must
+    # keep it out of the new-entry set.
+    pending = (PendingSecurity(security_code="600000",
+                               kind="open_buy_order", quantity=100),)
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    # Inject pending through the runner request by monkeypatching
+    # _account_facts is overkill - run_daily accepts holdings only, so drive
+    # the runner's pending path directly.
+    from quanthus.p12_daily.rule_runner import RunnerRequest
+    from quanthus.p12_daily.daily_core_input import qualify_daily_input
+
+    qualified = qualify_daily_input(
+        prod / "CURRENT_DAILY_CORE_BASE24.json",
+        expected_market_date=MARKET_DATE,
+        checked_at=datetime(2026, 11, 20, 22, 30, tzinfo=TZ),
+    )
+    request = RunnerRequest(
+        snapshot=qualified,
+        next_session=NEXT_SESSION,
+        holdings=(),
+        pending_securities=pending,
+        published_at=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        run_id="test-pending",
+    )
+    output = runner.run(request)
+    # 600000 is the candidate; pending must exclude it from new entries.
+    assert all(
+        d.security_code != "600000" or d.entry is None
+        for d in output.decision_set.decisions
+    )

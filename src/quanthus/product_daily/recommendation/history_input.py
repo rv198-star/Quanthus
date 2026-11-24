@@ -316,19 +316,30 @@ def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
         )
         key = (row.venue_id, row.session_date)
         prior = seen_sessions.get(key)
-        if prior is not None and (
-            prior.is_open != row.is_open
-            or prior.source_member_id != row.source_member_id
-            or prior.knowledge_from != row.knowledge_from
-        ):
-            _fail(
-                "conflicting_calendar_row",
-                f"calendar_rows[{index}] conflicts with an earlier "
-                f"{row.venue_id} {row.session_date} row",
-            )
-        if prior is None:
-            seen_sessions[key] = row
-            calendar_rows.append(row)
+        if prior is not None:
+            # A duplicate (venue, session_date) row is only admissible when it
+            # is semantically identical on every clock-bearing field - the same
+            # instant for open_at and close_at (equivalent-timezone instants
+            # compare equal), the same open flag, source member and knowledge
+            # clock.  Two anchors for the same session that differ in any of
+            # these cannot both describe its observation start, so the day is a
+            # named conflict rather than "first row wins".
+            if (
+                prior.is_open != row.is_open
+                or prior.source_member_id != row.source_member_id
+                or prior.knowledge_from != row.knowledge_from
+                or prior.open_at != row.open_at
+                or prior.close_at != row.close_at
+            ):
+                _fail(
+                    "conflicting_calendar_row",
+                    f"calendar_rows[{index}] conflicts with an earlier "
+                    f"{row.venue_id} {row.session_date} row",
+                )
+            # Semantically identical duplicates are normalised to a single row.
+            continue
+        seen_sessions[key] = row
+        calendar_rows.append(row)
 
     listing_rows: list[ListingRow] = []
     for index, lrow in enumerate(_seq(envelope.get("listing_rows"), "listing_rows")):
@@ -438,11 +449,24 @@ def derive_universe_membership(
     missing_anchor: list[date] = []
     for session, anchor in venue_sessions:
         if anchor is None:
-            # The session is admissible for listing evaluation only if we can
-            # prove the interval is active at its observation anchor.  A missing
-            # anchor is named and the session is not counted, rather than
+            # An anchor is required ONLY when the session could fall inside one
+            # of the listing intervals - before the listing, after delisting,
+            # or between disjoint intervals it provably cannot change the age.
+            # A session outside every interval's possible day range is skipped
+            # without an anchor; one that might intersect is named, never
             # guessed from the date or close clock.
-            missing_anchor.append(session)
+            intersects = any(
+                interval.effective_from.astimezone(_venue_tz(venue_id)).date()
+                <= session
+                <= (
+                    interval.effective_to.astimezone(_venue_tz(venue_id)).date()
+                    if interval.effective_to is not None
+                    else session
+                )
+                for interval in intervals
+            )
+            if intersects:
+                missing_anchor.append(session)
             continue
         for interval in intervals:
             # baseline: effective_from <= observation_start < effective_to
@@ -452,9 +476,9 @@ def derive_universe_membership(
                 membership.append(session)
                 break
     if missing_anchor:
-        # Anchor-missing sessions are a per-security isolation: the listing
-        # interval is recorded as unverifiable for those sessions so the
-        # receipt can name them without fabricating an age.
+        # Anchor-missing sessions that could intersect a listing interval are a
+        # per-security isolation: the listing interval is unverifiable for
+        # those sessions so the receipt names them without fabricating an age.
         _fail(
             "listing_anchor_unavailable",
             f"{security_id}/{listing_id}@{venue_id}: calendar rows lack an "

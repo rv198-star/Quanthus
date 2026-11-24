@@ -84,6 +84,7 @@ def _listing(
     effective_from: str = "2026-01-01",
     member_id: str = "core-daily-1d",
     listing_id: str | None = None,
+    effective_to: str | None = None,
 ) -> dict:
     # The identity carries listing-<code> (see _identity in test_p11_daily_runner);
     # the listing row must bind that exact listing_id, not a derived default.
@@ -93,7 +94,7 @@ def _listing(
         "listing_id": listing_id or f"listing-{code}",
         "venue_id": venue,
         "effective_from": effective_from,
-        "effective_to": None,
+        "effective_to": effective_to,
         "knowledge_from": "2026-01-01T00:00:00+08:00",
         "source_member_id": member_id,
     }
@@ -863,18 +864,129 @@ def test_r3_listing_z_and_offset_equivalent():
     assert iz[0].universe_membership == io[0].universe_membership
 
 
-def test_r3_listing_missing_anchor_isolated_not_guessed():
-    """A session without open_at cannot be half-open-compared; it is named
-    (listing_anchor_unavailable) rather than guessed from the date/close."""
+def test_r4_missing_anchor_before_listing_does_not_block():
+    """C6 P1-2: an anchor missing on a session BEFORE the listing starts is
+    irrelevant to that listing's age and must not exclude it."""
     raw = _trend_raw("600000")
     cal = _calendar()
-    cal[0].pop("open_at")  # strip the anchor on the first session
+    cal[0].pop("open_at")  # earliest session, long before the listing
     env = _envelope(
         [_security_entry(raw)],
         calendar=cal,
         listing=[_listing(raw.identity.security_id, effective_from="2026-01-01")],
     )
     inputs, receipts = raw_security_inputs_from_history(load_raw_history(env))
+    assert inputs  # the irrelevant missing anchor must not exclude the security
+    assert inputs[0].universe_membership
+
+
+def test_r4_missing_anchor_inside_listing_isolated():
+    """C6 P1-2: a missing anchor on a session that could intersect the listing
+    interval IS named (listing_anchor_unavailable), never guessed."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 200)
+    cal = _calendar(days=cal_days)
+    listing_start = cal_days[100]
+    # Strip the anchor on a session inside the listing window (after the start).
+    victim = cal_days[150]
+    for row in cal:
+        if row["session_date"] == victim.isoformat():
+            row.pop("open_at")
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[_listing(raw.identity.security_id, effective_from=listing_start.isoformat())],
+    )
+    inputs, receipts = raw_security_inputs_from_history(load_raw_history(env))
     assert inputs == []
     assert receipts[0]["status"] == "excluded"
     assert "anchor" in receipts[0]["reason"].lower()
+
+
+def test_r4_conflicting_open_at_duplicate_rejected():
+    """C6 P1-1: two rows for the same (venue, session) with DIFFERENT open_at
+    are a named conflict, never 'first row wins'."""
+    raw = _trend_raw("600000")
+    cal = _calendar()
+    # Second row: same session, a DIFFERENT open_at anchor.
+    dup = dict(cal[0])
+    dup["open_at"] = "2026-02-18T10:00:00+08:00"
+    cal.append(dup)
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[_listing(raw.identity.security_id, effective_from="2026-01-01")],
+    )
+    with pytest.raises(ProductDailyError, match="conflicting_calendar_row"):
+        raw_security_inputs_from_history(load_raw_history(env))
+
+
+def test_r4_conflicting_open_at_threshold_not_first_wins():
+    """C6 P1-1: at a listing ending 09:45, duplicate anchors 09:30 vs 10:00
+    would change the membership boundary - the conflict is rejected, not
+    resolved by taking the first row."""
+    raw = _trend_raw("600000")
+    cal = _calendar()
+    target_day = cal[0]["session_date"]
+    # Make the first session's listing end between the two candidate anchors.
+    listing = _listing(
+        raw.identity.security_id,
+        effective_from="2026-01-01",
+        effective_to=f"{target_day}T09:45:00+08:00",
+    )
+    dup = dict(cal[0])
+    dup["open_at"] = f"{target_day}T10:00:00+08:00"  # would EXCLUDE vs 09:30 include
+    cal.append(dup)
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[listing],
+    )
+    with pytest.raises(ProductDailyError, match="conflicting_calendar_row"):
+        raw_security_inputs_from_history(load_raw_history(env))
+
+
+def test_r4_identical_duplicate_normalised():
+    """An exact-duplicate calendar row (same instant for every clock field)
+    is normalised to one row, not a conflict; membership is unchanged."""
+    raw = _trend_raw("600000")
+    cal = _calendar()
+    dup = dict(cal[0])  # byte-identical duplicate
+    cal.append(dup)
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[_listing(raw.identity.security_id, effective_from="2026-01-01")],
+    )
+    inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
+    assert inputs[0].universe_membership
+    # Order-insensitive: reversing the duplicate keeps the same membership.
+    cal2 = _calendar()
+    dup2 = dict(cal2[0])
+    cal2.append(dup2)
+    cal2.reverse()
+    env2 = _envelope(
+        [_security_entry(raw)],
+        calendar=cal2,
+        listing=[_listing(raw.identity.security_id, effective_from="2026-01-01")],
+    )
+    inputs2, _ = raw_security_inputs_from_history(load_raw_history(env2))
+    assert inputs2[0].universe_membership == inputs[0].universe_membership
+
+
+def test_r4_equivalent_instant_open_at_normalised():
+    """open_at spelled '09:30+08:00' vs '01:30Z' is the SAME instant ->
+    normalised to one row (equivalent-timezone instants compare equal)."""
+    raw = _trend_raw("600000")
+    cal = _calendar()
+    dup = dict(cal[0])
+    # cal[0]'s 09:30+08 == the same instant spelled with Z: -8h -> 01:30Z.
+    dup["open_at"] = cal[0]["session_date"] + "T01:30:00Z"
+    cal.append(dup)
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[_listing(raw.identity.security_id, effective_from="2026-01-01")],
+    )
+    inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
+    assert inputs[0].universe_membership

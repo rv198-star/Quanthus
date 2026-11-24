@@ -1190,3 +1190,203 @@ class TestCoveragePrecheckRound2:
         assert block["day_block"] is not None
         assert "history_gate_unsatisfied" in block["note_text"] or \
                "整日阻断" in block["note_text"]
+
+
+class TestScanDetailDisplay:
+    """425db1a3 empty-package page: per-security audit.replay_no_action
+    transition checks and gates are rendered with raw values and
+    pass/fail flags; the 今日无操作 message reaches the note."""
+
+    @staticmethod
+    def _package():
+        """Minimal p11.daily-advice-package.v2 shape with the real
+        audit.replay_no_action structure from 425db1a3 / 10-08."""
+        def _scan(code, sid, events_obs, features_obs, listing_obs,
+                  prior_quiet, current_active, checks):
+            return {
+                "security_code": code,
+                "security_id": sid,
+                "verdict": "not_triggered",
+                "gates": {
+                    "events": {"required": 22, "observed": events_obs,
+                               "status": "satisfied",
+                               "reason": "qualified no-signal"},
+                    "features": {"required": 61, "observed": features_obs,
+                                 "status": "satisfied",
+                                 "reason": "feature_ready"},
+                    "listing": {"required": 120, "observed": listing_obs,
+                                "status": "satisfied",
+                                "reason": "listing_sessions=" + str(listing_obs) + " vs required 120"},
+                },
+                "transition": {
+                    "schema_version": "p11.scan-transition.v1",
+                    "prior_session": "2026-09-30",
+                    "signal_date": "2026-10-08",
+                    "window_start": "2026-09-01",
+                    "prior_quiet": prior_quiet,
+                    "current_active": current_active,
+                    "checks": checks,
+                },
+            }
+        return {
+            "schema_version": "p11.daily-advice-package.v2",
+            "package_id": "REPLAY-standard-base-2.5.1-2026-10-08",
+            "decision_sets": [{
+                "source_id": "REPLAY-standard-base-2.5.1",
+                "market_date": "2026-10-08",
+                "audit": {
+                    "replay_no_action": {
+                        "schema_version": "p11.replay-no-action.v1",
+                        "market_date": "2026-10-08",
+                        "candidate_count": 0,
+                        "message": "今日无操作",
+                        "scans": [
+                            _scan("000002", "security_011", 61, 61, 8709,
+                                  False, True, {
+                                      "quiet_range_ratio_max": {
+                                          "actual": "183376/30115",
+                                          "op": "<=", "threshold": "4/5",
+                                          "passed": False},
+                                      "quiet_turnover_ratio_max": {
+                                          "actual": "1031610480748/108867853831",
+                                          "op": "<=", "threshold": "4/5",
+                                          "passed": False},
+                                      "active_range_ratio_min": {
+                                          "actual": "626587/367434",
+                                          "op": ">=", "threshold": "3/2",
+                                          "passed": True},
+                                      "active_turnover_ratio_min": {
+                                          "actual": "609781280204/116823145805",
+                                          "op": ">=", "threshold": "3/2",
+                                          "passed": True},
+                                  }),
+                            _scan("600000", "security_2e0", 61, 61, 6519,
+                                  False, True, {
+                                      "quiet_range_ratio_max": {
+                                          "actual": "60390/30307",
+                                          "op": "<=", "threshold": "4/5",
+                                          "passed": False},
+                                      "quiet_turnover_ratio_max": {
+                                          "actual": "69310496869/30750016087",
+                                          "op": "<=", "threshold": "4/5",
+                                          "passed": False},
+                                      "active_range_ratio_min": {
+                                          "actual": "1124840/636447",
+                                          "op": ">=", "threshold": "3/2",
+                                          "passed": True},
+                                      "active_turnover_ratio_min": {
+                                          "actual": "110698219315/61500032174",
+                                          "op": ">=", "threshold": "3/2",
+                                          "passed": True},
+                                  }),
+                            _scan("002040", "security_729", 61, 61, 5232,
+                                  True, False, {
+                                      "quiet_range_ratio_max": {
+                                          "actual": "11758348/32865727",
+                                          "op": "<=", "threshold": "4/5",
+                                          "passed": True},
+                                      "quiet_turnover_ratio_max": {
+                                          "actual": "1411906922/4956993379",
+                                          "op": "<=", "threshold": "4/5",
+                                          "passed": True},
+                                      "active_range_ratio_min": {
+                                          "actual": "197370/5432100",
+                                          "op": ">=", "threshold": "3/2",
+                                          "passed": False},
+                                      "active_turnover_ratio_min": {
+                                          "actual": "110/1000000",
+                                          "op": ">=", "threshold": "3/2",
+                                          "passed": False},
+                                  }),
+                        ],
+                    },
+                },
+            }],
+        }
+    def _pkg_receipt(self):
+        """p11.paper-replay-day.v1 day dict carrying the published
+        v2 package whose audit.replay_no_action has three scans."""
+        pkg = self._package()
+        return {
+            "schema_version": "p11.paper-replay-day.v1",
+            "market_date": "2026-10-08",
+            "scenario_id": "spdb-20261008",
+            "delivered": {
+                "000002": {"entry_eligible": True},
+                "600000": {"entry_eligible": True},
+                "002040": {"entry_eligible": True},
+            },
+            "seam": {
+                "evaluated_universe": ["000002", "600000", "002040"],
+                "decisions": [],
+            },
+            "source_closure": {
+                "held_decisions": [],
+                "history_receipts": [
+                    {
+                        "security_code": c,
+                        "status": "not_qualified",
+                        "gates": {
+                            "events": {
+                                "status": "satisfied",
+                                "reason": "qualified no-signal",
+                            }
+                        },
+                    }
+                    for c in ("000002", "600000", "002040")
+                ],
+            },
+            "package": pkg,
+        }
+
+    def test_replay_no_action_details_reach_rows(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+
+        block = coverage_block(self._pkg_receipt())
+        assert block["replay_message"] == "今日无操作"
+        rows = {r["security_code"]: r for r in block["securities"]}
+        # 万科A 000002: four checks with raw values and pass flags.
+        d = rows["000002"]["scan_detail"]
+        assert d["verdict"] == "not_triggered"
+        assert len(d["checks"]) == 4
+        checks = {c["key"]: c for c in d["checks"]}
+        assert checks["active_range_ratio_min"]["passed"] is True
+        assert checks["active_range_ratio_min"]["actual"] == "1.7053x"
+        assert checks["quiet_range_ratio_max"]["passed"] is False
+        assert "前日振幅" in checks["quiet_range_ratio_max"]["label"]
+        assert "≥" in checks["active_range_ratio_min"]["label"]
+        # three gate lines with observed/required and a mark.
+        assert len(d["gates"]) == 3
+        assert "8709/120 ✓" in d["gates"][2]
+        assert d["candidate_count"] == 0
+        assert d["prior_session"] == "2026-09-30"
+
+    def test_600000_and_002040_details(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+
+        rows = {
+            r["security_code"]: r
+            for r in coverage_block(self._pkg_receipt())["securities"]
+        }
+        spdb = rows["600000"]["scan_detail"]
+        assert spdb["verdict"] == "not_triggered"
+        assert spdb["gates"][2] == "上市 6519/120 ✓"
+        spdb_checks = {c["key"]: c for c in spdb["checks"]}
+        assert spdb_checks["active_turnover_ratio_min"]["actual"] == "1.8000x"
+        nj = rows["002040"]["scan_detail"]
+        nj_checks = {c["key"]: c for c in nj["checks"]}
+        # 南京港 prior quiet, current not active.
+        assert nj["prior_quiet"] is True
+        assert nj["current_active"] is False
+        assert nj_checks["quiet_range_ratio_max"]["passed"] is True
+        assert nj_checks["active_range_ratio_min"]["passed"] is False
+
+    def test_no_package_no_detail_no_message(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+
+        r = self._pkg_receipt()
+        r["package"] = None
+        block = coverage_block(r)
+        assert block["replay_message"] is None
+        for row in block["securities"]:
+            assert row["scan_detail"] is None

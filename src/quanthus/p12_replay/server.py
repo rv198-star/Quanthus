@@ -100,7 +100,7 @@ footer{max-width:1120px;margin:0 auto 40px;padding:0 20px;color:var(--muted);fon
 .cov-na{background:#eef1f4;color:var(--muted)}
 .cov-block{background:#f6e8e8;color:#b03a3a}
 .covrow .v{color:var(--info);font-weight:600}
-.covrow .r{color:var(--muted);flex:1;min-width:160px}
+.covrow .r{color:var(--muted);flex:1;min-width:160px}.covdetail{margin:2px 0 4px 0;padding-left:4px;font-size:12px;line-height:1.7;color:var(--muted)}.covdetail .chk{display:inline-block;margin-right:14px}.covdetail .chk.pass{color:#1a7f37}.covdetail .chk.fail{color:#b03a3a}.covdetail .gates{color:#6a737d;margin-right:14px}
 tabs{display:flex;gap:0;margin-bottom:0}
 .tab{padding:8px 18px;cursor:pointer;border:1px solid var(--line);border-bottom:none;border-radius:5px 5px 0 0;background:#f3f4f5;font-size:13px}
 .tab.on{background:#fff;font-weight:600;border-bottom:1px solid #fff;margin-bottom:-1px}
@@ -167,12 +167,12 @@ function sideClass(label){if(label==='买入建议')return'buy';if(label==='卖�
 function renderCoverage(){
  const el=document.getElementById('coverage');const c=(S&&S.coverage)||null;
  if(!c){el.innerHTML='';return}
- let h='<p class=covnote><b>'+esc(c.note_text||'')+'</b></p>';
+ let h='<p class=covnote><b>'+esc(c.note_text||'')+'</b>'+(c.replay_message?'<span style="font-weight:400;color:var(--muted)"> · '+esc(c.replay_message)+'</span>':'')+'</p>';
  const rows=c.securities||[];
  if(rows.length){h+='<div style="margin-top:4px">';
   for(const r of rows){
    const st=r.state||'';const tag=st==='evaluated'?'<span class="covtag cov-eval">已评估</span>':(st==='blocked'?'<span class="covtag cov-block">时钟阻断</span>':(st==='pending'?'<span class="covtag cov-pend">待核</span>':'<span class="covtag cov-na">'+esc(st||'—')+'</span>'));
-   h+='<div class=covrow><span class=c>'+esc(r.security_code)+'</span>'+tag+(r.verdict?'<span class=v>'+esc(r.verdict)+'</span>':'')+(r.scan_reason?'<span class=r>'+esc(r.scan_reason)+'</span>':'')+'</div>';
+   h+='<div class=covrow><span class=c>'+esc(r.security_code)+'</span>'+tag+(r.verdict?'<span class=v>'+esc(r.verdict)+'</span>':'')+(r.scan_reason?'<span class=r>'+esc(r.scan_reason)+'</span>':'')+'</div>';   const sd=r.scan_detail||null;   if(sd){    let dh='<div class=covdetail>';    if((sd.gates||[]).length){dh+='<span class=gates>'+sd.gates.map(esc).join(' · ')+'</span>'}    for(const ck of (sd.checks||[])){dh+='<span class="chk '+(ck.passed?'pass':'fail')+'">'+esc(ck.label)+' 实测 '+esc(ck.actual)+(ck.passed?' ✓':' ✗')+'</span>'}    if(sd.verdict){dh+='<span class=gates>判定 '+esc(sd.verdict)+'</span>'}    dh+='</div>';h+=dh;   }
   }
   h+='</div>'
  }

@@ -934,14 +934,22 @@ def _analyze_member_use(
         "excluded_late_partitions": excluded,
         "unavailable_at_read": unavailable,
         "member_count": len(members),
+        # The three public counts are mutually exclusive by dependency_tier and
+        # sum to member_count: a member is counted by the class that binds it,
+        # not by its read disposition (an opened_not_used member is not also a
+        # registered_not_read member even though it was not read for T).
         "used_for_T_count": sum(
-            1 for m in members if m.get("disposition") == "used" and m.get("is_used")
+            1
+            for m in members
+            if m.get("is_used")
+            and m.get("dependency_tier")
+            in ("shared", "per_security", "multi_security")
         ),
         "opened_not_used_count": sum(
             1 for m in members if m.get("dependency_tier") == "opened_not_used"
         ),
         "registered_not_read_count": sum(
-            1 for m in members if m.get("disposition") == "unused"
+            1 for m in members if m.get("dependency_tier") == "unused"
         ),
         "match_window_through": match_end.isoformat(),
     }

@@ -234,8 +234,15 @@ def test_still_listed_truncated_calendar_still_shared_block():
             ],
         )
     )
-    with pytest.raises(ProductDailyError, match="calendar_coverage_incomplete"):
-        raw_security_inputs_from_history(hist)
+    inputs, receipts = raw_security_inputs_from_history(hist)
+    # Still-listed but listing history predates the calendar start: the
+    # security is isolated per-security with the named coverage reason, not a
+    # fabricated age and not a hard raise that would drop legal neighbours.
+    assert list(inputs) == []
+    r = [x for x in receipts if x.get("security_code") == "600000"]
+    assert r and r[0]["status"] == "excluded"
+    assert "calendar_coverage_incomplete" in r[0]["reason"]
+    assert r[0]["scope"] == "per_security"
 
 
 def test_end_to_end_delisted_neighbour_does_not_block_day(runner, resources):

@@ -624,7 +624,11 @@ def test_r1_truncated_calendar_coverage_rejected(runner, resources):
             )
         ],
     )
-    with pytest.raises(ProductDailyError, match="calendar_coverage_incomplete"):
+    # A still-listed security whose listing predates the calendar start is now
+    # isolated per-security with the named coverage reason (neighbours keep
+    # their scan).  As the ONLY security it leaves zero qualified inputs, so
+    # the day still fails closed at the shared missing_raw_inputs floor.
+    with pytest.raises(ProductDailyError, match="missing_raw_inputs"):
         run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
 
 
@@ -895,10 +899,13 @@ def test_r3_listing_effective_to_at_session_start_excludes_T():
     listing = _listing(raw.identity.security_id, effective_from=cal_days[0].isoformat())
     listing["effective_to"] = f"{TARGET.isoformat()}T00:00:00+08:00"
     env = _envelope([_security_entry(raw)], calendar=_calendar(days=cal_days), listing=[listing])
-    inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
-    membership = inputs[0].universe_membership
-    assert TARGET not in membership
-    assert len(membership) == 199
+    inputs, receipts = raw_security_inputs_from_history(load_raw_history(env))
+    # T is provably outside the interval -> not_listed_on_signal_date census,
+    # never a fabricated membership or a missing_signal_membership error.
+    assert inputs == []
+    r = [x for x in receipts if x.get("security_code") == "600000"]
+    assert r and r[0]["status"] == "excluded"
+    assert r[0]["reason"] == "not_listed_on_signal_date"
 
 
 def test_r3_listing_effective_from_after_close_excludes_T():
@@ -909,9 +916,12 @@ def test_r3_listing_effective_from_after_close_excludes_T():
     listing = _listing(raw.identity.security_id, effective_from=cal_days[0].isoformat())
     listing["effective_from"] = f"{TARGET.isoformat()}T20:00:00+08:00"
     env = _envelope([_security_entry(raw)], calendar=_calendar(days=cal_days), listing=[listing])
-    inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
-    membership = inputs[0].universe_membership
-    assert membership == ()  # no session's anchor is at/after 20:00 yet
+    inputs, receipts = raw_security_inputs_from_history(load_raw_history(env))
+    # effective_from is after T's open -> T is not yet a member, so the
+    # security is a named not_listed_on_signal_date census exclusion.
+    assert inputs == []
+    r = [x for x in receipts if x.get("security_code") == "600000"]
+    assert r and r[0]["status"] == "excluded" and r[0]["reason"] == "not_listed_on_signal_date"
 
 
 def test_r3_listing_z_and_offset_equivalent():
@@ -1159,7 +1169,11 @@ def test_eqday_listing_start_straddle_is_unresolved():
         load_raw_history(env), anchor_mode="equivalent_day"
     )
     assert inputs == []
-    assert "anchor" in receipts[0]["reason"].lower()
+    # effective_from mid-day at start_day: T straddles the interval start, so
+    # t_active is unresolved and the security is a named
+    # listing_anchor_unavailable per-security isolation, never a fabricated age.
+    r = [x for x in receipts if x.get("security_code") == "600000"]
+    assert r and r[0]["status"] == "excluded" and "anchor" in r[0]["reason"].lower()
 
 
 def test_eqday_delist_day_straddle_is_unresolved():
@@ -1185,7 +1199,11 @@ def test_eqday_delist_day_straddle_is_unresolved():
         load_raw_history(env), anchor_mode="equivalent_day"
     )
     assert inputs == []
-    assert "anchor" in receipts[0]["reason"].lower()
+    # effective_to is mid-day on an earlier session, so T sits outside the
+    # interval: the security is a named not_listed_on_signal_date exclusion
+    # before the equivalent-day straddle reasoning is even reached.
+    r = [x for x in receipts if x.get("security_code") == "600000"]
+    assert r and r[0]["status"] == "excluded" and r[0]["reason"] == "not_listed_on_signal_date"
 
 
 def test_eqday_session_outside_all_intervals_not_counted():

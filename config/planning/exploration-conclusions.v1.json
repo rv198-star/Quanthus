@@ -2817,6 +2817,61 @@
         "CP-690-R11-FINAL-ACCEPTED-20261116"
       ],
       "supersedes": "CON-R11-LIMITED-SYNTHETIC-PARK-20261116"
+    },
+    {
+      "id": "CON-P10-FORWARD-CALENDAR-20261124",
+      "recorded_at": "2026-11-24T00:04:00.755073+00:00",
+      "actor": "P10 data Owner",
+      "question_id": "P10-CALENDAR-NEXT-001",
+      "family": "p10-forward-calendar",
+      "work_item": "P10-DATA-CALENDAR-NEXT-001",
+      "modules": [
+        "DATA"
+      ],
+      "question": "Can currently observed official exchange authority provide P12 a bounded next_session without rewriting historical daily-core?",
+      "consumer": "P12 #719/#723; P11 F2 reference handoff",
+      "scope": "SSE/SZSE only, 2026-11-24..12-31 prospective date-only facts. BSE explicitly unavailable; next session beyond coverage unavailable.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Pinned official-source date derivation and current CN02 publication only; P12 consumer receipt/reader acceptance and all other source/member/use contracts remain separately owned.",
+      "decision_effect": "Replace P12 missing F2 entry with a real independent qualified-venue calendar candidate; reuse existing daily-core, preserve venue-local BSE debt and old manifests. Actual P12 reader integration is pending.",
+      "reopen_conditions": [
+        "BSE official original bytes become available with actual acquisition proof.",
+        "2027 official holiday arrangements and weekly-rule applicability support a new version.",
+        "P12 identifies a concrete additional calendar field/use and binds its finite scope."
+      ],
+      "retained_assets": [
+        "Code6693b9e077e5f07dfd7fe81cf06e49f44b0f5e50/tree37ff97a7db3b509777df8943af4e0c4cde6fda25 and PR745.",
+        "CN02 p10-calendar-20261124-v1, four pinned official originals and actual receipt/publication clocks.",
+        "Original Mac763 baseline failures; original CN029473pass/3fail/35skip and all Git-evidence recovery receipts."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Measured full-check elapsed277.70294s local+944.77763s CN02; direct logical document attempts13 and successful bytes832664. Redirect HTTP count and model/control effort are unknown, not zero. Three metadata failures recovered by versioned GitHub objects and targeted checks, without replaying 9473 passing tests. No paid or market-row acquisition.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/REQUEST-v1.json",
+        "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/LOCAL-SOURCE-RECEIPTS.json",
+        "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/MAKE-CHECK-RESULT.json",
+        "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/CN02-CHECKS/MAKE-CHECK-RESULT.json",
+        "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/CN02-CHECKS/RECOVERY-v2-RESULT.json"
+      ],
+      "evidence": [
+        {
+          "id": "CALENDAR-743-RESULT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/RESULT.json",
+          "sha256": "8d75e055d69bf70b31e5ce52370b5e056fa66f967309a4efab5fd60eaa2885be",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Only #743 pinned date-only calendar engineering and actual CN02 SSE/SZSE publication; P12 reader/use acceptance pending; BSE unavailable and no 2027 extrapolation."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-743-20261124T000232406651Z"
+      ],
+      "supersedes": null
     }
   ]
 }

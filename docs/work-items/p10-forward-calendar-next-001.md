@@ -79,3 +79,26 @@ immutable publication. Applicable local lint/type, exact-base maintenance/planni
 P12's new reader and actual receipt/acceptance remain with P12. This task adds no market fetch,
 rule algorithm, scheduler, strategy activation or change to Base 2.6. New calendar authority is
 a new versioned input; current use of source-observed historical calendars remains unchanged.
+
+## Fixed delivery checkpoint — 2026-11-24
+
+Runtime `6693b9e077e5f07dfd7fe81cf06e49f44b0f5e50` produced the CN02 version
+`p10-calendar-20261124-v1` under `/srv/agentdock/quanthus-ops/p10-forward-calendar-v1`.
+The descriptor SHA256 is `f13d1862d5d73d7c9d940ef88340c6650b6507b83cb243cb7c20e85203c307e9`;
+actual channel visibility is `2026-11-24T07:43:55.307901+08:00`. Handoff messages were sent to
+P11/P12; P12's consumer receipt and reader acceptance remain pending.
+
+Both local and CN02 focused16, Ruff and strict mypy passed. Mac full check retained the exact
+763-failure baseline (8707 pass/41 skip). CN02 full check produced 9473 pass/3 fail/35 skip.
+The three failures were missing immutable history-import/evidence Git objects in the fresh clone.
+Fetching its ancestry and the one non-ancestor pinned revision `869914380f233f1e792040a9a444f2d98b882e90`
+through GitHub resolved them: all three targeted tests, planning and exact-base history checks
+passed with the same code/tree. The original full-command exit2 and two recovery attempts are
+retained; the 9473 passing tests were reused. This is a checkout-evidence repair, not a new data
+or policy gate. Subsequent complete verification uses the project-isolated CN02 runtime.
+
+The fixed result is `RESULT.json` in the evidence directory, SHA256
+`8d75e055d69bf70b31e5ce52370b5e056fa66f967309a4efab5fd60eaa2885be`.
+PR745 and this worktree stay for review and consumer handoff. After ordinary merge and recoverable
+evidence closeout, archive the managed worktree; preserve any immutable calendar version still
+referenced by consumers. The new calendar installs no service or timer.

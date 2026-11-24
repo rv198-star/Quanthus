@@ -1786,17 +1786,18 @@ def verify_release_manifest_closure(
     *,
     project_root: Any,
     pending_is_failure: bool = True,
-    include_worktree_diff: bool = True,
 ) -> None:
     """Verify the manifest's declared code/input identities against real bytes.
 
     Structural parsing (load_release_manifest) only proves the file is well-formed;
     release-ready qualification additionally requires the declared code commit/tree
-    to exist and the FULL semantic tracked closure under it (all tracked
-    src/quanthus/, config/ and product-daily tests) to be byte-identical with the
-    checked-out tree.  The only tolerated diffs are the self-referential release
-    manifest itself and the governance/planning ledger paths, which are metadata,
-    not release bytes.  Named input bindings (feature registry, strategy card,
+    to exist and the FULL semantic tracked closure under it (every tracked file
+    under src/quanthus/, config/ and tests/) to be byte-identical with the
+    checked-out tree - additions, deletions and modifications all count.  The
+    only tolerated diffs are the self-referential release manifests and the
+    named governance/planning ledger+view paths, which are metadata, not release
+    bytes.  An untracked file under a semantic root is a closure defect, not an
+    oversight.  Named input bindings (feature registry, strategy card,
     expert/evaluation specs) must hash-match their governing files; a pending
     industry binding is reported as pending and can never satisfy a READY check,
     while a non-null industry sha whose path is absent fails outright.  This is
@@ -1805,12 +1806,8 @@ def verify_release_manifest_closure(
     pending_is_failure=False reports the same byte drift/forgery failures while
     treating an explicit pending binding as the qualified-pending state it is
     (check_three_piece_consistency uses it: the composed set is PENDING rather
-    than READY, but drift or forgery still fails).
-
-    include_worktree_diff=False keeps commit/tree existence, required roles and
-    every named hash binding while skipping the full worktree-vs-commit byte
-    diff - used by check_three_piece_consistency, which must tolerate
-    uncommitted development edits without letting a forged identity through.
+    than READY, but code drift or a forged hash still fails).  pending_is_failure
+    may only soften the pending industry/source binding - never the byte diff.
 
     Returns None on success; raises ProductDailyError otherwise.
     """
@@ -1858,11 +1855,12 @@ def verify_release_manifest_closure(
         failures.append(
             f"code_entry {code_commit}/{code_tree} does not resolve to the declared tree"
         )
-    elif include_worktree_diff:
+    else:
         # Full tracked semantic closure: every tracked file under the release's
         # semantic roots must be byte-identical between the declared commit and
-        # the on-disk tree.  Allowed diffs: the self-referential manifest and the
-        # governance/planning ledger (metadata, not release bytes).
+        # the on-disk tree.  Allowed diffs: the self-referential release
+        # manifests and the governance/planning ledger+view metadata (not
+        # release bytes).
         allowed_diff_prefixes = ("config/planning/", "docs/")
         allowed_diff_exact = {
             "config/research/r11/d1b-20261124/release-manifest.v1.json",
@@ -1871,49 +1869,73 @@ def verify_release_manifest_closure(
         semantic_prefixes = (
             "src/quanthus/",
             "config/",
-            "tests/unit/test_product_daily",
+            "tests/",
         )
         try:
-            tracked = subprocess.check_output(
+            declared_tracked = subprocess.check_output(
                 ["git", "ls-tree", "-r", declared_commit, "--name-only"],
                 cwd=root,
                 text=True,
                 stderr=subprocess.DEVNULL,
             ).splitlines()
         except (OSError, subprocess.CalledProcessError):
-            tracked = []
+            declared_tracked = []
+        # The union of the declared commit's tree and the current index matters:
+        # a tracked file added after the declaration must not be silently
+        # omitted, and a deletion from the declared set is a drift too.
+        try:
+            index_tracked = subprocess.check_output(
+                ["git", "-C", str(root), "ls-files"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).splitlines()
+        except (OSError, subprocess.CalledProcessError):
+            index_tracked = []
         semantic: list[str] = [
             rel
-            for rel in tracked
+            for rel in sorted(set(declared_tracked) | set(index_tracked))
             if isinstance(rel, str)
             and rel.startswith(semantic_prefixes)
             and not rel.startswith(allowed_diff_prefixes)
             and rel not in allowed_diff_exact
         ]
-        if semantic:
-            try:
-                diff_out = subprocess.check_output(
-                    ["git", "-C", str(root), "diff", "--name-only", declared_commit, "--"]
-                    + semantic,
-                    text=True,
-                    stderr=subprocess.DEVNULL,
-                ).splitlines()
-            except (OSError, subprocess.CalledProcessError):
-                diff_out = None
-            if diff_out is None:
-                failures.append("semantic closure diff could not be evaluated")
-            else:
-                drifted = sorted(
-                    rel
-                    for rel in diff_out
-                    if rel not in allowed_diff_exact
-                    and not rel.startswith(allowed_diff_prefixes)
+        try:
+            # Tracked/index modifications, additions and deletions vs declared.
+            diff_out = subprocess.check_output(
+                ["git", "-C", str(root), "diff", "--name-only", declared_commit, "--"]
+                + list(semantic_prefixes),
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).splitlines()
+        except (OSError, subprocess.CalledProcessError):
+            diff_out = None
+        try:
+            # Untracked-but-not-ignored files under a semantic root are a real
+            # closure defect: a new release-relevant path that never entered the
+            # declared tree must not ride along unverified.
+            untracked = subprocess.check_output(
+                ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard", "--"]
+                + list(semantic_prefixes),
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).splitlines()
+        except (OSError, subprocess.CalledProcessError):
+            untracked = []
+        if diff_out is None:
+            failures.append("semantic closure diff could not be evaluated")
+        else:
+            drifted = sorted(
+                rel
+                for rel in set(diff_out) | set(untracked)
+                if isinstance(rel, str)
+                and rel not in allowed_diff_exact
+                and not rel.startswith(allowed_diff_prefixes)
+            )
+            if drifted:
+                failures.append(
+                    f"semantic closure drifted vs {code_commit}: {drifted[:12]}"
+                    + (" ..." if len(drifted) > 12 else "")
                 )
-                if drifted:
-                    failures.append(
-                        f"semantic closure drifted vs {code_commit}: {drifted[:12]}"
-                        + (" ..." if len(drifted) > 12 else "")
-                    )
 
     def _sha_or_none(rel: str) -> str | None:
         try:
@@ -2040,5 +2062,4 @@ def check_three_piece_consistency(
         release_manifest,
         project_root=root,
         pending_is_failure=False,
-        include_worktree_diff=False,
     )

@@ -1436,6 +1436,10 @@ def test_date_context_as_observed_equivalent(runner, resources):
         resources=resources,
         as_observed=True,
         numeric_context="october_replay_as_observed",
+        # The versioned as-observed replay carries its real read instant so a
+        # sealed source version's readability can be judged; a later read than
+        # every Oct version stamp keeps the warm-up qualified.
+        as_observed_at=datetime(2026, 11, 24, 10, 0, tzinfo=ZoneInfo("UTC")),
         consumption_evidence={"replay": "oct08-42"},
         **_run_kwargs(),
     )
@@ -1475,6 +1479,7 @@ def test_date_context_neighbor_isolated(runner, resources):
         resources=resources,
         as_observed=True,
         numeric_context="october_replay_as_observed",
+        as_observed_at=datetime(2026, 11, 24, 10, 0, tzinfo=ZoneInfo("UTC")),
         consumption_evidence={"replay": "oct08-42"},
         **_run_kwargs(),
     )

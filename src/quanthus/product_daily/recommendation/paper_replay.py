@@ -2543,6 +2543,7 @@ def run_replay_day(
     snapshot_manifest_digest: str,
     clock: Callable[[], datetime] | None = None,
     observed_clock: Callable[[], datetime] | None = None,
+    source_read_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Run ONE replay session through the real chain; return a day receipt.
 
@@ -2620,6 +2621,12 @@ def run_replay_day(
             source_policy=source_policy,
             clock=domain_clock,
             input_exclusions=list(coverage_exclusions),
+            # The as-observed replay's actual-read instant: each sealed source
+            # version's readability is judged against THIS run's real read
+            # (knowledge_from <= observed_at); a version only readable later
+            # still blocks.  Bound on its own named field, never the domain
+            # (logical T) clock.
+            as_observed_at=source_read_at or observed_at,
         )
     except ProductDailyError as exc:
         day_block = {

@@ -665,8 +665,7 @@ def listing_active_at_market_day(
     # Both are resolved without the day-bound proof so a 42-day null-anchor
     # warmup does not leave a clear delisted/future listing undecided.
     if all(
-        iv.effective_to is not None
-        and iv.effective_to.astimezone(tz).date() < market_date
+        iv.effective_to is not None and iv.effective_to.astimezone(tz).date() < market_date
         for iv in intervals
     ):
         return False
@@ -676,9 +675,7 @@ def listing_active_at_market_day(
     # session's whole local day inside one interval -> active; wholly outside
     # every interval -> not listed at T; straddling a boundary stays
     # unresolved (returned None so the caller fails closed per-security).
-    return _equivalent_day_membership(
-        session=market_date, intervals=intervals, venue_id=venue_id
-    )
+    return _equivalent_day_membership(session=market_date, intervals=intervals, venue_id=venue_id)
 
 
 # --- securities[] -> RawSecurityInput ------------------------------------------------
@@ -948,6 +945,7 @@ def raw_security_inputs_from_history(
     *,
     anchor_mode: str = "strict",
     proof_sinks: dict[str, dict[str, str]] | None = None,
+    as_observed: bool = False,
 ) -> tuple[list[RawSecurityInput], list[dict[str, Any]]]:
     """Project raw_history.securities[] into RawSecurityInput[] + receipts.
 
@@ -961,6 +959,14 @@ def raw_security_inputs_from_history(
     """
     inputs: list[RawSecurityInput] = []
     receipts: list[dict[str, Any]] = []
+    # The source calendar's own knowledge_from keyed by (venue, session_date):
+    # used to prove a per-bar knowledge_cutoff is the source calendar VERSION
+    # clock under the calendar_source_knowledge_from role.  Only consulted
+    # inside the versioned as-observed replay.
+    cal_knowledge: dict[tuple[str, date], datetime] = {}
+    if as_observed:
+        for row in history.calendar_rows:
+            cal_knowledge[(row.venue_id, row.session_date)] = row.knowledge_from
     # Duplicate guard keys on the LISTING id (a relisted entity reuses
     # security_id across listings); see the check below.
     seen_ids: set[str] = set()
@@ -989,8 +995,7 @@ def raw_security_inputs_from_history(
         if identity.listing_id in seen_ids:
             _fail(
                 "duplicate_security",
-                f"duplicate listing_id {identity.listing_id} "
-                f"(security_id {identity.security_id})",
+                f"duplicate listing_id {identity.listing_id} (security_id {identity.security_id})",
             )
         seen_ids.add(identity.listing_id)
         position_facts, prior_det = _position_facts_from(sec_o)
@@ -1209,6 +1214,34 @@ def raw_security_inputs_from_history(
                     membership_proof=sec_proof,
                 )
             )
+        # Versioned as-observed: prove WHICH rows carry the source calendar
+        # VERSION clock by matching each per-bar knowledge_cutoff against the
+        # SAME venue+session_date calendar_row.knowledge_from.  Only a row
+        # whose cutoff is that exact source stamp moves the PIT coordinate to
+        # the business fact instant downstream; an ordinary/mismatched cutoff
+        # keeps its original identity (and a claimed role with no matching
+        # source row names a real exclusion, never a silently-adopted label).
+        matched_dates: frozenset[date] | None = None
+        if as_observed and knowledge_clock_role == "calendar_source_knowledge_from":
+            unmatched = [
+                d
+                for d, v in cutoff_map.items()
+                if v is not None and cal_knowledge.get((identity.venue_id, d)) != v
+            ]
+            if unmatched:
+                receipts.append(
+                    {
+                        "security_code": code,
+                        "status": "excluded",
+                        "reason": (
+                            "calendar_source_knowledge_from cutoff is not the "
+                            f"source calendar knowledge_from for {unmatched[:3]}"
+                        ),
+                        "scope": "per_security",
+                    }
+                )
+                continue
+            matched_dates = frozenset(d for d, v in cutoff_map.items() if v is not None)
         inputs.append(
             RawSecurityInput(
                 identity=identity,
@@ -1220,6 +1253,7 @@ def raw_security_inputs_from_history(
                 close_at_by_date=close_map,
                 knowledge_cutoff_by_date=cutoff_map,
                 knowledge_clock_role=knowledge_clock_role,
+                source_calendar_matched_dates=matched_dates,
                 position_facts=position_facts,
                 prior_deterioration_sessions=prior_det,
                 held_membership=held_membership,
@@ -1436,7 +1470,10 @@ def run_daily_advice_from_history(
     anchor_mode = kwargs.pop("anchor_mode", "strict")
     proof_sinks: dict[str, dict[str, str]] = {}
     inputs, receipts = raw_security_inputs_from_history(
-        history, anchor_mode=anchor_mode, proof_sinks=proof_sinks
+        history,
+        anchor_mode=anchor_mode,
+        proof_sinks=proof_sinks,
+        as_observed=as_observed,
     )
     if not inputs:
         _fail(
@@ -1521,6 +1558,13 @@ def run_daily_advice_from_history(
         )
         window = bar_context_window(open_sessions, history.market_date)
         scan_trading_dates = tuple(sorted({*window, facts.next_session}))
+    # The as-observed replay's actual-read instant is bound into the signed
+    # closure so each row's source clock can be re-read against THIS run's
+    # real read.  It is forwarded to the raw runner ONLY alongside the private
+    # token; a strict/forward caller may legitimately pass the same replay
+    # observed_at on the wire (the replay envelope always carries it), so it
+    # is dropped here rather than rejected as a context breach.
+    as_observed_at = kwargs.pop("as_observed_at", None)
     output = run_daily_advice_from_raw(
         raw=inputs,
         history_receipts=bound_receipts,
@@ -1528,6 +1572,7 @@ def run_daily_advice_from_history(
         consumption_evidence=kwargs.pop("consumption_evidence", None),
         numeric_context=replay_token,
         scan_trading_dates=scan_trading_dates,
+        as_observed_at=as_observed_at if replay_token is not None else None,
         **kwargs,
     )
     # The issued receipt's digest must match the closure actually carried on the

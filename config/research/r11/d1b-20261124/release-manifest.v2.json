@@ -105,7 +105,7 @@
     },
     "consumer": {
       "path": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json",
-      "sha256": "sha256:6739e0f162c82e2abe3a7ce2bbc219be47daf1feb6bbf7734ba38fb0227d597b"
+      "sha256": "sha256:ba7bbd0930d77a7f23d30858b985343d3bc48d789bbbc4d77330aa1ce827a0c0"
     }
   }
 }

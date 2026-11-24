@@ -67,6 +67,20 @@ def read_history(
     observed_at = observed_at or utcnow()
     read_at = iso(observed_at)
 
+    # Verify the fixed summary chain once per job (audit 749-01): the
+    # Base manifest, the DATES index and each day's standard/core
+    # descriptor are re-hashed against their frozen declared sha before
+    # member reads are trusted.  A failed hard link is folded into the
+    # day_block receipt below.
+    manifest_chain = []
+    chain_fn = getattr(smap, "manifest_chain", None)
+    if callable(chain_fn):
+        try:
+            manifest_chain = chain_fn()
+        except Exception as exc:  # noqa: BLE001
+            manifest_chain = [{"artifact": "manifest_chain", "status": "ERROR",
+                               "error": f"{type(exc).__name__}: {exc}"}]
+
     calendar_rows, cal_cov = cal_mod.read_calendar_rows(smap, market_date)
     listing_rows, list_cov = cal_mod.read_listing_rows(smap, market_date)
     identities, security_by_listing, uni_cov = id_mod.build_universe(
@@ -88,13 +102,23 @@ def read_history(
 
     # ---- assemble source_members (unique members actually opened) ----
     member_entries = {}
+    def _member_key(member):
+        # Package-qualified member key (audit 749-01): two daily packages
+        # can ship the same relative member path (same-member-path.parquet
+        # under daily-2026-11-23 and daily-2026-11-24).  The bare
+        # member_id would collide and keep only the first; the composite
+        # package_id::member_id keeps both registered and resolvable.
+        return f"{member.package_id}::{member.member_id}"
     def _reg(member, knowledge_at, date_from=None, date_to=None, visible_at=None):
-        if member.member_id not in member_entries:
-            member_entries[member.member_id] = env_mod.member_entry(
+        key = _member_key(member)
+        if key not in member_entries:
+            e = env_mod.member_entry(
                 member, knowledge_at,
                 visible_at if visible_at is not None else knowledge_at,
                 date_from, date_to,
             )
+            e["package_key"] = key
+            member_entries[key] = e
     # P11 裁定 (OCTOBER-REPLAY-TIME-v1): the original member clock is
     # carried verbatim - visible_at equals the member's own knowledge_at
     # and is NOT bounded by the decision_cutoff.  The logical replay
@@ -115,7 +139,7 @@ def read_history(
     ):
         for m in smap.base_members(table):
             if base_knowledge > decision_cutoff:
-                late_visible_members.append(m.member_id)
+                late_visible_members.append(_member_key(m))
             _reg(m, base_knowledge, visible_at=base_knowledge)
     for day in smap.daily_open_days():
         if day > market_date.isoformat():
@@ -126,7 +150,7 @@ def read_history(
         day_dt = datetime.fromisoformat(day + "T16:00:00+00:00")
         for m in pkg.members:
             if day_dt > decision_cutoff:
-                late_visible_members.append(m.member_id)
+                late_visible_members.append(_member_key(m))
             _reg(m, day_dt, date_from=day, date_to=day, visible_at=day_dt)
     source_member_entries = list(member_entries.values())
 
@@ -176,6 +200,32 @@ def read_history(
                     }
                 )
 
+    # Per-security original exception keys (audit 749-08): join each
+    # dwd_quality_exception row to the security whose listing_id the
+    # exception's affected_business_key names, within that security's
+    # dependency window.  The original business key, authority,
+    # disposition and resolution_state pass through verbatim - the
+    # reader never reinterprets an exception, it only locates it.
+    import json as _json
+    exc_by_listing = {}
+    for qe in (exceptions.get("quality_exceptions") or []):
+        try:
+            key = _json.loads(qe.get("affected_business_key_json") or "{}")
+        except Exception:  # noqa: BLE001
+            key = {}
+        lid = str(key.get("listing_id") or qe.get("listing_id") or "")
+        if not lid:
+            continue
+        exc_by_listing.setdefault(lid, []).append({
+            "affected_table": str(qe.get("affected_table") or ""),
+            "affected_business_key_json": qe.get("affected_business_key_json"),
+            "affected_effective_at": iso(parse_ts(qe.get("affected_effective_at"))),
+            "authority": str(qe.get("authority") or ""),
+            "disposition": str(qe.get("disposition") or ""),
+            "resolution_state": str(qe.get("resolution_state") or ""),
+            "knowledge_from": iso(parse_ts(qe.get("knowledge_from"))),
+        })
+
     for ident in identities:
         sec_bars = [
             bars_by_listing[ident.listing_id][s]
@@ -201,7 +251,9 @@ def read_history(
         sec_limits = limit_by_listing.get(ident.listing_id) or []
         securities.append(
             env_mod.security_entry(
-                ident, sec_bars, sec_actions, [], sec_limits,
+                ident, sec_bars, sec_actions,
+                exc_by_listing.get(ident.listing_id) or [],
+                sec_limits,
                 close_map, cutoff_map,
             )
         )
@@ -230,13 +282,17 @@ def read_history(
             mid = rec.get("member_id")
             if not mid or rec.get("status") != "READ":
                 continue
-            if mid in consumed:
-                consumed[mid]["uses"].append(key)
+            # Package-qualified key when the read emitted one (same-path
+            # members across two daily packages stay distinct).
+            key = rec.get("member_key") or mid
+            if key in consumed:
+                consumed[key]["uses"].append(key)
                 continue
             resolver = getattr(smap, "resolve", None)
-            resolved = resolver(mid) if callable(resolver) else None
-            consumed[mid] = {
+            resolved = (resolver(key) or resolver(mid)) if callable(resolver) else None
+            consumed[key] = {
                 "member_id": mid,
+                "member_key": key,
                 "package_id": (resolved.package_id if resolved else rec.get("package_id")),
                 "package_key": (
                     f"{(resolved.package_id if resolved else rec.get('package_id'))}::{mid}"
@@ -275,7 +331,7 @@ def read_history(
     november_not_used = sorted(
         v["member_id"] for v in consumed.values() if not v["relevant_for_T"]
     )
-    registered_ids = {m["member_id"] for m in source_member_entries}
+    registered_ids = {m.get("package_key") or m["member_id"] for m in source_member_entries}
     not_read = sorted(registered_ids - set(consumed))
 
     member_consumption = {
@@ -329,4 +385,39 @@ def read_history(
             "which securities drop."
         ),
     }
-    return HistoryResult(raw_history=raw_history, coverage=coverage, read_at=read_at)
+    # Whole-day block: a shared hard dependency failed (the venue
+    # calendar / listing / identity chain every security derives from).
+    # Emit a named day_block receipt and mark the run INPUT_BLOCKED -
+    # distinct from a clean zero-candidate read.  Per-security member
+    # faults stay isolated on their own reads and do NOT block the day.
+    day_block = None
+    if cal_cov.get("shared_failure"):
+        day_block = {
+            "reason_code": "SHARED_CALENDAR_UNAVAILABLE",
+            "detail": (
+                "no usable venue calendar rows: every shared calendar "
+                "member failed hash or was unreadable"
+            ),
+            "affected_scope": "whole_day",
+            "failed_members": cal_cov.get("failed_members") or [],
+            "disposition": "block_new_entries",
+        }
+    coverage["manifest_chain"] = manifest_chain
+    chain_faults = [c for c in manifest_chain if c.get("status") not in ("MATCH", "NO_PATH")]
+    if chain_faults and day_block is None:
+        day_block = {
+            "reason_code": "SUMMARY_CHAIN_FAULT",
+            "detail": (
+                "a declared manifest/dates/descriptor link failed "
+                "hash or was unreadable"
+            ),
+            "affected_scope": "whole_day",
+            "failed_members": [c.get("artifact") for c in chain_faults],
+            "disposition": "block_new_entries",
+        }
+    coverage["day_block"] = day_block
+    status = "INPUT_BLOCKED" if day_block is not None else "READ"
+    return HistoryResult(
+        raw_history=raw_history, coverage=coverage,
+        read_at=read_at, status=status,
+    )

@@ -31,6 +31,7 @@ _COLUMNS = [
     "source_record_id", "observation_end", "listing_id", "calendar_session_id",
     "interval_size", "price_basis", "currency",
     "open", "high", "low", "close", "volume", "turnover",
+    "source_revision", "record_source", "knowledge_from",
 ]
 
 
@@ -52,7 +53,7 @@ def _project_member(member, sessions_set, needed_listings, security_by_listing, 
         verify = source_map.verify_member(member)
         if not verify["matches"]:
             reads.append({
-                "member_id": member.member_id, "status": "SHA_MISMATCH",
+                "member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH",
                 "declared_sha256": verify["declared_sha256"],
                 "actual_sha256": verify["actual_sha256"], "verified_at": verify.get("verified_at"),
             })
@@ -60,7 +61,7 @@ def _project_member(member, sessions_set, needed_listings, security_by_listing, 
     try:
         recs = _rows(member.abs_path, _COLUMNS)
     except Exception as exc:  # noqa: BLE001
-        reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
         return
     scanned = admitted = 0
     for rec in recs:
@@ -94,12 +95,24 @@ def _project_member(member, sessions_set, needed_listings, security_by_listing, 
                 # session's own close_at / member knowledge_from are joined
                 # downstream per venue/date - never derived into the bar.
                 "observation_end": rec.get("observation_end"),
+                # Per-row provenance (audit 749-04): the member that
+                # produced this bar, its package version, and the source
+                # row's own business key + knowledge clock - so every
+                # price line traces back to a unique member version and
+                # source revision, never an anonymous row.
+                "member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}",
+                "package_id": member.package_id,
+                "package_kind": member.package_kind,
+                "source_record_id": str(rec.get("source_record_id") or ""),
+                "source_revision": str(rec.get("source_revision") or ""),
+                "record_source": str(rec.get("record_source") or ""),
+                "knowledge_from": rec.get("knowledge_from"),
             }
         except Exception:  # noqa: BLE001
             continue
         out.setdefault(listing_id, {})[session] = bar
         admitted += 1
-    reads.append({"member_id": member.member_id, "status": "READ", "rows": scanned, "admitted": admitted, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+    reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": scanned, "admitted": admitted, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
 
 
 def read_bars(source_map: SourceMap, sessions, security_by_listing):

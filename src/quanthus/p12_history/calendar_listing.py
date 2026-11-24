@@ -130,7 +130,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
         verify = source_map.verify_member(member)
         if not verify["matches"]:
             reads.append({
-                "member_id": member.member_id, "status": "SHA_MISMATCH",
+                "member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH",
                 "declared_sha256": verify["declared_sha256"],
                 "actual_sha256": verify["actual_sha256"], "verified_at": verify.get("verified_at"),
             })
@@ -142,7 +142,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
                  "observation_start", "knowledge_from", "calendar_session_id"],
             )
         except Exception as exc:  # noqa: BLE001
-            reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
             continue
         n = 0
         for rec in records:
@@ -180,12 +180,23 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
             csid = str(rec.get("calendar_session_id") or "")
             if csid and session is not None and venue_id is not None:
                 session_ids[csid] = (venue_id, session)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     out = sorted(rows.values(), key=lambda r: (r.venue_id, r.session_date))
+    # A venue calendar is a SHARED hard dependency - every security's
+    # session window derives from it.  If its sources all failed (sha or
+    # unreadable), or it yielded zero usable rows, that is a whole-day
+    # block, not a normal empty: flag it so read_history can emit a named
+    # day_block receipt instead of silently returning READ.
+    failed = [r for r in reads if r.get("status") != "READ"]
+    shared_failure = bool(sources) and (
+        (len(failed) == len(reads) and not out) or (not out)
+    )
     return out, {
         "reads": reads,
         "conflicts": conflicts,
         "session_ids": session_ids,
+        "shared_failure": shared_failure,
+        "failed_members": [r.get("member_id") for r in failed],
     }
 
 
@@ -198,7 +209,7 @@ def read_listing_rows(source_map: SourceMap, market_date: date):
         verify = source_map.verify_member(member)
         if not verify["matches"]:
             reads.append({
-                "member_id": member.member_id, "status": "SHA_MISMATCH",
+                "member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH",
                 "declared_sha256": verify["declared_sha256"],
                 "actual_sha256": verify["actual_sha256"], "verified_at": verify.get("verified_at"),
             })
@@ -210,7 +221,7 @@ def read_listing_rows(source_map: SourceMap, market_date: date):
                  "effective_to", "knowledge_from"],
             )
         except Exception as exc:  # noqa: BLE001
-            reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
             continue
         n = 0
         for rec in records:
@@ -234,6 +245,6 @@ def read_listing_rows(source_map: SourceMap, market_date: date):
                 )
             )
             n += 1
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     out = sorted(rows, key=lambda r: (r.security_id, r.effective_from))
     return out, {"reads": reads}

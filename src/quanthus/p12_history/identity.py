@@ -53,7 +53,7 @@ def _read_table(source_map, table, columns):
         verify = source_map.verify_member(member)
         if not verify["matches"]:
             reads.append({
-                "member_id": member.member_id, "status": "SHA_MISMATCH",
+                "member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH",
                 "declared_sha256": verify["declared_sha256"],
                 "actual_sha256": verify["actual_sha256"], "verified_at": verify.get("verified_at"),
             })
@@ -61,10 +61,10 @@ def _read_table(source_map, table, columns):
         try:
             recs = _rows(member.abs_path, columns)
         except Exception as exc:  # noqa: BLE001
-            reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
             continue
         rows.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     return rows, reads
 
 
@@ -169,15 +169,43 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
             )
             seen.add(sid)
             seen.add(pair)
-    # Merge account holdings/pending not already in the pool (held+alert path).
-    account_extra = []
+    # Account roles (audit 749-04): separate the new-candidate pool from
+    # held-inside-pool, held-with-unknown-quantity, and pending-only.
+    # Held and pending securities that are NOT in the candidate pool are
+    # still named so the rule can evaluate them as independent holdings
+    # (hold_alert path) or pending orders - they never silently drop.
+    held_sids = set()
+    held_unknown_qty = []
     for h in holdings or ():
         sid = str(h.get("security_id") or h.get("security_code") or "")
-        if sid and sid not in seen:
-            account_extra.append(sid)
+        if not sid:
+            continue
+        held_sids.add(sid)
+        if h.get("quantity") is None:
+            held_unknown_qty.append(sid)
+    pending_sids = set()
+    pending_typed = []
+    for pd in pending or ():
+        sid = str(pd.get("security_id") or pd.get("security_code") or "")
+        if not sid:
+            continue
+        pending_sids.add(sid)
+        pending_typed.append({
+            "security_id": sid,
+            "pending_kind": pd.get("pending_kind") or pd.get("kind"),
+            "pending_quantity": pd.get("pending_quantity") or pd.get("quantity"),
+        })
+    # Split account members vs the new-candidate pool by identity.
+    account_extra = sorted(
+        sid for sid in (held_sids | pending_sids) if sid not in seen
+    )
     security_by_listing = {i.listing_id: i.security_id for i in securities if i.listing_id}
     return securities, security_by_listing, {
         "reads": reads,
         "pool_size": len(securities),
         "account_extra_not_in_pool": account_extra,
+        "held_in_pool": sorted(held_sids & seen),
+        "held_unknown_quantity": sorted(set(held_unknown_qty)),
+        "pending_only": sorted(pending_sids - seen),
+        "pending_typed": pending_typed,
     }

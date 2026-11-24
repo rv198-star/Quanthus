@@ -214,19 +214,93 @@ class SourceMap:
 
         verified_at stamps the instant the hash FINISHED (the member's
         own verification clock), never the run's shared read_at - the
-        two clocks stay distinguishable on the consumption closure."""
-        actual = sha256_file(member.abs_path)
+        two clocks stay distinguishable on the consumption closure.
+
+        A member whose bytes cannot be opened at all is recorded as an
+        UNREADABLE verification result (matches=False, error named),
+        never raised - the caller decides whether that member is a
+        shared hard dependency (whole-day block) or an isolated
+        per-security fault."""
+        verified_at = iso(VerificationClock.now())
+        try:
+            actual = sha256_file(member.abs_path)
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "member_id": member.member_id,
+                "path": str(member.abs_path),
+                "declared_sha256": member.sha256,
+                "actual_sha256": None,
+                "matches": False,
+                "unreadable": True,
+                "error": f"{type(exc).__name__}: {exc}",
+                "verified_at": verified_at,
+                "size_bytes": None,
+            }
         return {
             "member_id": member.member_id,
             "path": str(member.abs_path),
             "declared_sha256": member.sha256,
             "actual_sha256": actual,
             "matches": actual == member.sha256,
-            "verified_at": iso(VerificationClock.now()),
+            "verified_at": verified_at,
             "size_bytes": (
                 member.abs_path.stat().st_size if member.abs_path.exists() else None
             ),
         }
+
+    def manifest_chain(self) -> list[dict]:
+        """Re-hash the fixed summary chain (audit 749-01).
+
+        The reader never trusts a member merely because a map names it -
+        the package MANIFEST, the DATES index and each day's standard
+        descriptor are themselves re-hashed against the frozen declared
+        sha before/while members are read.  Returns one record per
+        artifact: {artifact, path, declared_sha256, actual_sha256,
+        status, verified_at}.  A link whose bytes are unreadable or whose
+        digest does not match is a named chain fault (the caller turns a
+        hard link into a whole-day block receipt).
+        """
+        out = []
+
+        def _probe(artifact, path, declared):
+            verified_at = iso(VerificationClock.now())
+            if not path:
+                out.append({"artifact": artifact, "path": None,
+                            "declared_sha256": declared, "actual_sha256": None,
+                            "status": "NO_PATH", "verified_at": verified_at})
+                return
+            try:
+                actual = sha256_file(Path(path))
+            except Exception as exc:  # noqa: BLE001
+                out.append({"artifact": artifact, "path": str(path),
+                            "declared_sha256": declared, "actual_sha256": None,
+                            "status": "UNREADABLE",
+                            "error": f"{type(exc).__name__}: {exc}",
+                            "verified_at": verified_at})
+                return
+            ok = declared is None or actual == declared
+            out.append({"artifact": artifact, "path": str(path),
+                        "declared_sha256": declared, "actual_sha256": actual,
+                        "status": "MATCH" if ok else "SHA_MISMATCH",
+                        "verified_at": verified_at})
+
+        _probe("base_manifest", self._base_doc.get("manifest_path"),
+               self._base_doc.get("manifest_sha256"))
+        for day in self.daily_open_days():
+            e = self._daily_entries.get(day) or {}
+            desc = e.get("descriptor") or {}
+            if isinstance(desc, dict):
+                _probe(f"dates_index:{day}", desc.get("path"),
+                       desc.get("index_sha256") or desc.get("sha256"))
+            sd = e.get("standard_descriptor") or {}
+            if isinstance(sd, dict):
+                _probe(f"daily_manifest:{day}", sd.get("path"),
+                       sd.get("sha256"))
+            core = e.get("core_manifest") or {}
+            if isinstance(core, dict) and core.get("path"):
+                _probe(f"core_manifest:{day}", core.get("path"),
+                       core.get("sha256"))
+        return out
 
     def resolve(self, member_id: str) -> ResolvedMember | None:
         """Resolve one member_id back to its pinned ResolvedMember.
@@ -249,6 +323,11 @@ class SourceMap:
             if pkg is None:
                 continue
             for m in pkg.members:
-                if m.member_id == member_id or str(m.abs_path) == member_id:
+                composite = f"{m.package_id}::{m.member_id}"
+                if (
+                    m.member_id == member_id
+                    or str(m.abs_path) == member_id
+                    or composite == member_id
+                ):
                     return m
         return None

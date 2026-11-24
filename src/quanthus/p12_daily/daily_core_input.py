@@ -553,4 +553,3 @@ def qualify_daily_input(
         listed_securities=listed_securities,
         listed_securities_status=listed_status,
     )
-

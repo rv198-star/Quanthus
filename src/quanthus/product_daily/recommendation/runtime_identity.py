@@ -82,7 +82,7 @@ def consumer_identity_v2(root: Path) -> dict[str, Any]:
     """The candidate v2 consumer binding object.
 
     Distinct file, distinct schema state: its pin is explicitly pending until the real
-    p12.daily-advice-package.v2 loader/schema/digest is delivered (#723
+    p12.decision-set.v2 loader/schema/digest is delivered (#723
     comment7118368788).  The pinned synthetic v1 consumer bytes are never edited to
     declare a capability it does not have.
     """

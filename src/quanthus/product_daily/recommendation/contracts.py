@@ -62,7 +62,7 @@ BLOCKED_REASON_CODES = frozenset({STALE_MARKET_INPUT, INPUT_UNAVAILABLE})
 # decision must declare whether it is a full liquidation or a bounded reduction, and a
 # reduction must carry the expert's own target remaining-position fraction.  Older P12
 # loaders silently drop these fields and would read every exit_plan as a full sell, so a
-# package containing a reduce is serialized ONLY on the p12.daily-advice-package.v2
+# package containing a reduce is serialized ONLY on the p12.decision-set.v2
 # wire (Decision.to_wire_dict / publish wire_version) and may only be handed to a
 # pinned consumer whose versioned binding resolves and validates that schema; until
 # then the reduce stays display-only/refused.
@@ -71,7 +71,11 @@ EXIT_KIND_REDUCE = "reduce"
 EXIT_KINDS = frozenset({EXIT_KIND_FULL, EXIT_KIND_REDUCE})
 # P12 v2 package schema identity (planned handoff; the exact consumer pin arrives with
 # the fixed P12 loader).  Used for the version declaration embedded in new packages.
-HELD_REDUCTION_WIRE_VERSION = "p12.daily-advice-package.v2"
+# P12 decision-set schema identity for the v2 held-reduction contract (#723
+# comment7121035802): the raw decision_set dict carries decision_set_schema=
+# "p12.decision-set.v2"; the pinned consumer enforces it via
+# load_decision_set(raw, *, expected_schema="p12.decision-set.v2").
+HELD_REDUCTION_WIRE_VERSION = "p12.decision-set.v2"
 
 # Reason codes a produced entry_plan decision may carry on the wire.  The P12 gate
 # (validate_decision_set) does not police entry reason codes, so the producer keeps its own
@@ -380,7 +384,7 @@ class Decision:
     def to_dict(self) -> dict[str, Any]:
         """Serialize on the frozen v1 wire.
 
-        to_dict is the historical p12.daily-advice-package.v1 payload (the shape the
+        to_dict is the historical v1 decision-set payload (the shape the
         pinned 9de1cdb9 consumer validates); it intentionally carries no
         exit_kind/target_position_fraction keys.  The v2 wire fields are emitted only
         by to_wire_dict(), which is reached solely through the versioned v2
@@ -399,7 +403,7 @@ class Decision:
         }
 
     def to_wire_dict(self) -> dict[str, Any]:
-        """Serialize on the p12.daily-advice-package.v2 wire.
+        """Serialize on the p12.decision-set.v2 wire.
 
         The only difference from the v1 payload is the held-reduction fields, which the
         v1 consumer silently drops - precisely why a package containing an executable
@@ -527,7 +531,7 @@ class DecisionSet:
         }
 
     def to_wire_dict(self) -> dict[str, Any]:
-        """p12.daily-advice-package.v2 payload: v1 shape plus the reduce wire fields."""
+        """p12.decision-set.v2 payload: v1 shape plus the reduce wire fields."""
         out = self.to_dict()
         out["decisions"] = [item.to_wire_dict() for item in self.decisions]
         return out

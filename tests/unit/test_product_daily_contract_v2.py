@@ -460,12 +460,12 @@ def _v1_consumer_binding() -> dict:
     """The pinned v1 synthetic consumer binding (real versioned object).
 
     consumer_schema is attached at load time: the pinned v1 consumer only validates
-    the p12.daily-advice-package.v1 wire."""
+    the p12.decision-set.v1 wire."""
 
     from quanthus.product_daily.recommendation.runtime_identity import consumer_identity
 
     binding = consumer_identity(ROOT)
-    binding["consumer_schema"] = "p12.daily-advice-package.v1"
+    binding["consumer_schema"] = "p12.decision-set.v1"
     return binding
 
 
@@ -490,12 +490,12 @@ def _reduce_package() -> object:
 
 def test_reduce_package_refused_without_v2_consumer(tmp_path):
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="verified pinned consumer"):
+    with pytest.raises(ProductDailyError, match="pin"):
         publish_package(
             package,
             directory=tmp_path,
             published_at=package.decision_sets[0].published_at,
-            wire_version="p12.daily-advice-package.v2",
+            wire_version="p12.decision-set.v2",
         )
     assert not list(tmp_path.glob("*.json"))
 
@@ -504,7 +504,7 @@ def test_reduce_refused_on_v1_wire_even_with_binding(tmp_path):
     """A reduce on the v1 wire is refused before any loader call: the v1 consumer
     would silently read it as a full sell."""
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="p12.daily-advice-package.v2"):
+    with pytest.raises(ProductDailyError, match="p12.decision-set.v2"):
         publish_package(
             package,
             directory=tmp_path,
@@ -514,69 +514,58 @@ def test_reduce_refused_on_v1_wire_even_with_binding(tmp_path):
 
 
 def test_reduce_refused_with_unpinned_v2_candidate_binding(tmp_path):
-    """The candidate v2 binding declares the capability, but its source pin is
-    pending/null - it can never satisfy the verified pin check."""
+    """No caller-supplied binding opens the release while the versioned pin is
+    pending - the candidate file's own pin_state is the only authority."""
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="pinned identity"):
+    with pytest.raises(ProductDailyError, match="pin"):
         publish_package(
             package,
             directory=tmp_path,
             published_at=package.decision_sets[0].published_at,
             p12_loader=_p12_loader(),
             consumer_binding=_v2_candidate_binding(),
-            wire_version="p12.daily-advice-package.v2",
+            wire_version="p12.decision-set.v2",
         )
     assert not list(tmp_path.glob("*.json"))
 
 
 def test_reduce_refused_with_wrong_schema_binding(tmp_path):
-    """A v1-pinned consumer binding cannot serve a v2 wire release."""
+    """A v1-pinned caller binding cannot serve a v2 wire release either; the pin
+    check precedes any schema comparison."""
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="consumer_schema"):
+    with pytest.raises(ProductDailyError, match="pin"):
         publish_package(
             package,
             directory=tmp_path,
             published_at=package.decision_sets[0].published_at,
             p12_loader=_p12_loader(),
             consumer_binding=_v1_consumer_binding(),
-            wire_version="p12.daily-advice-package.v2",
+            wire_version="p12.decision-set.v2",
         )
     assert not list(tmp_path.glob("*.json"))
 
 
 def test_reduce_refused_with_arbitrary_capability_dict(tmp_path):
-    """A caller-supplied {capabilities: true} dict is not a versioned binding."""
+    """A caller-supplied {capabilities: true} dict is never a versioned pin."""
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="consumer-binding"):
+    with pytest.raises(ProductDailyError, match="pin"):
         publish_package(
             package,
             directory=tmp_path,
             published_at=package.decision_sets[0].published_at,
             p12_loader=_p12_loader(),
             consumer_binding={"capabilities": {"supports_held_reduction_v2": True}},
-            wire_version="p12.daily-advice-package.v2",
+            wire_version="p12.decision-set.v2",
         )
     assert not list(tmp_path.glob("*.json"))
 
 
-def _v2_pinned_binding() -> dict:
-    """A fully-pinned v2 consumer binding for the gate mechanics.
-
-    TEST_ONLY: stands in for the real p12.daily-advice-package.v2 pin that is not yet
-    delivered.  It exercises the verified pipeline; it is not a claimed integration."""
-
-    binding = _v2_candidate_binding()
-    binding["source_commit"] = "9de1cdb999f692d6cc1cd5be13b53116600ab4bf"
-    binding["source_tree"] = "53417ed848db0b78acb928ea2f7d1bfafa44be95"
-    binding["source_files_sha256"] = {"placeholder": "0" * 64}
-    return binding
-
-
 def _v2_double_loader():
-    """TEST_ONLY field-preserving loader double for the v2 wire.
+    """Pure field-preserving loader double for the internal coordinate matcher.
 
-    Marked _p11_test_only_consumer so it may exercise the pipeline mechanics; it is
-    never a real consumer qualification."
+    It only builds a validated-shaped object so _validate_consumer_object's
+    coordinate checks can be exercised without writing anything; it is never a
+    release authority and cannot open publish_package while the pin is pending.
     """
 
     @dataclasses.dataclass(frozen=True)
@@ -613,115 +602,136 @@ def _v2_double_loader():
 
     _Set.__module__ = "quanthus.capabilities.decision_access"
     _Decision.__module__ = "quanthus.capabilities.decision_access"
-    build._p11_test_only_consumer = True  # type: ignore[attr-defined]
     return build
 
 
-def test_reduce_publishes_through_marked_test_double(tmp_path):
-    """The verified pipeline opens for a marked TEST_ONLY double that preserves every
-    coordinate - mechanics evidence only, not a real v2 integration."""
+def _self_contained_p12_digest(monkeypatch):
+    """Each test that needs the bound-package digest declares its own dependency.
+
+    The P11 tree carries no quanthus.shared.fact_contracts of its own; a test that
+    exercises the internal matcher installs the digest namespace explicitly
+    instead of relying on an earlier test's sys.path side effects (CV2-6C-P2-1).
+    """
+
+    import sys
+    import types
+
+    shared = types.ModuleType("quanthus.shared")
+    shared.__path__ = []
+    fact_contracts = types.ModuleType("quanthus.shared.fact_contracts")
+    fact_contracts.digest = lambda _value: "sha256:" + "ab" * 32
+    monkeypatch.setitem(sys.modules, "quanthus.shared", shared)
+    monkeypatch.setitem(sys.modules, "quanthus.shared.fact_contracts", fact_contracts)
+
+
+def _v2_wire(package) -> dict:
+    from quanthus.product_daily.recommendation.publish import _serialize_decision_sets
+
+    return _serialize_decision_sets(package, wire_version="p12.decision-set.v2")[0]
+
+
+def test_reduce_public_release_refused_while_pin_pending(tmp_path):
+    """CV2-6C-P1-3: no caller loader, fake pin dict, marked attribute or injected
+    namespace opens a public v2 release - the versioned on-disk pin is pending, so
+    publish_package refuses before any file exists."""
     package = _reduce_package()
-    receipt = publish_package(
-        package,
-        directory=tmp_path,
-        published_at=package.decision_sets[0].published_at,
-        p12_loader=_v2_double_loader(),
-        consumer_binding=_v2_pinned_binding(),
-        wire_version="p12.daily-advice-package.v2",
-    )
-    raw = json.loads(Path(receipt.path).read_text())
-    decision = raw["decision_sets"][0]["decisions"][0]
-    assert decision["exit_kind"] == "reduce"
-    assert decision["target_position_fraction"] == "0.5"
-
-
-def test_reduce_refused_when_loader_drifts_between_calls(tmp_path):
-    """CV2-963-P1-3: the digest is computed from the SAME validated object that passed
-    the gate.  A loader whose second call drops fields can no longer exist, because
-    there is only one call."""
-    package = _reduce_package()
-    calls = {"count": 0}
-
-    def unstable_loader(raw, *, expected_schema=None):
-        calls["count"] += 1
-        out = _v2_double_loader()(raw, expected_schema=expected_schema)
-        if calls["count"] > 1:
-            out = dataclasses.replace(
-                out,
-                decisions=[
-                    dataclasses.replace(d, exit_kind=None, target_position_fraction=None)
-                    for d in out.decisions
-                ],
+    for loader, binding in (
+        (_v2_double_loader(), None),
+        (
+            _v2_double_loader(),
+            {
+                "schema_version": "quanthus.p11.p12-consumer-binding.v1",
+                "consumer_schema": "p12.decision-set.v2",
+                "loader_entry": "forged.loader",
+                "source_commit": "f" * 40,
+                "source_tree": "e" * 40,
+                "source_files_sha256": {"x.py": "0" * 64},
+                "capabilities": {"supports_held_reduction_v2": True},
+            },
+        ),
+        (_p12_loader(), _v2_candidate_binding()),
+        (None, None),
+    ):
+        with pytest.raises(ProductDailyError, match="pin"):
+            publish_package(
+                package,
+                directory=tmp_path,
+                published_at=package.decision_sets[0].published_at,
+                p12_loader=loader,
+                consumer_binding=binding,
+                wire_version="p12.decision-set.v2",
             )
-        return out
+    assert not list(tmp_path.glob("*.json"))
 
-    unstable_loader._p11_test_only_consumer = True  # type: ignore[attr-defined]
-    # The single-call design means the second (drifting) call never happens; the
-    # release either passes on the single validated object or fails.
-    receipt = publish_package(
-        package,
-        directory=tmp_path,
-        published_at=package.decision_sets[0].published_at,
-        p12_loader=unstable_loader,
-        consumer_binding=_v2_pinned_binding(),
-        wire_version="p12.daily-advice-package.v2",
+
+def test_validate_consumer_object_field_preserving(monkeypatch):
+    """The internal single-object matcher accepts a coordinate-faithful validated
+    object and returns the bound-package digest; pure mechanism, no release."""
+    from quanthus.product_daily.recommendation.publish import _validate_consumer_object
+
+    _self_contained_p12_digest(monkeypatch)
+    package = _reduce_package()
+    raw = _v2_wire(package)
+    validated = _v2_double_loader()(raw, expected_schema="p12.decision-set.v2")
+    assert _validate_consumer_object(raw, validated, wire_version="p12.decision-set.v2") == (
+        "sha256:" + "ab" * 32
     )
-    assert calls["count"] == 1, "the consumer must be validated exactly once"
-    raw = json.loads(Path(receipt.path).read_text())
-    assert raw["decision_sets"][0]["decisions"][0]["exit_kind"] == "reduce"
 
 
-def test_reduce_refused_when_loader_alters_target(tmp_path):
+def test_validate_consumer_object_rejects_altered_target(monkeypatch):
+    from quanthus.product_daily.recommendation.publish import _validate_consumer_object
+
+    _self_contained_p12_digest(monkeypatch)
     package = _reduce_package()
+    raw = _v2_wire(package)
 
-    def bad_loader(raw, *, expected_schema=None):
-        out = _v2_double_loader()(raw, expected_schema=expected_schema)
-        return dataclasses.replace(
-            out,
-            decisions=[
-                dataclasses.replace(d, target_position_fraction=Decimal("0.99"))
-                for d in out.decisions
-            ],
-        )
-
-    bad_loader._p11_test_only_consumer = True  # type: ignore[attr-defined]
+    validated = _v2_double_loader()(raw, expected_schema="p12.decision-set.v2")
+    drifted = dataclasses.replace(
+        validated,
+        decisions=[
+            dataclasses.replace(d, target_position_fraction=Decimal("0.99"))
+            for d in validated.decisions
+        ],
+    )
     with pytest.raises(ProductDailyError, match="reduce target"):
-        publish_package(
-            package,
-            directory=tmp_path,
-            published_at=package.decision_sets[0].published_at,
-            p12_loader=bad_loader,
-            consumer_binding=_v2_pinned_binding(),
-            wire_version="p12.daily-advice-package.v2",
-        )
-    assert not list(tmp_path.glob("*.json"))
+        _validate_consumer_object(raw, drifted, wire_version="p12.decision-set.v2")
 
 
-def test_reduce_refused_when_loader_returns_wrong_security(tmp_path):
-    """CV2-963-P1-3: a validated object with a different security/stage is refused."""
+def test_validate_consumer_object_rejects_wrong_security(monkeypatch):
+    from quanthus.product_daily.recommendation.publish import _validate_consumer_object
+
+    _self_contained_p12_digest(monkeypatch)
     package = _reduce_package()
+    raw = _v2_wire(package)
 
-    def wrong_loader(raw, *, expected_schema=None):
-        out = _v2_double_loader()(raw, expected_schema=expected_schema)
-        return dataclasses.replace(
-            out,
-            decisions=[
-                dataclasses.replace(d, security_code="999999", stage="holding")
-                for d in out.decisions
-            ],
-        )
-
-    wrong_loader._p11_test_only_consumer = True  # type: ignore[attr-defined]
+    validated = _v2_double_loader()(raw, expected_schema="p12.decision-set.v2")
+    drifted = dataclasses.replace(
+        validated,
+        decisions=[
+            dataclasses.replace(d, security_code="999999", stage="holding")
+            for d in validated.decisions
+        ],
+    )
     with pytest.raises(ProductDailyError, match="security/stage"):
-        publish_package(
-            package,
-            directory=tmp_path,
-            published_at=package.decision_sets[0].published_at,
-            p12_loader=wrong_loader,
-            consumer_binding=_v2_pinned_binding(),
-            wire_version="p12.daily-advice-package.v2",
-        )
-    assert not list(tmp_path.glob("*.json"))
+        _validate_consumer_object(raw, drifted, wire_version="p12.decision-set.v2")
+
+
+def test_validate_consumer_object_rejects_dropped_exit_kind(monkeypatch):
+    from quanthus.product_daily.recommendation.publish import _validate_consumer_object
+
+    _self_contained_p12_digest(monkeypatch)
+    package = _reduce_package()
+    raw = _v2_wire(package)
+    validated = _v2_double_loader()(raw, expected_schema="p12.decision-set.v2")
+    drifted = dataclasses.replace(
+        validated,
+        decisions=[
+            dataclasses.replace(d, exit_kind=None, target_position_fraction=None)
+            for d in validated.decisions
+        ],
+    )
+    with pytest.raises(ProductDailyError, match="exit_kind"):
+        _validate_consumer_object(raw, drifted, wire_version="p12.decision-set.v2")
 
 
 def test_full_exit_package_publishes_without_v2_consumer(tmp_path):
@@ -776,13 +786,56 @@ def test_decision_set_v2_wire_dict_carries_fields():
     }
 
 
+def test_v2_package_dict_is_self_describing():
+    """#723 comment7121035802: a v2 release carries the P11 envelope identity on
+    the package and the p12.decision-set.v2 header on each raw decision_set - the
+    two layers are named separately, never a single wire string."""
+    from quanthus.product_daily.recommendation.publish import _package_file_dict
+
+    package = _reduce_package()
+    raw = _package_file_dict(package, wire_version="p12.decision-set.v2")
+    assert raw["schema_version"] == "p11.daily-advice-package.v2"
+    assert raw["version"] == "1.0.0"  # business version keeps its own meaning
+    ds = raw["decision_sets"][0]
+    assert ds["decision_set_schema"] == "p12.decision-set.v2"
+    assert ds.get("schema_version") is None
+
+
+def test_v1_wire_refuses_v2_only_fields():
+    """A v1 raw that still shows exit fields is a version inconsistency, never a
+    silent field drop."""
+    from quanthus.product_daily.recommendation.publish import _serialize_decision_sets
+
+    package = _reduce_package()
+    ds = package.decision_sets[0]
+    # A stand-in decision_set whose to_dict yields a raw that still carries the
+    # v2-only exit fields; the serializer must refuse rather than strip them.
+    tampered = ds.to_dict()
+    tampered["decisions"][0]["exit_kind"] = "reduce"
+
+    class _FakeSet:
+        def to_dict(self):
+            return tampered
+
+    class _FakePackage:
+        decision_sets = (_FakeSet(),)
+
+    import pytest
+
+    with pytest.raises(ProductDailyError, match="version_inconsistent"):
+        _serialize_decision_sets(
+            _FakePackage(),  # type: ignore[arg-type]
+            wire_version="p12.decision-set.v1",
+        )
+
+
 # --- B. named dependency: the pinned v1 P12 loader drops the v2 fields -------------------------
 
 
 def test_old_p12_loader_drops_reduce_fields_named_dependency():
     """The pinned 9de1cdb9 synthetic loader accepts an exit_plan but silently drops
     exit_kind/target_position_fraction - the precise reason an executable reduce must
-    wait for the pinned p12.daily-advice-package.v2 consumer.  This is a documented gap,
+    wait for the pinned p12.decision-set.v2 consumer.  This is a documented gap,
     not a passed integration."""
 
     validate = _p12_loader()
@@ -799,4 +852,4 @@ def test_old_p12_loader_drops_reduce_fields_named_dependency():
 
 
 def test_wire_version_constant_matches_p12_handoff():
-    assert HELD_REDUCTION_WIRE_VERSION == "p12.daily-advice-package.v2"
+    assert HELD_REDUCTION_WIRE_VERSION == "p12.decision-set.v2"

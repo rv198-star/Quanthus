@@ -215,7 +215,7 @@
     }
   ],
   "held_reduction_wire": {
-    "wire_version": "p12.daily-advice-package.v2",
+    "wire_version": "p12.decision-set.v2",
     "exit_kind_field": "exit_kind",
     "target_field": "target_position_fraction",
     "reduce_denominator": "locked_cycle_budget",

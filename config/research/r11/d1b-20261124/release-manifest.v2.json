@@ -87,10 +87,10 @@
   },
   "note": "60-session minimum for sma60/base-exit; consumer published/available/revision contract pending from P10",
   "held_reduction_wire": {
-    "wire_version": "p12.daily-advice-package.v2",
+    "wire_version": "p12.decision-set.v2",
     "reduce_denominator": "locked_cycle_budget",
-    "consumer_capability": "versioned p12-consumer-binding.v1 object: consumer_schema=p12.daily-advice-package.v2 + real source_commit/tree/file-hash pin + capabilities.supports_held_reduction_v2 + single-call field-preserving validated object",
+    "consumer_capability": "versioned p12-consumer-binding.v1 object: consumer_schema=p12.decision-set.v2 + real source_commit/tree/file-hash pin + capabilities.supports_held_reduction_v2 + single-call field-preserving validated object",
     "missing_consumer_disposition": "refused or display_only",
-    "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set(raw,*,expected_schema=p12.daily-advice-package.v2)); caller bools/dicts, unpinned bindings and old field-dropping loaders are all refused before write; real pin pending -> refused/display_only"
+    "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set(raw,*,expected_schema=p12.decision-set.v2)); caller bools/dicts, unpinned bindings and old field-dropping loaders are all refused before write; real pin pending -> refused/display_only"
   }
 }

@@ -3,7 +3,7 @@
   "binding_id": "p11-p12-daily-advice-package-v2",
   "binding_version": "2.0.0-pending",
   "use_grade": "CANDIDATE_PIN_PENDING",
-  "consumer_schema": "p12.daily-advice-package.v2",
+  "consumer_schema": "p12.decision-set.v2",
   "loader_entry": "quanthus.p12_daily.decision_loader.load_decision_set",
   "loader_contract": "load_decision_set(raw, *, expected_schema)",
   "source_commit": null,

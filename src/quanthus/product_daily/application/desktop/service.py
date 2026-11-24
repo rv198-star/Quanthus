@@ -13,7 +13,7 @@ import dataclasses
 import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
 
 from quanthus.capabilities.accounting import AccountProjection, Position, value_account
@@ -1386,6 +1386,24 @@ class P12DesktopApplication:
         blockers = self._policy.missing_for_action(scope.mode)
         account = self._account(projection, history, None, funding, now)
         blockers = tuple(dict.fromkeys((*blockers, "INPUT_UNAVAILABLE")))
+        # Issue #721 R15 (r2): the blocked page still names the next check -
+        # the publish point of the next authoritative session when the
+        # forward calendar resolves one (None when it does not).  The
+        # publish time-of-day comes from the run receipt's configured
+        # decision cutoff; a receipt without it falls back to 22:30+08.
+        next_check_at = None
+        provider = getattr(self._decisions, "_next_session_provider", None)
+        if callable(provider):
+            nxt = provider(now.date())
+            if nxt is not None and nxt > now.date():
+                cutoff_time = time(22, 30)
+                raw_cutoff = (run_receipt or {}).get("decision_cutoff")
+                if raw_cutoff:
+                    try:
+                        cutoff_time = datetime.fromisoformat(str(raw_cutoff)).timetz()
+                    except (ValueError, AttributeError):
+                        pass
+                next_check_at = datetime.combine(nxt, cutoff_time)
         return WorkbenchView(
             scope=scope,
             package=None,
@@ -1395,7 +1413,7 @@ class P12DesktopApplication:
                 published_at=None,
                 retracted=False,
                 retraction_reason=None,
-                next_check_at=None,
+                next_check_at=next_check_at,
                 observed_at=now,
             ),
             clock=now,

@@ -129,7 +129,12 @@ def build_local_kernel(
                         "QUANTHUS_P12_DAILY_JOB_ROOT",
                         "/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5",
                     )
-                )
+                ),
+                calendar_root=(
+                    Path(os.environ["QUANTHUS_P12_CALENDAR_ROOT"])
+                    if os.environ.get("QUANTHUS_P12_CALENDAR_ROOT")
+                    else None
+                ),
             ),
         )
     paper_app = build_paper_application(

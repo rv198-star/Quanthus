@@ -27,72 +27,31 @@ PENDING_REF_ID = "p12-daily-advice"
 PENDING_VERSION = "v1"
 
 
-def calendar_next_session_provider(job_root: Path):
-    '''Build a governed-calendar next_session provider over a base24 job root.
+def calendar_next_session_provider(job_root: Path, calendar_root: Path | None = None):
+    '''Build the governed next_session provider over the P10 forward
+    calendar (issue #743 r2).
 
-    Returns a callable(today) -> date | None that reads the bound manifest's
-    calendar.next_session member; it never computes a date by arithmetic.'''
+    The retired manifest calendar.next_session and the dwd_trading_calendar
+    member fallback are removed: the next session comes only from the
+    forward-calendar pointer at ``calendar_root`` (default: the CN02
+    product root, or a job_root-local "calendar/" replica when present).
+    Returns a callable(today) -> date | None; an unresolvable calendar
+    yields None and the caller blocks rather than inventing a date.'''
 
-    def provide(today: date) -> date | None:
+    root = calendar_root
+    if root is None:
+        job_local = Path(job_root) / "calendar"
         try:
-            import json
-
-            pointer = json.loads(
-                (Path(job_root) / "CURRENT_DAILY_CORE_BASE24.json").read_text()
+            from quanthus.p12_daily.forward_calendar import (
+                DEFAULT_CALENDAR_ROOT,
             )
-            core = Path(str(pointer["entry"]["core"]))
-            if not core.is_absolute():
-                core = Path(job_root) / core
-            manifest = json.loads((core / "manifest.json").read_text())
-            raw = (manifest.get("calendar") or {}).get("next_session")
-            if raw:
-                return date.fromisoformat(str(raw))
-            # Audit R6/R12: fall back to the authoritative trading-calendar
-            # member (dwd_trading_calendar) the real product publishes; the
-            # next session is the smallest session date strictly after today.
-            for member in manifest.get("files") or ():
-                rel = str(member.get("path") or "")
-                if "dwd_trading_calendar" not in rel:
-                    continue
-                candidate = (core / rel).resolve()
-                try:
-                    candidate.relative_to(core)
-                except ValueError:
-                    continue
-                if not candidate.is_file():
-                    continue
-                try:
-                    import pyarrow.parquet as pq
 
-                    frame = pq.read_table(candidate)
-                    col = next(
-                        (
-                            name
-                            for name in (
-                                "session",
-                                "trade_date",
-                                "trading_date",
-                                "market_date",
-                                "session_date",
-                            )
-                            if name in frame.column_names
-                        ),
-                        None,
-                    )
-                    if col is None:
-                        return None
-                    sessions = sorted(
-                        {date.fromisoformat(str(v)[:10]) for v in frame[col].to_pylist() if v}
-                    )
-                    later = [s for s in sessions if s > today]
-                    return later[0] if later else None
-                except Exception:  # noqa: BLE001
-                    return None
-            return None
-        except (OSError, ValueError, KeyError):
-            return None
+            root = job_local if job_local.is_dir() else DEFAULT_CALENDAR_ROOT
+        except Exception:  # noqa: BLE001 - no calendar source available
+            root = job_local
+    from quanthus.p12_daily.forward_calendar import forward_calendar_provider
 
-    return provide
+    return forward_calendar_provider(Path(root))
 
 
 class PublishedPackageSource:

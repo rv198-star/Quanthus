@@ -2817,6 +2817,59 @@
         "CP-690-R11-FINAL-ACCEPTED-20261116"
       ],
       "supersedes": "CON-R11-LIMITED-SYNTHETIC-PARK-20261116"
+    },
+    {
+      "id": "CON-P10-PREOPEN-PREPARATION-20261124",
+      "recorded_at": "2026-11-24T05:38:34.148870+00:00",
+      "actor": "P10 Owner",
+      "question_id": "P10-PREOPEN-FINITE-SAMPLER-20261124-v1",
+      "family": "p10-preopen-field-sampling",
+      "work_item": "P10-DATA-P12-PREOPEN-001",
+      "modules": [
+        "DATA"
+      ],
+      "question": "Can a fixed bounded sampler preserve true preopen evidence while the Owner chat is busy?",
+      "consumer": "P10 #727 and P12 paper_quote_feed",
+      "scope": "Nov25/26 finite existing-endpoint sampling preparation, synthetic construction and CN02 verification; actual two mornings follow.",
+      "execution_status": "completed",
+      "verdict": "inconclusive",
+      "disposition": "investigate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Engineering and schedule preparation passed; actual busy-chat-independent capture and field semantics await two real mornings.",
+      "decision_effect": "Move finite raw capture to two node timers; heartbeat reviews receipts without issuing duplicate requests. Preserve Nov24 missed window.",
+      "reopen_conditions": [
+        "Read actual Nov25/26 T-reference/freeze/raw receipts under existing authority; after09:30 preserve gaps instead of adding requests."
+      ],
+      "retained_assets": [
+        "Fixed406 code and actual full/static logs; complete18-file immutable evidence.",
+        "Installed two finite timers, fixed fallback and09:35 receipt review.",
+        "Original Nov24 miss and source/calendar/category limitations."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "First finite preparation request retained its90min checkpoint. CN02 full957.186548s and focused pytest1.746341s measured; package42957bytes,0 actual #727 quote requests Nov24. Model/control and test scratch costs uninstrumented. Two mornings provide the smallest real evidence delta before permanent adoption.",
+      "attempt_refs": [
+        "REQUEST-v1.json",
+        "LOCAL-RECEIPT-v1.json",
+        "delivery-v1/FOCUSED.json",
+        "delivery-v1/FULL.json",
+        "delivery-v1/SCHEDULE-v1.json"
+      ],
+      "evidence": [
+        {
+          "id": "FINITE-PREOPEN",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-preopen-preparation/delivery-v1/RESULT.json",
+          "sha256": "23f0bb6f07ab9e6265e95ee13a223627fe3c255034f2053579bcaa408576e9ca",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed406 source/library engineering: 30 focused +9490pass/35skip full; two finite future timers installed. Real sample and field-grade acceptance pending."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-727-FINITE-SAMPLER-20261124"
+      ],
+      "supersedes": null
     }
   ]
 }

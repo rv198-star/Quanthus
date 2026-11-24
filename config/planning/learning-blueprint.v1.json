@@ -878,9 +878,10 @@
       "id": "P10-DATA-P12-PREOPEN-001",
       "issue": 727,
       "modules": [
-        "DATA"
+        "DATA",
+        "TRACE"
       ],
-      "contribution": "Finite existing-endpoint preopen field evidence for paper_quote_feed; P12/runtime and formal source qualification stay separate."
+      "contribution": "Finite existing-endpoint preopen field evidence for paper_quote_feed, with original-task evidence checkpoints; P12/runtime and formal source qualification stay separate."
     }
   ]
 }

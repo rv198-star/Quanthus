@@ -7,11 +7,21 @@ real sampling mornings, 2026-11-25 and 2026-11-26, after the missed Nov24 window
 ## Current recovery checkpoint
 
 Task base is `0faca06923cab6130d7107319c7e21412615515c`, branch
-`codex/issue-727-preopen-sampling`. The first candidate contains a narrow raw-field
-sampler, T-reference selector and synthetic regressions. CN02 verification and
-finite schedule installation are recorded in an append-only external receipt:
-`/Users/william/Documents/Codex/2026-11-24/quanthus-p10-preopen-preparation/`.
-The candidate has not yet produced real preopen samples.
+`codex/issue-727-preopen-sampling`. Fixed source
+`406cd7adc227f10769ab14df37991eef62f35579`, tree
+`045c67e2de25ad361831ad1ef7776f0b72b847bd`, passed CN02 30 focused tests,
+Ruff/format, strict mypy and full `make check`: 9,490 passed /35 skipped, exit0,
+957.187 seconds. The two finite09:00 timers are installed and read back; actual
+freeze/sample receipts are due Nov25/26, followed by field qualification.
+
+Fixed18-file evidence:
+`/Users/william/Documents/Codex/2026-11-24/quanthus-p10-preopen-preparation/delivery-v1/`.
+`RESULT.json` SHA256 is
+`23f0bb6f07ab9e6265e95ee13a223627fe3c255034f2053579bcaa408576e9ca`;
+`SHA256SUMS` SHA256 is
+`ed50740eab056f5913802ee386f16886e1beb1b23943866351c314d302a9f04e`.
+The later metadata-only checkpoint reuses this exact executable/config/test
+closure, with affected planning/history checks recorded separately.
 
 ## Input and selection
 
@@ -67,10 +77,13 @@ are retained. Invalid source clocks remain null; parser failures retain the
 wire identity. Late receipts and clock regression have explicit reasons.
 Auction, status letters and native limit fields await actual sample review.
 
-The intended runtime is two finite CN02 units at09:00 on Nov25/26, ending after
-the final slot with a1900s maximum lifetime. Existing daily-core, news and P12
-services/timers are separate. Schedule installation and future execution have
-distinct receipts. This source candidate does not alter a production pipeline.
+The installed runtime is `quanthus-p10-preopen-727-20261125.timer` and
+`quanthus-p10-preopen-727-20261126.timer`, at09:00 BJT on their named dates,
+ending after the final slot with a1900s maximum lifetime. Each service checks
+the fixed406 source/config bytes before startup. Existing daily-core, news and
+P12 services/timers are separate. Schedule installation and future execution
+have distinct receipts. The Owner-chat heartbeat now reviews receipts at09:35;
+it starts no second source collection.
 
 ## Verification and retention
 

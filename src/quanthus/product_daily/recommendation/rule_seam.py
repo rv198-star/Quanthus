@@ -1029,6 +1029,10 @@ class RuleDayOutput:
     result: ProducerResult
     source_closure: dict[str, Any]
     stage_metrics: tuple[dict[str, Any], ...]
+    # H1: per-security history-gate evidence (events=22, features=61, listing=120
+    # with the bounded floor-proof kind) produced by the raw-history adapter.  The
+    # thresholds stay in the original scan/panel algorithms; this is the read receipt.
+    history_receipts: tuple[dict[str, Any], ...] = ()
 
 
 def run_daily_advice(
@@ -1057,6 +1061,7 @@ def run_daily_advice(
     account_disposition: str | None = None,
     shared_prereq_ok: bool = True,
     shared_prereq_reason: str | None = None,
+    history_receipts: Sequence[Mapping[str, Any]] | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Run domain evaluation and issue its receipt in one job, before package assembly.
@@ -1210,6 +1215,10 @@ def run_daily_advice(
             }
             for d in seam.decisions
         ],
+        # H1 history-gate receipts: per-security 22/61/120 observations + the
+        # bounded listing-floor proof kind, bound into the job's digested closure.
+        "history_receipts": [dict(item) for item in (history_receipts or ())],
+        "history_receipts_digest": sha256_digest([dict(item) for item in (history_receipts or ())]),
         "held_decisions": [
             {
                 "security_code": d.security_code,
@@ -1329,6 +1338,7 @@ def run_daily_advice(
                 "elapsed_seconds": perf_counter() - assembly_start,
             },
         ),
+        history_receipts=tuple(dict(item) for item in (history_receipts or ())),
     )
 
 

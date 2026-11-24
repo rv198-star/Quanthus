@@ -572,12 +572,12 @@ def test_rerun_cannot_use_a_calendar_version_created_after_envelope_read(assets)
         for row in req["calendar_rows"]
         if row["venue_id"] == security["identity"]["venue_id"]
     }
-    version = "2026-11-25T00:00:00Z"
+    version = "2026-11-25T00:00:00+00:00"
     for bar in security["bars"][-61:]:
         day = bar["session_date"]
         rows[day]["knowledge_from"] = version
         security["knowledge_cutoff_by_date"][day] = version
-    rerun = "2026-11-26T00:00:00Z"
+    rerun = "2026-11-26T00:00:00+00:00"
 
     def run(source_read_at):
         return e_run_e1_replay(

@@ -1296,6 +1296,18 @@
         "type": "null"
        }
       ]
+     },
+     "target_position_fraction": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "required": [

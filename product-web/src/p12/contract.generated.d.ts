@@ -238,6 +238,7 @@ export interface Opportunity {
   security_name: string
   stage: "ended" | "entry_plan" | "exit_plan" | "holding" | "input_blocked" | "waiting"
   status_code: "ENDED" | "EXPIRED" | "MISSING_INPUT" | "NEEDS_REASSESSMENT" | "NEEDS_RECONCILIATION" | "POLICY_NOT_ADOPTED" | "READY" | "WAITING"
+  target_position_fraction: string | null
 }
 
 export interface OrderObservationRecord {

@@ -30,7 +30,23 @@ RETRACTIONS_FILE = "retractions.jsonl"
 SKIPS_FILE = "skipped-plans.jsonl"
 RUNS_DIR = "daily-runs"
 PUBLISHER_REGISTRY_FILE = "publisher-registry.json"
-PACKAGE_SCHEMA = "quanthus.p12.daily-package.v1"
+# P12 publish envelope.  v2 (issue #723 first step) carries the same fields as
+# v1 plus room for the v2 decision_set; readers admit both so existing v1
+# packages keep loading with unchanged bytes and digest.
+PACKAGE_SCHEMA = "quanthus.p12.daily-package.v2"
+PACKAGE_SCHEMA_V1 = "quanthus.p12.daily-package.v1"
+READABLE_PACKAGE_SCHEMAS = frozenset({PACKAGE_SCHEMA, PACKAGE_SCHEMA_V1})
+# Inner decision_set schema markers the envelope may carry (issue #723 second
+# step).  A v2 inner set may only ship inside the v2 envelope; a v1 envelope
+# must never wrap a v2 inner set, and the legacy v1 reader must refuse that
+# mix rather than silently drop the new fields.  A v2 envelope may carry a
+# bare v1 inner set for back-compat.
+DECISION_SET_SCHEMA_V2 = "p12.decision-set.v2"
+ENVELOPE_INNER_MISMATCH = "ENVELOPE_INNER_MISMATCH"
+# v2-only decision fields. A v1 envelope must refuse any inner decision_set
+# that carries these keys - whether it declares the v2 marker or smuggles the
+# fields bare - so the new exit semantics are never silently downgraded.
+_V2_ONLY_FIELDS = ("exit_kind", "target_position_fraction")
 RETRACTION_SCHEMA = "quanthus.p12.package-retraction.v1"
 RUN_SCHEMA = "quanthus.p12.daily-run.v1"
 
@@ -246,8 +262,31 @@ class DailyPackageStore:
 
     def _load_package_file(self, path: Path) -> StoredPackage:
         raw = _read_json(path)
-        if raw.get("schema_version") != PACKAGE_SCHEMA:
+        if raw.get("schema_version") not in READABLE_PACKAGE_SCHEMAS:
             raise FactError("INVALID_PACKAGE", "daily package schema differs")
+        # Envelope/inner version consistency (issue #723 second step): a v1
+        # envelope must never carry a v2 decision_set - the legacy reader
+        # would silently drop the new exit fields.  Refuse the mix outright
+        # rather than serve a downgraded package.
+        inner = raw.get("decision_set") or {}
+        inner_schema = inner.get("decision_set_schema")
+        if raw["schema_version"] == PACKAGE_SCHEMA_V1:
+            # Refuse a v2-marked inner set, and also a bare inner set that
+            # smuggles a v2-only key (exit_kind / target_position_fraction,
+            # even as null): both would silently downgrade under a v1 read.
+            leaked = any(
+                isinstance(item, dict)
+                and any(field in item for field in _V2_ONLY_FIELDS)
+                for item in inner.get("decisions") or ()
+            )
+            if (
+                inner_schema is not None
+                and str(inner_schema) == DECISION_SET_SCHEMA_V2
+            ) or leaked:
+                raise FactError(
+                    ENVELOPE_INNER_MISMATCH,
+                    "a v1 package envelope cannot carry a v2 decision_set",
+                )
         market_date = date.fromisoformat(str(raw["market_date"]))
         retraction = self.retraction_for(market_date)
         return StoredPackage(
@@ -294,6 +333,17 @@ class DailyPackageStore:
         errors after publication go through retraction, not replacement.
         '''
 
+        inner_schema = decision_set.get("decision_set_schema")
+        if (
+            inner_schema is not None
+            and str(inner_schema) == DECISION_SET_SCHEMA_V2
+            and PACKAGE_SCHEMA != "quanthus.p12.daily-package.v2"
+        ):
+            raise FactError(
+                ENVELOPE_INNER_MISMATCH,
+                "a v2 decision_set cannot be wrapped in a "
+                f"{PACKAGE_SCHEMA!r} envelope",
+            )
         market_date = date.fromisoformat(str(decision_set["market_date"]))
         path = self.package_path(market_date)
         body = {

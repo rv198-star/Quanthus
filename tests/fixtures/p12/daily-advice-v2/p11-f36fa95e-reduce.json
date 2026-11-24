@@ -1,0 +1,127 @@
+{
+ "source_id": "dwd-base24",
+ "version": "1.0.0",
+ "market_date": "2026-11-24",
+ "knowledge_cutoff": "2026-11-24T22:30:00+08:00",
+ "published_at": "2026-11-24T22:30:00+08:00",
+ "next_session": "2026-11-25",
+ "decisions": [
+  {
+   "opportunity_id": "held-600000",
+   "security_code": "600000",
+   "security_name": "name",
+   "stage": "exit_plan",
+   "component": {
+    "ref_id": "candidate.p4-trend-risk",
+    "version": "1.0.0"
+   },
+   "reason_codes": [],
+   "explanations": [
+    {
+     "code": "INPUT_CLOCK",
+     "use": "explanation",
+     "component_ref": "candidate.p4-trend-risk@1.0.0",
+     "text": "held"
+    }
+   ],
+   "next_observation": "next",
+   "entry": null,
+   "exit_kind": "reduce",
+   "target_position_fraction": "0.5"
+  }
+ ],
+ "audit": {
+  "producer_version": "1.1.0",
+  "policy_id": "p11-d1b",
+  "policy_version": "1.0.0",
+  "source_version": "1.0.0",
+  "candidate_rule_digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50",
+  "decision_cutoff": "2026-11-24T22:30:00+08:00",
+  "per_member_available_at": {
+   "core-daily-1d": "2026-11-24T21:30:00+08:00"
+  },
+  "admission_disposition": "publishable",
+  "empty_reason": null,
+  "git_revision": null,
+  "intake_receipt_id": "intake-1",
+  "evaluation_receipt": {
+   "producer_id": "p11.seam",
+   "producer_version": "1.1.0",
+   "run_id": "run-test",
+   "completed_at": "2026-11-24T22:25:00+08:00",
+   "coverage_digest": "sha256:b9ba298f853b933733f36cb2c1ee98a68c7762cce489740712147429cec0b526",
+   "evaluated_count": 1,
+   "evaluated_universe": [
+    "600000"
+   ],
+   "evaluation_started_at": null,
+   "source_closure_digest": null,
+   "qualified_count": 0,
+   "binding_digest": "sha256:aef08844417aa35ef197d31c849983928c299375704891a34d66053c5296acc2"
+  },
+  "evidence_grade": "TEST_ONLY_STRUCTURAL",
+  "decision_evidence": [
+   {
+    "opportunity_id": "held-600000",
+    "expert_decision_digest": null,
+    "risk_decision_digest": null,
+    "formal_decision": {
+     "schema_version": "quanthus.formal-strategy-decision.v1",
+     "event_id": "held-600000",
+     "intervention_id": null,
+     "topology_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+     "trend_state": null,
+     "governance": {
+      "security_code": "600000",
+      "snapshot_id": "snap-1",
+      "knowledge_cutoff": "2026-11-24T22:30:00+08:00",
+      "required_action": "none",
+      "terminating_veto_ids": [],
+      "veto_outputs": [],
+      "constraint_outputs": [],
+      "merged_constraints": {
+       "minimum_position": "0",
+       "maximum_position": "1",
+       "stop_rules": [
+        {
+         "expert_id": "e",
+         "expert_version": "1",
+         "rule": "r"
+        }
+       ],
+       "hold_rules": [
+        {
+         "expert_id": "e",
+         "expert_version": "1",
+         "rule": "r"
+        }
+       ],
+       "source_output_digests": [
+        "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+       ]
+      }
+     },
+     "action": {
+      "security_code": "600000",
+      "snapshot_id": "snap-1",
+      "knowledge_cutoff": "2026-11-24T22:30:00+08:00",
+      "position_state": "held",
+      "governance_digest": "sha256:f58c8601d7d7df28bb4e9dfa4cb7166167697beef1bcd09c1fd702e0324e42e8",
+      "action_policy_version": "pol@1",
+      "action_policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "scoring_outputs": [],
+      "aggregate_score": "0",
+      "proposed_action": "reduce",
+      "final_action": "reduce",
+      "reason_codes": []
+     },
+     "target_maximum_position": "0.5"
+    },
+    "signal_close": null,
+    "knowledge_cutoff": null,
+    "decision_at": null
+   }
+  ]
+ },
+ "decision_set_schema": "p12.decision-set.v2"
+}

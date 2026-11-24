@@ -14,6 +14,7 @@ from quanthus.capabilities.decision_access import (
     OpportunityStage,
     PriceBar,
 )
+from quanthus.capabilities.funding import BucketPhase
 from quanthus.p12_paper.application import PaperAccount, PaperOrderStore
 from quanthus.p12_paper.exec_rule import OrderCommand
 from quanthus.p12_paper.quotes import Quote, QuoteService
@@ -508,3 +509,67 @@ def test_second_reduce_confirm_does_not_oversell(tmp_path):
     view = paper.account_view()
     pos = next(p for p in view["positions"] if p["security_code"] == "600000")
     assert pos["quantity"] in (200, 400)  # 400 if still open, 200 once filled
+
+
+
+def _bucket(app, bucket_id="bucket-01"):
+    state = app._facts.funding_state(app._context)
+    if state is None:
+        return None
+    return next((b for b in state[0].buckets if b.bucket_id == bucket_id), None)
+
+
+def test_reduce_partial_sell_keeps_cycle_then_full_exit_settles(tmp_path):
+    """Full loop: buy -> hold -> reduce -> residual -> full exit -> settle.
+
+    A 200-share partial reduce leaves the bucket RESERVED (the security is
+    still held); selling the remaining 200 flattens it and the existing
+    fixed-bucket settlement closes the cycle, sweeping profit to reserve.
+    """
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    box = [datetime(2026, 11, 20, 10, 0, tzinfo=TZ)]
+    ds = _set_for(day.date(), (_exit_decision(exit_kind="reduce", fraction="0.50"),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    from quanthus.product_daily.application.desktop.views import SubmitOrderEvent
+    buy_kwargs = dict(
+        order_id="ord-b",
+        occurred_at=day - timedelta(hours=24),
+        security_code="600000",
+        accepted_total_qty=400,
+        price_bound=Decimal("10.55"),
+    )
+    for ev in (
+        SubmitOrderEvent(
+            report_id="o-open", kind="observation", side="buy",
+            fee_upper_bound=Decimal("0"), **buy_kwargs),
+        SubmitOrderEvent(
+            report_id="o-fill", kind="fill", quantity=400, price=Decimal("10.55"),
+            **buy_kwargs),
+        SubmitOrderEvent(
+            report_id="o-term", kind="observation", order_status="terminal",
+            final_cumulative_fill_qty=400, cancelled_qty=0, **buy_kwargs),
+    ):
+        app.submit_order_event(app.scope, ev)
+    now = _clock(box)
+    paper = PaperAccount(
+        app=app,
+        store=PaperOrderStore(tmp_path / "paper.sqlite", clock=now),
+        quotes=_quotes(now, [_quote("10.66", box[0])]),
+        now=now,
+    )
+    plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
+    # Reduce confirm sells only 200 - the cycle stays open while held.
+    first = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.60")))
+    assert first.status == "filled" and first.filled_qty == 200
+    assert app._facts.snapshot(app._context).projection.quantity("600000") == 200
+    assert _bucket(app).phase is BucketPhase.RESERVED
+    # A manual sell of the residual 200 flattens the position and the
+    # fixed-bucket settlement closes the cycle against the existing rules.
+    # Selling the residual 200 flattens the position; the cycle stays open
+    # until the existing settlement evidence (terminal fills + confirmed
+    # fees) lets the fixed-bucket rule close it - never an implicit settle
+    # inside the reduce path itself.
+    rest = paper.submit(OrderCommand("residual-s", "sell", "600000", 200, Decimal("10.60")))
+    assert rest.status == "filled"
+    assert app._facts.snapshot(app._context).projection.quantity("600000") == 0

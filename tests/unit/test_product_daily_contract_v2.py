@@ -372,6 +372,14 @@ def _publishable_package(held: HeldSignal):
     return result.package
 
 
+def _consumer_binding(*, supports: bool) -> dict:
+    from quanthus.product_daily.recommendation.runtime_identity import consumer_identity
+
+    binding = consumer_identity(ROOT)
+    binding["capabilities"] = {"supports_held_reduction_v2": supports}
+    return binding
+
+
 def test_reduce_package_refused_without_v2_consumer(tmp_path):
     package = _publishable_package(_held("reduce", Decimal("0.5")))
     with pytest.raises(ProductDailyError, match="supports_held_reduction_v2"):
@@ -380,20 +388,117 @@ def test_reduce_package_refused_without_v2_consumer(tmp_path):
             directory=tmp_path,
             published_at=package.decision_sets[0].published_at,
         )
+    assert not list(tmp_path.glob("*.json"))
 
 
-def test_reduce_package_publishes_with_v2_consumer(tmp_path):
+def test_reduce_package_refused_when_capability_declared_but_no_loader(tmp_path):
+    """A caller declaring the capability without a real loader never publishes."""
+
+    package = _publishable_package(_held("reduce", Decimal("0.5")))
+    with pytest.raises(ProductDailyError, match="no validated consumer"):
+        publish_package(
+            package,
+            directory=tmp_path,
+            published_at=package.decision_sets[0].published_at,
+            consumer_binding=_consumer_binding(supports=True),
+        )
+    assert not list(tmp_path.glob("*.json"))
+
+
+def test_reduce_package_refused_when_old_loader_drops_fields(tmp_path):
+    """fakeTrue + the actual pinned old loader: the validated object carries no
+    exit_kind/target_position_fraction, so the release is refused with no file."""
+
+    package = _publishable_package(_held("reduce", Decimal("0.5")))
+    with pytest.raises(ProductDailyError, match="dropped or altered the reduce fields"):
+        publish_package(
+            package,
+            directory=tmp_path,
+            published_at=package.decision_sets[0].published_at,
+            p12_loader=_p12_loader(),
+            consumer_binding=_consumer_binding(supports=True),
+        )
+    assert not list(tmp_path.glob("*.json"))
+
+
+def _field_preserving_loader():
+    """Minimal double of the future p12.daily-advice-package.v2 validated object.
+
+    Stands in ONLY to prove the gate itself opens for a consumer that preserves the
+    fields; it is not a claimed integration with the real P12 loader, which is still
+    pending (#723 comment7118368788).
+    """
+
+    @dataclasses.dataclass(frozen=True)
+    class _Decision:
+        opportunity_id: str
+        exit_kind: str | None
+        target_position_fraction: Decimal | None
+
+    @dataclasses.dataclass(frozen=True)
+    class _Set:
+        decisions: list
+        market_date: date
+
+    def build(raw):
+        return _Set(
+            decisions=[
+                _Decision(
+                    opportunity_id=d["opportunity_id"],
+                    exit_kind=d.get("exit_kind"),
+                    target_position_fraction=(
+                        None
+                        if d.get("target_position_fraction") is None
+                        else Decimal(str(d["target_position_fraction"]))
+                    ),
+                )
+                for d in raw["decisions"]
+            ],
+            market_date=date.fromisoformat(raw["market_date"]),
+        )
+
+    # The publish receipt resolves the P12 binding digest through the validated object's
+    # top package (quanthus.shared.fact_contracts); present the double under that module
+    # so the gate exercises the same resolution path as a real pinned consumer.
+    _Set.__module__ = "quanthus.capabilities.decision_access"
+    _Decision.__module__ = "quanthus.capabilities.decision_access"
+    return build
+
+
+def test_reduce_package_publishes_only_through_field_preserving_consumer(tmp_path):
     package = _publishable_package(_held("reduce", Decimal("0.5")))
     receipt = publish_package(
         package,
         directory=tmp_path,
         published_at=package.decision_sets[0].published_at,
-        consumer_supports_held_reduction_v2=True,
+        p12_loader=_field_preserving_loader(),
+        consumer_binding=_consumer_binding(supports=True),
     )
     raw = json.loads(Path(receipt.path).read_text())
     decision = raw["decision_sets"][0]["decisions"][0]
     assert decision["exit_kind"] == "reduce"
     assert decision["target_position_fraction"] == "0.5"
+
+
+def test_reduce_refused_when_loader_alters_target(tmp_path):
+    package = _publishable_package(_held("reduce", Decimal("0.5")))
+
+    def bad_loader(raw):
+        out = _field_preserving_loader()(raw)
+        out.decisions[0] = dataclasses.replace(
+            out.decisions[0], target_position_fraction=Decimal("0.99")
+        )
+        return out
+
+    with pytest.raises(ProductDailyError, match="dropped or altered"):
+        publish_package(
+            package,
+            directory=tmp_path,
+            published_at=package.decision_sets[0].published_at,
+            p12_loader=bad_loader,
+            consumer_binding=_consumer_binding(supports=True),
+        )
+    assert not list(tmp_path.glob("*.json"))
 
 
 def test_full_exit_package_publishes_without_v2_consumer(tmp_path):

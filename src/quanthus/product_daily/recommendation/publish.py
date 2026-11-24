@@ -118,7 +118,7 @@ def publish_package(
     published_at: datetime,
     elapsed_ms: int = 0,
     p12_loader: Callable[[dict[str, Any]], Any] | None = None,
-    consumer_supports_held_reduction_v2: bool = False,
+    consumer_binding: dict[str, Any] | None = None,
 ) -> PublishReceipt:
     """Write one package file append-only and return a receipt with all digest surfaces.
 
@@ -150,25 +150,21 @@ def publish_package(
             "never a published advice day",
         )
 
-    # Held-reduction wire v2 gate: an executable reduce must only be handed to a pinned
-    # consumer that preserves exit_kind/target_position_fraction.  An older loader that
+    # Held-reduction wire v2 gate: an executable reduce must only be released through a
+    # pinned consumer whose binding declares the capability AND whose actual loader
+    # preserves exit_kind/target_position_fraction on the validated object for the same
+    # opportunity/security.  A bare caller boolean can never grant that: a loader that
     # silently drops the fields would read the same exit_plan as a full liquidation, so
-    # without an explicit consumer capability declaration the reduce may only ever be
-    # published as display-only (never an executable wire decision).  The caller passes
-    # consumer_supports_held_reduction_v2 only from a pinned consumer binding that
-    # declares the capability; the default False keeps the fail-closed posture.
+    # without a real field-preserving validated object the reduce stays refused /
+    # display-only.  consumer_binding is the versioned consumer_identity() mapping
+    # (source_commit + capabilities), not a free-standing flag.
     has_reduce = any(
         decision.stage == "exit_plan" and decision.exit_kind == "reduce"
         for item in package.decision_sets
         for decision in item.decisions
     )
-    if has_reduce and not consumer_supports_held_reduction_v2:
-        raise ProductDailyError(
-            "unpublishable_package",
-            "an executable reduce requires a pinned P12 v2 consumer "
-            "(supports_held_reduction_v2); the current consumer would drop "
-            "exit_kind/target_position_fraction and read it as a full sell",
-        )
+    if has_reduce:
+        _require_field_preserving_v2_consumer(package, p12_loader, consumer_binding)
 
     # The P12 binding digest is computed and validated *before* any bytes land so a loader
     # failure leaves the directory untouched.
@@ -233,3 +229,78 @@ def publish_package(
         published_at=published_at,
         elapsed_ms=elapsed_ms,
     )
+
+
+def _require_field_preserving_v2_consumer(
+    package: DailyAdvicePackage,
+    p12_loader: Callable[[dict[str, Any]], Any] | None,
+    consumer_binding: dict[str, Any] | None,
+) -> None:
+    """Fail closed unless a real pinned v2 consumer preserves the reduce fields.
+
+    Three conditions, all checked before any filesystem write:
+
+    1. consumer_binding must be the versioned consumer_identity() mapping and declare
+       capabilities.supports_held_reduction_v2 == true (a caller-supplied bool is not a
+       binding).
+    2. A real p12_loader must be supplied; the absence of a loader can never be a
+       validated consumer.
+    3. For every decision_set containing an exit_kind=reduce decision, the loader's
+       validated object must carry exit_kind == "reduce" and a target_position_fraction
+       equal to the serialized value on the same opportunity_id/security_code.  A loader
+       that drops or alters either field (the pinned v1 consumer does exactly this) fails
+       the gate.
+    """
+
+    capability = (consumer_binding or {}).get("capabilities") or {}
+    if capability.get("supports_held_reduction_v2") is not True:
+        raise ProductDailyError(
+            "unpublishable_package",
+            "an executable reduce requires a pinned P12 v2 consumer "
+            "(consumer_binding capabilities.supports_held_reduction_v2); the current "
+            "consumer would drop exit_kind/target_position_fraction and read it as a "
+            "full sell",
+        )
+    if p12_loader is None:
+        raise ProductDailyError(
+            "unpublishable_package",
+            "an executable reduce requires the actual pinned P12 v2 loader to validate "
+            "and preserve its fields; no loader means no validated consumer",
+        )
+    for item in package.decision_sets:
+        reduce_ids = {
+            decision.opportunity_id
+            for decision in item.decisions
+            if decision.stage == "exit_plan" and decision.exit_kind == "reduce"
+        }
+        if not reduce_ids:
+            continue
+        raw = item.to_dict()
+        try:
+            validated = p12_loader(raw)
+        except Exception as exc:
+            raise ProductDailyError(
+                "unpublishable_package",
+                f"pinned v2 consumer failed to validate the reduce decision_set: {exc}",
+            ) from exc
+        by_id = {decision.opportunity_id: decision for decision in validated.decisions}
+        expected = {
+            decision.opportunity_id: decision
+            for decision in item.decisions
+            if decision.opportunity_id in reduce_ids
+        }
+        for opportunity_id, decision in expected.items():
+            seen = by_id.get(opportunity_id)
+            if (
+                seen is None
+                or getattr(seen, "exit_kind", None) != "reduce"
+                or getattr(seen, "target_position_fraction", None) is None
+                or str(getattr(seen, "target_position_fraction", ""))
+                != str(decision.target_position_fraction)
+            ):
+                raise ProductDailyError(
+                    "unpublishable_package",
+                    f"pinned consumer dropped or altered the reduce fields on "
+                    f"{opportunity_id}; an executable reduce may only be released "
+                    "through a field-preserving p12.daily-advice-package.v2 loader",
+                )

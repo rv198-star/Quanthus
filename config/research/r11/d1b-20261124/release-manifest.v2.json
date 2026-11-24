@@ -90,9 +90,9 @@
   "held_reduction_wire": {
     "wire_version": "p12.decision-set.v2",
     "reduce_denominator": "locked_cycle_budget",
-    "consumer_capability": "versioned p12-consumer-binding.v1 object bound to P12 commit 93948784: consumer_schema=p12.decision-set.v2 + real source_commit/tree + per-file sha256 pin + capabilities.supports_held_reduction_v2 + single-call (MarketDecisionSet, wire_digest)",
+    "consumer_capability": "versioned p12-consumer-binding.v1 object bound to P12 commit b756c63c: consumer_schema=p12.decision-set.v2 + real source_commit/tree + per-file sha256 pin + capabilities.supports_held_reduction_v2 + single-call (MarketDecisionSet, wire_digest) with the seam account_digest carried out",
     "missing_consumer_disposition": "refused or display_only",
-    "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set, bound at commit 93948784); caller bools/dicts, unpinned bindings, stale-commit trees and old field-dropping loaders are all refused before write. mode=simulation with purpose=historical_replay; the wire digest returned by the pinned call is the binding digest."
+    "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set, bound at commit b756c63c); caller bools/dicts, unpinned bindings, stale-commit trees and old field-dropping loaders are all refused before write. mode=simulation with purpose=historical_replay; the binding digest is p12_package_digests=digest(_package_content(validated)) - the account ConfigurationBinding identity - while the raw-byte wire digest is kept separately on p12_wire_digests."
   },
   "release_bindings": {
     "machine_policy": {
@@ -105,7 +105,7 @@
     },
     "consumer": {
       "path": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json",
-      "sha256": "sha256:21963532a99a9292d86bd4ebebfe7b02d54e865f5fba16ba8f1d8c9f1dda206d"
+      "sha256": "sha256:3b1239631ffaafc71b7928cd78e9bc18d62c4855f08ac700990041d812ad3131"
     }
   }
 }

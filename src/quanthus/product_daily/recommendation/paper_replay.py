@@ -31,7 +31,7 @@ daily, or live evidence.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -186,17 +186,13 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
     if envelope.get("purpose_mode") != ALLOWED_PURPOSE_MODE:
         _fail("invalid_purpose_mode", "replay request purpose_mode must be historical_replay")
     if envelope.get("permitted_account_use") != ALLOWED_ACCOUNT_USE:
-        _fail(
-            "invalid_account_use", "permitted_account_use must be personal_simulation"
-        )
+        _fail("invalid_account_use", "permitted_account_use must be personal_simulation")
     scenario_id = _text(envelope.get("scenario_id"), "scenario_id")
     open_sessions = tuple(
         sorted(
             {
                 _isodate(d, f"open_sessions[{i}]")
-                for i, d in enumerate(
-                    _seq(envelope.get("open_sessions"), "open_sessions")
-                )
+                for i, d in enumerate(_seq(envelope.get("open_sessions"), "open_sessions"))
             }
         )
     )
@@ -265,8 +261,10 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                     f"market_date {md} is outside the declared signal window "
                     f"{signal_window[0]}..{signal_window[1]}",
                 )
-        if fdp_date is not None and fdp_date in market_dates and (
-            signal_window[0] <= fdp_date <= signal_window[1]
+        if (
+            fdp_date is not None
+            and fdp_date in market_dates
+            and (signal_window[0] <= fdp_date <= signal_window[1])
         ):
             _fail(
                 "invalid_final_day_policy",
@@ -295,8 +293,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
         )
 
     exclusions = tuple(
-        _exclusion(i, e)
-        for i, e in enumerate(_seq(envelope.get("exclusions", ()), "exclusions"))
+        _exclusion(i, e) for i, e in enumerate(_seq(envelope.get("exclusions", ()), "exclusions"))
     )
 
     def _member_evidence(i: int, m: Any) -> MemberEvidence:
@@ -305,9 +302,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
             member_id=_text(mo.get("member_id"), "member_evidence[].member_id"),
             version=_text(mo.get("version"), "member_evidence[].version"),
             digest=_sha256(mo.get("digest"), "member_evidence[].digest"),
-            available_at=_isodatetime(
-                mo.get("available_at"), "member_evidence[].available_at"
-            ),
+            available_at=_isodatetime(mo.get("available_at"), "member_evidence[].available_at"),
             required=bool(mo.get("required", True)),
         )
 
@@ -341,9 +336,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
     ac = envelope.get("action_coverage")
     if ac is not None:
         aco = _obj(ac, "action_coverage")
-        default_state = _text(
-            aco.get("default_state", "unknown"), "action_coverage.default_state"
-        )
+        default_state = _text(aco.get("default_state", "unknown"), "action_coverage.default_state")
         # default_state may no longer be "covered": coverage without named
         # evidence is exactly the empty-credential case the R2 probe caught.
         if default_state not in ("unknown",):
@@ -375,9 +368,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
         # Per-security identity: security_id / listing_id / venue_id / code, so
         # a window record binds the exact identity, not a bare code.
         securities_cov: dict[str, dict[str, Any]] = {}
-        for i, s in enumerate(
-            _seq(aco.get("securities", ()), "action_coverage.securities")
-        ):
+        for i, s in enumerate(_seq(aco.get("securities", ()), "action_coverage.securities")):
             so = _obj(s, f"action_coverage.securities[{i}]")
             code = _text(so.get("security_code"), "coverage securities[].security_code")
             securities_cov[code] = {
@@ -417,9 +408,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                     "invalid_action_coverage",
                     f"window_evidence[{i}] references unregistered coverage_id {coverage_id!r}",
                 )
-            member_sha = _sha256(
-                eo.get("member_sha256"), "window_evidence[].member_sha256"
-            )
+            member_sha = _sha256(eo.get("member_sha256"), "window_evidence[].member_sha256")
             # member_map_sha256: the digest of the P10 member map that located
             # the raw register rows this record claims.  A verified state must
             # reach back to named raw member rows, never a bare summary hash.
@@ -467,9 +456,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                             "adjustment_effective"
                         ),
                     }
-                    for s in _seq(
-                        eo.get("scan_sessions", ()), "window_evidence[].scan_sessions"
-                    )
+                    for s in _seq(eo.get("scan_sessions", ()), "window_evidence[].scan_sessions")
                 ],
                 "events": [
                     _obj(e, "window_evidence[].events[]")
@@ -547,9 +534,7 @@ def _request_digest(request: ReplayRequest) -> str:
                 "member_evidence": [m.to_dict() for m in request.member_evidence],
                 "run_id": request.run_id,
                 "final_day_policy": (
-                    dict(request.final_day_policy)
-                    if request.final_day_policy is not None
-                    else None
+                    dict(request.final_day_policy) if request.final_day_policy is not None else None
                 ),
                 "signal_window": request.signal_window,
                 "action_coverage": (
@@ -597,8 +582,7 @@ def _is_final_display_day(request: ReplayRequest, market_date: date) -> bool:
     fdp = request.final_day_policy
     return (
         fdp is not None
-        and _isodate(fdp.get("market_date"), "final_day_policy.market_date")
-        == market_date
+        and _isodate(fdp.get("market_date"), "final_day_policy.market_date") == market_date
     )
 
 
@@ -610,9 +594,7 @@ def _excluded_codes(request: ReplayRequest, market_date: date) -> frozenset[str]
     )
 
 
-def bar_context_window(
-    open_sessions: tuple[date, ...], market_date: date
-) -> tuple[date, ...]:
+def bar_context_window(open_sessions: tuple[date, ...], market_date: date) -> tuple[date, ...]:
     """The last <=BAR_CONTEXT contiguous open sessions ending at (and including) T.
 
     Bound by the authoritative calendar, never by counting delivered rows; a
@@ -667,8 +649,7 @@ def build_replay_envelope(
             (
                 bar
                 for bar in _seq(sec_o.get("bars"), f"securities[{index}].bars")
-                if _isodate(_obj(bar, "bar").get("session_date"), "bar.session_date")
-                in window_set
+                if _isodate(_obj(bar, "bar").get("session_date"), "bar.session_date") in window_set
             ),
             key=lambda b: _isodate(_obj(b, "bar").get("session_date"), "bar.session_date"),
         )
@@ -703,17 +684,20 @@ def build_replay_envelope(
             filtered["limits"] = []
             filtered["close_at_by_date"] = {}
             filtered["knowledge_cutoff_by_date"] = {}
+        # Version dedup: byte-identical re-statements of the same action row
+        # (same security_code, effective_date, cash/bonus terms and known_at)
+        # collapse to ONE row so the projected actions feed the panel once.
+        # Two DISTINCT same-date rows are NOT collapsed here - they are the
+        # multiplicity conflict the coverage join isolates.
+        if filtered.get("actions"):
+            filtered["actions"] = _dedupe_action_rows(filtered["actions"])
         securities.append(filtered)
-        bar_dates = {
-            _isodate(_obj(b, "bar").get("session_date"), "bar.session_date") for b in bars
-        }
+        bar_dates = {_isodate(_obj(b, "bar").get("session_date"), "bar.session_date") for b in bars}
         delivered[code] = {
             "bar_rows": len(bars),
             "window_sessions": len(window),
             "gap_sessions": len(window_set - bar_dates),
-            "entry_eligible": not any(
-                e["security_code"] == code for e in coverage_exclusions
-            ),
+            "entry_eligible": not any(e["security_code"] == code for e in coverage_exclusions),
         }
 
     if not securities and not coverage_exclusions:
@@ -799,6 +783,15 @@ def _action_coverage_ok(
         return False
     if _sessions_have_effective_action(scan):
         return False
+    # R5: a scan record that declares verified_event but cannot point at a
+    # resolvable adjustment (no event rows, or event rows with neither an
+    # ex-date nor an adjustment_effective marker) is self-contradictory - the
+    # positive state was asserted without a row to bind it to, so the security
+    # stays out rather than getting a free adjustment_effective=False.
+    if scan.get("event_state") == "verified_event" and not _scan_events_resolvable(
+        scan.get("events"), scan.get("scan_sessions")
+    ):
+        return False
 
     # --- returns_61_session: exactly the 61 contiguous venue open sessions
     # ending at T (60 adjacent returns), verbatim and in order.  A positive
@@ -812,10 +805,195 @@ def _action_coverage_ok(
         return False
     # A verified_event returns window must carry full raw terms; verified_none
     # passes.  The negated condition is returned directly.
-    return not (
-        returns.get("event_state") == "verified_event"
-        and not _returns_events_have_full_terms(returns.get("events"))
-    )
+    if returns.get("event_state") == "verified_event":
+        if not _returns_events_have_full_terms(returns.get("events")):
+            return False
+        # R5: the verified event terms must JOIN the projected actions[] - a
+        # declared dividend/bonus that never reaches the feature row, or one
+        # that reaches it with a different amount, is a local block.  The
+        # projection maps pre-tax cash -> cash_dividend_per_share and folds
+        # bonus+transfer into the panel's single bonus_share_ratio (once, never
+        # double-counted); the ex-date that affects a return is inside
+        # (first_close, last_close] i.e. sessions[1:].
+        if not _returns_events_join_actions(
+            returns.get("events"), sec_o.get("actions"), code, returns_dates
+        ):
+            return False
+    elif returns.get("event_state") == "verified_none" and _actions_in_window(
+        sec_o.get("actions"), code, returns_dates
+    ):
+        # A positively "no adjustment" returns window contradicts any raw
+        # action row inside it (the conflict is isolated, never coalesced away).
+        return False
+    return True
+
+
+def _dedupe_action_rows(actions: Any) -> list[Any]:
+    """Collapse byte-identical action re-statements to one row per term tuple.
+
+    Rows are keyed on (security_code, effective_date, cash, bonus, known_at);
+    a re-delivered row with identical terms is the same version and feeds the
+    panel once.  DISTINCT rows on the same date are preserved verbatim - they
+    are the multiplicity conflict the coverage join isolates, not data to merge.
+    """
+    if not isinstance(actions, Sequence) or isinstance(actions, str):
+        return list(actions) if isinstance(actions, Sequence) else []
+    seen: set[tuple[Any, ...]] = set()
+    out: list[Any] = []
+    for a in actions:
+        if not isinstance(a, Mapping):
+            out.append(a)
+            continue
+        eff = a.get("effective_date")
+        eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
+        key = (
+            str(a.get("security_code")),
+            eff_iso,
+            str(a.get("cash_dividend_per_share")),
+            str(a.get("bonus_share_ratio")),
+            str(a.get("known_at")),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(a)
+    return out
+
+
+def _actions_in_window(actions: Any, code: str, window_sessions: Sequence[str]) -> bool:
+    """True when any projected action has an effective_date inside the return
+    window (first_close, last_close] = window_sessions[1:]."""
+    if not isinstance(actions, Sequence) or isinstance(actions, str):
+        return False
+    window_set = set(window_sessions[1:])
+    for a in actions:
+        if not isinstance(a, Mapping):
+            continue
+        if str(a.get("security_code")) != code:
+            continue
+        eff = a.get("effective_date")
+        eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
+        if eff_iso in window_set:
+            return True
+    return False
+
+
+def _returns_events_join_actions(
+    events: Any, actions: Any, code: str, window_sessions: Sequence[str]
+) -> bool:
+    """Join verified returns events to the projected actions[] for this security.
+
+    Returns True only when every in-window declared event maps to a matching
+    projected action AND every in-window projected action is backed by a
+    declared event - the panel's total_return then used the same amounts the
+    verified register proved.  Field mapping (P11-P10-ACTION-REGISTER-EVIDENCE):
+      event.cash_gross_per_share -> action.cash_dividend_per_share (pre-tax, CNY)
+      event.bonus_share_ratio + event.transfer_share_ratio -> action.bonus_share_ratio
+        (the panel's single dilution ratio; summed once, never double-counted)
+      event.currency must be CNY (the amount column's declared unit)
+      action.known_at must precede effective_date (the panel's mapped_actions filter)
+      event.implementation_sha256 / register_row bind the original register row.
+    """
+    window_set = set(window_sessions[1:])
+
+    def _dec(v: Any) -> Decimal | None:
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return None
+
+    def _event_ex(e: Mapping[str, Any]) -> str | None:
+        ex = e.get("ex_date")
+        return ex.isoformat() if isinstance(ex, date) else (str(ex) if ex else None)
+
+    # Index in-window projected actions by effective_date for this security.
+    window_actions: dict[str, list[Mapping[str, Any]]] = {}
+    if isinstance(actions, Sequence) and not isinstance(actions, str):
+        for a in actions:
+            if not isinstance(a, Mapping) or str(a.get("security_code")) != code:
+                continue
+            eff = a.get("effective_date")
+            eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
+            if eff_iso in window_set:
+                window_actions.setdefault(eff_iso, []).append(a)
+
+    # One-to-one binding: each in-window ex_date must have exactly ONE distinct
+    # projected action row.  Identical duplicate rows (same cash/bonus/known_at)
+    # dedupe to one by version; two DISTINCT rows on the same date (a proven
+    # 0.116 plus an unproven 0.232) are a multiplicity conflict - the real
+    # adjustment cannot be resolved to a single row, so the security isolates.
+    def _action_terms(a: Mapping[str, Any]) -> tuple[Any, ...]:
+        return (
+            _dec(a.get("cash_dividend_per_share")),
+            _dec(a.get("bonus_share_ratio")),
+            str(a.get("known_at")),
+        )
+
+    distinct_window_actions: dict[str, list[Mapping[str, Any]]] = {}
+    for eff_iso, rows in window_actions.items():
+        seen_terms: set[tuple[Any, ...]] = set()
+        deduped: list[Mapping[str, Any]] = []
+        for a in rows:
+            t = _action_terms(a)
+            if t not in seen_terms:
+                seen_terms.add(t)
+                deduped.append(a)
+        if len(deduped) != 1:
+            # Two different adjustment rows claim the same ex_date.
+            return False
+        distinct_window_actions[eff_iso] = deduped
+
+    declared_dates: set[str] = set()
+    declared_terms: dict[str, tuple[Any, ...]] = {}
+    for e in events or ():
+        if not isinstance(e, Mapping):
+            return False
+        ex_iso = _event_ex(e)
+        if ex_iso is None or ex_iso not in window_set:
+            # An event outside (first_close, last_close] does not affect these
+            # returns; it is neither required nor a conflict for THIS window.
+            continue
+        if str(e.get("currency")) != "CNY":
+            return False
+        cash = _dec(e.get("cash_gross_per_share"))
+        bonus = _dec(e.get("bonus_share_ratio"))
+        transfer = _dec(e.get("transfer_share_ratio"))
+        if cash is None or bonus is None or transfer is None:
+            return False
+        expected_bonus = bonus + transfer  # combined once, not double-counted
+        # A second declared event on the same ex_date with DIFFERENT terms is a
+        # declaration conflict; identical re-declarations dedupe to one.
+        this_terms = (cash, expected_bonus)
+        prior = declared_terms.get(ex_iso)
+        if prior is not None and prior != this_terms:
+            return False
+        declared_terms[ex_iso] = this_terms
+        declared_dates.add(ex_iso)
+        cands = distinct_window_actions.get(ex_iso) or []
+        matched = False
+        for a in cands:
+            if (
+                _dec(a.get("cash_dividend_per_share")) == cash
+                and _dec(a.get("bonus_share_ratio")) == expected_bonus
+            ):
+                # known_at must precede effective_date (panel mapped filter).
+                ka_raw = a.get("known_at")
+                try:
+                    ka_date = (
+                        ka_raw
+                        if isinstance(ka_raw, date)
+                        else (date.fromisoformat(str(ka_raw)) if ka_raw else None)
+                    )
+                except ValueError:
+                    ka_date = None
+                if ka_date is not None and ka_date < date.fromisoformat(ex_iso):
+                    matched = True
+        if not matched:
+            return False
+
+    # Reverse join: every in-window projected action must be backed by a
+    # declared verified event; an orphan action row is a conflict.
+    return all(eff_iso in declared_dates for eff_iso in distinct_window_actions)
 
 
 def _session_dates(value: Any) -> list[str]:
@@ -843,11 +1021,51 @@ def _sessions_have_effective_action(scan: Mapping[str, Any]) -> bool:
     an effective 'ex_date' on a scanned session.  Any effective action on a
     scanned session blocks the new entry.
     """
+    scanned = {s.get("date") for s in scan.get("scan_sessions") or () if isinstance(s, Mapping)}
+    scanned_iso = {
+        d.isoformat() if isinstance(d, date) else str(d) for d in scanned if d is not None
+    }
     for s in scan.get("scan_sessions") or ():
         if isinstance(s, Mapping) and s.get("adjustment_effective") is True:
             return True
     for e in scan.get("events") or ():
-        if isinstance(e, Mapping) and e.get("adjustment_effective") is True:
+        if not isinstance(e, Mapping):
+            continue
+        if e.get("adjustment_effective") is True:
+            return True
+        # An event row naming WHEN it applies (ex_date / effective_date /
+        # session_date / date) that lands on a scanned session is an effective
+        # adjustment on that day - the frozen gate blocks new entry on a real
+        # T-1/T ex-date even when the row spells it as a date, not a bool.
+        ex = e.get("ex_date") or e.get("effective_date") or e.get("session_date") or e.get("date")
+        if ex is not None:
+            ex_iso = ex.isoformat() if isinstance(ex, date) else str(ex)
+            if ex_iso in scanned_iso:
+                return True
+    return False
+
+
+def _scan_events_resolvable(events: Any, scan_sessions: Any) -> bool:
+    """True when a scan verified_event names a resolvable adjustment row.
+
+    A scan 'verified_event' state must reach a concrete event row carrying an
+    ex-date (or session date) or an explicit adjustment_effective marker - a
+    bare positive label with no bindable subtype row is self-contradictory and
+    the caller keeps the security out rather than granting a free clean scan.
+    """
+    evs = list(events or ())
+    if not evs:
+        return False
+    for e in evs:
+        if not isinstance(e, Mapping):
+            return False
+        # A resolvable row names WHEN the adjustment applies (ex_date or a
+        # session date inside the two scanned sessions) or carries an explicit
+        # adjustment marker; a row with neither is unbindable.
+        if e.get("adjustment_effective") is True:
+            return True
+        ex = e.get("ex_date") or e.get("effective_date") or e.get("session_date") or e.get("date")
+        if ex is not None:
             return True
     return False
 
@@ -895,12 +1113,8 @@ def _facts_for_day(request: ReplayRequest, market_date: date) -> DailyFactsView:
         required_member_ids=request.required_member_ids,
         intake_receipt_id=_text(ft.get("intake_receipt_id"), "facts_template.intake_receipt_id"),
         intake_received_at=_isodatetime(ft.get("intake_received_at"), "intake_received_at"),
-        intake_first_read_at=_isodatetime(
-            ft.get("intake_first_read_at"), "intake_first_read_at"
-        ),
-        intake_verified_at=_isodatetime(
-            ft.get("intake_verified_at"), "intake_verified_at"
-        ),
+        intake_first_read_at=_isodatetime(ft.get("intake_first_read_at"), "intake_first_read_at"),
+        intake_verified_at=_isodatetime(ft.get("intake_verified_at"), "intake_verified_at"),
     )
 
 
@@ -925,9 +1139,7 @@ def _policy_for_day(request: ReplayRequest, market_date: date) -> AdvicePolicy:
             SESSION_CLOSE,
             SHANGHAI,
         ),
-        candidate_rule_digest=_text(
-            p.get("candidate_rule_digest"), "policy.candidate_rule_digest"
-        ),
+        candidate_rule_digest=_text(p.get("candidate_rule_digest"), "policy.candidate_rule_digest"),
         trusted_producer_ids=tuple(
             _text(pid, "trusted_producer_ids[]")
             for pid in _seq(p.get("trusted_producer_ids", ()), "trusted_producer_ids")
@@ -965,9 +1177,7 @@ def _account_for_day(request: ReplayRequest, market_date: date) -> AccountFactsV
         account_id=account_id,
         as_of=bound_as_of,
         cash_available=(
-            Decimal(str(a["cash_available"]))
-            if a.get("cash_available") is not None
-            else None
+            Decimal(str(a["cash_available"])) if a.get("cash_available") is not None else None
         ),
         active_or_reserved_security_codes=tuple(
             _text(c, "active_or_reserved_security_codes[]")
@@ -989,9 +1199,7 @@ def _account_for_day(request: ReplayRequest, market_date: date) -> AccountFactsV
     )
 
 
-def _source_policy_for_day(
-    request: ReplayRequest, market_date: date
-) -> P6Base24CandidatePolicy:
+def _source_policy_for_day(request: ReplayRequest, market_date: date) -> P6Base24CandidatePolicy:
     next_open = datetime.combine(
         _next_open_session(request.open_sessions, market_date), SESSION_OPEN, SHANGHAI
     )
@@ -1166,17 +1374,13 @@ def _signal_fields(signal: Any) -> dict[str, Any]:
         "fraction": (str(f) if (f := first("fraction")) is not None else None),
         "target_maximum_position": (
             str(f)
-            if (f := first("target_maximum_position", "target_remaining_fraction"))
-            is not None
+            if (f := first("target_maximum_position", "target_remaining_fraction")) is not None
             else None
         ),
         # The v2 wire field a downstream executable reduce consumes; held
         # signals surface it so the projection keeps real reduce/full targets.
         "target_position_fraction": (
-            str(f)
-            if (f := first("target_position_fraction"))
-            is not None
-            else None
+            str(f) if (f := first("target_position_fraction")) is not None else None
         ),
         "exit_kind": first("exit_kind"),
         "expert_decision_digest": first("expert_decision_digest"),
@@ -1229,8 +1433,7 @@ def _rule_day_projection(output: Any, window_info: Mapping[str, Any]) -> dict[st
         "held_reduction_wire": RELEASE_WIRE_VERSION,
         "package_digest": sha256_digest(wire) if wire is not None else None,
         "diagnostics": [
-            dict(d) if isinstance(d, Mapping) else {"reason": str(d)}
-            for d in result.diagnostics
+            dict(d) if isinstance(d, Mapping) else {"reason": str(d)} for d in result.diagnostics
         ],
         "assessment": assessment,
         "seam": {
@@ -1269,9 +1472,7 @@ def _rule_day_projection(output: Any, window_info: Mapping[str, Any]) -> dict[st
                 "security_code": d.security_code,
                 "event_id": d.event_id,
                 "status": (
-                    d.disposition.value
-                    if hasattr(d.disposition, "value")
-                    else str(d.disposition)
+                    d.disposition.value if hasattr(d.disposition, "value") else str(d.disposition)
                 ),
             }
             for d in seam.decisions
@@ -1356,16 +1557,13 @@ def preview_replay_plan(raw_request: Mapping[str, Any]) -> dict[str, Any]:
                 )
                 for s in request.securities
             )
-            if code not in excluded
-            and not _action_coverage_ok(request, sec_o, code, market_date)
+            if code not in excluded and not _action_coverage_ok(request, sec_o, code, market_date)
         ]
         days.append(
             {
                 "market_date": market_date.isoformat(),
                 "kind": "signal_day",
-                "next_session": _next_open_session(
-                    request.open_sessions, market_date
-                ).isoformat(),
+                "next_session": _next_open_session(request.open_sessions, market_date).isoformat(),
                 "window_first": window[0].isoformat(),
                 "window_last": window[-1].isoformat(),
                 "bar_context_sessions": len(window),
@@ -1389,9 +1587,7 @@ def preview_replay_plan(raw_request: Mapping[str, Any]) -> dict[str, Any]:
         "days": days,
         "declared_venues": sorted(
             {
-                _text(
-                    _obj(r, "listing_rows[]").get("venue_id"), "listing_rows[].venue_id"
-                )
+                _text(_obj(r, "listing_rows[]").get("venue_id"), "listing_rows[].venue_id")
                 for r in request.listing_rows
             }
         ),

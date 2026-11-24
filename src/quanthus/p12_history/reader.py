@@ -18,7 +18,7 @@ from quanthus.p12_history import calendar_listing as cal_mod
 from quanthus.p12_history import envelope as env_mod
 from quanthus.p12_history import identity as id_mod
 from quanthus.p12_history import supplements as sup_mod
-from quanthus.p12_history.clocks import REPLAY_AS_OBSERVED, iso, utcnow
+from quanthus.p12_history.clocks import REPLAY_AS_OBSERVED, iso, parse_ts, utcnow
 from quanthus.p12_history.source_pins import BASE_BUSINESS_THROUGH, SourceMap
 
 BAR_SESSIONS = bars_mod.BAR_SESSIONS
@@ -41,6 +41,16 @@ def _window_sessions(calendar_rows, venue_id, market_date, count):
         if r.venue_id == venue_id and r.is_open and r.session_date <= market_date
     )
     return sessions[-count:]
+
+
+def _date_iso(value):
+    """bar session_date ISO string -> date, for the tradability join."""
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return None
 
 
 def read_history(
@@ -122,17 +132,75 @@ def read_history(
 
     # ---- per-security entries ----
     securities = []
+    # Native session-state joins (P11 裁定): close_at and the source
+    # knowledge clock come from the venue calendar row for that session;
+    # is_tradable comes from dwd_tradability_state joined on
+    # calendar_session_id; price-limit regimes join on venue + listing.
+    # A fact the sources do not carry stays null - the reader never
+    # derives tradability from the presence of a bar.
+    venue_close = {}
+    venue_knowledge = {}
+    for c in calendar_rows:
+        if c.close_at is not None:
+            venue_close.setdefault(c.venue_id, {})[c.session_date] = iso(c.close_at)
+        venue_knowledge.setdefault(c.venue_id, {})[c.session_date] = iso(c.knowledge_from)
+    session_ids = cal_cov.get("session_ids") or {}
+    tradability_by_key = {}
+    for t in limits.get("tradability_state") or []:
+        csid = str(t.get("calendar_session_id") or "")
+        vd = session_ids.get(csid)
+        if vd is None:
+            continue
+        venue_t, sess_t = vd
+        tradability_by_key[(str(t.get("listing_id") or ""), sess_t)] = {
+            "is_tradable": t.get("is_tradable"),
+            "can_buy": t.get("can_buy"),
+            "can_sell": t.get("can_sell"),
+            "reason_code": str(t.get("reason_code") or ""),
+            "observation_start": iso(parse_ts(t.get("observation_start"))),
+            "upper_price": t.get("upper_price"),
+            "lower_price": t.get("lower_price"),
+        }
+    limit_by_listing = {}
+    for rg in limits.get("price_limit_regimes") or []:
+        for lid in (rg.get("listing_id"),):
+            if lid:
+                limit_by_listing.setdefault(str(lid), []).append(
+                    {
+                        "upper_limit_ratio": rg.get("upper_limit_ratio"),
+                        "lower_limit_ratio": rg.get("lower_limit_ratio"),
+                        "security_status": rg.get("security_status"),
+                        "ipo_phase": rg.get("ipo_phase"),
+                        "effective_from": iso(parse_ts(rg.get("effective_from"))),
+                        "effective_to": iso(parse_ts(rg.get("effective_to"))),
+                    }
+                )
+
     for ident in identities:
         sec_bars = [
             bars_by_listing[ident.listing_id][s]
             for s in sessions_sorted
             if ident.listing_id in bars_by_listing and s in bars_by_listing[ident.listing_id]
         ]
+        for b in sec_bars:
+            sd = _date_iso(b.get("session_date"))
+            t = tradability_by_key.get((ident.listing_id, sd))
+            if t is not None:
+                b["is_tradable"] = t.get("is_tradable")
+                b["can_buy"] = t.get("can_buy")
+                b["can_sell"] = t.get("can_sell")
+                b["tradability_reason"] = t.get("reason_code") or None
         sec_actions = [
             a for a in actions.values() if a["security_id"] == ident.security_id
         ]
+        close_map = dict(venue_close.get(ident.venue_id) or {})
+        cutoff_map = dict(venue_knowledge.get(ident.venue_id) or {})
+        sec_limits = limit_by_listing.get(ident.listing_id) or []
         securities.append(
-            env_mod.security_entry(ident, sec_bars, sec_actions, [], [], {}, {})
+            env_mod.security_entry(
+                ident, sec_bars, sec_actions, [], sec_limits,
+                close_map, cutoff_map,
+            )
         )
 
     raw_history = env_mod.build_envelope(

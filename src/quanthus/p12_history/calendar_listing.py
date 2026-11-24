@@ -112,6 +112,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
     reads = []
     conflicts = []
     rows = {}
+    session_ids = {}
     sources = list(source_map.base_members("dwd_trading_calendar"))
     for day in source_map.daily_open_days():
         d = _date(day)
@@ -133,7 +134,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
             records = _rows(
                 member.abs_path,
                 ["venue_id", "trade_date", "is_open", "close_at",
-                 "observation_start", "knowledge_from"],
+                 "observation_start", "knowledge_from", "calendar_session_id"],
             )
         except Exception as exc:  # noqa: BLE001
             reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
@@ -167,9 +168,19 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
                 conflicts.append(
                     {"venue_id": row.venue_id, "session_date": session.isoformat(), "member_id": member.member_id}
                 )
+            # Native session-id -> (venue, trade_date) map so listing-level
+            # tradability_state (keyed by calendar_session_id hash) joins
+            # back to the session the bar projects onto.
+            csid = str(rec.get("calendar_session_id") or "")
+            if csid and session is not None and venue_id is not None:
+                session_ids[csid] = (venue_id, session)
         reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True})
     out = sorted(rows.values(), key=lambda r: (r.venue_id, r.session_date))
-    return out, {"reads": reads, "conflicts": conflicts}
+    return out, {
+        "reads": reads,
+        "conflicts": conflicts,
+        "session_ids": session_ids,
+    }
 
 
 def read_listing_rows(source_map: SourceMap, market_date: date):

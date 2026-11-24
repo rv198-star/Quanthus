@@ -89,6 +89,11 @@ def _project_member(member, sessions_set, needed_listings, security_by_listing, 
                 "volume": str(rec.get("volume")),
                 "amount": str(rec.get("turnover")),
                 "is_tradable": None,
+                # Native per-bar business clock verbatim (P11 裁定): the
+                # observation_end names the session close-side fact.  The
+                # session's own close_at / member knowledge_from are joined
+                # downstream per venue/date - never derived into the bar.
+                "observation_end": rec.get("observation_end"),
             }
         except Exception:  # noqa: BLE001
             continue

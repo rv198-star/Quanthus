@@ -361,6 +361,10 @@ def run_daily_advice_from_raw(
     # H1: per-security history-gate receipts from the p11.raw-history-input.v1
     # adapter (observe-only; thresholds stay in the scan/panel/row_number).
     history_receipts: Sequence[Mapping[str, Any]] | None = None,
+    # Caller-supplied exclusions (e.g. adapter-level securities[] rejections)
+    # merged BEFORE the run so they are inside the issued source_closure, never
+    # appended to the dict after the receipt digest was computed.
+    caller_input_exclusions: Sequence[dict[str, Any]] | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Build real panel facts + the scan series from raw inputs, then run the core.
@@ -384,7 +388,7 @@ def run_daily_advice_from_raw(
     features_by_security: dict[str, SecurityFeatureFacts] = {}
     scan_rows: list[CandidateDailyInput] = []
     prior_det: dict[str, int] = {}
-    input_exclusions: list[dict[str, Any]] = []
+    input_exclusions: list[dict[str, Any]] = list(caller_input_exclusions or ())
     signal_date = facts.market_date
     all_trading_dates: set[date] = set()
     # Account and raw closures are bound even when a particular market input fails.

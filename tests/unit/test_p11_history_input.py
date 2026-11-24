@@ -84,9 +84,12 @@ def _listing(
     member_id: str = "core-daily-1d",
     listing_id: str | None = None,
 ) -> dict:
+    # The identity carries listing-<code> (see _identity in test_p11_daily_runner);
+    # the listing row must bind that exact listing_id, not a derived default.
+    code = security_id.removeprefix("security-")
     return {
         "security_id": security_id,
-        "listing_id": listing_id or f"listing-{security_id}",
+        "listing_id": listing_id or f"listing-{code}",
         "venue_id": venue,
         "effective_from": effective_from,
         "effective_to": None,
@@ -327,6 +330,7 @@ def test_derive_membership_fail_closed_without_listing():
             listing_rows=[],
             calendar_rows=(),
             security_id="security-1",
+            listing_id="listing-1",
             venue_id="SSE",
             market_date=TARGET,
         )
@@ -615,3 +619,166 @@ def test_r1_119_membership_below_gate_not_qualified(runner, resources):
     receipt = output.source_closure["history_receipts"][0]
     assert receipt["gates"]["listing"]["status"] == "failed"
     assert receipt["status"] == "not_qualified"
+
+
+# --- H1-R2 C6 consolidated repair ----------------------------------------------------
+
+
+def _envelope_bars(code: str, n_bars: int, n_cal: int = 200, n_membership: int = 200) -> dict:
+    """A trend security truncated to n_bars inside a full listing envelope."""
+    raw = _trend_raw(code)
+    entry = _security_entry(raw)
+    entry["bars"] = entry["bars"][-n_bars:]
+    cal_days = _weekdays_ending(TARGET, n_cal)
+    listing_start = cal_days[-n_membership] if n_membership < n_cal else cal_days[0]
+    return _envelope(
+        [entry],
+        calendar=_calendar(days=cal_days),
+        listing=[_listing(raw.identity.security_id, effective_from=listing_start.isoformat())],
+    )
+
+
+@pytest.mark.parametrize("n_bars", [21, 22, 60])
+def test_r2_insufficient_history_blocks_publication(runner, resources, n_bars):
+    """C6 P1-1: 21/22/60 bars -> every market input not_qualified AND no held
+    evaluation -> the result is a blocked day, never a publishable ended."""
+    output = run_daily_advice_from_history(
+        _envelope_bars("600000", n_bars), runner=runner, resources=resources, **_run_kwargs()
+    )
+    assert output.result.publishable is False
+    assert output.seam.day_blocked is True
+    stages = (
+        [d.stage for ds in output.result.package.decision_sets for d in ds.decisions]
+        if output.result.package is not None
+        else []
+    )
+    assert "entry_plan" not in stages
+    receipt = output.source_closure["history_receipts"][0]
+    assert receipt["status"] == "not_qualified"
+
+
+def test_r2_119_membership_blocks_publication(runner, resources):
+    """C6 P1-1: a real 119-session membership fails the listing gate -> blocked."""
+    output = run_daily_advice_from_history(
+        _envelope_bars("600000", 130, n_cal=200, n_membership=119),
+        runner=runner,
+        resources=resources,
+        **_run_kwargs(),
+    )
+    assert output.result.publishable is False
+    assert output.seam.day_blocked is True
+    receipt = output.source_closure["history_receipts"][0]
+    assert receipt["gates"]["listing"]["status"] == "failed"
+    assert receipt["status"] == "not_qualified"
+
+
+def test_r2_qualified_no_signal_stays_publishable(runner, resources):
+    """61+ bars AND >=120 membership with a genuine no-signal -> a publishable
+    empty/ended day is still allowed (qualified-no-signal, not a blocked day)."""
+    output = run_daily_advice_from_history(
+        _trend_envelope(), runner=runner, resources=resources, **_run_kwargs()
+    )
+    assert output.result.publishable is True
+    assert output.seam.day_blocked is False
+
+
+def test_r2_held_still_evaluates_when_market_fails(runner, resources):
+    """A known-held security whose market parse failed still gets its held review
+    (account_member_market_unavailable), and the day is not falsely blocked."""
+    env = _trend_envelope()
+    env["securities"][0]["held_membership"] = True
+    env["securities"][0]["held_quantity"] = 100
+    env["securities"][0]["bars"] = []  # market member broken
+    output = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    actions = [d.action for d in output.seam.held_decisions]
+    assert actions == ["hold_alert"]
+    assert output.seam.day_blocked is False
+
+
+def test_r2_exclusion_bound_into_issued_closure(runner, resources):
+    """C6 P1-2: a malformed neighbour's exclusion is inside the SAME closure the
+    receipt digests - never appended after issuance (digest must match)."""
+    good = _security_entry(_trend_raw("600000"))
+    bad = _security_entry(_trend_raw("600001"))
+    bad["bars"][0]["close_price"] = "bad-close"
+    cal_days = _weekdays_ending(TARGET, 200)
+    env = _envelope(
+        [good, bad],
+        calendar=_calendar(days=cal_days),
+        listing=[
+            _listing("security-600000", effective_from=cal_days[0].isoformat()),
+            _listing("security-600001", effective_from=cal_days[0].isoformat()),
+        ],
+    )
+    output = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    closure = output.source_closure
+    exclusions = closure["exclusions"]
+    assert any(e["security_code"] == "600001" for e in exclusions)
+    # The issued receipt's digest must equal the digest of the closure actually
+    # carried on the output - the exclusion is inside the same bound object.
+    from quanthus.event_library.contracts import sha256_digest
+
+    assert output.receipt.source_closure_digest == sha256_digest(closure)
+    # The good neighbour still produces a real entry through the package.
+    assert output.result.publishable is True
+    entries = [d for d in output.seam.decisions if d.entry_allowed]
+    assert entries
+
+
+def test_r2_listing_effective_timestamp_accepted_and_projected():
+    """C6 P1-3: P10 effective_from as a UTC timestamp projects onto the venue's
+    session date - not rejected, not truncated to a UTC date."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 200)
+    # 16:00 UTC on the first cal day == 00:00+08 next day; still the SAME SSE day
+    # once anchored to Asia/Shanghai.  effective_from is a UTC instant.
+    from datetime import timezone as _tz
+
+    utc_from = datetime.combine(cal_days[0], datetime.min.time(), tzinfo=_tz.utc).isoformat()
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=_calendar(days=cal_days),
+        listing=[
+            _listing(raw.identity.security_id, effective_from=utc_from),
+        ],
+    )
+    history = load_raw_history(env)  # must not reject the timestamp
+    inputs, _ = raw_security_inputs_from_history(history)
+    assert inputs[0].universe_membership[0] == cal_days[0]
+
+
+def test_r2_listing_timestamp_day_boundary_not_truncated():
+    """A 23:00+08 instant on day X must stay on day X (not roll to X+1 UTC date)."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 200)
+    late = datetime.combine(cal_days[0], datetime.min.time()).replace(hour=23, tzinfo=SHANGHAI)
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=_calendar(days=cal_days),
+        listing=[_listing(raw.identity.security_id, effective_from=late.isoformat())],
+    )
+    history = load_raw_history(env)
+    inputs, _ = raw_security_inputs_from_history(history)
+    assert inputs[0].universe_membership[0] == cal_days[0]
+
+
+def test_r2_wrong_listing_id_rejected_not_matched():
+    """C6 P1-3: a listing row for a different listing_id must NOT produce a
+    membership - identity binds security_id AND listing_id AND venue."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 200)
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=_calendar(days=cal_days),
+        listing=[
+            _listing(
+                raw.identity.security_id,
+                effective_from=cal_days[0].isoformat(),
+                listing_id="wrong-listing",
+            )
+        ],
+    )
+    inputs, receipts = raw_security_inputs_from_history(load_raw_history(env))
+    assert inputs == []
+    assert receipts[0]["status"] == "excluded"
+    assert "listing" in receipts[0]["reason"].lower()

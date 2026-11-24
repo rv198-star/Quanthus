@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, NoReturn
+from zoneinfo import ZoneInfo
 
 from quanthus.product_daily.contracts import ProductDailyError
 from quanthus.product_daily.recommendation.daily_runner import RawSecurityInput
@@ -82,6 +83,54 @@ def _isodate(value: Any, label: str) -> date:
         except ValueError:
             _fail("invalid_raw_history", f"{label} is not an ISO date")
     _fail("invalid_raw_history", f"{label} must be an ISO date string")
+
+
+def _listing_session_date(value: Any, label: str, venue_id: str) -> date:
+    """Project a P10 listing effective_* endpoint onto the venue's session date.
+
+    P10 supplies effective_from/effective_to as a UTC timestamp (the DWD effective
+    interval is an instant, not a date literal).  The listing is active on the
+    venue session whose calendar day contains the instant, anchored by the venue
+    timezone - the same rule the warehouse uses to bind an instant to a trading
+    day.  A bare ISO date is also accepted (it is already a session day).
+
+    The projection is explicit per venue: the instant is converted to the
+    venue's local timezone and its calendar date is taken, so 16:00+08 on
+    2026-11-24 and 00:30+08 on 2026-11-24 both land on the 2026-11-24 SSE
+    session, never truncated to a UTC date.
+    """
+    tz = _venue_tz(venue_id)
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            _fail("invalid_raw_history", f"{label} must carry a timezone")
+        return value.astimezone(tz).date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            pass
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            _fail("invalid_raw_history", f"{label} is not an ISO date or datetime")
+        if parsed.tzinfo is None:
+            _fail("invalid_raw_history", f"{label} must carry a timezone")
+        return parsed.astimezone(tz).date()
+    _fail("invalid_raw_history", f"{label} must be an ISO date or timestamp")
+
+
+def _venue_tz(venue_id: str) -> ZoneInfo:
+    """The venue's session-day timezone, from the bound venue fact.
+
+    All currently admitted mainland venues trade on Asia/Shanghai; the mapping
+    is a named fact (not inferred from a bar clock) and is the only place a
+    source timestamp is turned into a session date.
+    """
+    if venue_id in ("SSE", "SZSE", "BSE", "XSHG", "XSHE", "XBEI"):
+        return ZoneInfo("Asia/Shanghai")
+    _fail("invalid_raw_history", f"no admitted session timezone for venue {venue_id}")
 
 
 def _isodatetime(value: Any, label: str) -> datetime:
@@ -271,9 +320,12 @@ def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
         smid = _text(lo.get("source_member_id"), f"listing_rows[{index}].source_member_id")
         if smid not in member_ids:
             _fail("unknown_source_member", f"listing_rows[{index}] -> {smid}")
-        eff_from = _isodate(lo.get("effective_from"), f"listing_rows[{index}].effective_from")
+        venue = _text(lo.get("venue_id"), f"listing_rows[{index}].venue_id")
+        eff_from = _listing_session_date(
+            lo.get("effective_from"), f"listing_rows[{index}].effective_from", venue
+        )
         eff_to = (
-            _isodate(lo["effective_to"], f"listing_rows[{index}].effective_to")
+            _listing_session_date(lo["effective_to"], f"listing_rows[{index}].effective_to", venue)
             if lo.get("effective_to")
             else None
         )
@@ -286,7 +338,7 @@ def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
             ListingRow(
                 security_id=_text(lo.get("security_id"), f"listing_rows[{index}].security_id"),
                 listing_id=_text(lo.get("listing_id"), f"listing_rows[{index}].listing_id"),
-                venue_id=_text(lo.get("venue_id"), f"listing_rows[{index}].venue_id"),
+                venue_id=venue,
                 effective_from=eff_from,
                 effective_to=eff_to,
                 knowledge_from=_isodatetime(lo["knowledge_from"], "listing_rows[].knowledge_from"),
@@ -314,10 +366,15 @@ def derive_universe_membership(
     listing_rows: Sequence[ListingRow],
     calendar_rows: Sequence[CalendarRow],
     security_id: str,
+    listing_id: str,
     venue_id: str,
     market_date: date,
 ) -> tuple[date, ...]:
     """Universe membership = open sessions of the venue covered by the listing.
+
+    The listing interval must match the caller-asserted identity on all three
+    keys (security_id AND listing_id AND venue_id) - a row for a different
+    listing of the same security cannot prove this security's sessions.
 
     The calendar must cover every open session from the listing's earliest
     effective_from through market_date; a calendar starting after the listing start
@@ -327,12 +384,17 @@ def derive_universe_membership(
     bar-count or weekday proxy and never a T+1 backfill.
     """
     intervals = [
-        row for row in listing_rows if row.security_id == security_id and row.venue_id == venue_id
+        row
+        for row in listing_rows
+        if row.security_id == security_id
+        and row.listing_id == listing_id
+        and row.venue_id == venue_id
     ]
     if not intervals:
         _fail(
             "listing_fact_missing",
-            f"no listing interval for {security_id}@{venue_id}; age cannot be inferred",
+            f"no listing interval for {security_id}/{listing_id}@{venue_id}; "
+            "age cannot be inferred",
         )
     earliest_start = min(row.effective_from for row in intervals)
     venue_sessions = sorted(
@@ -649,6 +711,7 @@ def raw_security_inputs_from_history(
                 listing_rows=history.listing_rows,
                 calendar_rows=history.calendar_rows,
                 security_id=identity.security_id,
+                listing_id=identity.listing_id,
                 venue_id=identity.venue_id,
                 market_date=history.market_date,
             )
@@ -905,6 +968,9 @@ def run_daily_advice_from_history(
     bound_receipts = [{**receipt, "raw_history_digest": envelope_identity} for receipt in receipts]
     # Convert adapter-level exclusions into the runner's input_exclusions so a bad
     # neighbour is a named isolation inside source_closure, never silently dropped.
+    # Adapter-level exclusions are named isolations INSIDE the issued closure,
+    # not appended after receipt issuance (a post-hoc dict replace would leave
+    # receipt.source_closure_digest pointing at the pre-exclusion bytes).
     adapter_exclusions = [
         {
             "security_code": receipt["security_code"],
@@ -915,18 +981,24 @@ def run_daily_advice_from_history(
         for receipt in receipts
         if receipt.get("status") == "excluded"
     ]
-    output = run_daily_advice_from_raw(raw=inputs, history_receipts=bound_receipts, **kwargs)
-    if adapter_exclusions:
-        import dataclasses as _dc
+    runner_exclusions = [*(adapter_exclusions), *(kwargs.pop("input_exclusions", None) or ())]
+    output = run_daily_advice_from_raw(
+        raw=inputs,
+        history_receipts=bound_receipts,
+        caller_input_exclusions=runner_exclusions,
+        **kwargs,
+    )
+    # The issued receipt's digest must match the closure actually carried on the
+    # output.  run_daily_advice already folded every exclusion into
+    # source_closure before computing its digest, so this is an invariant check,
+    # not a rewrite.
+    from quanthus.event_library.contracts import sha256_digest as _sha
 
-        output = _dc.replace(
-            output,
-            source_closure={
-                **output.source_closure,
-                "exclusions": [
-                    *adapter_exclusions,
-                    *output.source_closure.get("exclusions", ()),
-                ],
-            },
+    actual = _sha(output.source_closure)
+    bound = output.receipt.source_closure_digest if output.receipt is not None else actual
+    if actual != bound:
+        _fail(
+            "source_closure_receipt_mismatch",
+            "the final source_closure drifted from the issued receipt digest",
         )
     return output

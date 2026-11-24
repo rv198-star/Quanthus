@@ -1291,18 +1291,6 @@ def run_daily_advice(
         ],
         # H1 history-gate receipts: per-security 22/61/120 observations + the
         # bounded listing-floor proof kind, bound into the job's digested closure.
-        "history_receipts": _enriched_history_receipts(
-            history_receipts,
-            features_by_security=features_by_security,
-            seam=seam,
-        ),
-        "history_receipts_digest": sha256_digest(
-            _enriched_history_receipts(
-                history_receipts,
-                features_by_security=features_by_security,
-                seam=seam,
-            )
-        ),
         "held_decisions": [
             {
                 "security_code": d.security_code,
@@ -1323,6 +1311,46 @@ def run_daily_advice(
             for d in seam.held_decisions
         ],
     }
+    enriched_history = _enriched_history_receipts(
+        history_receipts,
+        features_by_security=features_by_security,
+        seam=seam,
+    )
+    source_closure["history_receipts"] = enriched_history
+    source_closure["history_receipts_digest"] = sha256_digest(enriched_history)
+
+    # H1-R2 P1-1: a history gate is a publish gate, not a label.  A receipt
+    # marked not_qualified means the original algorithm did NOT qualify that
+    # security - the day is only publishable when at least one market input was
+    # qualified, or a real held/exit evaluation produced an independent output.
+    #
+    # account_member_market_unavailable is not a market verdict: the market
+    # parse failed but the held review ran on its own facts, so that security
+    # contributes no market evidence either way.
+    market_receipts = [
+        item
+        for item in enriched_history
+        if item.get("status") != "account_member_market_unavailable"
+    ]
+    any_market_qualified = any(item.get("status") == "qualified" for item in market_receipts)
+    all_market_failed = bool(market_receipts) and not any_market_qualified
+    # Any held_decisions entry is an independent held evaluation - even a
+    # hold_alert, which is itself a valid held output (missing facts fail closed
+    # to hold_alert, never a manufactured entry).  A blocked whole-day or a
+    # missing-held case simply has an empty tuple.
+    held_evaluated = bool(seam.held_decisions)
+    if all_market_failed and not candidates and not held_evaluated and not seam.day_blocked:
+        seam = dataclasses.replace(
+            seam,
+            day_blocked=True,
+            day_block_reason=(
+                "history_gate_unsatisfied: every market input failed its "
+                "history qualification and no independent held evaluation "
+                "produced an output; this is a blocked day, never a qualified "
+                "no-advice package"
+            ),
+        )
+
     closure_digest = sha256_digest(source_closure)
     receipt = None
     if not seam.day_blocked and len(candidates) == len(seam.entries):

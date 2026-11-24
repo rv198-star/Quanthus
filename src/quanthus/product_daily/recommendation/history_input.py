@@ -923,6 +923,27 @@ def raw_security_inputs_from_history(
             or position_facts is not None
             or pending_kind is not None
         )
+        # Versioned #749 role.  "calendar_source_knowledge_from" declares the
+        # row's decision coordinate is the source calendar knowledge_from; it
+        # is bound verbatim into the input closure and admitted downstream only
+        # inside the versioned as-observed replay context.  Read BEFORE the
+        # market try so an unknown role is its own named exclusion, never a
+        # mislabelled market_parse failure.
+        knowledge_clock_role = sec_o.get("knowledge_clock_role")
+        if knowledge_clock_role is not None and knowledge_clock_role != (
+            "calendar_source_knowledge_from"
+        ):
+            receipts.append(
+                {
+                    "security_code": code,
+                    "status": "excluded",
+                    "reason": (
+                        f"knowledge_clock_role: {knowledge_clock_role!r} is not a named clock role"
+                    ),
+                    "scope": "per_security",
+                }
+            )
+            continue
         sec_proof: dict[str, str] = {}
         try:
             # Always resolve equivalent-day proofs into a local sink so the
@@ -1021,6 +1042,7 @@ def raw_security_inputs_from_history(
                 limits=limits,
                 close_at_by_date=close_map,
                 knowledge_cutoff_by_date=cutoff_map,
+                knowledge_clock_role=knowledge_clock_role,
                 position_facts=position_facts,
                 prior_deterioration_sessions=prior_det,
                 held_membership=held_membership,

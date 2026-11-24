@@ -937,6 +937,63 @@ def test_date_context_token_not_constructible_publicly(runner, resources):
     assert "replay_context_not_constructible" in str(exc.value)
 
 
+def _source_clock_raw(code: str, gap_days: int = 42) -> RawSecurityInput:
+    """The #749 v4 shape: knowledge_clock_role=calendar_source_knowledge_from,
+    warm-up rows keep close_at=None (original) while knowledge_cutoff carries
+    the source calendar knowledge_from as the decision coordinate."""
+
+    from dataclasses import replace as _replace
+    from datetime import datetime
+
+    raw = _gap_clocked_raw(code, gap_days)
+    stamp = datetime.fromisoformat("2026-10-14T16:28:52.274625+00:00")
+    return _replace(
+        raw,
+        knowledge_clock_role="calendar_source_knowledge_from",
+        knowledge_cutoff_by_date={
+            d: (stamp if v is None else v) for d, v in raw.knowledge_cutoff_by_date.items()
+        },
+    )
+
+
+def test_source_clock_role_admits_real_clocked_rows(runner, resources):
+    """Under the verified replay context + named role, a null close with a real
+    source knowledge_from is a clocked row (not date-context, not fail-closed)."""
+
+    raw = _source_clock_raw("600000")
+    out = _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    assert out.result.publishable is True
+    named = out.source_closure["consumption_evidence"]["source_knowledge_clock_rows"]
+    assert len(named) == 42
+    assert all(r["kind"] == "source_knowledge_clock_row" for r in named)
+    assert all(r["knowledge_clock_role"] == "calendar_source_knowledge_from" for r in named)
+    # close stays the original null; the source knowledge_from is the coordinate.
+    assert all(r["source_knowledge_from"] for r in named)
+    # Not a date-context row - date_context_rows stays empty under this shape.
+    assert not out.source_closure["consumption_evidence"].get("date_context_rows")
+
+
+def test_source_clock_role_refused_without_context(runner, resources):
+    """A forward/strict caller keeps the per-bar instant requirement even when
+    the role is declared - the role is effective ONLY inside the verified
+    replay context."""
+
+    raw = _source_clock_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw])
+    assert "missing_raw_inputs" in str(exc.value)
+
+
+def test_source_clock_role_refused_on_bare_string(runner, resources):
+    """The role cannot be activated by a caller-supplied context string - only
+    the private token minted inside the verified entry admits it."""
+
+    raw = _source_clock_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw], numeric_context="october_replay_as_observed")
+    assert "unknown_numeric_context" in str(exc.value)
+
+
 def test_date_context_warmup_rows_equivalent(runner, resources):
     """Null-instant warm-up rows reach the same numeric path as full clocks.
 

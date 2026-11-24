@@ -129,6 +129,16 @@ class RawSecurityInput:
     # closed on any missing instant.
     close_at_by_date: Mapping[date, datetime | None] | None = None
     knowledge_cutoff_by_date: Mapping[date, datetime | None] | None = None
+    # Versioned #749 role: "calendar_source_knowledge_from" declares that a
+    # warm-up row's decision coordinate is the source calendar's own
+    # knowledge_from (the instant the row became known to the source), not its
+    # native close instant.  Only admitted inside the versioned as-observed
+    # replay context under the OctoberReplayContext token; close_at stays the
+    # ORIGINAL null (never borrowed) while the verified source knowledge_from
+    # supplies an independent decision coordinate so the row evaluates as a
+    # real clocked row, not a date-context row and not a fail-closed partial
+    # pair.  Any other value / None keeps the per-bar close instant required.
+    knowledge_clock_role: str | None = None
     position_facts: HeldPositionFacts | None = None
     prior_deterioration_sessions: int | None = None
     # Explicit held membership: True = a confirmed open position, False = confirmed not
@@ -461,6 +471,7 @@ def run_daily_advice_from_raw(
     signal_date = facts.market_date
     all_trading_dates: set[date] = set()
     date_context_rows: list[dict[str, Any]] = []
+    source_clock_rows: list[dict[str, Any]] = []
     # The typed replay token is the ONLY thing that admits a date-context row.
     # A bare string/anchor/boolean can never satisfy the type check, so a strict
     # /forward/H1/M2 caller cannot substitute a label for the versioned entry's
@@ -484,6 +495,15 @@ def run_daily_advice_from_raw(
             signal_close = close_map.get(signal_date)
             if signal_close is None:
                 raise ProductDailyError("missing_close_at", f"security {code} lacks signal close")
+            # The #749 calendar_source_knowledge_from role admits a warm-up row
+            # whose native close is absent while the source calendar's own
+            # knowledge_from supplies the decision coordinate.  It is effective
+            # ONLY inside the versioned as-observed replay context (the private
+            # token) - a strict/forward caller keeps the per-bar instant
+            # requirement.  close_at stays the ORIGINAL null, never borrowed.
+            _role_source_clock = (
+                _date_context_ok and item.knowledge_clock_role == "calendar_source_knowledge_from"
+            )
             facts_row = compute_security_feature_facts(
                 security_id=identity.security_id,
                 bars=item.bars,
@@ -498,12 +518,34 @@ def run_daily_advice_from_raw(
             action_dates = {action.effective_date for action in item.actions}
             security_rows: list[CandidateDailyInput] = []
             security_date_rows: list[dict[str, Any]] = []
+            security_source_clock_rows: list[dict[str, Any]] = []
             for bar in sorted(item.bars, key=lambda row: row.session_date):
                 day = bar.session_date
                 if day > signal_date:
                     continue
                 close_at, cutoff = close_map.get(day), cutoff_map.get(day)
-                if close_at is None and cutoff is None and day < signal_date and _date_context_ok:
+                if (
+                    close_at is None
+                    and cutoff is not None
+                    and day < signal_date
+                    and _role_source_clock
+                ):
+                    # Source-clock warm-up row under the verified #749 role:
+                    # the row's decision coordinate is the source calendar's
+                    # knowledge_from (its cutoff), NOT the absent native close.
+                    # close_at stays the original null; the row evaluates as a
+                    # real clocked row (knowledge bound = source knowledge_from),
+                    # never a date-context row and never a fail-closed pair.
+                    security_source_clock_rows.append(
+                        {
+                            "security_code": code,
+                            "session_date": day.isoformat(),
+                            "kind": "source_knowledge_clock_row",
+                            "knowledge_clock_role": item.knowledge_clock_role,
+                            "source_knowledge_from": cutoff.isoformat(),
+                        }
+                    )
+                elif close_at is None and cutoff is None and day < signal_date and _date_context_ok:
                     # Date-context warm-up row: original nulls preserved.  The
                     # scan treats its session_date as the knowledge coordinate
                     # (strictly earlier than T under the declared sequence); T
@@ -550,6 +592,7 @@ def run_daily_advice_from_raw(
         features_by_security[code] = facts_row
         scan_rows.extend(security_rows)
         date_context_rows.extend(security_date_rows)
+        source_clock_rows.extend(security_source_clock_rows)
         all_trading_dates.update(security_dates)
         if item.prior_deterioration_sessions is not None:
             prior_det[code] = item.prior_deterioration_sessions
@@ -579,6 +622,15 @@ def run_daily_advice_from_raw(
             **(dict(consumption_evidence) if consumption_evidence else {}),
             "date_context_rows": tuple(date_context_rows),
             "numeric_context": numeric_context.context_id,
+        }
+    if source_clock_rows:
+        # Every source-knowledge clock row admitted under the verified #749 role
+        # is named inside the signed closure with its role and the source
+        # knowledge_from that supplied the decision coordinate -- close_at stays
+        # the original null, bound verbatim.  The evidence dict is caller-owned.
+        consumption_evidence = {
+            **(dict(consumption_evidence) if consumption_evidence else {}),
+            "source_knowledge_clock_rows": tuple(source_clock_rows),
         }
 
     return run_daily_advice(

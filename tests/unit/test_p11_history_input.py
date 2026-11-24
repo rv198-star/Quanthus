@@ -432,6 +432,28 @@ def test_h1_receipts_bound_into_source_closure(runner, resources):
     assert receipts[0]["raw_history_digest"].startswith("sha256:")
 
 
+def test_749_knowledge_clock_role_bound_into_input(runner, resources):
+    """securities[].knowledge_clock_role=calendar_source_knowledge_from is parsed
+    and carried verbatim into the RawSecurityInput for the downstream role gate."""
+    env = _trend_envelope()
+    env["securities"][0]["knowledge_clock_role"] = "calendar_source_knowledge_from"
+    history = load_raw_history(env)
+    inputs, _ = raw_security_inputs_from_history(history)
+    assert inputs[0].knowledge_clock_role == "calendar_source_knowledge_from"
+
+
+def test_749_unknown_clock_role_is_named_exclusion():
+    """An unrecognized knowledge_clock_role is a named per-security exclusion,
+    never a market_parse failure or a silent default."""
+    env = _trend_envelope()
+    env["securities"][0]["knowledge_clock_role"] = "invented_clock_role"
+    history = load_raw_history(env)
+    inputs, receipts = raw_security_inputs_from_history(history)
+    assert inputs == []
+    excluded = [r for r in receipts if r.get("status") == "excluded"]
+    assert excluded and "knowledge_clock_role" in excluded[0]["reason"]
+
+
 def test_h1_neighbour_failure_isolated_not_day_block(runner, resources):
     good_env_sec = _security_entry(_trend_raw("600000"))
     bad = _trend_raw("600001")

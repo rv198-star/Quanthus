@@ -137,6 +137,11 @@ class CandidateDailyInput:
     # absent may carry BOTH as None (a date-context row): its knowledge
     # coordinate is then its business DATE under the ordered session
     # sequence, never a borrowed clock.  A partial pair stays invalid.
+    # Under the versioned #749 calendar_source_knowledge_from role a source-clock
+    # warm-up row may carry close_at=None with a real knowledge_cutoff - the
+    # source calendar's own knowledge_from IS its decision coordinate while the
+    # native close stays the original null.  The invalid shape is a native close
+    # with NO knowledge bound (meaningless), which stays fail-closed.
     close_at: datetime | None
     knowledge_cutoff: datetime | None
     open_price: Decimal | None
@@ -159,9 +164,9 @@ class CandidateDailyInput:
             "instrument_type",
         ):
             _require_text(getattr(self, field_name), field_name)
-        if (self.close_at is None) != (self.knowledge_cutoff is None):
+        if self.close_at is not None and self.knowledge_cutoff is None:
             raise CandidateScanError(
-                "close_at and knowledge_cutoff must be both present or both absent"
+                "a native close with no knowledge cutoff is not a qualified row"
             )
         if self.close_at is not None:
             _require_aware(self.close_at, "close_at")

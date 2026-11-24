@@ -235,11 +235,59 @@ def test_asobserved_post_T_content_refused(assets):
     from tests.unit import test_p11_paper_replay as f
 
     req = _sealed_member_request()
-    # A member whose business rows run past T carries post-T business fact;
-    # it is isolated fail-closed, never consumed.
+    # A USED member whose whole declared span begins past the signal cannot
+    # have supplied an on/before-T row: consuming it is a post-window
+    # contradiction and stays fail-closed.
+    req["source_members"][0]["date_from"] = "2026-11-02"
     req["source_members"][0]["date_to"] = "2026-11-30"
     with pytest.raises(ProductDailyError):
         e_run_e1_replay(req, f.T1, assets)
+
+
+def test_asobserved_monthly_container_admitted_and_named(assets):
+    """R2: a member used by consumed rows whose container edge spans the whole
+    month (covering a November partition the period does not read) is admitted;
+    the container edge and the used-row business date stay separate."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    # Container spans the whole month (T+1 match window = 10-30; edge 10-31 is
+    # within it).  The member is used (identity/listing/calendar rows bind it).
+    req["source_members"][0]["date_to"] = "2026-10-31"
+    out = e_run_e1_replay(req, f.T1, assets)
+    use = out.get("as_observed", {}).get("member_use", {})
+    mem = use["members"][0]
+    assert mem["is_used"] is True
+    assert mem["disposition"] == "used"
+    assert use["blocking_used_members"] == []
+
+
+def test_asobserved_late_partition_excluded_not_refused(assets):
+    """R2: a member the period does NOT use, whose whole declared span is past
+    T (a November daily market partition), is named as an excluded late
+    partition -- moved out of the period input, never a hard failure."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    # Keep the used member; add a wholly-late unused partition member.
+    req["source_members"].append(
+        {
+            "member_id": "nov-daily-1d",
+            "package_id": "standard-base-2.5.1-8cd966be87fc",
+            "version": "synthetic.v1",
+            "member_path": "nov/daily.parquet",
+            "sha256": "sha256:" + "2" * 64,
+            "date_from": "2026-11-02",
+            "date_to": "2026-11-24",
+            "knowledge_at": "2026-11-24T16:00:00+08:00",
+            "visible_at": "2026-11-24T16:00:00+08:00",
+        }
+    )
+    out = e_run_e1_replay(req, f.T1, assets)
+    use = out.get("as_observed", {}).get("member_use", {})
+    excl = use["excluded_late_partitions"]
+    assert excl and excl[0]["member_id"] == "nov-daily-1d"
+    assert use["blocking_used_members"] == []
 
 
 def test_strict_still_rejects_sealed_member(assets):

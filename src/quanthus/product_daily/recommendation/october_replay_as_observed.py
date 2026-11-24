@@ -41,28 +41,34 @@ def _fail(code: str, message: str) -> None:
 def _sealed_business_content_check(
     raw_history: Mapping[str, Any], market_date: date
 ) -> list[dict[str, Any]]:
-    """Assert each member's declared content ends within the T+1 match window.
+    """Classify members by used-row business content vs the signal period.
 
-    Signal bars are sliced to <=T by the envelope; the T+1 open is carried
-    only for later matching.  A member may therefore legitimately declare
-    content through T+1.  A declared edge past T+1 carries post-window
-    business fact and is isolated here (named, never silently consumed).
-    Returns the per-member content-window records for the receipt.
+    The envelope slices consumed rows to <=T; a member's date_to is a
+    CONTAINER edge (a whole-month/year span), not the business date of any
+    selected row, so it is disclosed rather than gated.  The post-window
+    signal is a member whose declared coverage only BEGINS past T (a wholly
+    November partition).  A used member in that shape carries a real
+    contradiction and is isolated here; an unused one is named as a late
+    partition.  Returns per-member content-window records for the receipt.
     """
     out: list[dict[str, Any]] = []
     env = raw_history.get("raw_history", raw_history)
-    match_end = (market_date + timedelta(days=1)).isoformat()
+    match_end = market_date + timedelta(days=1)
     for m in env.get("source_members") or ():
         if not isinstance(m, Mapping):
             continue
         date_to = m.get("date_to")
+        date_from = m.get("date_from")
+        wholly_late = (
+            date_from is not None
+            and date.fromisoformat(str(date_from)[:10]) > match_end
+        )
         out.append(
             {
                 "member_id": m.get("member_id"),
+                "container_date_from": date_from,
                 "business_content_through": date_to,
-                "within_T_plus_1_window": (
-                    None if date_to is None else str(date_to) <= match_end
-                ),
+                "wholly_post_T_partition": wholly_late,
             }
         )
     return out
@@ -99,12 +105,12 @@ def run_october_replay_as_observed(
     """
     signal = facts.market_date
     content_check = _sealed_business_content_check(raw_history, signal)
-    leaking = [c for c in content_check if c["within_T_plus_1_window"] is False]
+    leaking = [c for c in content_check if c["wholly_post_T_partition"]]
     if leaking:
         _fail(
             "as_observed_post_T_content",
-            f"member business content extends past the T+1 match window of "
-            f"signal {signal}: "
+            f"member declared coverage begins wholly past signal {signal} "
+            f"(a wholly post-T partition): "
             f"{[c['member_id'] for c in leaking]}",
         )
 
@@ -151,8 +157,9 @@ def run_october_replay_as_observed(
         "pit_disguise": False,
         "note": (
             "Post-cutoff archives keep their original publish/acquire clocks; "
-            "their declared business content is asserted within the T+1 "
-            "match window.  No clock is rewritten to fake October-known."
+            "the container edge is disclosed per member and only a member "
+            "whose used rows begin wholly past T is isolated.  No clock is "
+            "rewritten to fake October-known."
         ),
     }
     return output, as_observed

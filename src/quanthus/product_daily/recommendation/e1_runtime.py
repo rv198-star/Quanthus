@@ -477,12 +477,22 @@ def run_e1_replay_day(
         observed_sink=observed_sink,
     )
 
-    # Business-content window assertion: a member may declare content through
-    # T+1 -- the T+1 open is consumed only for matching, not as signal input.
-    # Content declared past T+1 carries post-window business fact and is
-    # refused here (named, never consumed).  The declared edge is disclosed on
-    # the receipt either way.
-    declared = _assert_business_content_window(req, market_date)
+    # Used-member analysis, keyed on the member ids the run actually consumes
+    # (identity depends_on_member_ids, calendar/listing/register rows,
+    # member_evidence, required_member_ids).  A member's declared coverage edge
+    # may legitimately span the whole month/year; only a member WHOSE USED
+    # business rows run past T+1 carries post-window fact and is refused.
+    # Wholly-late partitions (November daily market rows, no October rows the
+    # run reads) are excluded from the period's input and named with a reason,
+    # never a hard failure.  The container edge and the used-row business date
+    # are disclosed separately per member.
+    member_use = _analyze_member_use(req, market_date)
+    if member_use["blocking_used_members"]:
+        _fail(
+            "as_observed_post_T_content",
+            "member used business rows run past the T+1 match window of signal "
+            f"{market_date}: {member_use['blocking_used_members']}",
+        )
 
     receipt = paper_replay.run_replay_day(
         req,
@@ -511,7 +521,7 @@ def run_e1_replay_day(
     receipt["as_observed"] = {
         "schema_version": "p11.october-replay-as-observed.v1",
         "logical_decision_at": receipt.get("logical_decision_at"),
-        "member_content_windows": declared,
+        "member_use": member_use,
         "sealed_archives": {
             "members": observed_sink.get("sealed_members", []),
             "calendar": observed_sink.get("sealed_calendar", []),
@@ -577,30 +587,127 @@ def _pending_panel_placeholder(assets: E1RuleAssets) -> BaselineFeaturePanelRepo
     )
 
 
-def _assert_business_content_window(request: Any, market_date: date) -> list[dict[str, Any]]:
-    """Refuse when a member declares business content past the T+1 match window.
+def _member_id_of(m: Any) -> Any:
+    return m.get("member_id") if isinstance(m, Mapping) else getattr(m, "member_id", None)
 
-    Signal input (the 61-session bars) is sliced to <=T by the envelope; the
-    T+1 open is carried only for later matching per the October replay time
-    contract.  A member may therefore legitimately declare a content window
-    ending at T+1.  A declared edge past T+1 carries post-window business fact
-    and is isolated fail-closed.  Returns the per-member declared content
-    window for disclosure on the receipt.
+
+def _date_to_of(m: Any) -> date | None:
+    date_to = m.get("date_to") if isinstance(m, Mapping) else getattr(m, "date_to", None)
+    if date_to is None:
+        return None
+    return date_to if isinstance(date_to, date) else date.fromisoformat(str(date_to)[:10])
+
+
+def _date_from_of(m: Any) -> date | None:
+    date_from = m.get("date_from") if isinstance(m, Mapping) else getattr(m, "date_from", None)
+    if date_from is None:
+        return None
+    return date_from if isinstance(date_from, date) else date.fromisoformat(str(date_from)[:10])
+
+
+def _used_member_ids(request: Any) -> dict[str, set[str]]:
+    """Collect the member ids the run actually consumes, by binding kind.
+
+    A replay envelope is a PROJECTION: securities[] rows, calendar/listing rows,
+    action registers and declared member_evidence each name the source member
+    they came from.  A member referenced by NO consumed row is not used by this
+    period even though it ships inside the package; the package-level date_to
+    is a container edge, not the business date of any selected row.
     """
-    declared: list[dict[str, Any]] = []
+    used: dict[str, set[str]] = {}
+
+    def add(member_id: Any, kind: str) -> None:
+        if member_id is None:
+            return
+        used.setdefault(str(member_id), set()).add(kind)
+
+    for sec in getattr(request, "securities", ()) or ():
+        ident = sec.get("identity") if isinstance(sec, Mapping) else getattr(sec, "identity", None)
+        dep = (ident or {}).get("depends_on_member_ids", ()) if isinstance(ident, Mapping) else ()
+        for mid in dep:
+            add(mid, "identity")
+        acts = sec.get("actions") if isinstance(sec, Mapping) else getattr(sec, "actions", ())
+        for act in acts or ():
+            if isinstance(act, Mapping):
+                add(act.get("source_member_id") or act.get("member_id"), "action")
+    for row in getattr(request, "calendar_rows", ()) or ():
+        if isinstance(row, Mapping):
+            add(row.get("source_member_id"), "calendar")
+    for row in getattr(request, "listing_rows", ()) or ():
+        if isinstance(row, Mapping):
+            add(row.get("source_member_id"), "listing")
+    ac = getattr(request, "action_coverage", None)
+    if isinstance(ac, Mapping):
+        for reg in ac.get("registers", ()) or ():
+            if isinstance(reg, Mapping):
+                add(reg.get("source_member_id"), "action_register")
+    for me in getattr(request, "member_evidence", ()) or ():
+        add(_member_id_of(me), "member_evidence")
+    for mid in getattr(request, "required_member_ids", ()) or ():
+        add(mid, "required")
+    return used
+
+
+def _analyze_member_use(request: Any, market_date: date) -> dict[str, Any]:
+    """Classify each source member by USED-row business content vs the period.
+
+    The envelope slices every consumed row (bars, calendar, listing) to <=T;
+    a member's date_to is a CONTAINER edge (the latest date the package could
+    supply, possibly a whole-month or whole-year span), not the business date
+    of any selected row.  So date_to is disclosed, never a hard gate.
+
+    The post-window signal is a member whose declared coverage STARTS past T:
+    every business row it could carry is wholly post-T (a November daily
+    partition).  When the period uses no row from it, it is named and moved
+    out of the period's input with a reason -- never a hard failure.  When the
+    period DOES consume rows from a member that only begins past T, that is a
+    contradiction (a used row dated past the signal) and stays fail-closed.
+
+    Returns members (per-member disclosure), blocking_used_members (fail),
+    excluded_late_partitions (named, moved out), match_window_through.
+    """
+    used = _used_member_ids(request)
     match_end = market_date + timedelta(days=1)
-    for m in request.source_members:
-        date_to = m.get("date_to") if isinstance(m, Mapping) else getattr(m, "date_to", None)
-        member_id = m.get("member_id") if isinstance(m, Mapping) else getattr(m, "member_id", None)
-        if date_to is None:
-            declared.append({"member_id": member_id, "content_through": None})
-            continue
-        d = date_to if isinstance(date_to, date) else date.fromisoformat(str(date_to)[:10])
-        declared.append({"member_id": member_id, "content_through": d.isoformat()})
-        if d > match_end:
-            _fail(
-                "as_observed_post_T_content",
-                f"source_member {member_id} declares business content through {d} "
-                f"past the T+1 match window of signal {market_date}",
+    members: list[dict[str, Any]] = []
+    blocking: list[str] = []
+    excluded: list[dict[str, Any]] = []
+    for m in getattr(request, "source_members", ()) or ():
+        mid = _member_id_of(m)
+        d_to = _date_to_of(m)
+        d_from = _date_from_of(m)
+        kinds = sorted(used.get(str(mid), ())) if mid is not None else []
+        is_used = bool(kinds)
+        rec = {
+            "member_id": mid,
+            "container_date_from": d_from.isoformat() if d_from else None,
+            "container_date_to": d_to.isoformat() if d_to else None,
+            "used_by": kinds,
+            "is_used": is_used,
+        }
+        # A partition that only BEGINS after the signal carries no on/before-T
+        # business row at all.
+        wholly_late = d_from is not None and d_from > match_end
+        if is_used and wholly_late:
+            # Consumed rows cannot predate the member's own start: a used row
+            # dated past the signal is a real post-window contradiction.
+            blocking.append(str(mid))
+            rec["disposition"] = "blocked_post_window"
+        elif not is_used and wholly_late:
+            rec["disposition"] = "excluded_late_partition"
+            excluded.append(
+                {
+                    "member_id": mid,
+                    "container_date_from": d_from.isoformat(),
+                    "container_date_to": d_to.isoformat() if d_to else None,
+                    "reason": "wholly_post_T_partition_no_used_rows",
+                }
             )
-    return declared
+        else:
+            rec["disposition"] = "used" if is_used else "unused"
+        members.append(rec)
+    return {
+        "members": members,
+        "blocking_used_members": sorted(set(blocking)),
+        "excluded_late_partitions": excluded,
+        "match_window_through": match_end.isoformat(),
+    }

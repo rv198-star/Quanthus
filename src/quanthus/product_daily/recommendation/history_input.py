@@ -48,6 +48,32 @@ def _fail(code: str, message: str) -> NoReturn:
     raise ProductDailyError(code, message)
 
 
+def _note_sealed_member(
+    observed_sink: dict[str, Any],
+    member_id: str,
+    *,
+    knowledge_at: datetime,
+    visible_at: datetime | None,
+    date_to: Any,
+) -> None:
+    """Record a post-cutoff sealed member once, keeping BOTH original clocks."""
+    sealed = observed_sink.setdefault("sealed_members", [])
+    existing = next((x for x in sealed if x.get("member_id") == member_id), None)
+    record = {
+        "member_id": member_id,
+        "knowledge_at": knowledge_at.isoformat(),
+        "visible_at": visible_at.isoformat() if visible_at is not None else None,
+        "date_to": date_to,
+        "kind": "sealed_post_cutoff_archive",
+    }
+    if existing is None:
+        sealed.append(record)
+    else:
+        for k in ("knowledge_at", "visible_at", "date_to"):
+            if existing.get(k) is None:
+                existing[k] = record[k]
+
+
 def _obj(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         _fail("invalid_raw_history", f"{label} must be an object")
@@ -290,14 +316,12 @@ def load_raw_history(
                     f"source_member {member_id} visible_at after decision_cutoff",
                 )
             if observed_sink is not None:
-                observed_sink.setdefault("sealed_members", []).append(
-                    {
-                        "member_id": member_id,
-                        "knowledge_at": knowledge_at.isoformat(),
-                        "visible_at": visible_at.isoformat(),
-                        "date_to": mo.get("date_to"),
-                        "kind": "sealed_post_cutoff_archive",
-                    }
+                _note_sealed_member(
+                    observed_sink,
+                    member_id,
+                    knowledge_at=knowledge_at,
+                    visible_at=visible_at,
+                    date_to=mo.get("date_to"),
                 )
         members.append(
             SourceMember(
@@ -1103,13 +1127,12 @@ def bind_raw_history_to_run(
                     f"the run decision_cutoff {policy.decision_cutoff}",
                 )
             if observed_sink is not None:
-                observed_sink.setdefault("sealed_members", []).append(
-                    {
-                        "member_id": m.member_id,
-                        "knowledge_at": m.knowledge_at.isoformat(),
-                        "date_to": m.date_to.isoformat() if m.date_to else None,
-                        "kind": "sealed_post_cutoff_archive",
-                    }
+                _note_sealed_member(
+                    observed_sink,
+                    m.member_id,
+                    knowledge_at=m.knowledge_at,
+                    visible_at=m.visible_at,
+                    date_to=(m.date_to.isoformat() if m.date_to else None),
                 )
     required = set(getattr(facts, "required_member_ids", ()) or ())
     supplied = {m.member_id for m in history.source_members}

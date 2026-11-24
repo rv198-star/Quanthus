@@ -896,6 +896,107 @@ def test_v2_package_dict_is_self_describing():
     assert ds.get("schema_version") is None
 
 
+# --- C. v2 reduce target canonical wire form (issue #723 comment7141061814) ----
+
+
+def test_v2_target_fraction_canonical_form():
+    r"""The v2 writer emits the unique canonical string ^0.[0-9]*[1-9]$ for a
+    reduce target: a finite plain decimal strictly in (0,1), trailing fractional
+    zeros stripped, no exponent or whitespace."""
+    from quanthus.product_daily.recommendation.contracts import (
+        V2_TARGET_FRACTION_PATTERN,
+        v2_target_fraction_text,
+    )
+
+    cases = {
+        Decimal("0.10"): "0.1",
+        Decimal("0.5000"): "0.5",
+        Decimal("1E-3"): "0.001",
+        Decimal("0.1"): "0.1",
+        Decimal("0.00000000000000001"): "0.00000000000000001",
+        Decimal("0.999999"): "0.999999",
+        Decimal("0.9"): "0.9",
+    }
+    for value, expected in cases.items():
+        out = v2_target_fraction_text(value)
+        assert out == expected
+        assert V2_TARGET_FRACTION_PATTERN.match(out), (value, out)
+        # read-back identity: the emitted string re-parses to a Decimal whose
+        # own canonical emission is byte-identical.
+        assert v2_target_fraction_text(Decimal(out)) == out
+    assert v2_target_fraction_text(None) is None
+
+
+def test_v2_target_fraction_refuses_non_canonical_values():
+    """Zero, integral and out-of-(0,1) or non-finite targets are contract errors
+    at write time - the reader-side refusal of leading-space/exponent/trailing
+    whitespace bytes is preserved by never emitting them."""
+    from quanthus.product_daily.recommendation.contracts import v2_target_fraction_text
+
+    for bad in ("0", "0.0", "1", "1.0", "2", "-0.5"):
+        with pytest.raises(ProductDailyError, match="> 0 and < 1"):
+            v2_target_fraction_text(Decimal(bad))
+    for bad in ("NaN", "Infinity", "-Infinity"):
+        with pytest.raises(ProductDailyError, match="finite"):
+            v2_target_fraction_text(Decimal(bad))
+
+
+def test_v2_wire_dict_emits_canonical_reduce_target():
+    """to_wire_dict normalizes the Decimal through the canonical form, so a
+    stored 0.10 or 0.5000 writes as 0.1 / 0.5 and a stored exponent Decimal
+    writes as its plain decimal expansion."""
+    assert (
+        _decision(
+            stage=EXIT_PLAN, exit_kind="reduce", target_position_fraction=Decimal("0.10")
+        ).to_wire_dict()["target_position_fraction"]
+        == "0.1"
+    )
+    assert (
+        _decision(
+            stage=EXIT_PLAN, exit_kind="reduce", target_position_fraction=Decimal("0.5000")
+        ).to_wire_dict()["target_position_fraction"]
+        == "0.5"
+    )
+    assert (
+        _decision(
+            stage=EXIT_PLAN, exit_kind="reduce", target_position_fraction=Decimal("1E-3")
+        ).to_wire_dict()["target_position_fraction"]
+        == "0.001"
+    )
+    assert (
+        _decision(
+            stage=EXIT_PLAN,
+            exit_kind="reduce",
+            target_position_fraction=Decimal("0.00000000000000001"),
+        ).to_wire_dict()["target_position_fraction"]
+        == "0.00000000000000001"
+    )
+    # full exit: still null, never a number.
+    assert (
+        _decision(stage=EXIT_PLAN, exit_kind="full", target_position_fraction=None).to_wire_dict()[
+            "target_position_fraction"
+        ]
+        is None
+    )
+
+
+def test_v1_and_shared_decimal_surfaces_unchanged():
+    """The canonical target form is v2-only: the v1 decision payload keeps no
+    exit fields at all, and decimal_text (cash/price/shared) still uses bare
+    format(x, "f") - never rstrip-normalized."""
+    from quanthus.product_daily.contracts import decimal_text
+
+    # A trailing-zero Decimal on a shared surface keeps its full expansion; only
+    # the v2 reduce target normalizes.
+    assert decimal_text(Decimal("0.10")) == "0.10"
+    assert decimal_text(Decimal("0.5000")) == "0.5000"
+    raw_v1 = _decision(
+        stage=EXIT_PLAN, exit_kind="reduce", target_position_fraction=Decimal("0.10")
+    ).to_dict()
+    assert "target_position_fraction" not in raw_v1
+    assert "exit_kind" not in raw_v1
+
+
 def test_v1_wire_refuses_v2_only_fields():
     """A v1 raw that still shows exit fields is a version inconsistency, never a
     silent field drop."""

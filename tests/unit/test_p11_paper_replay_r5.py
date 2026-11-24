@@ -45,12 +45,13 @@ def _r5_action(code, effective_date, cash="0.116", bonus="0", known_at="2026-09-
     }
 
 
-def _bind_artifacts(req):
+def _bind_artifacts(req, authority=None):
     # For every returns_61_session verified_event, register the event rows as
     # the verified-artifact catalogue of the bound coverage register: the
-    # P10-delivered list of (register_row -> implementation sha / notice /
-    # identity) the upstream credential actually verified.  Tampering with an
-    # event's implementation_sha256/register_row/notice then fails the bind.
+    # P10-delivered list of (register_row -> full original clause) the upstream
+    # credential actually verified.  The catalogue carries a digest + producer
+    # + authority/receipt identity (B02/B03/B10 lineage) so a caller-assembled
+    # minimal or self-copied list is not an authority.
     arts = []
     for ev in req["action_coverage"]["window_evidence"]:
         if ev["purpose"] != "returns_61_session" or ev["event_state"] != "verified_event":
@@ -61,12 +62,33 @@ def _bind_artifacts(req):
             rows.append(
                 {
                     "register_row": e.get("register_row"),
+                    "ex_date": e.get("ex_date"),
                     "implementation_sha256": e.get("implementation_sha256"),
                     "notice": e.get("notice"),
                     "notice_id": e.get("notice_id") or e.get("notice"),
+                    "cash_gross_per_share": e.get("cash_gross_per_share"),
+                    "bonus_share_ratio": e.get("bonus_share_ratio"),
+                    "transfer_share_ratio": e.get("transfer_share_ratio"),
+                    "currency": e.get("currency"),
+                    "security_id": e.get("security_id"),
+                    "listing_id": e.get("listing_id"),
+                    "venue_id": e.get("venue_id"),
                 }
             )
-        arts.append({"coverage_id": cid, "rows": rows})
+        arts.append(
+            {
+                "coverage_id": cid,
+                "digest": "sha256:" + "9" * 64,
+                "producer": "p10.b02-b03-b10-register.v1",
+                "authority": authority
+                or {
+                    "batch_id": "p10-b02-b03-b10",
+                    "manifest_sha256": "sha256:" + "b" * 64,
+                    "result_sha256": "sha256:" + "c" * 64,
+                },
+                "rows": rows,
+            }
+        )
     if arts:
         req["action_coverage"]["verified_artifacts"] = arts
     return req
@@ -421,8 +443,39 @@ def test_r7_event_identity_mismatch_isolated():
     assert window_info["coverage_isolated"] == 1
 
 
-def _r7_artifacts(coverage_id, register_row, **row):
-    return [{"coverage_id": coverage_id, "rows": [dict({"register_row": register_row}, **row)]}]
+def _r7_artifacts(coverage_id, register_row, event=None, **row):
+    # Default the catalogue row's original clause to the declared event's own
+    # terms (the upstream credential verified this same clause); explicit
+    # kwargs override for mismatch cases.
+    e = event or {}
+    base = {
+        "register_row": register_row,
+        "ex_date": row.pop("ex_date", e.get("ex_date", "2026-07-28")),
+        "cash_gross_per_share": row.pop(
+            "cash_gross_per_share", e.get("cash_gross_per_share", "0.116")
+        ),
+        "bonus_share_ratio": row.pop("bonus_share_ratio", e.get("bonus_share_ratio", "0")),
+        "transfer_share_ratio": row.pop("transfer_share_ratio", e.get("transfer_share_ratio", "0")),
+        "currency": row.pop("currency", e.get("currency", "CNY")),
+        "implementation_sha256": row.pop(
+            "implementation_sha256", e.get("implementation_sha256", "a" * 64)
+        ),
+        "notice": row.pop("notice", e.get("notice", "r5")),
+    }
+    base.update(row)
+    return [
+        {
+            "coverage_id": coverage_id,
+            "digest": "sha256:" + "9" * 64,
+            "producer": "p10.b02-b03-b10-register.v1",
+            "authority": {
+                "batch_id": "p10-b02-b03-b10",
+                "manifest_sha256": "sha256:" + "b" * 64,
+                "result_sha256": "sha256:" + "c" * 64,
+            },
+            "rows": [base],
+        }
+    ]
 
 
 def test_r7_bound_artifact_admits_matching_event():
@@ -434,7 +487,7 @@ def test_r7_bound_artifact_admits_matching_event():
     req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.42", known_at=known)])
     cid = req["action_coverage"]["registers"][0]["coverage_id"]
     req["action_coverage"]["verified_artifacts"] = _r7_artifacts(
-        cid, 302, implementation_sha256="a" * 64, notice="r5"
+        cid, 302, event=ev, implementation_sha256="a" * 64, notice="r5"
     )
     request = load_replay_request(req)
     _, _, window_info, _ = build_replay_envelope(request, T1)
@@ -451,7 +504,7 @@ def test_r7_bound_artifact_forged_implementation_isolated():
     req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.42", known_at=known)])
     cid = req["action_coverage"]["registers"][0]["coverage_id"]
     req["action_coverage"]["verified_artifacts"] = _r7_artifacts(
-        cid, 302, implementation_sha256="a" * 64, notice="r5"
+        cid, 302, event=_r5_event(ex, cash="0.42"), implementation_sha256="a" * 64, notice="r5"
     )
     request = load_replay_request(req)
     _, _, window_info, _ = build_replay_envelope(request, T1)
@@ -468,7 +521,7 @@ def test_r7_bound_artifact_wrong_register_row_isolated():
     req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.42", known_at=known)])
     cid = req["action_coverage"]["registers"][0]["coverage_id"]
     req["action_coverage"]["verified_artifacts"] = _r7_artifacts(
-        cid, 302, implementation_sha256="a" * 64, notice="r5"
+        cid, 302, event=_r5_event(ex, cash="0.42"), implementation_sha256="a" * 64, notice="r5"
     )
     request = load_replay_request(req)
     _, _, window_info, _ = build_replay_envelope(request, T1)
@@ -506,3 +559,105 @@ def test_r7_neighbour_retained_when_one_isolated():
     assert window_info["coverage_isolated"] == 1
     assert window_info["delivered"]["600001"]["entry_eligible"] is True
     assert window_info["delivered"]["600000"]["entry_eligible"] is False
+
+
+# --- R8: source-authority catalogue + full-term binding + designated key ------
+
+
+def test_r8_minimal_or_self_copied_catalogue_refused():
+    # C6-R7-P1-1: a catalogue that is only register_row, or self-copied from
+    # the event, has no producer/digest/authority and no complete original
+    # clause - it is caller-controlled, not an authority, so it must fail
+    # closed even when the event looks complete.
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _security("600000", days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    ev = _r5_event(ex, cash="0.42")
+    req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.42", known_at=known)])
+    cid = req["action_coverage"]["registers"][0]["coverage_id"]
+    # A minimal/self-copied catalogue: only register_row, no authority.
+    req["action_coverage"]["verified_artifacts"] = [
+        {"coverage_id": cid, "rows": [{"register_row": 302}]}
+    ]
+    import pytest
+
+    from quanthus.product_daily.contracts import ProductDailyError
+
+    with pytest.raises(ProductDailyError):
+        load_replay_request(req)
+
+
+def test_r8_catalogue_missing_authority_refused():
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _security("600000", days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    ev = _r5_event(ex, cash="0.42")
+    req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.42", known_at=known)])
+    cid = req["action_coverage"]["registers"][0]["coverage_id"]
+    art = _r7_artifacts(cid, 302, event=ev)[0]
+    art.pop("authority")
+    req["action_coverage"]["verified_artifacts"] = [art]
+    import pytest
+
+    from quanthus.product_daily.contracts import ProductDailyError
+
+    with pytest.raises(ProductDailyError):
+        load_replay_request(req)
+
+
+def test_r8_source_terms_mismatch_isolated():
+    # C6-R7-P1-2: the catalogue row keeps the TRUE clause while event/action
+    # carry a different economic term (real impl sha, wrong cash/ex_date).
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _security("600000", days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    ev = _r5_event(ex, cash="0.52")
+    req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.52", known_at=known)])
+    cid = req["action_coverage"]["registers"][0]["coverage_id"]
+    # Catalogue keeps the true 0.42 clause on the true ex_date.
+    true_ev = _r5_event(ex, cash="0.42")
+    req["action_coverage"]["verified_artifacts"] = _r7_artifacts(cid, 302, event=true_ev)
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r8_bare_listing_code_action_rejected_when_codes_differ():
+    # C6-R7-P2-1: stock_code=sh.600000, listing_code=600000; an action row
+    # keyed by bare 600000 is a foreign source key and must NOT be reported
+    # entry_eligible at the coverage gate.
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _r7_sse_security(days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    req = _r7_req(
+        sec,
+        [_r5_event(ex, cash="0.42")],
+        [_r5_action("600000", ex, cash="0.42", known_at=known)],
+    )
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    # The bare listing_code action is not this security's source row, so the
+    # declared verified event has no matching action -> named isolation.
+    assert window_info["coverage_isolated"] == 1
+    assert window_info["delivered"]["600000"]["entry_eligible"] is False
+
+
+def test_r8_listing_code_action_ok_when_codes_same():
+    # When stock_code == listing_code the single value is the source key.
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _security("600000", days)  # stock_code == listing_code == "600000"
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    req = _r7_req(
+        sec,
+        [_r5_event(ex, cash="0.42")],
+        [_r5_action("600000", ex, cash="0.42", known_at=known)],
+    )
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 0
+    assert window_info["delivered"]["600000"]["entry_eligible"] is True

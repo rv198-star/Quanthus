@@ -466,10 +466,23 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                 "verified_at": eo.get("verified_at"),
             }
         # Verified-artifact catalogues: per-register named original rows the
-        # bound credential actually verified.  Keyed by coverage_id then
-        # register_row so a declared event can be hit-tested without the
-        # caller recomputing anything.
-        verified_artifacts: dict[str, dict[Any, dict[str, Any]]] = {}
+        # bound credential actually verified.  The catalogue must carry a
+        # digest plus producer/authority identity bound to the P10-signed
+        # member bytes (B02/B03/B10 lineage) - a bare caller-assembled list
+        # with only register_row is not an authority.  Each row carries the
+        # complete original clause (identity, ex_date, cash/bonus/transfer,
+        # currency, implementation sha/notice) so the declared event AND the
+        # projected action are both compared to the same source row.
+        ART_ROW_REQUIRED = (
+            "ex_date",
+            "cash_gross_per_share",
+            "bonus_share_ratio",
+            "transfer_share_ratio",
+            "currency",
+            "implementation_sha256",
+            "register_row",
+        )
+        verified_artifacts: dict[str, dict[str, Any]] = {}
         for i, va in enumerate(
             _seq(aco.get("verified_artifacts", ()), "action_coverage.verified_artifacts")
         ):
@@ -480,17 +493,39 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                     "invalid_action_coverage",
                     f"verified_artifacts[{i}] references unregistered coverage_id {cid!r}",
                 )
+            digest = _text(vo.get("digest"), f"verified_artifacts[{i}].digest")
+            producer = _text(vo.get("producer"), f"verified_artifacts[{i}].producer")
+            authority = vo.get("authority") or vo.get("receipt")
+            if authority is None:
+                _fail(
+                    "invalid_action_coverage",
+                    f"verified_artifacts[{i}] lacks authority/receipt binding",
+                )
+            auth_o = _obj(authority, f"verified_artifacts[{i}].authority")
+            authority_id = {
+                "manifest_sha256": _sha256(
+                    auth_o.get("manifest_sha256"), "authority.manifest_sha256"
+                ),
+                "result_sha256": _sha256(auth_o.get("result_sha256"), "authority.result_sha256"),
+                "batch_id": _text(auth_o.get("batch_id"), "authority.batch_id"),
+            }
             rows: dict[Any, dict[str, Any]] = {}
             for j, r in enumerate(_seq(vo.get("rows", ()), "verified_artifacts[].rows")):
                 rr = _obj(r, f"verified_artifacts[{i}].rows[{j}]")
+                for field in ART_ROW_REQUIRED:
+                    if rr.get(field) is None:
+                        _fail(
+                            "invalid_action_coverage",
+                            f"verified_artifacts[{i}].rows[{j}] lacks {field}",
+                        )
                 reg_row = rr.get("register_row")
-                if reg_row is None:
-                    _fail(
-                        "invalid_action_coverage",
-                        f"verified_artifacts[{i}].rows[{j}] lacks register_row",
-                    )
                 rows[reg_row] = dict(rr)
-            verified_artifacts[cid] = rows
+            verified_artifacts[cid] = {
+                "digest": digest,
+                "producer": producer,
+                "authority": authority_id,
+                "rows": rows,
+            }
         action_coverage = {
             "default_state": default_state,
             "registers": registers,
@@ -795,9 +830,13 @@ def _action_coverage_ok(
             return False
 
     # The source action/feature key is identity.stock_code (e.g. sh.600000);
-    # listing_code (600000) is the trading/coverage key.  Both belong to the
-    # frozen identity, but only these two codes may key this security's rows.
-    codes = (str(ident.get("stock_code") or ""), str(ident.get("listing_code") or code))
+    # listing_code (600000) is the trading/coverage key.  When the frozen
+    # identity distinguishes them, ONLY stock_code keys this security's
+    # action rows (R7-P2): a bare listing_code row is a foreign key, not a
+    # fallback.  When they are the same code the single value is the key.
+    stock_code = str(ident.get("stock_code") or "")
+    listing_code = str(ident.get("listing_code") or code)
+    codes = (stock_code,) if stock_code != listing_code else (listing_code,)
 
     # Verified-artifact catalogues bound to each coverage register: the named
     # rows the upstream credential actually verified.  Caller-supplied events
@@ -1063,30 +1102,53 @@ def _returns_events_join_actions(
         # whose coverage register carries NO catalogue has no object the
         # provenance can bind to, so the verified_event is refused (the
         # evidence grade is preserved, never upgraded by a non-null field).
-        artifacts = (bound_artifacts or {}).get(coverage_id) if coverage_id else None
-        if artifacts is None:
+        cat = (bound_artifacts or {}).get(coverage_id) if coverage_id else None
+        if cat is None:
             return False
-        if artifacts is not None:
-            reg_row = e.get("register_row")
-            reg_key: Any
-            try:
-                reg_key = int(reg_row)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
-                reg_key = str(reg_row)
-            row = artifacts.get(reg_key) or artifacts.get(str(reg_row))
-            if row is None:
+        artifacts = cat.get("rows", cat) if isinstance(cat, Mapping) else cat
+        reg_row = e.get("register_row")
+        reg_key: Any
+        try:
+            reg_key = int(reg_row)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            reg_key = str(reg_row)
+        row = artifacts.get(reg_key) or artifacts.get(str(reg_row))
+        if row is None:
+            return False
+        impl = row.get("implementation_sha256") or row.get("sha256")
+        if impl is None or str(e.get("implementation_sha256")) != str(impl):
+            return False
+        notice = row.get("notice") or row.get("notice_id")
+        if notice is not None and str(e.get("notice")) != str(notice):
+            return False
+        # Bind the verified security identity the row names.
+        for k in ("security_id", "listing_id", "venue_id"):
+            rv = row.get(k)
+            if rv is not None and ident.get(k) is not None and str(rv) != str(ident.get(k)):
                 return False
-            impl = row.get("implementation_sha256") or row.get("sha256")
-            if impl is not None and str(e.get("implementation_sha256")) != str(impl):
-                return False
-            notice = row.get("notice") or row.get("notice_id")
-            if notice is not None and str(e.get("notice")) != str(notice):
-                return False
-            # Bind the verified security identity when the row names it.
-            for k in ("security_id", "listing_id", "venue_id"):
-                rv = row.get(k)
-                if rv is not None and ident.get(k) is not None and str(rv) != str(ident.get(k)):
-                    return False
+        # Source terms: the catalogue row's original clause must equal the
+        # event's declared clause AND the projected action's clause.  A row
+        # may carry the true announcement digest while the event/action use a
+        # different economic term - compare ex_date, cash, bonus+transfer
+        # (combined once) and currency so the real clause actually governs.
+        row_ex = row.get("ex_date")
+        row_ex_iso = (
+            row_ex.isoformat()
+            if isinstance(row_ex, date)
+            else (str(row_ex) if row_ex is not None else None)
+        )
+        if row_ex_iso is not None and row_ex_iso != ex_iso:
+            return False
+        row_cash = _dec(row.get("cash_gross_per_share"))
+        row_bonus = _dec(row.get("bonus_share_ratio"))
+        row_transfer = _dec(row.get("transfer_share_ratio"))
+        if row_cash is None or row_bonus is None or row_transfer is None:
+            return False
+        if row_cash != cash or (row_bonus + row_transfer) != expected_bonus:
+            return False
+        row_cur = row.get("currency")
+        if row_cur is not None and str(row_cur) != "CNY":
+            return False
         cands = distinct_window_actions.get(ex_iso) or []
         matched = False
         for a in cands:

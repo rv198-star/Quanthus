@@ -217,3 +217,81 @@ def test_bar_window_is_last_61_sessions(tmp_path):
     assert len(bars) == 61
     # last session is the market date itself
     assert bars[-1]["session_date"] == "2026-11-24"
+
+
+class TestActionAuthorityHandoff:
+    '''#749 action-authority handoff: per-security-day action_coverage is
+    rebuilt from the real, once-verified P10 members via
+    build_signed_action_authority - never copied or fabricated.'''
+
+    def _members(self):
+        # Minimal manifest + member bytes sufficient for load_release /
+        # _batch_member_keys to resolve the batch + shared members.
+        return {
+            "2026-11-25/quanthus-p10-action-supply/sse/batch-02-spdb-r2/RESULT.json": b'{"batch":"SSE-02-R2"}',
+            "2026-11-25/quanthus-p10-action-supply/sse/batch-02-spdb-r2/events.json": b'{"events":[]}',
+            "2026-11-25/quanthus-p10-action-supply/sse/batch-02-spdb-r2/security-windows.json": b'{"windows":[]}',
+            "2026-11-25/quanthus-p10-action-supply/sse/batch-02-spdb-r2/coverage.json": b'{"coverage":1}',
+            "2026-11-25/quanthus-p10-action-supply/sse/batch-02-spdb-r2/exception-scope.json": b'{"x":1}',
+            "2026-11-25/quanthus-p10-action-supply/sse/batch-02-spdb-r2/issuer-index-crosswalk.json": b'{"x":1}',
+            "2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/ACCEPTED-OCTOBER-ACTION-COVERAGE.v2.json": b'{"a":1}',
+            "2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/WINDOW-USE.json": b'{"w":1}',
+        }
+
+    def _release_tree(self, tmp_path):
+        # Build a fake reader-package tree whose MANIFEST declares members
+        # under source_prefix, with real member bytes on disk.
+        import json, hashlib
+        members = self._members()
+        manifest = {
+            "release": "company-actions-20261125-b02",
+            "source_prefix": str(tmp_path / "src"),
+            "members": {
+                k: {"sha256": hashlib.sha256(v).hexdigest(), "bytes": len(v)}
+                for k, v in members.items()
+            },
+        }
+        pkg = tmp_path / "reader-packages" / "company-actions-20261125-b02"
+        pkg.mkdir(parents=True)
+        (pkg / "MANIFEST.json").write_text(json.dumps(manifest))
+        src = tmp_path / "src"
+        for k, v in members.items():
+            p = src / k
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(v)
+        return tmp_path / "reader-packages"
+
+    def test_build_day_resolves_batch_and_shared_members(self, tmp_path, monkeypatch):
+        from quanthus.p12_history import action_authority_749 as m
+
+        reader_root = self._release_tree(tmp_path)
+        captured = {}
+
+        def fake_authority(**kw):
+            captured.update(kw)
+            return {"action_coverage": "REBUILT", "_keys": sorted(kw["members"].keys())}
+
+        def fake_bind(bts, sha):
+            return {"manifest_sha256": sha, "bound": True}
+
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "quanthus.product_daily.recommendation.paper_replay",
+            type("M", (), {
+                "build_signed_action_authority": staticmethod(fake_authority),
+                "bind_signed_manifest": staticmethod(fake_bind),
+            }),
+        )
+        out = m.build_day("600000", "2026-10-08", reader_root=reader_root)
+        # The authority was invoked with the batch RESULT member, the shared
+        # accepted + windows index members, and the frozen identity.
+        assert captured["result_member"].endswith("batch-02-spdb-r2/RESULT.json")
+        assert captured["accepted_member"].endswith("ACCEPTED-OCTOBER-ACTION-COVERAGE.v2.json")
+        assert captured["index_member"].endswith("WINDOW-USE.json")
+        assert captured["signal_date"] == "2026-10-08"
+        assert captured["security_id"] == "security_2e02245cf8b28319ec8af0e9554cdc24"
+        # The batch member bytes + the two shared members were actually read.
+        members_read = out["members_read"]
+        assert any("batch-02-spdb-r2/RESULT.json" in x for x in members_read)
+        assert any("WINDOW-USE.json" in x for x in members_read)
+        assert out["action_coverage"]["action_coverage"] == "REBUILT"

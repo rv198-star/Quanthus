@@ -141,10 +141,8 @@ def test_e1_replay_runner_carries_p12_evidence_into_closure(assets):
         "scenario_account": {"ledger_digest": "ef" * 32, "as_of": "2026-10-08T21:30:00+08:00"},
         "action_use": {"b02": ["member:ca-600000"], "b10": []},
     }
-    ctx = E1ReplayContext(
-        **{k: v for k, v in vars(_context(req)).items()},
-        p12_evidence=evidence,
-    )
+    from dataclasses import replace as _replace
+    ctx = _replace(_context(req), p12_evidence=evidence)
     runner = E1ReplayRunner(
         runner_ref_id="p11.e1-replay-day",
         runner_version="1.0.0",

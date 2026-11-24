@@ -138,7 +138,7 @@ def test_r2_replay_day_binds_real_panel_not_placeholder(assets):
     assert out1.get("publishable") is True
 
 
-def e_run_e1_replay(req, day, assets, observed_at=None):
+def e_run_e1_replay(req, day, assets, observed_at=None, p12_evidence=None):
     from quanthus.product_daily.recommendation.e1_runtime import run_e1_replay_day
 
     observed_clock = (
@@ -148,6 +148,7 @@ def e_run_e1_replay(req, day, assets, observed_at=None):
         req, day, assets=assets, snapshot_id="s",
         snapshot_manifest_digest="sha256:" + "a" * 64,
         observed_clock=observed_clock,
+        p12_evidence=p12_evidence,
     )
 
 
@@ -385,6 +386,59 @@ def test_r4_unused_member_sealed_after_read_not_a_block(assets):
     )
     out = e_run_e1_replay(req, f.T1, assets, observed_at="2026-11-25T03:00:00+08:00")
     assert out.get("disposition") == "publishable"
+
+
+def test_r5_per_security_member_isolates_that_security_only(assets):
+    """R5: a member bound only through one security's depends_on_member_ids
+    is a per-security dependency -- its late seal isolates that security
+    (demoted held-only) while the neighbour keeps evaluating; the day is not
+    blocked.  A shared member's failure still blocks the whole day."""
+    from copy import deepcopy
+
+    from tests.unit import test_p11_paper_replay as f
+
+    days = tuple(v for v in f.SESSION_DAYS if v <= f.T1)
+    secs = [f._security(c, days) for c in ("600000", "600001")]
+    req = f._request(market_dates=(f.T1,), securities=secs)
+    for m in req["source_members"]:
+        m["knowledge_at"] = "2026-11-01T00:00:00+08:00"
+        m["visible_at"] = "2026-11-01T00:00:00+08:00"
+    sp = deepcopy(req["source_members"][0])
+    sp.update(
+        member_id="only-second-security",
+        member_path="second-only.parquet",
+        sha256="sha256:" + "9" * 64,
+        knowledge_at="2026-12-01T00:00:00+08:00",
+        visible_at="2026-12-01T00:00:00+08:00",
+    )
+    req["source_members"].append(sp)
+    req["securities"][1]["identity"]["depends_on_member_ids"].append(
+        "only-second-security"
+    )
+    out = e_run_e1_replay(req, f.T1, assets, observed_at="2026-11-25T03:00:00+08:00")
+    assert out.get("disposition") == "publishable"
+    use = out["as_observed"]["member_use"]
+    assert use["isolated_by_security"] == {"600001": ["only-second-security"]}
+    assert use["blocking_shared_members"] == []
+
+
+def test_r5_p12_evidence_folded_into_closure(assets):
+    """R5: p12_evidence (envelope bytes ref/SHA, selected member/row versions,
+    actual first-read/verify instants, ledger digest) is folded into the
+    signed closure under consumption_evidence.p12 -- bound, not asserted."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    ev = {
+        "envelope_sha256": "59a323ff" + "0" * 56,
+        "receipt_sha256": "ccacfcf4" + "0" * 56,
+        "member_first_read_at": "2026-11-24T19:15:57+00:00",
+        "member_verified_at": "2026-11-24T19:16:20+00:00",
+        "ledger_digest": "sha256:" + "d" * 64,
+    }
+    out = e_run_e1_replay(req, f.T1, assets, p12_evidence=ev)
+    cl = out["source_closure"].get("consumption_evidence", {})
+    assert cl.get("p12", {}).get("envelope_sha256") == ev["envelope_sha256"]
 
 
 def test_strict_still_rejects_sealed_member(assets):

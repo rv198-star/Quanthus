@@ -15291,6 +15291,41 @@
       "reviewed_modules": [
         "DATA"
       ]
+    },
+    {
+      "id": "CP-726-20261124T002136210821Z",
+      "recorded_at": "2026-11-24T00:22:04.410552+00:00",
+      "actor": "P10 Owner; p10-sidecar-repair/p10-42e-repair-1",
+      "work_item": "P10-DATA-P12-DAILY-001",
+      "outcome": "progress",
+      "summary": "Fixed42e two-finding candidate: independent15:00 anchors,119 local focused/static pass and current runtime/request lineage. Critical independent closure and fullCN02 remain pending.",
+      "evidence": [
+        {
+          "id": "LOCAL-42E-ANCHOR-005",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-sidecar-42e-anchor-repair-005/LOCAL-VERIFICATION.json",
+          "sha256": "6fed281a3427d7e7c507ccef9ad95b87d536cc3bb3e26c39886fb2c97532c838",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Uncommitted code/config/test bytes bound by SHA and exact42e base;119 focused/static locally passed, node/full/independent acceptance pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Narrow corrective candidate only; original8d2 partial-node acceptance,42e rejection and source/admission gates remain unchanged pending P11 fixed-version review.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-P12-DAILY-001",
+          "number": 726,
+          "title": "[P10-DATA-P12-DAILY-001] 固定日线供给的发布、可见时点与修订撤回合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T21:06:19Z",
+          "body_sha256": "0a3fba23c3e36bf6f206d912995fe25b0c230c9529613b6770feedacca1c5f94"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
     }
   ],
   "history_imports": [

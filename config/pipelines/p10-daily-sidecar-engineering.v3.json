@@ -1,0 +1,54 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "P10-DAILY-SIDECAR-42E-ANCHOR-REPAIR-003",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "repair",
+  "family": "p10-daily-consumer-sidecar",
+  "work_item": "P10-DATA-P12-DAILY-001",
+  "modules": [
+    "DATA"
+  ],
+  "question": "Do fixed Shanghai15:00 binding and member price anchors reject the paired15:30 bypass while preserving independently scoped full-day quantity15:30?",
+  "consumer": "P11 #700 independent review and P12 #719 input adapter",
+  "scope": "Only audit42E-P1-1 and42E-P2-1: fixed price anchor checks, fail-first synthetic counterexample/control, current runtime/request lineage. Retain42e/8d2 and frozen v1/v2.",
+  "deliverable": "Narrow p10_daily_sidecar source/test patch, current work-item/header and new requestv3, necessary append-only checkpoint, fixed receipt for P11 independent audit.",
+  "decision_if_pass": "Submit narrow engineering candidate for independent review; bind final source-observed consumer closure after M2/pool gates.",
+  "decision_if_fail": "Retain failures and fixed checkpoint; stop affected feature and give exact next repair without enlarging scope.",
+  "acceptance": [
+    "Paired15:30 binding/member price rejected independently against Shanghai15:00; legal price15:00 quantity15:30 and real source18:00/publication19:00/visible19:01 preserved.",
+    "Existing114 tests plus narrowly targeted adversarial regressions remain passing.",
+    "Exactly one current runtime/request header, current request base42e, oldv1/v2/f32 retained as history.",
+    "Local and CN02 focused/static/exact-base checks bound to fixed candidate; full checks honestly deferred until critical independent closure."
+  ],
+  "stop_conditions": [
+    "First fixed candidate or real blocker by08:45:24+08; stop if repair needs broader contract/source changes.",
+    "No Mac full; CN02 focused/static now, complete make check after critical independent closure.",
+    "No source rows or publisher/deployment/collection or #743/#727/#701 changes."
+  ],
+  "memory_sha256": "7ea37a64fd1c9719615de95c9ef7c87a14730a3c0cfc0aa5961bba48188def8f",
+  "prior_reviews": [],
+  "budget": {
+    "wall_seconds": 1800,
+    "network_requests": 0,
+    "max_new_bytes": 2097152,
+    "accounting_owner": "P10; market/news/source requests zero, versioned GitHub code and Nexus verification transport separate."
+  },
+  "cumulative_cost_review": "Continue accepted inventory/spec work and its 23 specimen checks; prior data spend 0, model/active cost unknown_not_zero. This tranche is engineering, no renewed market experiment.",
+  "runtime_authority_boundary": "Verified existing Owner scope and P11 P10-42E-REPAIR-BRIEF.md; p10-sidecar-repair/p10-42e-repair-1; no model override.",
+  "base_revision": "42e26447d89aaa2aa9b32ccedfafc405a60fe90e",
+  "code_paths": [
+    "src/quanthus/p10_daily_sidecar.py",
+    "tests/unit/test_p10_daily_sidecar.py"
+  ],
+  "write_boundary": "explicit fresh/disjoint isolated metadata store only; no existing source/root/CURRENT writes",
+  "spec_baseline_sha256": "b072a68abf79167d052511e79817bb6eca58e0a123be31698c2fe24f3d77716f",
+  "regulation_addendum_sha256": "10a87a3f86259869d70f272ffac9b84f03c6c3ed14e8c4dab0020f7bf82057fe",
+  "m2_v3_sha256": "e50e6396aeca56e574da379ada96ab0a69bb939377fedbcd7025eef074d7c892",
+  "preflight_timing_note": "New repair request at actual recorded time before fail-first execution and source patch; v1/v2 previous clocks/base remain unchanged.",
+  "base_tree": "2da1b72a94303300e30a7d4c2941383ab4896836",
+  "pr_base_revision": "8d2d7dcb96bb5406266262ce8de0597d5bf4dec5",
+  "round": "p10-sidecar-repair/p10-42e-repair-1",
+  "request_recorded_at": "2026-11-24T00:17:58.449519+00:00",
+  "checkpoint_deadline": "2026-11-24T08:45:24+08:00"
+}

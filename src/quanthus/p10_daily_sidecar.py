@@ -28,7 +28,7 @@ SESSION_SCHEMA = "quanthus.p10.daily-consumer-sidecar.v2"
 SESSION_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v2"
 SESSION_BOUNDED_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v2.1"
 M0_SESSION_CONFIG_SCHEMA = "quanthus.p10.daily-consumer-config.v2.2"
-RUNTIME_VERSION = "p10-daily-consumer-sidecar-runtime-v2.2"
+RUNTIME_VERSION = "p10-daily-consumer-sidecar-runtime-v2.2.1"
 STORE_SCHEMA = "quanthus.p10.sidecar-verified-event-envelope.v1"
 _SHA = re.compile(r"sha256:[0-9a-f]{64}")
 _REVISION = re.compile(r"[0-9a-f]{40}")
@@ -516,14 +516,18 @@ def _metadata_ref(raw: Any) -> None:
     _sha(ref["sha256"])
 
 
+def _official_price_close(day: date) -> datetime:
+    return datetime.combine(day, time(15), ZoneInfo("Asia/Shanghai"))
+
+
 def _session_blockers(
     raw: Any,
     requirement: MeasureRequirement,
     day: date,
-    price_anchor: datetime,
     clocks: Sequence[tuple[datetime, datetime] | None],
 ) -> set[str]:
     """Check declared, identity-bound metadata; upstream owns applicability/source truth."""
+    price_anchor = _official_price_close(day)
     if raw is None:
         return {"SESSION_METADATA_UNKNOWN"}
     meta = _object(raw, _SESSION_FIELDS, "INVALID_SESSION_METADATA")
@@ -651,6 +655,8 @@ def assess(
         and observation_end <= cutoff,
         "OBSERVATION_WINDOW_MISMATCH",
     )
+    if session_version:
+        _require(observation_end == _official_price_close(day), "PRICE_OBSERVATION_END_MISMATCH")
     _require(
         binding["consumer_id"] == config.consumer_id and binding["purpose_id"] == config.purpose_id,
         "CONSUMER_CONFIG_MISMATCH",
@@ -822,7 +828,6 @@ def assess(
                         m["session"],
                         measures[name],
                         day,
-                        observation_end,
                         (known, published, available),
                     )
                 )

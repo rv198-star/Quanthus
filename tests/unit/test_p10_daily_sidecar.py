@@ -930,6 +930,54 @@ def session_meta(record):
     return record["members"][0]["session"]
 
 
+@pytest.mark.parametrize(
+    "observation,anchor,reason",
+    [
+        ("15:30:00", "15:30:00", "PRICE_OBSERVATION_END_MISMATCH"),
+        ("15:30:00", "15:00:00", "PRICE_OBSERVATION_END_MISMATCH"),
+        ("15:00:00", "15:30:00", "PRICE_CLOSE_ANCHOR_MISMATCH"),
+    ],
+)
+def test_42e_price_anchor_cannot_move_with_binding(observation, anchor, reason):
+    record, cfg, _ = session_specimen()
+    record["binding"]["observation_end"] = f"2026-11-24T{observation}+08:00"
+    session_meta(record)["official_price_close_anchor"] = f"2026-11-24T{anchor}+08:00"
+    record, cfg, receipt = reseal_session(record, cfg)
+    with pytest.raises(SidecarError, match=reason):
+        assess(record, cfg, receipt)
+
+
+def test_42e_legal_separate_price_quantity_and_real_clocks():
+    record, cfg, receipt = session_specimen()
+    assert assess(record, cfg, receipt).blockers == ()
+    assert record["binding"]["observation_end"] == "2026-11-24T15:00:00+08:00"
+    assert session_meta(record)["official_price_close_anchor"] == "2026-11-24T15:00:00+08:00"
+    assert session_meta(record)["full_day_volume_amount_observation_end"].endswith("15:30:00+08:00")
+    assert record["members"][0]["source_available_at"]["start"].endswith("18:00:00+08:00")
+    assert record["publication"]["published_at"]["start"].endswith("19:00:00+08:00")
+    assert record["members"][0]["available_at"]["start"].endswith("19:01:00+08:00")
+
+
+def test_42e_current_work_item_resolves_one_runtime_and_repair_request():
+    from quanthus.p10_daily_sidecar import RUNTIME_VERSION
+
+    root = Path(__file__).resolve().parents[2]
+    header = (
+        (root / "docs/work-items/p10-p12-daily-sidecar.md")
+        .read_text()
+        .split("## Goal and boundary", 1)[0]
+    )
+    assert header.count("| Runtime |") == 1
+    assert f"| Runtime | {RUNTIME_VERSION}," in header
+    assert "p10-daily-sidecar-engineering.v3.json" in header
+    assert "p10-daily-sidecar-engineering.v1.json" not in header
+    request = json.loads(
+        (root / "config/pipelines/p10-daily-sidecar-engineering.v3.json").read_text()
+    )
+    assert request["base_revision"] == "42e26447d89aaa2aa9b32ccedfafc405a60fe90e"
+    assert request["round"] == "p10-sidecar-repair/p10-42e-repair-1"
+
+
 def test_session_v2_accepts_explicit_complete_volume_and_keeps_v1_shape():
     record, cfg, receipt = session_specimen()
     assert assess(record, cfg, receipt).disposition == "TEST_ONLY"

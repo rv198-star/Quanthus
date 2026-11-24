@@ -6,13 +6,11 @@
 | Work | P10-DATA-P12-DAILY-001 / [#726](https://github.com/rv198-star/Quanthus/issues/726), parent #478 |
 | Design status | approved for the bounded metadata scope accepted by P11 |
 | Delivery gate | open; isolated candidate, independent review and consumer binding pending |
-| Baseline | origin/main b995967655cb7ed2265f6eca1a1e2c27fb84f3e3 |
-| Runtime | p10-daily-consumer-sidecar-runtime-v2.2, src/quanthus/p10_daily_sidecar.py |
-
-
-| Runtime | p10-daily-consumer-sidecar-runtime-v2.1, src/quanthus/p10_daily_sidecar.py |
+| Baseline | Current repair: 42e26447d89aaa2aa9b32ccedfafc405a60fe90e / tree 2da1b72a94303300e30a7d4c2941383ab4896836 |
+| PR lineage | PR742 base 8d2d7dcb96bb5406266262ce8de0597d5bf4dec5 (PR729); retained history |
+| Runtime | p10-daily-consumer-sidecar-runtime-v2.2.1, src/quanthus/p10_daily_sidecar.py |
 | Tests | tests/unit/test_p10_daily_sidecar.py |
-| Request | [finite engineering request](../../config/pipelines/p10-daily-sidecar-engineering.v1.json) |
+| Request | [current 42e repair request v3](../../config/pipelines/p10-daily-sidecar-engineering.v3.json) |
 
 ## Goal and boundary
 
@@ -107,7 +105,9 @@ CURRENT or source files, or derive missing clocks from the call time. Activation
 SOURCE_OBSERVED member qualification and P12 physical input reading are separate work.
 The current PR contains only the library, synthetic probes, mapping and governance records.
 
-## Checks, bounded cost and remaining work
+## Historical first engineering checkpoint
+
+This section retains the initial v1 execution budget and clocks. The current repair follows v3.
 
 First checkpoint budget: 90 minutes from 2026-11-24 03:31:43+08; no market network, purchase,
 new source or deployment. Project Python 3.10.16 is used through its explicit absolute path.
@@ -197,7 +197,7 @@ CN02 formal command results are recorded separately. The prior regulation/sessio
 stays fixed until these repairs are propagated in an independently versioned successor.
 
 
-## Repaired independent session successor
+## Historical 305/2c1 independent session successor
 
 The retained PR730/2a6f5eee session candidate is superseded by this successor based on
 30503b92, preserving both old Git trees, audit evidence and branch-local checkpoints. Only
@@ -227,7 +227,7 @@ pool, field/source members, industry/action/exception facts and real clocks rema
 Formal #727 source remains blocked; finite paper_quote_feed field samples are separately queued. P11 owns window/regime comparability and algorithms, P12 physical/account
 consumption. This successor adds no source collection, strategy or publisher deployment.
 
-## Binding-repaired session successor
+## Historical 8d2/42e binding-repaired session successor
 
 This new successor starts at8d2d7dcb and carries only2c1's regulation/session product delta.
 The prior2c1/2a6 trees and branch-local ledgers remain fixed. Their older unmerged checkpoint
@@ -237,3 +237,25 @@ legacy v1/v1.1/v2/v2.1 wire formats stay readable and pending without actual M0 
 Policy/M0, exact retry, committed orphan recovery and Selection boundary fixes apply to both.
 FULL_DAY quantity15:30, price15:00, unknown clock/volume/N-A and rule scope remain as2c1.
 No source adapter, publisher, market-row read or deployment is introduced.
+
+## Current 42e two-finding repair
+
+Round `p10-sidecar-repair/p10-42e-repair-1` starts from the exact42e baseline in the header.
+The current request is v3, recorded at its real creation time with a30-minute first-checkpoint
+budget. The original [v1 request](../../config/pipelines/p10-daily-sidecar-engineering.v1.json)
+and [v2 session request](../../config/pipelines/p10-daily-sidecar-engineering.v2.json) are
+frozen history: v1 retains originalmain b995 and v2 retains its f32 scaffold base/preflight note.
+Historical runtimev2.1/v2.2 and their original receipts stay preserved in the sections above.
+
+Runtimev2.2.1 fixes the session price-close implementation: binding.observation_end and a
+required member official_price_close_anchor each independently match Shanghai15:00 for the
+market date. Matching two caller-supplied15:30 values raisesPRICE_OBSERVATION_END_MISMATCH.
+Applicable FULL_DAY quantity observation still has its separate15:30 floor; existing v1
+historical profile behavior and all config/wire schemas remain unchanged. No source,
+publication, channel-visible or consumer clocks are rewritten.
+
+Fail-first probes retain the paired15:30 bypass and duplicate current-header rows. The repaired
+candidate retains the legal price15:00/quantity15:30/source18:00/publication19:00/visible19:01
+control and the full114 predecessor regressions. Use exact local/CN02 focused/static receipts;
+Mac full is NOT_RUN by scope, and full CN02 make check follows critical independent closure.
+The #743 calendar evidence closure is separate. P11 owns independent review and adoption.

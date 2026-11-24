@@ -33,8 +33,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,10 @@ from quanthus.expert_evaluation.serialization import artifact_from_bytes
 from quanthus.expert_strategy.registry import ExpertStrategyRegistry
 from quanthus.expert_strategy.runner import FormalStrategyRunner
 from quanthus.feature_registry import load_feature_registry
+from quanthus.forward_validation.base24_runtime import (
+    AfterCloseDecisionClock,
+    P6Base24CandidatePolicy,
+)
 from quanthus.forward_validation.prospective_source import (
     P6ProspectiveSplitPolicy,
 )
@@ -77,6 +82,11 @@ _TREND_SPEC = (
 
 # The E1 production panel evaluator identity, bound to the frozen registry.
 _E1_EVALUATOR_VERSION = "p11-e1-runtime-v1"
+
+# The registered release manifest whose code_entry/named assets pin this E1
+# construction.  Loaded through the verified release loader; its code_commit/
+# code_tree are the executable-source identity, never a caller pin.
+_E1_RELEASE_MANIFEST_ID = "p11-d1b-fixed-rule-20261124-v2"
 
 
 def _fail(code: str, message: str) -> None:
@@ -116,14 +126,22 @@ def load_e1_rule_assets(
 ) -> E1RuleAssets:
     """Load and pin the frozen E1 rule assets from the repository root.
 
-    Every expected_* the caller supplies is independently verified truth for
-    the current checkout; a non-None expected value must equal the loaded
-    identity exactly.  A changed version, identity or digest refuses the
-    asset rather than silently rebinding.
+    The bound identities come from the FIXED release manifest's real
+    code_entry (commit/tree) and the named asset files' bytes -- never from
+    the caller's pins.  A caller-supplied expected_* is only an assertion:
+    when it differs from the manifest/file truth the asset is refused, never
+    echoed back as if verified.  A wrong commit/tree (even a valid 40-hex
+    string) and any changed asset byte all fail closed.
     """
     repository = Path(root).resolve()
     if not repository.is_dir():
         _fail("e1_root_missing", f"{repository} is not a repository root")
+
+    # The release manifest is the single source of truth for the bound code
+    # identity and the named asset digests.  Verified through the registered
+    # release loader so a drifted semantic closure or a wrong commit/tree is
+    # caught before any asset is constructed.
+    code_commit, code_tree = _verify_release_code_identity(repository)
 
     registry = ExpertStrategyRegistry(repository)
     runner = FormalStrategyRunner(registry.card, registry.topology_manifest.digest)
@@ -137,7 +155,11 @@ def load_e1_rule_assets(
     )
     registry_digest = feature_registry.digest
 
+    # Caller pins are assertions only: a supplied value that disagrees with the
+    # verified manifest/file identity refuses the asset, never passes through.
     for name, expected, actual in (
+        ("code_commit", expected_code_commit, code_commit),
+        ("code_tree", expected_code_tree, code_tree),
         ("card_digest", expected_card_digest, card_digest),
         ("registry_digest", expected_registry_digest, registry_digest),
     ):
@@ -153,12 +175,38 @@ def load_e1_rule_assets(
         feature_registry=feature_registry,
         trend_config=trend_config,
         trend_spec=trend_spec,
-        code_commit=expected_code_commit or "",
-        code_tree=expected_code_tree or "",
+        code_commit=code_commit,
+        code_tree=code_tree,
         card_digest=card_digest,
         registry_digest=registry_digest,
         topology_digest=registry.topology_manifest.digest,
     )
+
+
+def _verify_release_code_identity(repository: Path) -> tuple[str, str]:
+    """Resolve the E1 code commit/tree from the registered release manifest.
+
+    Uses the verified release loader so the manifest's code_entry is checked
+    against the real git closure (the executable-source commit, distinct from
+    a manifest-only rebind HEAD).  Returns (code_commit, code_tree); a missing
+    release or a closure drift fails closed rather than echoing caller pins.
+    """
+    from quanthus.product_daily.recommendation.release_contract import (
+        load_verified_release,
+    )
+
+    try:
+        release = load_verified_release(repository, _E1_RELEASE_MANIFEST_ID)
+    except ProductDailyError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        _fail("e1_release_unverified", f"{exc}")
+    code = release.manifest.get("code_entry") or {}
+    commit = code.get("code_commit")
+    tree = code.get("code_tree")
+    if not commit or not tree:
+        _fail("e1_release_unverified", "release manifest lacks code_entry identity")
+    return commit, tree
 
 
 def _split_policy_for(market_date: date) -> P6ProspectiveSplitPolicy:
@@ -203,6 +251,15 @@ def run_e1_from_history(
     signal = market_date or facts.market_date
     if split_policy is None:
         split_policy = _split_policy_for(signal)
+    if clock is None:
+        # Default to the signal day's logical decision instant (the T-close
+        # coordinate the chain binds); a None clock must not reach the seam.
+        decision_at = policy.decision_cutoff
+        clock = lambda: decision_at  # noqa: E731
+    if source_policy is None:
+        source_policy = _default_source_policy(
+            facts=facts, policy=policy, market_date=signal
+        )
 
     # The panel report is built ONCE inside the job from the features the chain
     # computes; the factory is invoked with the actual features_by_security so
@@ -252,6 +309,36 @@ def run_e1_from_history(
     return output, report_holder["report"]
 
 
+def _default_source_policy(
+    *, facts: DailyFactsView, policy: AdvicePolicy, market_date: date
+) -> P6Base24CandidatePolicy:
+    """Build the use-correct source policy for this E1 day.
+
+    The decision coordinate is the policy's own decision_cutoff, the
+    observation end is the T close and the next open comes from
+    facts.next_session -- real bound inputs, never a fixture.  history_start
+    keeps the chain's floor.
+    """
+    tz = policy.decision_cutoff.tzinfo
+    next_open = (
+        datetime.combine(facts.next_session, time(9, 30), tzinfo=tz)
+        if getattr(facts, "next_session", None) is not None
+        else None
+    )
+    clock = AfterCloseDecisionClock(
+        market_date=market_date,
+        source_available_at=policy.decision_cutoff,
+        decision_at=policy.decision_cutoff,
+        next_session_open=next_open,
+    )
+    return P6Base24CandidatePolicy(
+        clock=clock,
+        history_start=date(2026, 1, 1),
+        inputs_manifest_sha256=getattr(facts, "manifest_sha256", None)
+        or "sha256:" + "0" * 64,
+    )
+
+
 def _panel_report_for(
     *,
     assets: E1RuleAssets,
@@ -273,20 +360,38 @@ def _panel_report_for(
     exceptions = sum(
         1 for f in features_by_security.values() if getattr(f, "exception_active", False)
     )
+    # Actual per-row verdicts from THIS computation, never a hard-filled 0 or
+    # a fixed scope floor: unexplained transitions and continuity exclusions
+    # are counted from the computed rows, and the scope is the real signal-to-
+    # earliest-input window the panel covered.
+    unexplained = sum(
+        1
+        for f in features_by_security.values()
+        if getattr(f, "unexplained_price_transition", False)
+    )
+    continuity_excluded = sum(
+        1
+        for f in features_by_security.values()
+        if getattr(f, "scope_continuity_excluded", False)
+    )
+    scope_start = min(
+        (f.signal_date for f in features_by_security.values() if getattr(f, "signal_date", None)),
+        default=signal_date,
+    )
     return BaselineFeaturePanelReport(
         evaluator_version=_E1_EVALUATOR_VERSION,
         feature_registry_version=assets.feature_registry.registry_version,
         feature_registry_digest=assets.feature_registry.digest,
         bundle_snapshot_id=snapshot_id,
         bundle_digest=snapshot_manifest_digest,
-        scope_start=date(2026, 1, 1),
+        scope_start=scope_start,
         scope_end=signal_date,
         row_count=len(features_by_security),
         feature_ready_count=ready,
         entry_eligible_count=eligible,
         exception_active_count=exceptions,
-        unexplained_transition_count=0,
-        continuity_excluded_security_count=0,
+        unexplained_transition_count=unexplained,
+        continuity_excluded_security_count=continuity_excluded,
         data_content_digest=sha256_digest(
             {
                 code: _feature_row_dict(f)
@@ -341,10 +446,29 @@ def run_e1_replay_day(
         if isinstance(request, paper_replay.ReplayRequest)
         else paper_replay.load_replay_request(request)
     )
-    return paper_replay.run_replay_day(
+
+    # Bind THIS replay day's real panel computation into the history call: the
+    # factory is invoked once with the job's actual features_by_security, and
+    # the rebound report is what source_closure signs (never the placeholder).
+    report_holder: dict[str, BaselineFeaturePanelReport] = {}
+
+    def _factory(features_by_security: Mapping[str, Any]) -> BaselineFeaturePanelReport:
+        report = _panel_report_for(
+            assets=assets,
+            features_by_security=features_by_security,
+            signal_date=market_date,
+            snapshot_id=snapshot_id,
+            snapshot_manifest_digest=snapshot_manifest_digest,
+        )
+        report_holder["report"] = report
+        return report
+
+    hist_with_panel = partial(_hist, panel_report_factory=_factory)
+
+    receipt = paper_replay.run_replay_day(
         req,
         market_date,
-        run_daily_advice_from_history=_hist,
+        run_daily_advice_from_history=hist_with_panel,
         runner=assets.runner,
         resources=SeamResources(
             feature_registry=assets.feature_registry,
@@ -359,6 +483,11 @@ def run_e1_replay_day(
         clock=clock,
         observed_clock=observed_clock,
     )
+    # Surface the real same-job panel report on the receipt so the caller sees
+    # the actual computation, not the binding placeholder.
+    if "report" in report_holder:
+        receipt["feature_panel_report"] = report_holder["report"].to_dict()
+    return receipt
 
 
 def _replay_panel_placeholder(assets: E1RuleAssets) -> BaselineFeaturePanelReport:

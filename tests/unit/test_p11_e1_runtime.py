@@ -111,3 +111,67 @@ def test_run_e1_rejects_empty_universe(assets):
             source_policy=kw["source_policy"],
             clock=kw["clock"],
         )
+
+
+# --- R2: real panel on the replay path + verified asset identity ---------------
+
+
+def test_r2_replay_day_binds_real_panel_not_placeholder(assets):
+    # Root R2 probe: run_e1_replay_day must sign the actual same-job panel,
+    # not the zero-row placeholder.  Two inputs that change real features get
+    # two different real reports.
+    from tests.unit import test_p11_paper_replay as f
+
+    days = tuple(d for d in f.SESSION_DAYS if d <= f.T1)
+    req = f._request(market_dates=(f.T1,), securities=[f._security("600000", days)])
+    out1 = e_run_e1_replay(req, f.T1, assets)
+    other = f._request(market_dates=(f.T1,), securities=[f._security("600000", days)])
+    other["securities"][0]["bars"][-10]["volume"] = "91234"
+    out2 = e_run_e1_replay(other, f.T1, assets)
+    placeholder = _ph(assets)
+    d1 = out1["source_closure"].get("feature_panel_report_digest")
+    d2 = out2["source_closure"].get("feature_panel_report_digest")
+    assert d1 != placeholder.digest
+    assert d1 != d2
+    assert out1.get("publishable") is True
+
+
+def e_run_e1_replay(req, day, assets):
+    from quanthus.product_daily.recommendation.e1_runtime import run_e1_replay_day
+
+    return run_e1_replay_day(
+        req, day, assets=assets, snapshot_id="s", snapshot_manifest_digest="sha256:" + "a" * 64
+    )
+
+
+def _ph(assets):
+    from quanthus.product_daily.recommendation.e1_runtime import _replay_panel_placeholder
+
+    return _replay_panel_placeholder(assets)
+
+
+def test_r2_wrong_code_commit_refused(assets):
+    with pytest.raises(ProductDailyError):
+        load_e1_rule_assets(
+            ROOT,
+            expected_code_commit="1" * 40,
+            expected_code_tree="2" * 40,
+        )
+
+
+def test_r2_default_call_no_clock_not_crash(assets):
+    kw = _run_kwargs()
+    output, report = run_e1_from_history(
+        _trend_envelope(),
+        assets=assets,
+        facts=kw["facts"],
+        policy=kw["policy"],
+        account=kw["account"],
+        run_id="e1-noclock",
+        snapshot_id="s",
+        snapshot_manifest_digest=sha256_digest({"n": 1}),
+        source_policy=kw["source_policy"],
+        # clock omitted -> default logical decision instant, never a TypeError
+    )
+    assert output.receipt is not None
+    assert report.row_count == 1

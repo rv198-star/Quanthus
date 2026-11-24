@@ -134,6 +134,13 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
             venue = "SSE" if mic == "XSHG" else ("SZSE" if mic == "XSHE" else str(lst.get("venue_id") or ""))
             if venue not in ADMITTED_VENUES:
                 continue
+            # One security x listing pair emits once; a duplicated listing
+            # row for the same (security_id, listing_id) is one identity,
+            # never a second securities[] entry (the loader rejects
+            # duplicate_security).
+            pair = (sid, str(lst.get("listing_id") or ""))
+            if pair in seen:
+                continue
             code = code_by_security.get(sid) or str(lst.get("listing_code") or sid)
             securities.append(
                 SecurityIdentity(
@@ -153,6 +160,7 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
                 )
             )
             seen.add(sid)
+            seen.add(pair)
     # Merge account holdings/pending not already in the pool (held+alert path).
     account_extra = []
     for h in holdings or ():

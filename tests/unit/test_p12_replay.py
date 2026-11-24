@@ -558,3 +558,93 @@ class TestFillDay:
         block = json.loads((state / "replay-exclusion-block.json").read_text())
         assert block["status"] == "blocked"
         assert block["reason"] == "EXCLUSION_SHA_MISMATCH"
+
+
+class TestCoverageDisplay:
+    '''R5: 当日覆盖展示 - the same-run rule receipt drives N/M and the
+    per-security verdict + scan reason; the synthetic phase shows pool-only.'''
+
+    def test_real_receipt_rows_and_counts(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+
+        receipt = {
+            "delivered": {
+                "600000": {"bar_rows": 61, "window_sessions": 61,
+                           "gap_sessions": 0, "entry_eligible": True},
+                "000002": {"bar_rows": 61, "window_sessions": 61,
+                           "gap_sessions": 0, "entry_eligible": True},
+                "601390": {"bar_rows": 40, "window_sessions": 61,
+                           "gap_sessions": 21, "entry_eligible": False},
+            },
+            "seam": {
+                "evaluated_universe": ["600000", "000002"],
+                "decisions": [
+                    {"security_code": "600000", "disposition": "ENTRY",
+                     "reason": "NEW_ENTRY_SIGNAL"},
+                    {"security_code": "000002", "disposition": "REVIEW",
+                     "reason": "SOME_CODE"},
+                ],
+                "excluded": [],
+            },
+            "source_closure": {
+                "held_decisions": [
+                    {"security_code": "600000", "action": "held",
+                     "reason": "HELD_OK"},
+                ],
+            },
+            "excluded_security_codes": ["300999"],
+            "coverage_exclusions": [
+                {"security_code": "601390", "reason": "ACTION_COVERAGE_UNKNOWN"},
+            ],
+            "as_observed": {"note": "x"},
+        }
+        block = coverage_block(receipt)
+        assert block["pool_count"] == 3
+        assert block["evaluated_count"] == 2
+        assert block["pending_count"] == 1
+        assert block["note_text"].startswith("本日可评估 2 只 / 策略池 3 只")
+        assert "其余 1 只" in block["note_text"]
+        rows = {r["security_code"]: r for r in block["securities"]}
+        assert rows["600000"]["evaluated"] is True
+        assert rows["600000"]["verdict"] == "新建信号"
+        assert rows["000002"]["verdict"] == "待复核"
+        # The coverage-isolated member is pending with a clearance reason.
+        assert rows["601390"]["evaluated"] is False
+        assert rows["601390"]["state"] == "pending"
+        assert rows["601390"]["scan_reason"]
+
+    def test_zero_signal_day_still_lists_evaluated(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+
+        receipt = {
+            "delivered": {
+                "600000": {"entry_eligible": True},
+                "000002": {"entry_eligible": True},
+            },
+            "seam": {
+                "evaluated_universe": ["600000", "000002"],
+                "decisions": [],
+                "excluded": [],
+            },
+            "source_closure": {"held_decisions": []},
+            "coverage_exclusions": [],
+        }
+        block = coverage_block(receipt)
+        # Zero signals: N=2 evaluated, every one still listed.
+        assert block["evaluated_count"] == 2
+        assert len(block["securities"]) == 2
+        assert all(r["evaluated"] for r in block["securities"])
+        assert all(r["verdict"] is None for r in block["securities"])
+
+    def test_synthetic_returns_pool_only(self):
+        from quanthus.p12_replay.coverage_display import (
+            coverage_block,
+            pool_only_block,
+        )
+        assert coverage_block(None) is None
+        block = pool_only_block(3, delivered_codes=["600000", "000002", "601390"])
+        assert block["pool_count"] == 3
+        assert block["evaluated_count"] is None
+        assert len(block["securities"]) == 3
+        assert all(r["evaluated"] is None for r in block["securities"])
+        assert "待真实规则接入" in block["note_text"]

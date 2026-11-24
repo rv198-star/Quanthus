@@ -89,6 +89,17 @@ footer{max-width:1120px;margin:0 auto 40px;padding:0 20px;color:var(--muted);fon
 .review td,.review th{padding:4px 8px 4px 0;border-bottom:1px solid #f0f0ee;text-align:left;vertical-align:top}
 .review th{color:var(--muted);font-weight:600;white-space:nowrap}
 .chip{display:inline-block;background:#eef1f4;border-radius:3px;padding:1px 8px;font-size:11px;color:var(--info);margin-right:6px}
+.covnote{font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5}
+.covnote b{color:var(--ink)}
+.covrow{display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid #f0f0ee;font-size:12px;flex-wrap:wrap}
+.covrow:last-child{border-bottom:none}
+.covrow .c{font-weight:600;min-width:64px}
+.covtag{font-size:11px;padding:1px 8px;border-radius:2px;white-space:nowrap}
+.cov-eval{background:#e9f3ec;color:var(--ok)}
+.cov-pend{background:#f3ede0;color:var(--warn)}
+.cov-na{background:#eef1f4;color:var(--muted)}
+.covrow .v{color:var(--info);font-weight:600}
+.covrow .r{color:var(--muted);flex:1;min-width:160px}
 tabs{display:flex;gap:0;margin-bottom:0}
 .tab{padding:8px 18px;cursor:pointer;border:1px solid var(--line);border-bottom:none;border-radius:5px 5px 0 0;background:#f3f4f5;font-size:13px}
 .tab.on{background:#fff;font-weight:600;border-bottom:1px solid #fff;margin-bottom:-1px}
@@ -107,6 +118,7 @@ tabs{display:flex;gap:0;margin-bottom:0}
   <div class=tabbody id=body-today>
    <h2>今日建议</h2><div id=plans><p class=empty>尚未生成本日建议。点「运行当晚任务」生成。</p></div>
    <div class=actions><button class=primary id=runbtn>运行当晚任务</button><span id=runstatus></span></div>
+   <div id=coverage></div>
    <h2 style="margin-top:18px">记录</h2><div id=orders class=empty>—</div>
    <h2 style="margin-top:14px">引擎日志</h2><div class=log id=log>—</div>
   </div>
@@ -151,6 +163,20 @@ function showTab(k){document.getElementById('tab-today').className='tab'+(k==='t
 
 function sideClass(label){if(label==='买入建议')return'buy';if(label==='卖出建议'||label==='退出建议'||label==='减仓建议')return'sell';if(label==='继续持有')return'hold';if(label==='已跳过')return'skip';return'hold'}
 
+function renderCoverage(){
+ const el=document.getElementById('coverage');const c=(S&&S.coverage)||null;
+ if(!c){el.innerHTML='';return}
+ let h='<p class=covnote><b>'+esc(c.note_text||'')+'</b>'+(c.note&&c.note!==c.note_text?('<br>'+esc(c.note)):'')+'</p>';
+ const rows=c.securities||[];
+ if(rows.length){h+='<div style="margin-top:4px">';
+  for(const r of rows){
+   const st=r.state||'';const tag=st==='evaluated'?'<span class="covtag cov-eval">已评估</span>':(st==='pending'?'<span class="covtag cov-pend">待核</span>':'<span class="covtag cov-na">'+esc(st||'—')+'</span>');
+   h+='<div class=covrow><span class=c>'+esc(r.security_code)+'</span>'+tag+(r.verdict?'<span class=v>'+esc(r.verdict)+'</span>':'')+(r.scan_reason?'<span class=r>'+esc(r.scan_reason)+'</span>':'')+'</div>';
+  }
+  h+='</div>'
+ }
+ el.innerHTML=h
+}
 async function refresh(){
  S=await api('/api/state');const r=S.replay||{};
  document.getElementById('day').textContent=(r.current_day||'—')+' · 第 '+(r.day_index+1)+'/'+r.sessions_total+' 个交易日';
@@ -176,6 +202,7 @@ async function refresh(){
    +'</div>';
  }
  document.getElementById('plans').innerHTML=ph;
+ renderCoverage();
  const a=S.account||{};const acct=(wb.account||{});
  document.getElementById('cash').textContent=fmt(a.cash);
  const mkt=acct.market_value||acct.total_value||null;

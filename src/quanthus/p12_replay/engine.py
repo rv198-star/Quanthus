@@ -1260,8 +1260,37 @@ class ReplayEngine:
                 else None
             ),
             "runs": runs,
+            "coverage": self._coverage_block(),
             "account": ledger,
         })
+
+    def _coverage_block(self) -> dict:
+        """本日覆盖展示: the day's evaluable/pool counts + per-security rows.
+
+        Source is the day's own run receipt (the same run the page already
+        shows).  When a real-rule runner issues a receipt carrying
+        delivered/seam/coverage fields, coverage_block() renders the
+        verbatim N/M and per-security verdicts; otherwise the synthetic
+        phase reports pool-only coverage and no invented per-security rows.
+        """
+        from quanthus.p12_replay.coverage_display import (
+            coverage_block,
+            pool_only_block,
+        )
+        receipt = None
+        try:
+            latest = self._store.latest_run_for_date(self.current_day)
+            if isinstance(latest, dict):
+                receipt = latest
+        except Exception:  # noqa: BLE001 - coverage is additive, never fatal
+            receipt = None
+        block = coverage_block(receipt) if receipt else None
+        if block is not None:
+            return block
+        # Pool size is honest even under the synthetic runner: the number of
+        # securities whose bars the replay actually delivered for this day.
+        pool = sorted((self.bars_by_day.get(self.current_day) or {}).keys())
+        return pool_only_block(len(pool), delivered_codes=pool)
 
     # ---- phase-1 experience additions ------------------------------------------------
     def records_view(self) -> dict:

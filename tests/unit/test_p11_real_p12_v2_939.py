@@ -114,6 +114,8 @@ def test_resolve_pinned_loader_verifies_every_file_byte(pinned_checkout, monkeyp
     assert wire_digest.startswith("sha256:")
     # The wire digest covers the raw bytes - a tampered payload digests
     # differently.  Recompute it through the pinned tree's own fact_contracts.
+    import sys as _sys
+
     import quanthus as _q
 
     _q.__path__.insert(0, str(pinned_checkout / "src" / "quanthus"))
@@ -243,6 +245,8 @@ def test_publish_reduce_through_real_pinned_consumer(pinned_checkout, tmp_path, 
     assert receipt.p12_package_digests is not None
     binding = dict(receipt.p12_package_digests)
     assert binding[raw["market_date"]].startswith("sha256:")
+    import sys as _sys
+
     import quanthus as _q
 
     _q.__path__.insert(0, str(pinned_checkout / "src" / "quanthus"))

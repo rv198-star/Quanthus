@@ -604,6 +604,83 @@ def derive_universe_membership(
     return tuple(membership)
 
 
+def listing_active_at_market_day(
+    *,
+    listing_rows: Sequence[ListingRow],
+    calendar_rows: Sequence[CalendarRow],
+    security_id: str,
+    listing_id: str,
+    venue_id: str,
+    market_date: date,
+) -> bool | None:
+    """Eligibility check BEFORE aging: is T inside this security's listing interval?
+
+    The qualified listing interval is the caller-asserted triple (security_id,
+    listing_id, venue_id).  T's local open anchor is the venue calendar row for
+    market_date (open_at when present, else the local-day bound proof).  A
+    security whose qualified interval does NOT cover T -- e.g. delisted before
+    T -- is not an entry-scan candidate at all: it must be isolated per-security,
+    never force the shared "calendar cannot cover listing start" failure that
+    ages a listed security needs.  A still-listed security keeps the strict
+    coverage gate (the calendar must prove its full membership from the
+    listing start).
+
+    Returns True when the T open anchor/day-bound is provably inside one
+    qualified interval, False when it is provably outside every interval, and
+    None when the T anchor is absent and the day straddles an interval
+    boundary (unresolved -- the caller treats it as unverifiable, never
+    assumed listed).
+    """
+    intervals = [
+        row
+        for row in listing_rows
+        if row.security_id == security_id
+        and row.listing_id == listing_id
+        and row.venue_id == venue_id
+    ]
+    if not intervals:
+        return None
+    tz = _venue_tz(venue_id)
+    anchor_row = next(
+        (
+            row
+            for row in calendar_rows
+            if row.venue_id == venue_id and row.session_date == market_date
+        ),
+        None,
+    )
+    if anchor_row is not None and anchor_row.open_at is not None:
+        anchor = anchor_row.open_at
+        for iv in intervals:
+            if iv.effective_from <= anchor and (
+                iv.effective_to is None or anchor < iv.effective_to
+            ):
+                return True
+        return False
+    # The T session carries no stored anchor.  Before falling back to the
+    # local-day bound, discharge the two whole-interval positions: if EVERY
+    # qualified interval ended on a session strictly before market_date the
+    # security is provably not listed at T (False); if EVERY interval begins
+    # on a session strictly after market_date it is not yet listed (False).
+    # Both are resolved without the day-bound proof so a 42-day null-anchor
+    # warmup does not leave a clear delisted/future listing undecided.
+    if all(
+        iv.effective_to is not None
+        and iv.effective_to.astimezone(tz).date() < market_date
+        for iv in intervals
+    ):
+        return False
+    if all(iv.effective_from.astimezone(tz).date() > market_date for iv in intervals):
+        return False
+    # No stored anchor for T's session: prove by the local-day bound.  The
+    # session's whole local day inside one interval -> active; wholly outside
+    # every interval -> not listed at T; straddling a boundary stays
+    # unresolved (returned None so the caller fails closed per-security).
+    return _equivalent_day_membership(
+        session=market_date, intervals=intervals, venue_id=venue_id
+    )
+
+
 # --- securities[] -> RawSecurityInput ------------------------------------------------
 
 
@@ -875,6 +952,8 @@ def raw_security_inputs_from_history(
     """
     inputs: list[RawSecurityInput] = []
     receipts: list[dict[str, Any]] = []
+    # Duplicate guard keys on the LISTING id (a relisted entity reuses
+    # security_id across listings); see the check below.
     seen_ids: set[str] = set()
     for si, sec in enumerate(history.securities):
         sec_o = _obj(sec, f"securities[{si}]")
@@ -891,9 +970,20 @@ def raw_security_inputs_from_history(
             )
             continue
         code = identity.listing_code
-        if identity.security_id in seen_ids:
-            _fail("duplicate_security", f"duplicate security_id {identity.security_id}")
-        seen_ids.add(identity.security_id)
+        # Duplicate guard keys on the LISTING id, not the bare security_id: one
+        # corporate entity legitimately carries several listings over time (a
+        # delisted + a relisted share, e.g. security_7ca1ec46 spanning 000043 /
+        # 001914).  Rejecting on security_id alone would hard-block the whole
+        # day on that relisted shape even though each listing is aged by its
+        # own listing_id interval and isolated per-listing.  The same
+        # listing_id twice stays a hard error (a true duplicate row).
+        if identity.listing_id in seen_ids:
+            _fail(
+                "duplicate_security",
+                f"duplicate listing_id {identity.listing_id} "
+                f"(security_id {identity.security_id})",
+            )
+        seen_ids.add(identity.listing_id)
         position_facts, prior_det = _position_facts_from(sec_o)
         held_membership = _bool3(sec_o.get("held_membership"), "securities[].held_membership")
         pending_kind = (
@@ -934,10 +1024,59 @@ def raw_security_inputs_from_history(
                 proof_sinks[identity.listing_code] = sec_proof
         except ProductDailyError as exc:
             if getattr(exc, "reason_code", "") == "calendar_coverage_incomplete":
-                # A shared calendar that cannot cover the listing start is a
-                # shared failure for every security on that venue, not a
-                # per-security isolation.
-                raise
+                # The shared coverage gate assumes the security is STILL
+                # listed at T.  Resolve T's local open anchor against the
+                # qualified listing interval FIRST:
+                #   * T provably OUTSIDE the interval (delisted before the
+                #     signal day, e.g. 000005): a normal universe-census
+                #     result -- the security is removed BEFORE the scan with
+                #     the stable not_listed_on_signal_date reason, never the
+                #     shared block and never a fabricated early age.
+                #   * T provably INSIDE the interval (still listed): the
+                #     shared calendar-coverage failure stands verbatim.
+                #   * T unresolved (no listing row / straddling anchor): the
+                #     shared failure also stands -- unverifiable is not a
+                #     free not-listed claim.
+                t_active = listing_active_at_market_day(
+                    listing_rows=history.listing_rows,
+                    calendar_rows=history.calendar_rows,
+                    security_id=identity.security_id,
+                    listing_id=identity.listing_id,
+                    venue_id=identity.venue_id,
+                    market_date=history.market_date,
+                )
+                if t_active is False:
+                    if is_account_member:
+                        # A held/pending position in a delisted security keeps
+                        # its own reminder path: it is preserved below with
+                        # empty membership, never dropped, never a new-entry
+                        # scan and never the shared block.
+                        membership = ()
+                        receipts.append(
+                            {
+                                "security_code": code,
+                                "status": "account_member_market_unavailable",
+                                "reason": "not_listed_on_signal_date",
+                                "scope": "per_security",
+                            }
+                        )
+                    else:
+                        receipts.append(
+                            {
+                                "security_code": code,
+                                "status": "excluded",
+                                "reason": "not_listed_on_signal_date",
+                                "scope": "per_security",
+                            }
+                        )
+                        continue
+                else:
+                    # t_active True (still listed) or None (unverifiable): the
+                    # shared coverage failure stands -- a still-listed
+                    # security's truncated calendar is a shared whole-day
+                    # gap, and an unverifiable listing is never silently
+                    # called not-listed.
+                    raise
             if is_account_member:
                 membership = ()
                 receipts.append(

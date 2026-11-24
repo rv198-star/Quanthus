@@ -529,7 +529,13 @@ class ReplayEngine:
                         "target_qty": plan.get("target_qty"),
                         "delta_qty": plan.get("delta_qty"),
                         "price_cap": plan.get("price_cap"),
+                        # workbench stage (entry_plan / review / holding /
+                        # waiting / ended) - confirm uses it to keep
+                        # non-actionable advice from posting a fill.
                         "stage": item.get("stage"),
+                        # item status (NEEDS_RECONCILIATION / SKIPPED /
+                        # ENDED / ...) kept for the same reason.
+                        "status_code": item.get("status_code"),
                     }
                 )
         return plans
@@ -598,9 +604,17 @@ class ReplayEngine:
             return {"plan_id": plan_id, "status": "rejected", "reason": "PLAN_NOT_FOUND"}
         # REVIEW / non-actionable advice never executes (R3 item 1): the
         # plan keeps its original state; a confirm attempt records the
-        # intent only, never posts a fill.
+        # intent only, never posts a fill.  The workbench marks it with
+        # action_code=REVIEW or a non-actionable stage/status.
+        action_code = str(plan.get("action_code") or "").upper()
         stage = str(plan.get("stage") or "").lower()
-        if stage in ("review", "holding", "waiting", "ended", "input_blocked"):
+        status_code = str(plan.get("status_code") or "").upper()
+        non_actionable = (
+            action_code in ("REVIEW", "HOLD", "WAIT", "END", "INPUT_BLOCKED")
+            or stage in ("review", "holding", "waiting", "ended", "input_blocked")
+            or status_code in ("NEEDS_RECONCILIATION", "SKIPPED", "ENDED", "EXPIRED")
+        )
+        if non_actionable:
             outcome = {
                 "plan_id": plan_id,
                 "status": "pending_review",

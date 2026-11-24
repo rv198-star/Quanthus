@@ -63,6 +63,7 @@ ENVELOPE = {
 
 COVERAGE = {
     "member_consumption": {
+        "run_read_at": "2026-10-08T13:30:00Z",
         "members": [
             {
                 "member_id": "m-cal",
@@ -154,7 +155,19 @@ def test_build_e1_entry_returns_runner_and_per_t_context(monkeypatch):
     assert ctx.snapshot_id == "snap-1"
     assert ctx.exclusions == EXCLUSIONS
     assert ctx.action_coverage == ACTION_COVERAGE
-    assert ctx.p12_evidence == SCENARIO["p12_evidence"]
+    # p12_evidence is rebuilt from THIS run's coverage: the produced
+    # envelope digest, run clocks and the scenario's static provenance.
+    from quanthus.event_library.contracts import sha256_digest
+
+    ev = ctx.p12_evidence
+    env_digest = sha256_digest(ENVELOPE).removeprefix("sha256:")
+    assert ev["envelope"]["sha256"] == env_digest
+    assert ev["envelope"]["uri"] == "mem://env"  # static provenance kept
+    assert ev["member_consumption"] is COVERAGE["member_consumption"]
+    assert ev["read_at"] == "2026-10-08T13:30:00Z"
+    assert ev["source_clocks"]["run_read_at"] == "2026-10-08T13:30:00Z"
+    assert ev["source_clocks"]["logical_decision_cutoff"] == CUTOFF.isoformat()
+    assert ev["coverage"] is COVERAGE
     # member evidence carries ONLY this run's consumed members with clocks
     assert [m["member_id"] for m in ctx.member_evidence] == ["m-cal", "m-nov"]
     req_ids = ctx.required_member_ids
@@ -162,11 +175,13 @@ def test_build_e1_entry_returns_runner_and_per_t_context(monkeypatch):
     m0 = ctx.member_evidence[0]
     assert m0["package_key"] == "pkg::m-cal"
     assert m0["digest"] == "a" * 64
-    # available_at is the member's own declared usable instant (the
-    # envelope source_members visible_at), never the read verify_at.
-    assert m0["available_at"] == "2026-10-08T15:00:00+00:00"
+    # available_at is THIS run's consumption verify_at (the wall-clock
+    # instant the member's sha256 finished re-hashing inside this read),
+    # projected to a +00:00 offset for the loader.  The envelope's
+    # supplier-declared visible_at is a source clock, never the run clock.
+    assert m0["available_at"] == "2026-10-08T13:30:00+00:00"
     assert "verified_at" not in m0
-    assert ctx.member_evidence[1]["available_at"] is None
+    assert ctx.member_evidence[1]["available_at"] == "2026-10-08T13:30:01+00:00"
     assert m0["required"] is True
 
 

@@ -106,6 +106,7 @@ def _publish_gate_block(
     trusted_ids: tuple[str, ...],
     expected_run_id: str,
     expected_manifest_sha256: str,
+    market_date: date,
 ) -> tuple[str, dict] | None:
     '''Run-seam publish gate (issue #719): publish only when all three hold.
 
@@ -134,10 +135,17 @@ def _publish_gate_block(
         return ("evaluation_receipt_missing", {"detail": "runner produced no evaluation receipt"})
     # The receipt must echo the run identity this job minted; a receipt
     # minted by a prior or different run can never pass (audit R10).
-    if receipt.get("run_id") != expected_run_id:
+    # The public P11 replay entry echoes the producer-side run id as
+    # ``<P12 run_id>-<market_date>`` (paper_replay.run_replay_day mints the
+    # inner run identity with the T suffix).  Both the bare job-minted id
+    # and that same-T suffixed echo bind THIS run; a receipt minted by any
+    # other run or date is refused.
+    actual_run_id = receipt.get("run_id")
+    acceptable = {expected_run_id, f"{expected_run_id}-{market_date.isoformat()}"}
+    if actual_run_id not in acceptable:
         return (
             "candidate_evaluation_run_mismatch",
-            {"expected_run_id": expected_run_id, "actual_run_id": receipt.get("run_id")},
+            {"expected_run_id": expected_run_id, "actual_run_id": actual_run_id},
         )
     closure = output.source_closure
     if not isinstance(closure, dict) or not closure:
@@ -1484,6 +1492,7 @@ def _run_daily_inner(
         trusted_ids=trusted_ids,
         expected_run_id=receipt["run_id"],
         expected_manifest_sha256=snapshot.core_manifest_sha256,
+        market_date=market_date,
     )
     if gate_block is not None:
         reason_code, detail = gate_block

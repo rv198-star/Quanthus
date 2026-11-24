@@ -34,6 +34,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from quanthus.event_library.contracts import sha256_digest
 from quanthus.p12_daily.e1_replay import E1ReplayContext, E1ReplayRunner
 from quanthus.p12_history.reader import read_history
 from quanthus.p12_history.source_pins import SourceMap
@@ -101,27 +102,27 @@ def build_e1_entry(
         state["result"] = result
         mc = (result.coverage or {}).get("member_consumption") or {}
         members = mc.get("members") or []
-        # P11 load_replay_request requires member_evidence[].available_at -
-        # the member's own declared usable instant.  The #749 envelope's
-        # source_members[] carries the supplier-declared visible_at (the
-        # qualified-index observed_at, a proven usable instant); the read
-        # verify_at stays on the consumption receipt, never masquerading as
-        # a source-declared instant.
-        visible_by_member = {
-            m.get("member_id"): m.get("visible_at") or m.get("knowledge_at")
-            for m in (result.raw_history.get("source_members") or [])
-            if isinstance(m, dict)
-        }
-        # The pre-db240043 P11 _isodatetime (datetime.fromisoformat) rejects
-        # the trailing 'Z' the v6 source_members carry; the request-level
-        # projection converts it to the equivalent '+00:00' offset so the
-        # replay diagnostic proceeds.  The source envelope and evidence keep
-        # their original bytes - only this projected field is rewritten.
+        # P11 _october_package_clock (b7dca041) binds each member_evidence to
+        # THIS run's consumption receipt: available_at is the member's own
+        # verify_at (the wall-clock instant its sha256 finished re-hashing
+        # inside this read) and must sit inside [source_read_at, observed_at].
+        # The envelope's supplier-declared visible_at is a source clock,
+        # never this run's read/verify clock - using it both breaks the
+        # same-run binding and is refused by the package-clock rule.  The
+        # request-level projection converts verify_at's trailing 'Z' to the
+        # equivalent '+00:00' offset so the pre-db240043 loader's bare
+        # fromisoformat accepts it; the envelope and the consumption receipt
+        # keep their original bytes.
         def _iso_offset(value):
             if isinstance(value, str) and value.endswith("Z"):
                 return value[:-1] + "+00:00"
             return value
 
+        verify_by_member = {
+            m.get("member_id"): m.get("verify_at")
+            for m in members
+            if isinstance(m, dict)
+        }
         member_evidence = tuple(
             {
                 "member_id": m.get("member_id"),
@@ -129,7 +130,7 @@ def build_e1_entry(
                 "version": m.get("version"),
                 "digest": m.get("sha256"),
                 "available_at": _iso_offset(
-                    visible_by_member.get(m.get("member_id"))
+                    verify_by_member.get(m.get("member_id"))
                 ),
                 "required": bool(m.get("relevant_for_T")),
             }
@@ -163,6 +164,54 @@ def build_e1_entry(
             v = facts_template.get(key)
             if isinstance(v, str) and v.endswith("Z"):
                 facts_template[key] = v[:-1] + "+00:00"
+        # Rebind the intake clocks to THIS run's read/verify window: the
+        # package-clock rule requires
+        #   received <= first_read == run_read_at <= verified == max(verify_at)
+        # so the static scenario receipt's frozen 11-24 instants are replaced
+        # by this run's actual member-consumption clocks.  The sealed 163-
+        # member v6 receipt stays the source artefact; its read_at is kept on
+        # p12_evidence.envelope/source_clocks, never on facts_template.
+        consumed_verify = sorted(
+            v for v in verify_by_member.values() if isinstance(v, str)
+        )
+        run_read_at = mc.get("run_read_at")
+        last_verify = consumed_verify[-1] if consumed_verify else run_read_at
+        if isinstance(run_read_at, str) and isinstance(last_verify, str):
+            facts_template["intake_received_at"] = run_read_at.replace(
+                "Z", "+00:00"
+            )
+            facts_template["intake_first_read_at"] = run_read_at.replace(
+                "Z", "+00:00"
+            )
+            facts_template["intake_verified_at"] = last_verify.replace(
+                "Z", "+00:00"
+            )
+        # The snapshot_manifest_digest binds THIS run's produced raw_history
+        # envelope: the P11 package-clock compares it to p12_evidence's
+        # declared envelope sha256.  It is recomputed over the actual bytes
+        # of this run's envelope - never the frozen v6 file digest and never
+        # the scenario's static snapshot digest.
+        envelope_digest = sha256_digest(result.raw_history)
+        # Rebuild p12_evidence from THIS run's coverage: member_consumption,
+        # source_clocks and the envelope digest this run actually produced.
+        # The scenario's static provenance (action_use, the sealed v6
+        # artefact uri/sha, the read/coverage receipts) carries over
+        # verbatim; only the run-bound clocks and the produced-envelope
+        # binding are re-bound to this read.
+        base_evidence = scenario.get("p12_evidence") or {}
+        p12_evidence = dict(base_evidence)
+        p12_evidence["member_consumption"] = mc
+        p12_evidence["envelope"] = {
+            **(base_evidence.get("envelope") or {}),
+            "sha256": envelope_digest.removeprefix("sha256:"),
+        }
+        p12_evidence["read_at"] = run_read_at
+        p12_evidence["source_clocks"] = {
+            **(base_evidence.get("source_clocks") or {}),
+            "run_read_at": run_read_at,
+            "logical_decision_cutoff": decision_cutoff.isoformat(),
+        }
+        p12_evidence["coverage"] = result.coverage
 
         state["contexts"][day.isoformat()] = E1ReplayContext(
             scenario_id=scenario["scenario_id"],
@@ -174,12 +223,12 @@ def build_e1_entry(
             policy=scenario["policy"],
             facts_template=facts_template,
             snapshot_id=scenario["snapshot_id"],
-            snapshot_manifest_digest=scenario["snapshot_manifest_digest"],
+            snapshot_manifest_digest=envelope_digest,
             exclusions=tuple(exclusions),
             member_evidence=member_evidence,
             required_member_ids=required_member_ids,
             action_coverage=action_coverage,
-            p12_evidence=scenario.get("p12_evidence"),
+            p12_evidence=p12_evidence,
         )
         return result.raw_history
 

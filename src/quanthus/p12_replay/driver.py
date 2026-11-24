@@ -573,6 +573,9 @@ def main(argv=None) -> int:
             e1_runner=e1_runner,
             history_reader=e1_history_reader,
             decision_cutoff_time=e1_decision_cutoff,
+            account_mode=(
+                "simulation" if e1_runner is not None else "synthetic"
+            ),
             reset=reset,
         )
 

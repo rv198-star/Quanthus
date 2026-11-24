@@ -162,6 +162,13 @@ class RunnerRequest:
     # The configured decision cutoff (tz-aware): the package's knowledge_cutoff
     # is this value, not the 15:00 close anchor or the job's completed_at.
     decision_cutoff: datetime = None
+    # E1 raw-history carrier (P11-P12-HISTORY-INPUT-v1 §4): the source's raw
+    # bars/calendar/listing facts envelope handed to the runner VERBATIM.
+    # P12 validates only its schema_version marker and transports it; it never
+    # interprets, gates, or reconstructs the contents.  None means the H1
+    # reader has not yet supplied history - the job then blocks the day with
+    # history_inputs_unavailable rather than inferring counts from a manifest.
+    raw_history: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -925,5 +932,8 @@ class SyntheticRuleRunner:
             holding_directives=tuple(holding_directives),
             held_signals=tuple(held_signals),
             trend_observations=tuple(trend_observations),
-            history_gates=tuple(snapshot.history_gates),
+            # P11-P12-HISTORY-INPUT-v1: per-security gate results come back on
+            # source_closure from the runner; the synthetic runner emits none
+            # here (the snapshot no longer carries manifest-derived counts).
+            history_gates=(),
         )

@@ -522,6 +522,7 @@ def run_daily(
     decision_cutoff: datetime | None = None,
     publish_gate_config: Path | None = None,
     calendar_root: Path | None = None,
+    raw_history: dict | None = None,
 ) -> dict:
     '''Public entry: run one daily job and ALWAYS land a run receipt.
 
@@ -929,50 +930,46 @@ def _run_daily_inner(
         store.write_run(receipt)
         return receipt
 
-    # M2 section 3: the three history floors are checked separately.  A floor
-    # the qualified input cannot prove is a whole-day block, never a pass.
-    failed_gates = [g for g in snapshot.history_gates if not g.satisfied]
-    if failed_gates:
-        reasons = [
-            g.gate_id + (": " + g.unavailable_reason if g.unavailable_reason else "")
-            for g in failed_gates
-        ]
-        t = stage("history", t, result="blocked", gates=reasons)
+    # P11-P12-HISTORY-INPUT-v1 (issue #748/#749 seam): the three history floors
+    # are no longer read from the daily-core manifest.  P12 carries the raw
+    # history envelope to the runner and lets the runner compute per-security
+    # gates; a missing or wrongly-versioned envelope blocks the day with
+    # history_inputs_unavailable, never a fabricated manifest count.
+    raw_history_marker = None
+    if isinstance(raw_history, dict):
+        raw_history_marker = raw_history.get("schema_version")
+    if raw_history is None or raw_history_marker != "p11.raw-history-input.v1":
+        detail = (
+            "raw history input unavailable: the H1 raw-history reader supplied "
+            + (
+                "no envelope"
+                if raw_history is None
+                else "an envelope with schema_version "
+                + repr(raw_history_marker)
+                + " (expected p11.raw-history-input.v1)"
+            )
+        )
+        t = stage("history", t, result="blocked", reason_code="history_inputs_unavailable")
         _blocked_receipt(
             receipt,
             InputBlock(
                 reason_code="INPUT_UNAVAILABLE",
-                detail="daily input history floors not satisfied: " + "; ".join(reasons),
+                detail=detail,
                 checked_at=moment,
                 expected_market_date=market_date,
                 observed_market_date=snapshot.market_date,
             ),
             market_date=market_date,
-            missing_members=[g.gate_id for g in failed_gates],
+            missing_members=["history_inputs"],
         )
-        receipt["history_gates"] = [
-            {
-                "gate_id": g.gate_id,
-                "satisfied": g.satisfied,
-                "observed_sessions": g.observed_sessions,
-                "required_sessions": g.required_sessions,
-                "unavailable_reason": g.unavailable_reason,
-            }
-            for g in snapshot.history_gates
-        ]
+        receipt["history_inputs_unavailable"] = {
+            "reason": detail,
+            "expected_schema": "p11.raw-history-input.v1",
+            "declared_schema": raw_history_marker,
+        }
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt
-    receipt["history_gates"] = [
-        {
-            "gate_id": g.gate_id,
-            "satisfied": g.satisfied,
-            "observed_sessions": g.observed_sessions,
-            "required_sessions": g.required_sessions,
-            "unavailable_reason": g.unavailable_reason,
-        }
-        for g in snapshot.history_gates
-    ]
 
     # M2 F11 / audit R7: each declared corporate-action / adjustment field is
     # checked individually against the input - never trusted by the
@@ -1248,6 +1245,10 @@ def _run_daily_inner(
                 # its evaluation receipt so the gate binds this exact run.
                 run_id=receipt["run_id"],
                 decision_cutoff=decision_cutoff,
+                # The raw-history envelope is transported verbatim; the
+                # runner's per-security gate results come back on
+                # source_closure.  P12 never interprets its contents.
+                raw_history=raw_history,
             )
         )
     except FactError as exc:

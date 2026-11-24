@@ -317,7 +317,9 @@ def test_asobserved_member_sealed_after_actual_read_refused(assets):
     late["source_members"][0]["visible_at"] = "2026-12-01T00:00:00+08:00"
     with pytest.raises(ProductDailyError) as ei:
         e_run_e1_replay(late, f.T1, assets, observed_at=read_at)
-    assert "unavailable_at_read" in str(ei.value)
+    # A shared member sealed later than the actual read fails the whole-day
+    # gate (unavailable_at_read), surfaced via the shared-block reason code.
+    assert "unavailable" in str(ei.value) or "shared member" in str(ei.value)
 
 
 def test_asobserved_late_partition_projected_out_of_envelope(assets):

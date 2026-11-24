@@ -9,7 +9,7 @@ and binds the per-security history-gate receipts into source_closure.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -990,3 +990,286 @@ def test_r4_equivalent_instant_open_at_normalised():
     )
     inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
     assert inputs[0].universe_membership
+
+
+# --- h1-exact-day-membership: equivalent-day anchor proof ---------------------------
+#
+# Real October evidence (terms-740-897-v2): both venues carry is_open=True rows
+# whose open_at is null for 42 sessions 2026-08-03..2026-09-30.  The named venue
+# contract (SSE order-acceptance 09:30 / SZSE 09:15, Asia/Shanghai) bounds every
+# possible open instant inside [local_midnight, next_midnight), so a session whose
+# whole local day is strictly inside one listing interval still counts exactly.
+# anchor_mode is an explicit consumer config: "strict" keeps R4 isolation; the
+# "equivalent_day" mode resolves only provable days and names each on the receipt.
+
+
+def _cal_null_anchor(venue: str, days, member_id: str = "core-daily-1d") -> list:
+    """is_open rows with open_at ABSENT (the real October Base shape)."""
+    return [
+        {
+            "venue_id": venue,
+            "session_date": day.isoformat(),
+            "is_open": True,
+            "open_at": None,
+            "close_at": f"{day.isoformat()}T15:00:00+08:00",
+            "knowledge_from": f"{day.isoformat()}T15:30:00+08:00",
+            "source_member_id": member_id,
+        }
+        for day in days
+    ]
+
+
+def test_eqday_resolves_sessions_wholly_inside_listing():
+    """Missing anchor + whole local day strictly inside the listing interval
+    -> counted exactly (equivalent_day), never isolated."""
+    raw = _trend_raw("600000")
+    days = _weekdays_ending(TARGET, 200)
+    cal = _cal_null_anchor("SSE", days)  # EVERY session lacks open_at
+    # Listing is active from the FIRST delivered session's midnight so every
+    # open day bound is strictly inside AND coverage covers the start day.
+    eff_from = days[0].isoformat()
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[_listing(raw.identity.security_id, effective_from=eff_from)],
+    )
+    inputs, receipts = raw_security_inputs_from_history(
+        load_raw_history(env), anchor_mode="equivalent_day"
+    )
+    assert inputs  # the day-bound proof carried the membership, not an exclusion
+    assert len(inputs[0].universe_membership) == len(days)
+    receipt = receipts[0]
+    assert receipt["membership_proof"]["kind"] == "mixed"
+    assert receipt["membership_proof"]["anchor_mode"] == "equivalent_day"
+    assert receipt["membership_proof"]["equivalent_day_sessions"]
+
+
+def test_eqday_strict_mode_still_isolates_missing_anchor():
+    """Default anchor_mode='strict' (R4) keeps the missing-anchor isolation -
+    equivalent_day must be opted into, never a silent default."""
+    raw = _trend_raw("600000")
+    days = _weekdays_ending(TARGET, 200)
+    cal = _cal_null_anchor("SSE", days)
+    listing_start = days[50]
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[_listing(raw.identity.security_id, effective_from=listing_start.isoformat())],
+    )
+    inputs, receipts = raw_security_inputs_from_history(load_raw_history(env))
+    assert inputs == []
+    assert "anchor" in receipts[0]["reason"].lower()
+
+
+def test_eqday_listing_start_straddle_is_unresolved():
+    """The session whose local day CONTAINS the listing's effective_from
+    (eff_from.date == session) straddles the interval start -> unresolved even
+    in equivalent_day (the open could fall before the interval begins)."""
+    raw = _trend_raw("600000")
+    days = _weekdays_ending(TARGET, 200)
+    cal = _cal_null_anchor("SSE", days)
+    start_day = days[50]
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[
+            _listing(
+                raw.identity.security_id,
+                effective_from=f"{start_day.isoformat()}T10:00:00+08:00",
+            )
+        ],
+    )
+    inputs, receipts = raw_security_inputs_from_history(
+        load_raw_history(env), anchor_mode="equivalent_day"
+    )
+    assert inputs == []
+    assert "anchor" in receipts[0]["reason"].lower()
+
+
+def test_eqday_delist_day_straddle_is_unresolved():
+    """A session whose local day contains effective_to straddles the interval
+    end -> unresolved (the open could be at/after the listing ended)."""
+    raw = _trend_raw("600000")
+    days = _weekdays_ending(TARGET, 200)
+    cal = _cal_null_anchor("SSE", days)
+    end_day = days[150]
+    eff_from = days[0].isoformat()
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[
+            _listing(
+                raw.identity.security_id,
+                effective_from=eff_from,
+                effective_to=f"{end_day.isoformat()}T11:00:00+08:00",
+            )
+        ],
+    )
+    inputs, receipts = raw_security_inputs_from_history(
+        load_raw_history(env), anchor_mode="equivalent_day"
+    )
+    assert inputs == []
+    assert "anchor" in receipts[0]["reason"].lower()
+
+
+def test_eqday_session_outside_all_intervals_not_counted():
+    """Missing anchor on a session wholly OUTSIDE every listing interval is not
+    counted and not isolated (it provably cannot change the age)."""
+    raw = _trend_raw("600000")
+    days = _weekdays_ending(TARGET, 200)
+    cal = _cal_null_anchor("SSE", days)
+    # listing window covers only the LAST 30 sessions; the first 170 missing
+    # anchors are wholly outside every interval -> count 0, no isolation.
+    listing_start = days[170]
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[
+            _listing(
+                raw.identity.security_id,
+                effective_from=f"{listing_start.isoformat()}T00:00:00+08:00",
+            )
+        ],
+    )
+    inputs, _ = raw_security_inputs_from_history(
+        load_raw_history(env), anchor_mode="equivalent_day"
+    )
+    assert inputs
+    assert len(inputs[0].universe_membership) == len(days) - 170
+
+
+def test_eqday_real_october_intervals_count_exactly():
+    """Real listing intervals (600000 XSHG / 002040 XSHE / 000002 XSHE / 002238
+    XSHE) all span the 42 missing-anchor sessions 2026-08-03..2026-09-30 with
+    effective_to=None -> every missing-anchor session resolves wholly inside
+    (verdict True) and none straddles a boundary.  This exercises the real
+    interval shapes directly; coverage is a separate gate."""
+    from quanthus.product_daily.recommendation.history_input import (
+        ListingRow,
+        _equivalent_day_membership,
+        _listing_instant,
+    )
+
+    # The 42 sessions that lack open_at in the real October/November Base.
+    missing = [
+        "2026-08-03",
+        "2026-08-04",
+        "2026-08-05",
+        "2026-08-06",
+        "2026-08-07",
+        "2026-08-10",
+        "2026-08-11",
+        "2026-08-12",
+        "2026-08-13",
+        "2026-08-14",
+        "2026-08-17",
+        "2026-08-18",
+        "2026-08-19",
+        "2026-08-20",
+        "2026-08-21",
+        "2026-08-24",
+        "2026-08-25",
+        "2026-08-26",
+        "2026-08-27",
+        "2026-08-28",
+        "2026-08-31",
+        "2026-09-01",
+        "2026-09-02",
+        "2026-09-03",
+        "2026-09-04",
+        "2026-09-07",
+        "2026-09-08",
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-16",
+        "2026-09-17",
+        "2026-09-18",
+        "2026-09-21",
+        "2026-09-22",
+        "2026-09-23",
+        "2026-09-24",
+        "2026-09-28",
+        "2026-09-29",
+        "2026-09-30",
+    ]
+    cases = [
+        (
+            "600000",
+            "XSHG",
+            "security_2e02245cf8b28319ec8af0e9554cdc24",
+            "listing_5edd7b7cdd4b6445afae0d2cca6b85ce",
+            "1999-11-09T16:00:00+00:00",
+        ),
+        (
+            "002040",
+            "XSHE",
+            "security_72946bcaf22e26f7028e5ffe79c54424",
+            "listing_e30521d51b0e506341403f5a70da7a1d",
+            "2005-03-24T16:00:00+00:00",
+        ),
+        (
+            "000002",
+            "XSHE",
+            "security_011cff7c2146007a3e51037c8476d8ab",
+            "listing_c49a60eac39b48d4e349a1cc6dab0e56",
+            "1991-01-28T16:00:00+00:00",
+        ),
+        (
+            "002238",
+            "XSHE",
+            "security_00051d650c0deebabb68fc4367ce2df4",
+            "listing_204f88502b2f60311ddbc730878af434",
+            "2008-05-25T16:00:00+00:00",
+        ),
+    ]
+    for code, venue, sec_id, list_id, eff_from in cases:
+        listing_row = ListingRow(
+            security_id=sec_id,
+            listing_id=list_id,
+            venue_id=venue,
+            effective_from=_listing_instant(eff_from, "effective_from", venue),
+            effective_to=None,
+            knowledge_from=datetime(2026, 8, 3, 23, 59, tzinfo=SHANGHAI),
+            source_member_id="core-daily-1d",
+        )
+        resolved = 0
+        for sess in missing:
+            verdict = _equivalent_day_membership(
+                session=date.fromisoformat(sess),
+                intervals=[listing_row],
+                venue_id=venue,
+            )
+            # Each session's whole local day is strictly inside the open-ended
+            # listing interval -> provably a member (count 1).
+            assert verdict is True, (code, sess, verdict)
+            resolved += 1
+        assert resolved == 42
+
+
+def test_eqday_receipt_marks_proof_source_and_kind():
+    """The per-security receipt names the proof kind + source so an
+    equivalent-day count is never passed off as a stored-anchor instant."""
+    raw = _trend_raw("600000")
+    days = _weekdays_ending(TARGET, 130)
+    cal = _cal_null_anchor("SSE", days)
+    eff_from = days[0].isoformat()
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[_listing(raw.identity.security_id, effective_from=eff_from)],
+    )
+    sinks: dict[str, dict[str, str]] = {}
+    _, receipts = raw_security_inputs_from_history(
+        load_raw_history(env), anchor_mode="equivalent_day", proof_sinks=sinks
+    )
+    assert "600000" in sinks
+    assert all(v == "equivalent_day" for v in sinks["600000"].values())
+    proof = receipts[0]["membership_proof"]
+    assert proof["anchor_mode"] == "equivalent_day"
+    assert "open_at" in proof["source"]
+    # exact_instant kind when nothing needed the day bound
+    _, receipts2 = raw_security_inputs_from_history(load_raw_history(_trend_envelope()))
+    assert receipts2[0]["membership_proof"]["kind"] == "exact_instant"

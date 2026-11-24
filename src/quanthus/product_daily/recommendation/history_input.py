@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, NoReturn
 from zoneinfo import ZoneInfo
@@ -388,6 +388,55 @@ def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
 # --- membership derivation ----------------------------------------------------------
 
 
+def _equivalent_day_membership(
+    *,
+    session: date,
+    intervals: Sequence[ListingRow],
+    venue_id: str,
+) -> bool | None:
+    """Exact membership proof for an is_open session whose open_at is absent.
+
+    The venue's regular open is on the session's local trading day
+    (SSE 09:30 / SZSE 09:15 order-acceptance, Asia/Shanghai - a named frozen
+    contract, so the open instant is inside [local_midnight, next_midnight)).
+    That lets us prove membership WITHOUT a stored anchor:
+
+    * the whole day bound is strictly inside one listing interval -> count 1
+    * the whole day bound is outside every interval                  -> count 0
+    * the day straddles an interval start/end, or a venue/interval has no
+      day bound evidence                                           -> unresolved
+
+    Unresolved is returned as None so the caller isolates it rather than
+    fabricating an age.  A present open_at keeps the exact half-open check.
+    """
+    tz = _venue_tz(venue_id)
+    day_start = datetime.combine(session, datetime.min.time(), tzinfo=tz)
+    day_end = day_start + timedelta(days=1)
+
+    wholly_inside = False
+    straddles = False
+    for iv in intervals:
+        # effective interval in venue-local instants; open upper bound means
+        # "no end" for the day-bound test as well.
+        frm = iv.effective_from.astimezone(tz)
+        to = iv.effective_to.astimezone(tz) if iv.effective_to is not None else None
+        if to is not None and to <= frm:
+            # an empty/inverted interval is a date/identity conflict, not a gap
+            continue
+        # Wholly inside this interval: from <= day_start AND day_end <= to
+        if frm <= day_start and (to is None or day_end <= to):
+            wholly_inside = True
+            continue
+        # Wholly outside this interval: day_end <= frm OR day_start >= to
+        if day_end <= frm or (to is not None and day_start >= to):
+            continue
+        # Otherwise the day intersects the interval boundary -> unresolved.
+        straddles = True
+    if straddles:
+        return None
+    return wholly_inside
+
+
 def derive_universe_membership(
     *,
     listing_rows: Sequence[ListingRow],
@@ -396,6 +445,18 @@ def derive_universe_membership(
     listing_id: str,
     venue_id: str,
     market_date: date,
+    # "strict" (R3/R4 default): a session missing open_at is unresolved and is
+    # isolated when it could intersect the listing.  "equivalent_day" adds a
+    # versioned day-boundary proof for the is_open=True / open_at=null rows
+    # actually present in the October/November Base - when every possible open
+    # instant of the session's local day is either entirely inside one listing
+    # interval (count 1) or entirely outside all of them (count 0), the age is
+    # still exact; only a boundary/straddling day is unresolved.
+    anchor_mode: str = "strict",
+    # Optional sink: when supplied and anchor_mode == "equivalent_day", each
+    # session resolved by the day-boundary proof is recorded as
+    # session_iso -> "equivalent_day".  Lets the receipt name the proof kind.
+    proof_sink: dict[str, str] | None = None,
 ) -> tuple[date, ...]:
     """Universe membership = open sessions of the venue covered by the listing.
 
@@ -465,8 +526,22 @@ def derive_universe_membership(
                 )
                 for interval in intervals
             )
-            if intersects:
-                missing_anchor.append(session)
+            if not intersects:
+                continue
+            if anchor_mode == "equivalent_day":
+                verdict = _equivalent_day_membership(
+                    session=session, intervals=intervals, venue_id=venue_id
+                )
+                if verdict is True:
+                    membership.append(session)
+                    if proof_sink is not None:
+                        proof_sink[session.isoformat()] = "equivalent_day"
+                    continue
+                if verdict is False:
+                    continue
+                # verdict is None -> the day straddles a boundary and stays
+                # unresolved.
+            missing_anchor.append(session)
             continue
         for interval in intervals:
             # baseline: effective_from <= observation_start < effective_to
@@ -666,6 +741,12 @@ def history_receipt_for_security(
     bars: Sequence[DailyBar],
     market_date: date,
     listing_rows: Sequence[ListingRow],
+    # Sessions resolved by the versioned equivalent-day proof (anchor_mode
+    # "equivalent_day"), session_iso -> proof_kind.  None/empty means every
+    # counted session used the exact instant anchor.  The receipt names WHICH
+    # proof carried the membership so an equivalent-day count is never passed
+    # off as a stored-anchor instant proof.
+    membership_proof: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Per-security history gate receipt (goes into source_closure).
 
@@ -692,6 +773,17 @@ def history_receipt_for_security(
             security_id=security_id,
             venue_id=venue_id,
             membership=membership,
+        ),
+        # How each counted session was proven: "exact_instant" when a stored
+        # open_at anchor carried the half-open check; "equivalent_day" when the
+        # local day bound was proven wholly inside one listing interval.
+        "membership_proof": (
+            {
+                "kind": "mixed" if membership_proof else "exact_instant",
+                "anchor_mode": "equivalent_day" if membership_proof else "strict",
+                "equivalent_day_sessions": (sorted(membership_proof) if membership_proof else []),
+                "source": "dwd_trading_calendar.open_at | local-day-bound",
+            }
         ),
         "membership_count": observed_membership,
         "bar_count": observed_bars,
@@ -725,6 +817,9 @@ def _position_facts_from(sec: Mapping[str, Any]) -> tuple[Any, int | None]:
 
 def raw_security_inputs_from_history(
     history: RawHistory,
+    *,
+    anchor_mode: str = "strict",
+    proof_sinks: dict[str, dict[str, str]] | None = None,
 ) -> tuple[list[RawSecurityInput], list[dict[str, Any]]]:
     """Project raw_history.securities[] into RawSecurityInput[] + receipts.
 
@@ -777,7 +872,12 @@ def raw_security_inputs_from_history(
             or position_facts is not None
             or pending_kind is not None
         )
+        sec_proof: dict[str, str] = {}
         try:
+            # Always resolve equivalent-day proofs into a local sink so the
+            # receipt can name them; mirror into proof_sinks only when the
+            # caller asked for the raw map.  anchor_mode stays a consumer
+            # config - the proof marks, not the mode flag, drive the receipt.
             membership = derive_universe_membership(
                 listing_rows=history.listing_rows,
                 calendar_rows=history.calendar_rows,
@@ -785,7 +885,11 @@ def raw_security_inputs_from_history(
                 listing_id=identity.listing_id,
                 venue_id=identity.venue_id,
                 market_date=history.market_date,
+                anchor_mode=anchor_mode,
+                proof_sink=sec_proof,
             )
+            if proof_sinks is not None and sec_proof:
+                proof_sinks[identity.listing_code] = sec_proof
         except ProductDailyError as exc:
             if getattr(exc, "reason_code", "") == "calendar_coverage_incomplete":
                 # A shared calendar that cannot cover the listing start is a
@@ -853,6 +957,7 @@ def raw_security_inputs_from_history(
                     bars=bars,
                     market_date=history.market_date,
                     listing_rows=history.listing_rows,
+                    membership_proof=sec_proof,
                 )
             )
         inputs.append(
@@ -1029,7 +1134,16 @@ def run_daily_advice_from_history(
             "run_daily_advice_from_history requires facts and policy",
         )
     bind_raw_history_to_run(history, facts=facts, policy=policy)
-    inputs, receipts = raw_security_inputs_from_history(history)
+    # Versioned anchor policy: "strict" keeps the R3/R4 stored-anchor gate;
+    # "equivalent_day" additionally resolves an is_open session whose open_at
+    # is absent when its whole local day is provably inside/outside the listing.
+    # The mode is a consumer-side evaluation config, never a data rewrite, and
+    # each resolved session is named on the receipt's membership_proof.
+    anchor_mode = kwargs.pop("anchor_mode", "strict")
+    proof_sinks: dict[str, dict[str, str]] = {}
+    inputs, receipts = raw_security_inputs_from_history(
+        history, anchor_mode=anchor_mode, proof_sinks=proof_sinks
+    )
     if not inputs:
         _fail(
             "missing_raw_inputs",

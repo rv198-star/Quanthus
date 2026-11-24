@@ -34,7 +34,7 @@ from decimal import Decimal
 from typing import Any
 
 from quanthus.event_library.contracts import sha256_digest
-from quanthus.event_library.scan import CandidateDailyInput
+from quanthus.event_library.scan import CandidateDailyInput, CandidateScanError
 from quanthus.expert_strategy.position_risk import HeldPositionFacts
 from quanthus.expert_strategy.runner import FormalStrategyRunner
 from quanthus.product_daily.contracts import (
@@ -105,6 +105,10 @@ class RawSecurityInput:
     # sessions/return/reduction counts are None and this reason travels with the
     # membership; P11 never invents HeldPositionFacts counts.
     held_unavailable_reason: str | None = None
+    # Shares from P12's distinct holdings / pending_securities records. None remains
+    # unknown; a missing quantity is never silently replaced with zero.
+    held_quantity: int | None = None
+    pending_quantity: int | None = None
 
 
 def raw_security_input_closure(item: RawSecurityInput) -> dict[str, Any]:
@@ -152,10 +156,120 @@ def raw_security_input_closure(item: RawSecurityInput) -> dict[str, Any]:
         "held_membership": item.held_membership,
         "pending_kind": item.pending_kind,
         "held_unavailable_reason": item.held_unavailable_reason,
+        "held_quantity": item.held_quantity,
+        "pending_quantity": item.pending_quantity,
     }
 
 
 PENDING_KINDS = frozenset({"open_buy_order", "reserved_bucket", "unconfirmed_fill"})
+
+
+@dataclass(frozen=True)
+class _NormalizedAccount:
+    held_facts: dict[str, HeldPositionFacts | None]
+    pending_codes: tuple[str, ...]
+    unavailable_reasons: dict[str, str]
+    provenance: tuple[dict[str, Any], ...]
+
+
+def _normalize_account_inputs(
+    raw: Sequence[RawSecurityInput],
+    account: AccountFactsView,
+    pending_security_codes: Sequence[str] | None,
+    disposition: str,
+) -> _NormalizedAccount:
+    """Resolve account membership before any market projection can fail.
+
+    Explicit filled membership/facts outrank a pending reservation. An account's
+    combined active-or-reserved hint alone is unresolved: keep an alert, except when
+    a pending-only record or explicit not-held declaration resolves it as reserved.
+    """
+    if disposition == "ACCOUNT_FACTS_UNAVAILABLE":
+        raise ProductDailyError("account_facts_unavailable", "account ledger read failed")
+    if disposition not in {"ok", "FRESH_NO_BASELINE"}:
+        raise ProductDailyError("invalid_account_disposition", str(disposition))
+    pending = set(pending_security_codes or ())
+    hints = set(account.active_or_reserved_security_codes)
+    for code in pending | hints:
+        require_text(code, "account.security_code")
+    held: dict[str, HeldPositionFacts | None] = {}
+    reasons: dict[str, str] = {}
+    records: dict[str, dict[str, Any]] = {}
+    for item in raw:
+        code = item.identity.listing_code
+        require_text(code, "raw.identity.listing_code")
+        if code in records:
+            raise ProductDailyError("duplicate_raw_security", code)
+        if item.held_membership is not None and type(item.held_membership) is not bool:
+            raise ProductDailyError("invalid_held_membership", code)
+        if item.pending_kind is not None and (
+            not isinstance(item.pending_kind, str) or item.pending_kind not in PENDING_KINDS
+        ):
+            raise ProductDailyError("invalid_pending_kind", code)
+        for label, quantity in (
+            ("held_quantity", item.held_quantity),
+            ("pending_quantity", item.pending_quantity),
+        ):
+            if quantity is not None and (type(quantity) is not int or quantity < 0):
+                raise ProductDailyError("invalid_account_quantity", f"{code}: {label}")
+        has_facts = item.position_facts is not None
+        positive_quantity = item.held_quantity is not None and item.held_quantity > 0
+        if (item.held_membership is False and (has_facts or positive_quantity)) or (
+            item.held_quantity == 0 and (item.held_membership is True or has_facts)
+        ):
+            raise ProductDailyError("contradictory_account_membership", code)
+        is_pending = item.pending_kind is not None or code in pending
+        if item.held_membership is False and code in hints:
+            is_pending = True  # known not-held, but still active/reserved
+        if item.pending_quantity is not None and not is_pending:
+            raise ProductDailyError("pending_kind_unavailable", code)
+        if is_pending:
+            pending.add(code)
+        is_held = (
+            item.held_membership is True
+            or has_facts
+            or positive_quantity
+            or (item.held_membership is None and code in hints and not is_pending)
+        )
+        if is_held:
+            held[code] = item.position_facts
+            if item.held_unavailable_reason:
+                reasons[code] = item.held_unavailable_reason
+            elif not has_facts:
+                reasons[code] = "holding_position_facts_unavailable"
+        records[code] = {
+            "security_code": code,
+            "held_membership": item.held_membership,
+            "held": is_held,
+            "held_quantity": item.held_quantity,
+            "pending": is_pending,
+            "pending_kind": item.pending_kind,
+            "pending_quantity": item.pending_quantity,
+            "unavailable_reason": item.held_unavailable_reason or reasons.get(code),
+        }
+    # A known account member without any market row must not disappear from the day.
+    for code in sorted(hints | pending):
+        if code in records:
+            continue
+        is_held = code not in pending
+        if is_held:
+            held[code] = None
+            reasons[code] = "account_membership_details_and_market_input_unavailable"
+        records[code] = {
+            "security_code": code,
+            "held_membership": None,
+            "held": is_held,
+            "held_quantity": None,
+            "pending": code in pending,
+            "pending_kind": None,
+            "pending_quantity": None,
+            "unavailable_reason": reasons.get(code),
+        }
+    if disposition == "FRESH_NO_BASELINE" and held:
+        raise ProductDailyError("fresh_account_has_positions", ",".join(sorted(held)))
+    return _NormalizedAccount(
+        held, tuple(sorted(pending)), reasons, tuple(records[code] for code in sorted(records))
+    )
 
 
 def run_daily_advice_from_raw(
@@ -179,8 +293,8 @@ def run_daily_advice_from_raw(
     pending_security_codes: Sequence[str] | None = None,
     # Account read disposition from P12: "ok" | "FRESH_NO_BASELINE" |
     # "ACCOUNT_FACTS_UNAVAILABLE".  A failed/unknown account read is a shared
-    # whole-day block, never a manufactured empty-positions success; empty holdings is
-    # allowed only under FRESH_NO_BASELINE (no ledger file and no baseline).
+    # whole-day block, never a manufactured empty-positions success. A missing ledger
+    # may imply an empty account only under FRESH_NO_BASELINE (no prior baseline).
     account_disposition: str = "ok",
     shared_prereq_ok: bool = True,
     shared_prereq_reason: str | None = None,
@@ -197,49 +311,32 @@ def run_daily_advice_from_raw(
     """
 
     require_text(run_id, "run_id")
-    if not raw:
+    account_view = _normalize_account_inputs(
+        raw, account, pending_security_codes, account_disposition
+    )
+    held_facts = dict(account_view.held_facts)
+    held_reasons = dict(account_view.unavailable_reasons)
+    if not raw and not held_facts:
         raise ProductDailyError("missing_raw_inputs", "no qualified security inputs")
-    if account_disposition == "ACCOUNT_FACTS_UNAVAILABLE":
-        raise ProductDailyError(
-            "account_facts_unavailable",
-            "the account read failed; a failed/unknown account read is a whole-day "
-            "block, never a manufactured empty-positions success",
-        )
-    if account_disposition not in {"ok", "FRESH_NO_BASELINE"}:
-        raise ProductDailyError(
-            "invalid_account_disposition",
-            f"account_disposition must be ok|FRESH_NO_BASELINE|ACCOUNT_FACTS_UNAVAILABLE, "
-            f"got {account_disposition}",
-        )
-
     features_by_security: dict[str, SecurityFeatureFacts] = {}
     scan_rows: list[CandidateDailyInput] = []
-    # Mapping held code -> its qualified position facts; a None value means the security
-    # is an explicit held member whose position facts are unavailable, which the core
-    # turns into a hold+alert review (never an omission, never a forced sale).
-    held_facts: dict[str, HeldPositionFacts | None] = {}
     prior_det: dict[str, int] = {}
     input_exclusions: list[dict[str, Any]] = []
     signal_date = facts.market_date
     all_trading_dates: set[date] = set()
-    raw_closures: list[dict[str, Any]] = []
+    # Account and raw closures are bound even when a particular market input fails.
+    raw_closures = [raw_security_input_closure(item) for item in raw]
 
     for item in raw:
         code = item.identity.listing_code
         identity = item.identity
         close_map = item.close_at_by_date or {}
         cutoff_map = item.knowledge_cutoff_by_date or {}
-
-        # A malformed or incomplete closure for one locatable security excludes only
-        # that security; a valid neighbour still reaches its real entry review.  Only
-        # shared or unlocatable prerequisites may block the whole day.
+        all_trading_dates.update(item.universe_membership)
         try:
             signal_close = close_map.get(signal_date)
             if signal_close is None:
-                raise ProductDailyError(
-                    "missing_close_at",
-                    f"security {code} has no close instant on the signal date",
-                )
+                raise ProductDailyError("missing_close_at", f"security {code} lacks signal close")
             facts_row = compute_security_feature_facts(
                 security_id=identity.security_id,
                 bars=item.bars,
@@ -251,36 +348,16 @@ def run_daily_advice_from_raw(
                 signal_date=signal_date,
                 signal_close=signal_close,
             )
-        except ProductDailyError as exc:
-            input_exclusions.append(
-                {
-                    "security_code": code,
-                    "reason": "raw_input_closure_invalid",
-                    "member_or_field": str(exc),
-                    "at": signal_date.isoformat(),
-                    "scope": "per_security",
-                }
-            )
-            continue
-        features_by_security[code] = facts_row
-
-        # Emit the full per-session series so the transition scan sees the quiet->active
-        # window ending at the signal date; every bar carries its own close/cutoff and
-        # the qualified adjustment flag for that session.
-        action_dates = {a.effective_date for a in item.actions}
-        try:
-            for bar in sorted(item.bars, key=lambda b: b.session_date):
+            action_dates = {action.effective_date for action in item.actions}
+            security_rows: list[CandidateDailyInput] = []
+            for bar in sorted(item.bars, key=lambda row: row.session_date):
                 day = bar.session_date
                 if day > signal_date:
                     continue
-                close_at = close_map.get(day)
-                cutoff = cutoff_map.get(day)
+                close_at, cutoff = close_map.get(day), cutoff_map.get(day)
                 if close_at is None or cutoff is None:
-                    raise ProductDailyError(
-                        "missing_session_clock",
-                        f"security {code} bar {day.isoformat()} lacks a close/cutoff instant",
-                    )
-                scan_rows.append(
+                    raise ProductDailyError("missing_session_clock", f"{code}: {day}")
+                security_rows.append(
                     daily_input_from_bar(
                         bar=bar,
                         identity=identity,
@@ -291,46 +368,32 @@ def run_daily_advice_from_raw(
                         adjustment_effective=day in action_dates,
                     )
                 )
-        except ProductDailyError as exc:
-            # The feature row was built but the session series is incomplete: exclude the
-            # security entirely so its partial rows never reach the scan.
-            scan_rows = [row for row in scan_rows if row.listing_code != code]
-            features_by_security.pop(code, None)
+        except (ProductDailyError, CandidateScanError) as exc:
+            detail = f"{type(exc).__name__}: {exc}"
             input_exclusions.append(
                 {
                     "security_code": code,
                     "reason": "raw_input_closure_invalid",
-                    "member_or_field": str(exc),
+                    "member_or_field": detail,
                     "at": signal_date.isoformat(),
                     "scope": "per_security",
                 }
             )
+            if code in held_facts:
+                held_facts[code] = None
+                held_reasons[code] = "; ".join(
+                    part for part in (held_reasons.get(code), detail) if part
+                )
             continue
-        all_trading_dates.update(item.universe_membership)
-        raw_closures.append(raw_security_input_closure(item))
-
-        # Explicit held membership: a confirmed position carries its facts; a member of
-        # the account's active_or_reserved set without an explicit not-held declaration
-        # is a held member with unavailable facts (hold+alert), never an entry and never
-        # dropped.  held_membership=False is the only explicit "not held" escape.
-        if item.pending_kind is not None and item.pending_kind not in PENDING_KINDS:
-            raise ProductDailyError(
-                "invalid_pending_kind",
-                f"security {code} pending_kind must be one of {sorted(PENDING_KINDS)}",
-            )
-        if item.position_facts is not None:
-            held_facts[code] = item.position_facts
-        elif item.held_membership is True or (
-            item.held_membership is not False and code in account.active_or_reserved_security_codes
-        ):
-            held_facts[code] = None
+        # Commit both projections together, only after this security is fully valid.
+        features_by_security[code] = facts_row
+        scan_rows.extend(security_rows)
         if item.prior_deterioration_sessions is not None:
             prior_det[code] = item.prior_deterioration_sessions
 
-    if not raw_closures:
+    if not scan_rows and not held_facts:
         raise ProductDailyError(
-            "missing_raw_inputs",
-            "every supplied security closure failed per-security validation",
+            "missing_raw_inputs", "every supplied market input failed validation"
         )
 
     # The scan requires the T+1 session in trading_dates; take it from the bound
@@ -355,7 +418,9 @@ def run_daily_advice_from_raw(
         held_facts_by_security=held_facts or None,
         prior_deterioration_sessions_by_security=prior_det or None,
         input_exclusions=input_exclusions,
-        pending_security_codes=pending_security_codes,
+        pending_security_codes=account_view.pending_codes,
+        held_unavailable_reasons_by_security=held_reasons,
+        account_membership=account_view.provenance,
         raw_security_inputs_digest=sha256_digest(raw_closures),
         account_disposition=account_disposition,
         shared_prereq_ok=shared_prereq_ok,

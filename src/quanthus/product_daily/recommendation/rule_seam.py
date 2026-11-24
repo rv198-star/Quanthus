@@ -213,6 +213,7 @@ class HeldDecision:
     signal_close: datetime | None = None
     knowledge_cutoff: datetime | None = None
     decision_at: datetime | None = None
+    unavailable_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -680,6 +681,7 @@ def evaluate_day(
     features_by_security: Mapping[str, SecurityFeatureFacts],
     knowledge_cutoff: datetime,
     held_facts_by_security: Mapping[str, HeldPositionFacts | None] | None = None,
+    held_unavailable_reasons_by_security: Mapping[str, str] | None = None,
     prior_deterioration_sessions_by_security: Mapping[str, int] | None = None,
     pending_security_codes: Sequence[str] | None = None,
     shared_prereq_ok: bool = True,
@@ -711,14 +713,18 @@ def evaluate_day(
         )
 
     adapter = RuleSeamAdapter(runner, resources)
-    scan = scan_forward_candidates(
-        rows,
-        trading_dates=trading_dates,
-        snapshot_id=snapshot_id,
-        snapshot_manifest_digest=snapshot_manifest_digest,
-        card=card,
-        split_policy=split_policy,
-        source_policy=source_policy,
+    candidates = (
+        scan_forward_candidates(
+            rows,
+            trading_dates=trading_dates,
+            snapshot_id=snapshot_id,
+            snapshot_manifest_digest=snapshot_manifest_digest,
+            card=card,
+            split_policy=split_policy,
+            source_policy=source_policy,
+        ).candidates
+        if rows
+        else ()
     )
     decisions: list[SeamDecision] = []
     excluded: list[dict[str, str]] = []
@@ -726,7 +732,7 @@ def evaluate_day(
     for row in rows:
         if row.knowledge_cutoff <= knowledge_cutoff:
             source_rows.setdefault((row.listing_code, row.session_date), []).append(row)
-    for candidate in scan.candidates:
+    for candidate in candidates:
         code = candidate.listing_code
         if held_facts_by_security is not None and code in held_facts_by_security:
             # An existing position has its own daily review, not a second entry plan.
@@ -800,6 +806,9 @@ def evaluate_day(
                         decision=None,
                         features=facts,
                         knowledge_cutoff=knowledge_cutoff,
+                        unavailable_reason=(held_unavailable_reasons_by_security or {}).get(
+                            code, "held_market_input_unavailable"
+                        ),
                     )
                 )
                 continue
@@ -833,18 +842,24 @@ def evaluate_day(
                 decision_at=knowledge_cutoff,
                 source_evidence_digest=row.source_evidence_digest,
             )
-            held_decisions.append(
-                adapter.evaluate_held(
-                    review=review,
-                    features=facts,
-                    position_facts=position_facts,
-                    knowledge_cutoff=knowledge_cutoff,
-                    position_state="trial",
-                    prior_deterioration_sessions=(
-                        prior_deterioration_sessions_by_security or {}
-                    ).get(code),
-                )
+            held_decision = adapter.evaluate_held(
+                review=review,
+                features=facts,
+                position_facts=position_facts,
+                knowledge_cutoff=knowledge_cutoff,
+                position_state="trial",
+                prior_deterioration_sessions=(prior_deterioration_sessions_by_security or {}).get(
+                    code
+                ),
             )
+            if held_decision.action == "hold_alert":
+                held_decision = dataclasses.replace(
+                    held_decision,
+                    unavailable_reason=(held_unavailable_reasons_by_security or {}).get(
+                        code, "holding_position_facts_unavailable"
+                    ),
+                )
+            held_decisions.append(held_decision)
     return SeamResult(
         day_blocked=False,
         day_block_reason=None,
@@ -981,7 +996,8 @@ def seam_to_candidates(
                     "use": USE_EXPLANATION,
                     "component_ref": f"{experts.ref_id}@{experts.version}",
                     "text": (
-                        "position facts unavailable; hold and alert"
+                        "position facts unavailable; hold and alert: "
+                        + (held.unavailable_reason or held.reason)
                         if held.action == "hold_alert"
                         else f"expert held outcome {held.reason}"
                     ),
@@ -1031,6 +1047,8 @@ def run_daily_advice(
     account: AccountFactsView,
     run_id: str,
     held_facts_by_security: Mapping[str, HeldPositionFacts | None] | None = None,
+    held_unavailable_reasons_by_security: Mapping[str, str] | None = None,
+    account_membership: Sequence[Mapping[str, Any]] | None = None,
     prior_deterioration_sessions_by_security: Mapping[str, int] | None = None,
     input_exclusions: Sequence[dict[str, Any]] | None = None,
     raw_security_inputs_digest: str | None = None,
@@ -1085,6 +1103,7 @@ def run_daily_advice(
         features_by_security=features_by_security,
         knowledge_cutoff=policy.decision_cutoff,
         held_facts_by_security=held_facts_by_security,
+        held_unavailable_reasons_by_security=held_unavailable_reasons_by_security,
         prior_deterioration_sessions_by_security=prior_deterioration_sessions_by_security,
         pending_security_codes=pending_security_codes,
         shared_prereq_ok=shared_prereq_ok and policy.producer_version == RULE_DAY_PRODUCER_VERSION,
@@ -1095,6 +1114,16 @@ def run_daily_advice(
         ),
     )
     evaluation_elapsed = perf_counter() - stage_start
+    if input_exclusions and not seam.day_blocked:
+        seam = dataclasses.replace(
+            seam,
+            evaluated_universe=tuple(
+                sorted(
+                    set(seam.evaluated_universe)
+                    | {item["security_code"] for item in input_exclusions}
+                )
+            ),
+        )
     assembly_start = perf_counter()
     experts = ExpertBundle.from_runner(runner)
     candidates, held = seam_to_candidates(
@@ -1162,14 +1191,15 @@ def run_daily_advice(
         "topology_digest": runner.topology_digest,
         "evaluated_universe": list(seam.evaluated_universe),
         "exclusions": [*(input_exclusions or ()), *seam.excluded],
-        # The complete accepted RawSecurityInput closure digest supplied by the raw
+        # The complete RawSecurityInput closure digest supplied by the raw
         # adapter (bars/actions/exceptions/limits/membership/identity/held/clocks).  It
         # is distinct from raw_inputs_digest (the projected scan rows) so a byte change
-        # inside an accepted raw input alters the job identity even when the projected
-        # features happen not to move.
+        # inside a raw input alters the job identity even when projected features
+        # happen not to move or that security is excluded.
         "raw_security_inputs_digest": raw_security_inputs_digest,
         "pending_security_codes": sorted(pending_security_codes or ()),
         "account_disposition": account_disposition,
+        "account_membership": [dict(item) for item in (account_membership or ())],
         "entry_decisions": [
             {
                 "security_code": d.security_code,
@@ -1185,6 +1215,7 @@ def run_daily_advice(
                 "action": d.action,
                 "decision_digest": d.decision_digest,
                 "reason": d.reason,
+                "unavailable_reason": d.unavailable_reason,
                 "trend_context": None
                 if d.decision is None
                 else _held_no_trend_evidence(

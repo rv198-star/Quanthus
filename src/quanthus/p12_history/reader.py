@@ -101,9 +101,9 @@ def read_history(
     # cutoff is declared separately on the envelope; consumers consume
     # through the versioned October-replay entry which reads the real
     # clock.  Members whose source clock post-dates the cutoff are still
-    # named on the receipt (bounded_members, kept for comparison).
+    # named on the receipt (late_visible_members: renamed for byte-accuracy - their visible_at is the real source clock verbatim, never bounded by the cutoff).
     base_knowledge = datetime.fromisoformat(BASE_BUSINESS_THROUGH + "T16:00:00+00:00")
-    bounded_members = []
+    late_visible_members = []
     for table in (
         "dwd_trading_calendar", "dwd_listing", "dwd_security",
         "dwd_security_identifier", "dwd_trading_venue", "dwd_listed_company",
@@ -115,7 +115,7 @@ def read_history(
     ):
         for m in smap.base_members(table):
             if base_knowledge > decision_cutoff:
-                bounded_members.append(m.member_id)
+                late_visible_members.append(m.member_id)
             _reg(m, base_knowledge, visible_at=base_knowledge)
     for day in smap.daily_open_days():
         if day > market_date.isoformat():
@@ -126,7 +126,7 @@ def read_history(
         day_dt = datetime.fromisoformat(day + "T16:00:00+00:00")
         for m in pkg.members:
             if day_dt > decision_cutoff:
-                bounded_members.append(m.member_id)
+                late_visible_members.append(m.member_id)
             _reg(m, day_dt, date_from=day, date_to=day, visible_at=day_dt)
     source_member_entries = list(member_entries.values())
 
@@ -313,7 +313,7 @@ def read_history(
         "security_count": len(securities),
         "bar_sessions": BAR_SESSIONS,
         "listing_proof_sessions": LISTING_PROOF_SESSIONS,
-        "bounded_members": bounded_members,
+        "late_visible_members": late_visible_members,
         "member_consumption": member_consumption,
         "note": (
             "Corporate-action/exception completeness for the covered window is "

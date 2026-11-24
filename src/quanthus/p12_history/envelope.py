@@ -105,6 +105,11 @@ def security_entry(identity, bars, actions, exceptions, limits,
         "limits": limits,
         "close_at_by_date": close_map,
         "knowledge_cutoff_by_date": cutoff_map,
+        # Clock-role annotation (P11 裁定): knowledge_cutoff_by_date carries
+        # the venue calendar row's own knowledge_from for that session - a
+        # SOURCE publish clock, never the run's decision_cutoff.  The
+        # versioned October-replay entry binds the per-day cutoff separately.
+        "knowledge_clock_role": "calendar_source_knowledge_from",
     }
     entry.update(account)
     return entry

@@ -204,6 +204,37 @@ def test_activate_missing_replay_run_expected_refuses():
         activate_use_receipt(doc, **exp)
 
 
+def test_activate_all_empty_expected_refuses():
+    # Root NORMAL-ENTRY finding: six EMPTY dicts must not activate.  An empty
+    # mapping is not a verified pin set.
+    doc = _receipt()
+    with pytest.raises(ProductDailyError):
+        activate_use_receipt(
+            doc,
+            expected_source={},
+            expected_rule={},
+            expected_consumer={},
+            expected_execution={},
+            expected_scope={},
+            expected_replay_run={},
+        )
+
+
+def test_activate_one_empty_expected_refuses():
+    doc = _receipt()
+    exp = _expected(doc)
+    exp["expected_execution"] = {}
+    with pytest.raises(ProductDailyError):
+        activate_use_receipt(doc, **exp)
+
+
+def test_activate_full_expected_passes():
+    doc = _receipt()
+    receipt = activate_use_receipt(doc, **_expected(doc))
+    assert receipt.adoption_state == "adopted"
+    assert receipt.permits("new_entry") is True
+
+
 def test_activate_mismatched_replay_run_refuses():
     doc = _receipt()
     exp = _expected(doc)

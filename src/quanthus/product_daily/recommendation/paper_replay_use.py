@@ -284,10 +284,12 @@ def activate_use_receipt(
         ("expected_scope", expected_scope),
         ("expected_replay_run", expected_replay_run),
     ):
-        if value is None:
+        # An empty mapping activates nothing: every block must be present AND
+        # non-empty so the caller can never 'verify' a receipt it did not pin.
+        if not isinstance(value, Mapping) or not value:
             _fail(
                 "use_receipt_expected_missing",
-                f"{name} is required to activate a replay use receipt",
+                f"{name} is required and must be a non-empty verified pin set",
             )
     receipt = load_use_receipt(
         raw,

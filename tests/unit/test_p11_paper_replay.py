@@ -141,13 +141,9 @@ def _security(code: str, days: tuple[date, ...], *, held: bool = False) -> dict:
     if held:
         sec["held_membership"] = True
         sec["held_quantity"] = 1000
-        sec["position_facts"] = {
-            "position_id": f"pos-{code}",
-            "entry_date": "2026-10-20",
-            "quantity": 1000,
-            "cost_basis": "100",
-            "entry_price": "100",
-        }
+        # The request is a JSON-bound contract: held membership is declared by
+        # the markers, and the scenario account's typed position_facts is
+        # injected at run time by the account projection, not serialized here.
     return sec
 
 
@@ -226,19 +222,28 @@ def _coverage(mode, securities, market_dates):
             }
         )
         for t in market_dates:
-            base["window_evidence"].append(
-                {
-                    "security_code": code,
-                    "signal_date": t.isoformat(),
-                    "purpose": "scan_two_session",
-                    "event_state": "verified_none",
-                    "coverage_id": reg["coverage_id"],
-                    "member_sha256": "sha256:" + "6" * 64,
-                    "sessions": [t.isoformat()],
-                    "source_published_at": "2026-07-10",
-                    "verified_at": "2026-11-24T00:00:00+08:00",
-                }
-            )
+            for purpose in ("scan_two_session", "returns_61_session"):
+                base["window_evidence"].append(
+                    {
+                        "security_code": code,
+                        "signal_date": t.isoformat(),
+                        "purpose": purpose,
+                        "event_state": "verified_none",
+                        "coverage_id": reg["coverage_id"],
+                        "member_sha256": "sha256:" + "6" * 64,
+                        # Bound upstream reader credential -- the P10 batch that
+                        # actually verified this window; never a caller summary.
+                        "credential": {
+                            "batch_id": "p10-synthetic-b02",
+                            "manifest_sha256": "sha256:" + "7" * 64,
+                            "result_sha256": "sha256:" + "8" * 64,
+                            "reader": "p10.register-reader.v1",
+                        },
+                        "sessions": [t.isoformat()],
+                        "source_published_at": "2026-07-10",
+                        "verified_at": "2026-11-24T00:00:00+08:00",
+                    }
+                )
     return base
 
 
@@ -567,6 +572,42 @@ def test_coverage_unknown_keeps_held_member():
     assert sec["held_membership"] is True
     assert len(sec["bars"]) == 61
     assert cov == ()
+
+
+def test_coverage_scan_only_missing_returns_isolates():
+    # Root's NORMAL-ENTRY case: verified scan alone with zero returns evidence
+    # must NOT admit entry - both branches are required for a new position.
+    req = _request(market_dates=(T1,), coverage="verified")
+    req["action_coverage"]["window_evidence"] = [
+        ev
+        for ev in req["action_coverage"]["window_evidence"]
+        if ev["purpose"] != "returns_61_session"
+    ]
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+    assert cov[0]["reason"] == "replay_action_coverage_unknown"
+
+
+def test_coverage_missing_upstream_credential_isolates():
+    # A verified state with no bound upstream read is a caller summary, not
+    # proof; entry stays isolated.
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        ev["credential"] = None
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_coverage_wrong_identity_on_returns_isolates():
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "returns_61_session":
+            ev["security_code"] = "600999"
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
 
 
 # --- real-chain replay ---------------------------------------------------------------

@@ -44,7 +44,7 @@ scan/feature/expert/veto 链，仅工程回放，不评价策略表现。
   security_id/listing_id/venue_id 身份；`window_evidence` 为
   (券, 信号日, scan_two_session|returns_61_session) 记录，须携带
   verified_none|verified_event 的 event_state、已登记 coverage_id 与
-  已哈希成员 sha256。证据不全/未核/unresolved/身份不符的券按
+  已哈希成员 sha256 与上游 reader credential（batch_id+manifest/result sha256+reader；缺 credential 为调用方自述，不授用途）。新增仓需扫描与收益两用途同时 verified 且身份相符；任一缺失/未核/身份不符的券按
   replay_action_coverage_unknown 在信封前隔离新增评估；held 持仓仍按其
   自有证据进入正式 held 专家。
 

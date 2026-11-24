@@ -64,6 +64,10 @@ SESSION_CLOSE = time(15, 0)
 BAR_CONTEXT = 61
 ALLOWED_PURPOSE_MODE = "historical_replay"
 ALLOWED_ACCOUNT_USE = "personal_simulation"
+# The bound release's held_reduction_wire.wire_version: the replay serializes
+# decision_sets on the registered v2 surface, never the field-dropping v1
+# package path.  Kept as the module constant the release contract registers.
+RELEASE_WIRE_VERSION = "p12.decision-set.v2"
 
 
 def _fail(code: str, message: str) -> NoReturn:
@@ -416,6 +420,24 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
             member_sha = _sha256(
                 eo.get("member_sha256"), "window_evidence[].member_sha256"
             )
+            # Upstream credential: the bound P10 batch/result identity that
+            # actually read and verified this window.  It is the provenance
+            # the caller may NOT self-declare -- a record without a bound
+            # upstream credential is a locator, not proof.
+            credential = eo.get("credential")
+            cred_o = None
+            if credential is not None:
+                cred_o = _obj(credential, "window_evidence[].credential")
+                cred_o = {
+                    "batch_id": _text(cred_o.get("batch_id"), "credential.batch_id"),
+                    "manifest_sha256": _sha256(
+                        cred_o.get("manifest_sha256"), "credential.manifest_sha256"
+                    ),
+                    "result_sha256": _sha256(
+                        cred_o.get("result_sha256"), "credential.result_sha256"
+                    ),
+                    "reader": _text(cred_o.get("reader"), "credential.reader"),
+                }
             window_evidence[(code, t.isoformat(), purpose)] = {
                 "security_code": code,
                 "signal_date": t.isoformat(),
@@ -423,6 +445,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                 "event_state": state,
                 "coverage_id": coverage_id,
                 "member_sha256": member_sha,
+                "credential": cred_o,
                 "sessions": [
                     _isodate(d, "window_evidence[].sessions[]").isoformat()
                     for d in _seq(eo.get("sessions", ()), "window_evidence[].sessions")
@@ -702,36 +725,39 @@ def build_replay_envelope(
 def _action_coverage_ok(
     request: ReplayRequest, sec_o: Mapping[str, Any], code: str, market_date: date
 ) -> bool:
-    """True only when a verified window_evidence record binds this security,
-    this signal day and the two-session scan purpose to a hashed register.
+    """True only when BOTH the two-session scan AND the 61-session return
+    purposes are verified for this security x signal day, each bound to a
+    hashed register AND an upstream reader credential.
 
-    An absent record, an unregistered coverage_id, or a non-verified
-    event_state all fail closed: the empty actions[] cannot be read as
-    'no adjustment'.  The security identity (listing_id / venue_id) must also
-    match the declared coverage identity so a record for a different listing
-    cannot be reused.
+    New entry depends on both the T-1/T effective-state scan (an effective
+    action excludes the day) and the 60 adjacent ordinary-holder returns
+    (an unproven entitlement breaks the return series the rule consumes).  An
+    absent record, an unregistered coverage_id, a non-verified event_state, a
+    missing upstream credential, or a mismatched security identity all fail
+    closed: the empty actions[] cannot be read as 'no adjustment'.
     """
     if request.action_coverage is None:
         return False
-    record = request.action_coverage.get("window_evidence", {}).get(
-        (code, market_date.isoformat(), "scan_two_session")
-    )
-    if record is None or record.get("event_state") not in (
-        "verified_none",
-        "verified_event",
-    ):
-        return False
+    we = request.action_coverage.get("window_evidence", {})
+    iso = market_date.isoformat()
+    scan = we.get((code, iso, "scan_two_session"))
+    returns = we.get((code, iso, "returns_61_session"))
+    for record in (scan, returns):
+        if record is None or record.get("event_state") not in (
+            "verified_none",
+            "verified_event",
+        ):
+            return False
+        # A verified state must reach back to an actual upstream read, never a
+        # caller-supplied summary.
+        if record.get("credential") is None:
+            return False
     declared = request.action_coverage.get("securities", {}).get(code)
     if declared is not None:
         ident = sec_o.get("identity", {}) if isinstance(sec_o, Mapping) else {}
-        if ident.get("listing_id") and declared.get("listing_id") and (
-            ident["listing_id"] != declared["listing_id"]
-        ):
-            return False
-        if ident.get("venue_id") and declared.get("venue_id") and (
-            ident["venue_id"] != declared["venue_id"]
-        ):
-            return False
+        for key in ("listing_id", "venue_id", "security_id"):
+            if ident.get(key) and declared.get(key) and ident[key] != declared[key]:
+                return False
     return True
 
 
@@ -1025,6 +1051,14 @@ def _signal_fields(signal: Any) -> dict[str, Any]:
             is not None
             else None
         ),
+        # The v2 wire field a downstream executable reduce consumes; held
+        # signals surface it so the projection keeps real reduce/full targets.
+        "target_position_fraction": (
+            str(f)
+            if (f := first("target_position_fraction"))
+            is not None
+            else None
+        ),
         "exit_kind": first("exit_kind"),
         "expert_decision_digest": first("expert_decision_digest"),
         "reason_codes": [str(c) for c in (getattr(signal, "reason_codes", None) or ())],
@@ -1036,7 +1070,26 @@ def _rule_day_projection(output: Any, window_info: Mapping[str, Any]) -> dict[st
     seam = output.seam
     result = output.result
     pkg = result.package
-    wire = pkg.to_dict() if pkg is not None and hasattr(pkg, "to_dict") else None
+    # The release's registered wire is the versioned P12 surface, not the
+    # package's v1 to_dict (which drops the reduce/full exit fields by
+    # design).  Serialize decision_sets on the bound held_reduction_wire
+    # version so a reduce keeps exit_kind/target_position_fraction.
+    wire = None
+    if pkg is not None:
+        from quanthus.product_daily.recommendation.publish import (
+            DECISION_SET_SCHEMA_FIELD,
+            P11_ENVELOPE_V2,
+            V2_DS_SCHEMA,
+        )
+
+        sets = []
+        for item in pkg.decision_sets:
+            raw = item.to_wire_dict()
+            raw[DECISION_SET_SCHEMA_FIELD] = V2_DS_SCHEMA
+            sets.append(raw)
+        wire = pkg.to_dict()
+        wire["decision_sets"] = sets
+        wire["schema_version"] = P11_ENVELOPE_V2
     assessment = getattr(result, "assessment", None)
     if assessment is not None and hasattr(assessment, "to_dict"):
         assessment = assessment.to_dict()
@@ -1054,6 +1107,7 @@ def _rule_day_projection(output: Any, window_info: Mapping[str, Any]) -> dict[st
         "package_id": getattr(pkg, "package_id", None),
         "package_schema": getattr(pkg, "schema", None),
         "package": wire,
+        "held_reduction_wire": RELEASE_WIRE_VERSION,
         "package_digest": sha256_digest(wire) if wire is not None else None,
         "diagnostics": [
             dict(d) if isinstance(d, Mapping) else {"reason": str(d)}

@@ -371,6 +371,6 @@
     "registers": [],
     "securities": [],
     "window_evidence": [],
-    "note": "October corporate-action coverage is UNKNOWN unless a window_evidence record binds security_id/listing_id/venue_id x signal_date x purpose to a hashed register (P11-P10-ACTION-REGISTER-EVIDENCE-v1).  Empty arrays = no named evidence; every qualified security is new-entry isolated at the envelope.  A register is a locator, not a proof."
+    "note": "October action coverage is UNKNOWN unless a window_evidence record binds (security_code x signal_date x purpose) to a hashed register AND an upstream reader credential.  New entry requires BOTH scan_two_session AND returns_61_session verified for the security identity; an unproven record, missing credential, or wrong identity isolates new entry (replay_action_coverage_unknown) while held members keep their own evidence path.  A register is a locator, not a proof."
   }
 }

@@ -612,7 +612,7 @@
               </template>
             </template>
 
-            <template v-else-if="selected.stage === 'exit_plan' && !isUnheldExit(selected)">
+            <template v-else-if="selected.stage === 'exit_plan' && !isUnheldExit(selected) && !isReduceExit(selected)">
               <dl class="p12-plan p12-num" data-testid="p12-sell-plan">
                 <div><dt>当前持有</dt><dd>{{ qty(sellTask ? sellTask.held : 0) }}</dd></div>
                 <div><dt>卖出数量</dt><dd>{{ sellTask ? qty(sellTask.total) : '—' }}</dd></div>
@@ -660,6 +660,7 @@
               <p v-if="isUnheldExit(selected)" data-testid="p12-unheld-exit-note">
                 本账户此前未买入 {{ selectedDisplayName }}（当前持仓 0 股），本轮退出计划对你的账户不产生卖出任务或待办费用。
               </p>
+              <p v-else-if="selected.stage === 'exit_plan' && isReduceExit(selected)" data-testid="p12-reduce-note">减仓建议（执行将在批次 B 接入）：建议减少对 {{ selectedDisplayName }} 的持仓，本批不生成卖出任务，持仓继续持有。</p>
               <p v-else-if="selected.stage === 'exit_plan' && selected.status_code === 'ENDED'" data-testid="p12-ended-note">{{ actionSentence }}</p>
               <p v-else-if="selected.stage === 'exit_plan'" data-testid="p12-sell-note">{{ actionSentence }}</p>
               <p v-if="selected.stage === 'exit_plan'" class="p12-precheck-warn" data-testid="p12-sell-unverified-note">无法核验停牌或跌停，委托可能无法成交；卖出确认照常放行。</p>
@@ -1759,6 +1760,12 @@ export default {
       if (!item || item.stage !== 'exit_plan') return false
       if (item.status_code === 'ENDED') return false
       return this.heldQtyFor(item.security_code) === 0 && this.sellOrdersFor(item.security_code).length === 0
+    },
+    // Issue #723 comment-7117663809: a reduce exit_plan is a reduction
+    // suggestion - batch B wires the sell task; batch A shows 减仓建议
+    // and keeps the position held, never a full-liquidation form.
+    isReduceExit (item) {
+      return Boolean(item && item.stage === 'exit_plan' && item.exit_kind === 'reduce')
     },
     groupTitle (key) {
       const map = {

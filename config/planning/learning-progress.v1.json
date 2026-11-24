@@ -15859,6 +15859,81 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-20261124T165447505525Z",
+      "recorded_at": "2026-11-24T16:54:47.505525+00:00",
+      "actor": "P11-root-october-first-owner",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "十月回放381因未来账户时点、原始窗口、决策输出和用途验证退修。H1 R2经C6复核后仅余上市区间。采用逐券及逐动作的历史模拟输入口径，并固定排除元信息。",
+      "evidence": [
+        {
+          "id": "P11-OCT-ACTION-FEASIBILITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/RECEIPT.json",
+          "sha256": "02a5b890ac5710bc46e74e4eedb0a85c4f3a3de2d62ab73e098001bc7c04c382",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "P10 metadata only; code/date exclusion pin verified. Actual eligible count unknown."
+        },
+        {
+          "id": "P11-OCT-BRANCH-PURPOSE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/P11-OCTOBER-AS-OBSERVED-v1.md",
+          "sha256": "7e22f3664ff54e922595a494952db5e39e9125dd5f7ab7d68d03fb33eed85a1b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "October delegated paper replay input and display rules. E5 remains proposed."
+        },
+        {
+          "id": "P11-OCT-RSI-SENSITIVITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/PREVIOUS-CLOSE-SENSITIVITY.json",
+          "sha256": "67c0d4fe71ec409404af7da3a8b5c2593232c4f39345c3356c28a14736d46d46",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Synthetic contrast on fixed panel. Demonstrates feature sensitivity only."
+        },
+        {
+          "id": "P11-PAPER-381-ACCEPTANCE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/replay-381ca6ad-root/REPORT.md",
+          "sha256": "bf08e70e13369644291966752423193806cd9be6301be15041131984a3729ef4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Reproduced synthetic acceptance failures. Successor assigned to author."
+        },
+        {
+          "id": "P11-H1-R2-ACCEPTANCE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/H1-R2-OWNER-DISPOSITION.json",
+          "sha256": "a48cda296c70d8b32f837307a9107d02a8bc7957e7830f064c8ac8d34a7db835",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "C6 fixed review adopted. One listing timestamp issue assigned."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "登记验收决定、资料适用性及修复分工。H1 R3、回放修复、真实消费端及联验仍开放。",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T16:53:47Z",
+          "body_sha256": "1889f7caef0e5ea00b764ab858a6d25450989154affa8972796c99b48b18cb96"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

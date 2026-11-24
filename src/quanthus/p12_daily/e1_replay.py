@@ -230,8 +230,25 @@ class E1ReplayRunner:
         # The context may be bound per-T by a supplier (the 8792 web entry
         # rebuilds it inside the same run's history read); fall back to the
         # constructor-supplied fixed context.
+        market_date_raw = raw_history.get("market_date")
+        if market_date_raw is None:
+            raise FactError(
+                HISTORY_INPUTS_UNAVAILABLE,
+                "raw_history envelope lacks market_date; the #749 reader must "
+                "bind the signal day",
+            )
+        market_date = (
+            market_date_raw
+            if isinstance(market_date_raw, date)
+            else date.fromisoformat(str(market_date_raw))
+        )
+        # A per-T supplier resolves the context bound to THIS run's own
+        # market_date - never the last-read context, which a following
+        # request could already have replaced.
         supplier = getattr(self, "_context_supplier", None)
-        context = supplier() if callable(supplier) else self._context
+        context = (
+            supplier(market_date) if callable(supplier) else self._context
+        )
         if context is None or self._assets is None:
             raise FactError(
                 HISTORY_INPUTS_UNAVAILABLE,
@@ -253,18 +270,6 @@ class E1ReplayRunner:
             ) from exc
 
         c = context
-        market_date_raw = raw_history.get("market_date")
-        if market_date_raw is None:
-            raise FactError(
-                HISTORY_INPUTS_UNAVAILABLE,
-                "raw_history envelope lacks market_date; the #749 reader must "
-                "bind the signal day",
-            )
-        market_date = (
-            market_date_raw
-            if isinstance(market_date_raw, date)
-            else date.fromisoformat(str(market_date_raw))
-        )
         request_dict = build_replay_request(
             raw_history,
             scenario_id=c.scenario_id,

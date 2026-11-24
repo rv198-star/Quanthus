@@ -48,7 +48,14 @@ ENVELOPE = {
     "schema_version": "p11.raw-history-input.v1",
     "market_date": T.isoformat(),
     "decision_cutoff": CUTOFF.isoformat(),
-    "source_members": [{"member_id": "m-cal", "sha256": "a" * 64}],
+    "source_members": [
+        {
+            "member_id": "m-cal",
+            "sha256": "a" * 64,
+            "visible_at": "2026-10-08T15:00:00Z",
+        },
+        {"member_id": "m-nov", "sha256": "b" * 64, "visible_at": None},
+    ],
     "calendar_rows": [{"venue_id": "XSHG"}],
     "listing_rows": [],
     "securities": [],
@@ -136,7 +143,7 @@ def test_build_e1_entry_returns_runner_and_per_t_context(monkeypatch):
 
     env = reader(T, CUTOFF)
     assert env is ENVELOPE
-    ctx = runner._context_supplier()  # same T's evidence, bound late
+    ctx = runner._context_supplier(T)  # same T's evidence, bound by date
     assert ctx is not None
     assert ctx.scenario_id == "spdb-20261008"
     assert ctx.market_dates == (T.isoformat(),)
@@ -155,7 +162,11 @@ def test_build_e1_entry_returns_runner_and_per_t_context(monkeypatch):
     m0 = ctx.member_evidence[0]
     assert m0["package_key"] == "pkg::m-cal"
     assert m0["digest"] == "a" * 64
-    assert m0["verified_at"] == "2026-10-08T13:30:00Z"
+    # available_at is the member's own declared usable instant (the
+    # envelope source_members visible_at), never the read verify_at.
+    assert m0["available_at"] == "2026-10-08T15:00:00Z"
+    assert "verified_at" not in m0
+    assert ctx.member_evidence[1]["available_at"] is None
     assert m0["required"] is True
 
 
@@ -181,6 +192,25 @@ def test_history_reader_passes_holdings_and_pending(monkeypatch):
     reader(T, CUTOFF)
     assert seen["holdings"] == ({"security_code": "600000"},)
     assert seen["pending"] == ({"security_code": "000002", "kind": "open_buy_order"},)
+
+
+def test_context_is_bound_per_market_date_not_last_read(monkeypatch):
+    """A second day's read must not replace the context the FIRST T's run
+    resolves - the supplier keys contexts by market_date."""
+    T2 = date(2026, 10, 9)
+    runner, reader = _build(monkeypatch)
+
+    reader(T, CUTOFF)
+    reader(T2, CUTOFF.replace(day=9))
+    # The run for T still resolves T's own context (market_dates carries T).
+    ctx_t = runner._context_supplier(T)
+    ctx_t2 = runner._context_supplier(T2)
+    assert ctx_t is not None and ctx_t2 is not None
+    assert ctx_t is not ctx_t2
+    assert ctx_t.market_dates == (T.isoformat(),)
+    assert ctx_t2.market_dates == (T2.isoformat(),)
+    # A day never read resolves no context -> honest block.
+    assert runner._context_supplier(date(2026, 10, 12)) is None
 
 
 def test_make_engine_accepts_e1_runner_and_reader(tmp_path):
@@ -340,7 +370,7 @@ def test_load_e1_scenario_builds_runner(tmp_path, monkeypatch):
     assert isinstance(runner, E1ReplayRunner)
     env = reader(T, CUTOFF)
     assert env is ENVELOPE
-    ctx = runner._context_supplier()
+    ctx = runner._context_supplier(T)
     assert ctx.scenario_id == "spdb-20261008"
     assert ctx.account["account_id"] == "SYN-PAPER-A"
     assert ctx.open_sessions == ("2026-10-09",)

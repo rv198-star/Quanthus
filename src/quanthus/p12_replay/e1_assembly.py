@@ -83,8 +83,10 @@ def build_e1_entry(
 
     # The per-T context is rebuilt inside history_reader once the real
     # member_consumption for that T is known; ``state`` carries the runner
-    # between calls so the context the run sees is the same T's evidence.
-    state: dict[str, Any] = {"context": None, "result": None}
+    # between calls.  Contexts are keyed by market_date so the runner's
+    # context supplier binds THIS run's same-T evidence, never the
+    # last-read context a following request may already have replaced.
+    state: dict[str, Any] = {"contexts": {}, "result": None}
 
     def history_reader(day: date, decision_cutoff: datetime) -> dict:
         day_holdings = holdings(day) if callable(holdings) else holdings
@@ -99,13 +101,24 @@ def build_e1_entry(
         state["result"] = result
         mc = (result.coverage or {}).get("member_consumption") or {}
         members = mc.get("members") or []
+        # P11 load_replay_request requires member_evidence[].available_at -
+        # the member's own declared usable instant.  The #749 envelope's
+        # source_members[] carries the supplier-declared visible_at (the
+        # qualified-index observed_at, a proven usable instant); the read
+        # verify_at stays on the consumption receipt, never masquerading as
+        # a source-declared instant.
+        visible_by_member = {
+            m.get("member_id"): m.get("visible_at") or m.get("knowledge_at")
+            for m in (result.raw_history.get("source_members") or [])
+            if isinstance(m, dict)
+        }
         member_evidence = tuple(
             {
                 "member_id": m.get("member_id"),
                 "package_key": m.get("package_key"),
                 "version": m.get("version"),
                 "digest": m.get("sha256"),
-                "verified_at": m.get("verify_at"),
+                "available_at": visible_by_member.get(m.get("member_id")),
                 "required": bool(m.get("relevant_for_T")),
             }
             for m in members
@@ -116,7 +129,7 @@ def build_e1_entry(
             for m in members
             if isinstance(m, dict) and m.get("relevant_for_T")
         )
-        state["context"] = E1ReplayContext(
+        state["contexts"][day.isoformat()] = E1ReplayContext(
             scenario_id=scenario["scenario_id"],
             market_dates=(day.isoformat(),),
             open_sessions=tuple(open_sessions),
@@ -135,8 +148,8 @@ def build_e1_entry(
         )
         return result.raw_history
 
-    def context_supplier() -> E1ReplayContext | None:
-        return state["context"]
+    def context_supplier(day: date) -> E1ReplayContext | None:
+        return state["contexts"].get(day.isoformat())
 
     runner = E1ReplayRunner(
         runner_ref_id=runner_ref_id,

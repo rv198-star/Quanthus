@@ -2486,6 +2486,107 @@ class P12DesktopApplication:
         fact reads unavailable."""
         self._preopen_facts = provider
 
+    def bind_preopen_quotes(self, quotes) -> None:
+        """Bind the real-time quote surface used by the E6 pre-open check.
+
+        The object only needs a ``quote(security_code)`` snapshot method.
+        Absent a bound surface the check still runs and records every
+        quote-dependent verdict as unavailable rather than guessing."""
+        self._preopen_quotes = quotes
+
+    def preopen_pool(self, scope: AccountScope, *, as_of=None):
+        """The named pre-open stock pool for this account (issue #723 E6).
+
+        Union of the visible package's buy candidates and the live held
+        positions, each tagged with its package or ledger source.  P12's
+        pre-open check and P10 #727 field verification read this one
+        snapshot so neither side re-derives the pool."""
+        from quanthus.product_daily.application.preopen import (
+            stock_pool_snapshot,
+        )
+
+        self._require(scope)
+        moment = as_of or self._now()
+        snapshot = self._facts.snapshot(self._context)
+        package = None
+        try:
+            decisions = self._current_decisions()
+            if self._visible(decisions, moment):
+                package = self._publish(decisions, snapshot.history)
+        except FactError:
+            package = None
+        return stock_pool_snapshot(
+            package=package,
+            positions=snapshot.projection.positions,
+            as_of=moment,
+        )
+
+    def preopen_check(self, scope: AccountScope, *, as_of=None) -> dict:
+        """Run the E6 09:00-09:25 pre-open verification (issue #723).
+
+        Applies only the failure conditions already inside the published
+        package: it resolves each plan's declared pre-open facts, re-derives
+        the still-executable quantity against the live position and cash,
+        and lets sell/reduce proceed with an alert when a fact is missing.
+        No new signal is produced.  The result is meant to be written into
+        the day's run receipt by the caller."""
+        from quanthus.product_daily.application.preopen import run_check
+
+        self._require(scope)
+        moment = as_of or self._now()
+        snapshot = self._facts.snapshot(self._context)
+        package = None
+        try:
+            decisions = self._current_decisions()
+            if self._visible(decisions, moment):
+                package = self._publish(decisions, snapshot.history)
+        except FactError:
+            package = None
+
+        quotes = getattr(self, "_preopen_quotes", None)
+
+        class _NullQuotes:
+            def quote(self, code):
+                return None
+
+        def _sellable(code: str) -> int:
+            held = snapshot.projection.quantity(code)
+            reserved = sum(
+                o.hold_qty
+                for o in snapshot.history.orders
+                if o.security_code == code and o.side == "sell"
+            )
+            return max(0, held - reserved)
+
+        return run_check(
+            package=package,
+            projection=snapshot.projection,
+            history=snapshot.history,
+            quotes=quotes if quotes is not None else _NullQuotes(),
+            now=moment,
+            sellable_for=_sellable,
+        )
+    def write_preopen_pool(self, scope: AccountScope, *, as_of=None):
+        """Build and persist the day's named pre-open stock pool (issue #723 E6).
+
+        Written before 09:00 each trading day at the decision store's fixed
+        ``preopen-pool/<trading_date>.json`` path, with its SHA embedded so
+        both the P12 check and P10 #727 field verification read the identical
+        snapshot.  Returns the written file path."""
+        from quanthus.product_daily.application.preopen import (
+            write_stock_pool_snapshot,
+        )
+
+        snapshot = self.preopen_pool(scope, as_of=as_of)
+        store = getattr(self._decisions, "_store", None)
+        root = getattr(store, "_root", None)
+        if root is None:
+            raise FactError(
+                "POLICY_NOT_ADOPTED",
+                "the bound decision source exposes no state dir for the pool",
+            )
+        return write_stock_pool_snapshot(root, snapshot)
+
     def rebuild_matches(self, scope: AccountScope) -> bool:
         """Deterministic rebuild from baseline + events equals the stored projection."""
 

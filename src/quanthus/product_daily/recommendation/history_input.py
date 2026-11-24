@@ -1260,6 +1260,7 @@ def run_daily_advice_from_history(
         raw=inputs,
         history_receipts=bound_receipts,
         caller_input_exclusions=runner_exclusions,
+        consumption_evidence=kwargs.pop("consumption_evidence", None),
         **kwargs,
     )
     # The issued receipt's digest must match the closure actually carried on the

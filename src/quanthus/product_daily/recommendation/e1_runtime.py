@@ -469,12 +469,21 @@ def run_e1_replay_day(
     # default elsewhere.  Their business content is asserted on/before T before
     # the day runs -- a post-T business fact stays isolated, never back-dated.
     observed_sink: dict[str, Any] = {}
+    # October consumption-evidence block, folded into the issued
+    # source_closure BEFORE its digest.  The same mutable dict is passed to
+    # the history call (which signs it) and filled below once the member-use
+    # analysis and the shared read instant exist, so the closure binds the
+    # ORIGINAL envelope identity, selected member/row versions, original
+    # clocks, this run's actual open/verify/observe instants, exclusions and
+    # the full member catalogue -- never a post-hoc receipt replacement.
+    consumption_evidence: dict[str, Any] = {}
     hist_with_panel = partial(
         _hist,
         panel_report_factory=_factory,
         anchor_mode="equivalent_day",
         as_observed=True,
         observed_sink=observed_sink,
+        consumption_evidence=consumption_evidence,
     )
 
     # This run's real read instant, resolved ONCE and shared with the replay
@@ -528,6 +537,25 @@ def run_e1_replay_day(
         )
         if excluded_ids
         else req
+    )
+
+    # Bind the October consumption evidence into the to-be-signed closure:
+    # original envelope identity + selected member/row versions + original
+    # clocks + this run's actual read + exclusions + the member catalogue.
+    consumption_evidence.update(
+        {
+            "schema_version": "p11.october-consumption-evidence.v1",
+            "request_digest": getattr(req, "request_digest", None),
+            "package_id": getattr(req, "package_id", None),
+            "manifest_sha256": getattr(req, "manifest_sha256", None),
+            "signal_date": market_date.isoformat(),
+            "logical_decision_at": None,  # filled by the receipt's logical field
+            "actual_read_at": observed_at.isoformat(),
+            "member_use": member_use,
+            "projected_out_member_ids": sorted(excluded_ids),
+            "anchor_mode": "equivalent_day",
+            "pit_disguise": False,
+        }
     )
 
     receipt = paper_replay.run_replay_day(
@@ -753,7 +781,10 @@ def _analyze_member_use(
         # A member the consumer could not have obtained by THIS run's real
         # read/verify instant is unavailable at read -- material later than
         # the actual verification is refused by dependency, never admitted.
-        if avail is not None and observed_at is not None and avail > observed_at:
+        # This only binds members the period actually CONSUMES; a member the
+        # period does not use cannot block the day (it is named unused below).
+        unreadable = avail is not None and observed_at is not None and avail > observed_at
+        if unreadable and is_used:
             rec["disposition"] = "unavailable_at_read"
             unavailable.append(
                 {
@@ -766,6 +797,8 @@ def _analyze_member_use(
             )
             members.append(rec)
             continue
+            # Unused and also not yet obtained: doubly outside the period --
+            # fall through to the wholly-late / unused classification below.
         # A partition that only BEGINS after the signal carries no on/before-T
         # business row at all.
         wholly_late = d_from is not None and d_from > match_end
@@ -786,6 +819,9 @@ def _analyze_member_use(
             )
         else:
             rec["disposition"] = "used" if is_used else "unused"
+            if not is_used and unreadable:
+                # Named but never a block: it is simply outside the period's use.
+                rec["unused_obtained_after_read"] = True
         members.append(rec)
     return {
         "members": members,

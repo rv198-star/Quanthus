@@ -70,6 +70,26 @@ def _rows(path: Path, columns):
     return pq.ParquetFile(str(path)).read(columns=columns).to_pylist()
 
 
+def _venue_code_map(source_map: SourceMap):
+    """hash venue_id -> admitted venue code (SSE/SZSE/...), via mic_code.
+
+    The sources key the calendar/listing venue by an opaque venue_id hash;
+    the P11 loader admits a venue only by its named code or mic.  Resolve
+    the hash to the admitted code through dwd_trading_venue.mic_code so
+    downstream rows carry the admitted venue key, never the raw hash.
+    """
+    mic_to_code = {"XSHG": "SSE", "XSHE": "SZSE", "XBEI": "BSE"}
+    out = {}
+    for member in source_map.base_members("dwd_trading_venue"):
+        try:
+            for rec in _rows(member.abs_path, ["venue_id", "mic_code"]):
+                mic = str(rec.get("mic_code") or "")
+                out[str(rec.get("venue_id") or "")] = mic_to_code.get(mic, mic)
+        except Exception:  # noqa: BLE001
+            continue
+    return out
+
+
 def read_calendar_rows(source_map: SourceMap, market_date: date):
     """Venue calendar rows covering up to T (dedup on venue+date).
 
@@ -77,6 +97,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
     are deduplicated on (venue_id, session_date); a conflicting later
     row is a named defect on the receipt.
     """
+    venue_code = _venue_code_map(source_map)
     reads = []
     conflicts = []
     rows = {}
@@ -104,8 +125,11 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
             knowledge_from = parse_ts(rec.get("knowledge_from"))
             if session is None or session > market_date or knowledge_from is None:
                 continue
+            venue_id = venue_code.get(
+                str(rec.get("venue_id") or ""), str(rec.get("venue_id") or "")
+            )
             row = CalendarRow(
-                venue_id=str(rec.get("venue_id") or ""),
+                venue_id=venue_id,
                 session_date=session,
                 is_open=bool(rec.get("is_open")),
                 close_at=parse_ts(rec.get("close_at")),
@@ -131,6 +155,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
 
 def read_listing_rows(source_map: SourceMap, market_date: date):
     """Listing intervals from Base dwd_listing (instants kept verbatim)."""
+    venue_code = _venue_code_map(source_map)
     reads = []
     rows = []
     for member in source_map.base_members("dwd_listing"):
@@ -154,7 +179,9 @@ def read_listing_rows(source_map: SourceMap, market_date: date):
                 ListingRow(
                     security_id=str(rec.get("security_id") or ""),
                     listing_id=str(rec.get("listing_id") or ""),
-                    venue_id=str(rec.get("venue_id") or ""),
+                    venue_id=venue_code.get(
+                        str(rec.get("venue_id") or ""), str(rec.get("venue_id") or "")
+                    ),
                     effective_from=eff_from,
                     effective_to=eff_to,
                     knowledge_from=knowledge_from,

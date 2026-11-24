@@ -16186,6 +16186,90 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-20261124T181020253143Z",
+      "recorded_at": "2026-11-24T18:10:20.253143+00:00",
+      "actor": "P11-root-october-first-owner",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "十月回放与发布两处验收已分别交回修复。11 月 24 日读取器的历史范围、开盘时刻与北京时间截止已按 CN02 原输入核实，并交 P12。",
+      "evidence": [
+        {
+          "id": "OCT-REPLAY-R1-COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/replay-r1-d7c23f17-c6/SHA256SUMS",
+          "sha256": "bdef03d74c2e4feba05bc96026e31154ba710b74fbdea70a657b2e661c559d4c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed d7, four open correctness and release findings."
+        },
+        {
+          "id": "OCT-REPLAY-R2-INTAKE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/replay-r2-eaa81034-root/NORMAL-ENTRY.json",
+          "sha256": "5ac5a8eabae1e75d32b555d0efbe9c632b1607758e47986d6514784edd1aecf4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed eaa replay on synthetic rows. One scan date and no return evidence still published a new entry. The six empty E5 binding maps were accepted."
+        },
+        {
+          "id": "V2-PUBLISH-ACCOUNT-RECEIPT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/execution/v2-b756-root-intake/CN02-FIXTURE-RECEIPT.json",
+          "sha256": "3e6d04c075beb79068b449796aded0c5f49947bacc130bd0cb3612fcd113a699",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CN02 passed matching the genuine reduce/full fixtures. Its receipt gave the wire digest where P12 binds the validated account content."
+        },
+        {
+          "id": "H1-749-CALENDAR-FIXED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/history-input-h1/issue749-14c6a071-root/CN02-IDENTITY-CALENDAR.json",
+          "sha256": "e98fbc877ea7060f3bc676d80ab2ef04f1b143ad3c9d691526d0f5e2e6e082cd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed 11-24 source metadata only. 5508 listings precede current envelope first open. With full source dates there is one earlier listing, already expired."
+        },
+        {
+          "id": "H1-749-P10-B07",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/history-input-h1/issue749-14c6a071-root/B07-RECEIPT.json",
+          "sha256": "71cb68dfd954af1da4e6f33968b3bb260999834a34ba18d84265c2faa4498f26",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "P10 calendar and term file localization. November terms preserve their observed grades. No October window opened."
+        },
+        {
+          "id": "REPLAY-ROOT-FIXED-DISPOSITION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/replay-r2-eaa81034-root/ROOT-DISPOSITION.json",
+          "sha256": "7c315ad853f78c634d1ac9d5d8e86df48e391261df3cbe22ede156549ede2d4d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed work, named successor rounds, use state and CN02 scope."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "用途回执为 proposed。此次记录回放仍可在缺收益凭据时建仓、实际账户和传输摘要的差异，以及现有 41 份父日历和 17 份日增量的采用范围。",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T18:09:20Z",
+          "body_sha256": "3ad74630d6cfcb231d87a8eebd94ba3a4c56ec5d42342ce5c1d344cf0afb4faa"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

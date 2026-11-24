@@ -301,6 +301,31 @@ def resolve_pinned_v2_loader(
     mounted = str(consumer_root / "src" / "quanthus")
     pkg_path.insert(0, mounted)
     try:
+        # A previously resolved consumer module could belong to another tree;
+        # evict the whole quanthus.p12_daily subtree (and its dependency names)
+        # so this resolution binds exactly the byte-verified bound checkout.
+        consumer_prefix = str(consumer_root.resolve()) + "/"
+        for name in list(sys.modules):
+            if not (name == "quanthus.p12_daily" or name.startswith("quanthus.p12_daily.")):
+                continue
+            module = sys.modules[name]
+            module_file = getattr(module, "__file__", None)
+            if module_file is None or not str(Path(module_file).resolve()).startswith(
+                consumer_prefix
+            ):
+                del sys.modules[name]
+        for name in (
+            "quanthus.capabilities.decision_access",
+            "quanthus.shared.fact_contracts",
+            "quanthus.shared.values",
+        ):
+            module = sys.modules.get(name)
+            module_file = getattr(module, "__file__", None)
+            if module is not None and (
+                module_file is None
+                or not str(Path(module_file).resolve()).startswith(consumer_prefix)
+            ):
+                del sys.modules[name]
         import quanthus.p12_daily.decision_loader as pinned_loader
     finally:
         pkg_path.remove(mounted)

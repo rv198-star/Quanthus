@@ -1,0 +1,49 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "P10-DAILY-SIDECAR-SESSION-INCREMENT-002",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "p10-daily-consumer-sidecar",
+  "work_item": "P10-DATA-P12-DAILY-001",
+  "modules": [
+    "DATA"
+  ],
+  "question": "Can versioned per-member quantity/session metadata enforce FULL_DAY and real completeness clocks without changing the fixed v1 contract or publisher?",
+  "consumer": "P11 #700 independent review and P12 #719 input adapter",
+  "scope": "M2 v3 source mapping plus opt-in v2 session/measure metadata validation, synthetic boundaries only; original f32 engineering candidate remains immutable.",
+  "deliverable": "Extend only src/quanthus/p10_daily_sidecar.py and its focused test; new p10-p12-member-map.m2-v3.json and p10-session-source-map.rules-20260706.v1.json; work item/version notes and external fixed evidence.",
+  "decision_if_pass": "Submit narrow engineering candidate for independent review; bind final source-observed consumer closure after M2/pool gates.",
+  "decision_if_fail": "Retain failures and fixed checkpoint; stop affected feature and give exact next repair without enlarging scope.",
+  "acceptance": [
+    "Strict schema/config/source identity and exact member coverage",
+    "Explicit source/publication/channel/consumer responsibility, unknown never filled with now",
+    "Append-only crash-safe idempotent events and conservative as-of withdrawal/revision selection",
+    "Focused adversarial tests, lint/type/maintenance checks; exact closure make check and node status reported honestly"
+  ],
+  "stop_conditions": [
+    "One bounded regulation metadata increment, first v1 checkpoint already delivered",
+    "No market rows, endpoints, procurement, historical repair, deployment or production mutation",
+    "Actual vendor scope and applicability missing remain UNKNOWN; source-observed binding deferred"
+  ],
+  "memory_sha256": "7ea37a64fd1c9719615de95c9ef7c87a14730a3c0cfc0aa5961bba48188def8f",
+  "prior_reviews": [],
+  "budget": {
+    "wall_seconds": 3600,
+    "network_requests": 20,
+    "max_new_bytes": 1048576,
+    "accounting_owner": "P10; <=20 logical GitHub code/issue/PR and Nexus control calls; market requests zero. Full local test logs accounted separately."
+  },
+  "cumulative_cost_review": "Continue accepted inventory/spec work and its 23 specimen checks; prior data spend 0, model/active cost unknown_not_zero. This tranche is engineering, no renewed market experiment.",
+  "runtime_authority_boundary": "Owner/P11 authorized #726 isolated metadata engineering in current message; no source data reads or deployed publisher.",
+  "base_revision": "f32e2c1c307da30763a78786c28517d1e3ba4afd",
+  "code_paths": [
+    "src/quanthus/p10_daily_sidecar.py",
+    "tests/unit/test_p10_daily_sidecar.py"
+  ],
+  "write_boundary": "explicit fresh/disjoint isolated metadata store only; no existing source/root/CURRENT writes",
+  "spec_baseline_sha256": "b072a68abf79167d052511e79817bb6eca58e0a123be31698c2fe24f3d77716f",
+  "regulation_addendum_sha256": "10a87a3f86259869d70f272ffac9b84f03c6c3ed14e8c4dab0020f7bf82057fe",
+  "m2_v3_sha256": "e50e6396aeca56e574da379ada96ab0a69bb939377fedbcd7025eef074d7c892",
+  "preflight_timing_note": "Opt-in v2 schema scaffolding was edited before this incremental preflight; no tests, source qualification or execution occurred for v2. Remaining implementation/checks follow this request."
+}

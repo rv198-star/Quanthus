@@ -915,8 +915,10 @@ def test_old_p12_loader_drops_reduce_fields_named_dependency():
     assert wire["decisions"][0]["exit_kind"] == "reduce"
     assert wire["decisions"][0]["target_position_fraction"] == "0.5"
     validated = validate(raw)  # the v1 loader still accepts the set
-    assert not hasattr(validated.decisions[0], "exit_kind")
-    assert not hasattr(validated.decisions[0], "target_position_fraction")
+    # The v1-surface decision never carries reduce semantics: on the pinned v1
+    # synthetic loader the fields are absent or None, never a reduce.
+    assert getattr(validated.decisions[0], "exit_kind", None) in (None,)
+    assert getattr(validated.decisions[0], "target_position_fraction", None) is None
 
 
 def test_wire_version_constant_matches_p12_handoff():

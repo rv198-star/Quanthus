@@ -315,6 +315,12 @@ def _humanize_bucket_id(bucket_id: str) -> str:
 class P12DesktopApplication:
     """Use-case facade bound to exactly one trusted account scope."""
 
+    # Issue #723 E8 r5 (planning ruling): the 8792 phase-1 execution slice
+    # keeps every sell surface display-only.  "sell_execution_open=False"
+    # binds the whole instance: the production confirm entry refuses all
+    # sell-side orders, and manual sell fact registration closes for new
+    # and held positions alike.  Ordinary accounts keep the default open
+    # mode so shared order paths on other slices are unchanged.
     def __init__(
         self,
         *,
@@ -328,6 +334,7 @@ class P12DesktopApplication:
         sizing_trial_cap: bool = False,
         live_marks: Callable[[Iterable[str]], Mapping[str, Decimal]] | None = None,
         live_valuation_ref: str = "paper-live-quote",
+        sell_execution_open: bool = True,
     ) -> None:
         if (context.account_id, context.mode) != (scope.account_id, scope.mode):
             raise FactError("UNAUTHORIZED_CONTEXT", "facts context and account scope differ")
@@ -344,6 +351,12 @@ class P12DesktopApplication:
         self._sizing_trial_cap = sizing_trial_cap
         self._live_marks = live_marks
         self._live_valuation_ref = live_valuation_ref
+        self._sell_execution_open = sell_execution_open
+
+    @property
+    def sell_execution_open(self) -> bool:
+        """Whether the bound instance may execute sell-side flow (E8 r5)."""
+        return self._sell_execution_open
 
     @property
     def scope(self) -> AccountScope:
@@ -2289,6 +2302,31 @@ class P12DesktopApplication:
         history = self._facts.history(self._context)
         existing = next((o for o in history.orders if o.order_id == command.order_id), None)
         order_security = self._order_security(command, existing)
+
+        # Issue #723 E8 r5 (planning ruling): phase-1 sell registration is
+        # closed for BOTH new and old positions.  A sell-side fill or an
+        # in-progress sell-order observation opens an exposure the slice is
+        # not allowed to take, so the server refuses it outright - no order
+        # row, no fill, no cash or position change.  The refusal is bound to
+        # this instance's phase-1 execution mode, so buy events and the
+        # shared order path on open instances are unchanged.  A terminal
+        # observation or a fee still posts: it only closes/settles an order
+        # that already exists, never opens one.
+        if (
+            not self._sell_execution_open
+            and command.side == "sell"
+            and command.kind in ("fill", "observation")
+        ):
+            obs_opens = (
+                command.kind == "fill"
+                or (command.order_status or "in_progress") == "in_progress"
+            )
+            if obs_opens:
+                raise FactError(
+                    "PLAN_NOT_EXECUTABLE",
+                    "phase-1 sell registration is display-only; sell fills and "
+                    "open sell orders are refused for both new and held positions",
+                )
 
         if command.kind == "observation":
             observation = OrderObservation(

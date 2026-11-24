@@ -51,6 +51,9 @@ REJECT = {
     "DUPLICATE_ORDER": "duplicate order id",
     "INVALID_ORDER": "order field is invalid",
     "PLAN_NOT_FOUND": "the referenced plan is not currently effective",
+    # Issue #723 E8 r5 (planning ruling): phase-1 sell confirms and sell
+    # registrations are display-only - the order never reaches the matcher.
+    "PLAN_NOT_EXECUTABLE": "the plan is display-only in this phase; sell execution is not open",
     "ORDER_CONTEXT_MISMATCH": "the order disagrees with the plan's side or security",
     # Issue #719 R12: typed unavailable gates for the pre-open facts a plan's
     # conditions may depend on; never inferred from a zero-volume bar, a last

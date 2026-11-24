@@ -293,11 +293,14 @@ def test_expired_plan_never_submitted_is_refused(state_dir):
         order_id=f"plan:{plan_id}", side="buy",
         security_code="600000", quantity=1200, limit_price=Decimal("10.75"),
     ))
+    # E8 r5: the closed-session confirm on the still-live bound plan is an
+    # advisory MARKET_CLOSED - no stored row - instead of a terminal
+    # PLAN_NOT_FOUND that would lock the same id out of the legal window.
     assert out.status == "rejected"
-    assert out.reason_code == "PLAN_NOT_FOUND"
-    # Nothing was posted: the ledger holds no fill and the order is terminal.
+    assert out.reason_code == "MARKET_CLOSED"
+    # Nothing was posted: the ledger holds no fill and no order row.
     assert app._facts.history(app._context).reports == ()
-    assert acct.order(f"plan:{plan_id}")["status"] == "rejected"
+    assert acct.order(f"plan:{plan_id}") is None
 
 
 def test_plan_confirm_uses_server_qty_and_cap_not_client(state_dir):

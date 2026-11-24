@@ -44,7 +44,11 @@ CN_HOLIDAYS_2026: frozenset = frozenset(
         "2026-05-01",
         "2026-06-19",
         "2026-09-25",
-        "2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08",
+        # Issue #723 E8 r5 (P10 排期回执 issuecomment-7145646570): the 2026
+        # National Day closure is 10-01..10-07; 10-08 reopens on both SSE and
+        # SZSE per their published notices, so it is NOT a holiday.  A
+        # package bound to 10-08 confirms at its real 09:30 open.
+        "2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06", "2026-10-07",
     )
 )
 

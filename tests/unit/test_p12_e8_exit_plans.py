@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from quanthus.capabilities.decision_access import (
@@ -148,6 +148,9 @@ def _app(tmp_path, decision_set, clock_box):
     apps = synthetic_applications(state_dir=tmp_path, fixture=fixture, clock=now)
     app = apps["SYN-P12-A"]
     app._decisions = _Source(decision_set)
+    # E8 r5: bind this slice to the 8792 phase-1 execution mode - sell
+    # confirms and sell registrations are display-only on the instance.
+    app._sell_execution_open = False
     return app
 
 
@@ -440,6 +443,8 @@ def test_reduce_confirm_creates_sell_order_with_suggestion_link(tmp_path):
         quotes=_quotes(now, [_quote("10.66", box[0])]),
         now=now,
     )
+    # E8 r5: the sell plan is still published for display (sized 200), but
+    # the production confirm entry refuses it outright in phase 1.
     plan = app.paper_current_plan("plan-OPP-EXIT-600000-" + day.date().isoformat())
     assert plan is not None and plan.delta_qty == 200
     out = paper.submit(
@@ -451,11 +456,9 @@ def test_reduce_confirm_creates_sell_order_with_suggestion_link(tmp_path):
             Decimal("10.60"),
         )
     )
-    # The order path binds the plan's server-side sell quantity.
-    assert out.status in ("open", "filled")
-    if out.status == "filled":
-        hist = app.paper_history()
-        assert any(r.suggestion_id == plan.plan_id for r in hist.reports)
+    assert out.status == "rejected" and out.reason_code == "PLAN_NOT_EXECUTABLE"
+    assert paper._store.get(out.order_id, app.scope.account_id) is None
+    assert app.paper_projection().quantity("600000") == 400
 
 
 def test_second_reduce_confirm_does_not_oversell(tmp_path):
@@ -509,14 +512,14 @@ def test_second_reduce_confirm_does_not_oversell(tmp_path):
         now=now,
     )
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
+    # E8 r5: every sell confirm is refused display-only, so nothing opens.
     first = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.60")))
-    assert first.status in ("open", "filled")
-    # A repeat confirm is idempotent: the same order id replays, never doubles.
+    assert first.status == "rejected" and first.reason_code == "PLAN_NOT_EXECUTABLE"
     second = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.60")))
-    assert second.order_id == first.order_id and second.status == first.status
+    assert second.status == "rejected" and second.reason_code == "PLAN_NOT_EXECUTABLE"
     view = paper.account_view()
     pos = next(p for p in view["positions"] if p["security_code"] == "600000")
-    assert pos["quantity"] in (200, 400)  # 400 if still open, 200 once filled
+    assert pos["quantity"] == 400
 
 
 
@@ -567,20 +570,17 @@ def test_reduce_partial_sell_keeps_cycle_then_full_exit_settles(tmp_path):
         now=now,
     )
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
-    # Reduce confirm sells only 200 - the cycle stays open while held.
+    # E8 r5: the reduce plan is display-only - the confirm entry refuses it,
+    # the position stays held and the cycle stays RESERVED untouched.
     first = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.60")))
-    assert first.status == "filled" and first.filled_qty == 200
-    assert app._facts.snapshot(app._context).projection.quantity("600000") == 200
+    assert first.status == "rejected" and first.reason_code == "PLAN_NOT_EXECUTABLE"
+    assert app._facts.snapshot(app._context).projection.quantity("600000") == 400
     assert _bucket(app).phase is BucketPhase.RESERVED
-    # A manual sell of the residual 200 flattens the position and the
-    # fixed-bucket settlement closes the cycle against the existing rules.
-    # Selling the residual 200 flattens the position; the cycle stays open
-    # until the existing settlement evidence (terminal fills + confirmed
-    # fees) lets the fixed-bucket rule close it - never an implicit settle
-    # inside the reduce path itself.
+    # A self-directed sell is refused by the same instance switch - the
+    # phase-1 refusal lives on the bound account, not on the plan id.
     rest = paper.submit(OrderCommand("residual-s", "sell", "600000", 200, Decimal("10.60")))
-    assert rest.status == "filled"
-    assert app._facts.snapshot(app._context).projection.quantity("600000") == 0
+    assert rest.status == "rejected" and rest.reason_code == "PLAN_NOT_EXECUTABLE"
+    assert app._facts.snapshot(app._context).projection.quantity("600000") == 400
 
 
 
@@ -614,6 +614,69 @@ def _paper(app, tmp_path, box, quote_price="10.66"):
     )
 
 
+def _inject_terminal_sell(app, order_id, qty, filled, at, price="10.55", terminal=True):
+    """Stage-1 helper: write a prior terminal sell order + its fill into the
+    facts ledger directly (the phase-1 order-event entry refuses NEW sell
+    registrations, so a carried-intent premise is injected at the port).
+    """
+    from quanthus.capabilities.execution.facts import (
+        ExecutionReport, OrderObservation)
+    ctx = app._context
+    app._facts.submit_order_observation(
+        ctx,
+        OrderObservation(
+            observation_id=order_id + ":open",
+            order_id=order_id,
+            status="in_progress",
+            observed_at=at,
+            source_id="test",
+            source_sequence=order_id + ":open",
+        ),
+        accepted_total_qty=qty,
+        side="sell",
+        security_code="600000",
+        price_bound=Decimal(price),
+        estimated_fee_upper=Decimal("0"),
+    )
+    if filled:
+        app._facts.submit_report(
+            ctx,
+            ExecutionReport(
+                report_id=order_id + ":fill",
+                security_code="600000",
+                side="sell",
+                quantity=filled,
+                price=Decimal(price),
+                confirmed_fee=Decimal("0"),
+                occurred_at=at,
+                source_id="test",
+                source_sequence=order_id + ":fill",
+                intended_quantity=qty,
+                intended_price_cap=Decimal(price),
+                order_id=order_id,
+            ),
+        )
+    if terminal:
+        app._facts.submit_order_observation(
+            ctx,
+            OrderObservation(
+                observation_id=order_id + ":term",
+                order_id=order_id,
+                status="terminal",
+                observed_at=at,
+                source_id="test",
+                source_sequence=order_id + ":term",
+                final_cumulative_fill_qty=filled,
+                cancelled_qty=qty - filled,
+            ),
+            accepted_total_qty=qty,
+            side="sell",
+            security_code="600000",
+            price_bound=Decimal(price),
+            estimated_fee_upper=Decimal("0"),
+        )
+
+
 def test_unverified_exit_emits_no_plan_and_confirm_refused(tmp_path):
     # r2-1: a package with no bound run receipt holds the exit - no sell
     # plan and the confirm path refuses before committing.
@@ -634,8 +697,10 @@ def test_unverified_exit_emits_no_plan_and_confirm_refused(tmp_path):
 
 
 def test_inflight_sell_covers_target_no_oversell(tmp_path):
-    # r2-2: an in-flight sell already covering the reduce target leaves
-    # zero new quantity; a partial cover only sells the difference.
+    # r5: the in-flight netting math is preserved - a resting sell already
+    # covering the reduce target leaves zero new quantity - but the resting
+    # sell itself is injected at the facts port because the phase-1 order
+    # entry refuses new sell registrations on this instance.
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     box = [datetime(2026, 11, 20, 10, 0, tzinfo=TZ)]
     ds = _set_for(day.date(), (_exit_decision(exit_kind="reduce", fraction="0.50"),))
@@ -645,7 +710,10 @@ def test_inflight_sell_covers_target_no_oversell(tmp_path):
         app.submit_order_event(app.scope, ev)
     paper = _paper(app, tmp_path, box)
     # 200 already resting -> a 0.5-target reduce (sell 200) adds nothing.
-    paper.submit(OrderCommand("rest-open", "sell", "600000", 200, Decimal("10.60")))
+    _inject_terminal_sell(app, "rest-open", 200, 0, box[0], price="10.60", terminal=False)
+    # The same resting sell through the production confirm entry is refused.
+    refused = paper.submit(OrderCommand("rest-open-2", "sell", "600000", 200, Decimal("10.60")))
+    assert refused.status == "rejected" and refused.reason_code == "PLAN_NOT_EXECUTABLE"
     plan = app.paper_current_plan("plan-OPP-EXIT-600000-" + day.date().isoformat())
     assert plan is None or plan.delta_qty == 0
 
@@ -661,20 +729,20 @@ def test_confirm_uses_live_mark_and_raw_precision_lot_floor(tmp_path):
     for ev in _buy_events(day):
         app.submit_order_event(app.scope, ev)
     paper = _paper(app, tmp_path, box, quote_price="11.10")
+    # E8 r5: the confirm entry refuses the display-only sell.  The
+    # confirm-time live-mark sizing that would re-derive 300 is retained
+    # for the later sell-open round (R4 review keeps the 200-vs-300
+    # sizing check pending until sell execution opens).
     out = paper.submit(OrderCommand(
         "plan:plan-OPP-EXIT-600000-" + day.date().isoformat(),
         "sell", "600000", 100, Decimal("10.55")))
-    # 0.44 * 5000 / 11.10 -> keep 100, sell 300 (not the stale-10.55 200).
-    assert out.status == "filled" and out.filled_qty == 300
-    assert app.paper_projection().quantity("600000") == 100
+    assert out.status == "rejected" and out.reason_code == "PLAN_NOT_EXECUTABLE"
+    assert app.paper_projection().quantity("600000") == 400
 
 
 def test_sell_confirm_refused_outside_bound_session(tmp_path):
-    # r4: a plan-bound sell confirms ONLY inside the bound next_session
-    # continuous auction.  A post-close confirm is refused with an advisory
-    # MARKET_CLOSED (no stored order - the same confirm id stays usable);
-    # at the bound 09:30 open the same id re-sizes on the live facts and
-    # fills.  The refusal also left no open order and no reservation.
+    # r5: phase-1 sell confirms are display-only - refused outright at any
+    # hour (advisory, nothing stored), inside AND outside the bound session.
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     box = [day]  # clock at T close, market closed
     ds = _set_for(day.date(), (_exit_decision(exit_kind="full", fraction=None),))
@@ -685,24 +753,22 @@ def test_sell_confirm_refused_outside_bound_session(tmp_path):
     paper = _paper(app, tmp_path, box)
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
     closed = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
-    assert closed.status == "rejected" and closed.reason_code == "MARKET_CLOSED"
-    # Advisory refusal: nothing persisted, the confirm id stays confirmable.
+    assert closed.status == "rejected" and closed.reason_code == "PLAN_NOT_EXECUTABLE"
+    # Advisory refusal: nothing persisted, no order row and no movement.
     assert paper._store.get(plan_id, app.scope.account_id) is None
     assert app.paper_projection().quantity("600000") == 400
 
-    # Bound-session open: the same confirm id re-sizes live and fills all.
+    # Even at the bound open the phase-1 sell confirm stays refused.
     box[0] = day.replace(day=20, hour=9, minute=31)
     paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
     opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
-    assert opened.status == "filled" and opened.filled_qty == 400
-    assert app.paper_projection().quantity("600000") == 0
+    assert opened.status == "rejected" and opened.reason_code == "PLAN_NOT_EXECUTABLE"
+    assert app.paper_projection().quantity("600000") == 400
 
 
 def test_sell_confirm_refused_during_lunch_break(tmp_path):
-    # r4 delta: the bound-session lunch break sits outside continuous
-    # auction, so an 11:45 confirm is refused like the pre/post-close
-    # cases (advisory, nothing persisted, the id stays usable); the same
-    # id confirms at the 13:00 resume and re-sizes on the live mark.
+    # r5: the phase-1 sell confirm is display-only - refused at 11:45 and
+    # again at the 13:00 resume (advisory, nothing stored).
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     open_ = day.replace(day=20, hour=9, minute=30)
     lunch = open_.replace(hour=11, minute=45)
@@ -715,23 +781,20 @@ def test_sell_confirm_refused_during_lunch_break(tmp_path):
         app.submit_order_event(app.scope, ev)
     paper = _paper(app, tmp_path, box)
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
-    # lunch_break is not a confirmable state for a bound sell.
     mid = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
-    assert mid.status == "rejected" and mid.reason_code == "MARKET_CLOSED"
+    assert mid.status == "rejected" and mid.reason_code == "PLAN_NOT_EXECUTABLE"
     assert paper._store.get(plan_id, app.scope.account_id) is None
     assert app.paper_projection().quantity("600000") == 400
-    # At the 13:00 resume the same confirm id re-sizes live and fills.
     box[0] = resume
     paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
     opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
-    assert opened.status == "filled" and opened.filled_qty == 400
-    assert app.paper_projection().quantity("600000") == 0
+    assert opened.status == "rejected" and opened.reason_code == "PLAN_NOT_EXECUTABLE"
+    assert app.paper_projection().quantity("600000") == 400
 
 
 def test_sell_confirm_refused_on_disagreeing_calendar(tmp_path):
-    # r4: a sell confirm outside the bound next_session is refused, even
-    # while the quote clock reads a trading day - the package binds
-    # execution to 11-23 and the quote clock 11-20 is not its session.
+    # r5: the phase-1 sell confirm is display-only - refused regardless of
+    # the session the quote clock reads.
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     nextopen = day.replace(day=20, hour=9, minute=30)
     box = [nextopen]
@@ -744,21 +807,21 @@ def test_sell_confirm_refused_on_disagreeing_calendar(tmp_path):
     paper = _paper(app, tmp_path, box)
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
     out = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
-    assert out.status == "rejected" and out.reason_code == "MARKET_CLOSED"
+    assert out.status == "rejected" and out.reason_code == "PLAN_NOT_EXECUTABLE"
     assert paper._store.get(plan_id, app.scope.account_id) is None
     assert app.paper_projection().quantity("600000") == 400
 
-    # On the bound session itself the same confirm fills.
+    # On the bound session itself the same confirm is still refused.
     box[0] = nextopen.replace(day=23)
     paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
     opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
-    assert opened.status == "filled" and opened.filled_qty == 400
+    assert opened.status == "rejected" and opened.reason_code == "PLAN_NOT_EXECUTABLE"
 
 
 def test_unfilled_exit_intent_carries_to_next_package(tmp_path):
-    # r2-6: an unfilled plan sell ends terminal at the bound close; the
-    # successor package re-offers the same intent, re-sized on the live
-    # holding.
+    # r5: an unfilled plan sell ended terminal at the bound close (injected
+    # at the facts port - phase-1 sell entry refuses new sell orders); the
+    # successor package still re-offers the same intent for display.
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     nextopen = day.replace(day=20, hour=9, minute=30)
     box = [nextopen]
@@ -767,14 +830,8 @@ def test_unfilled_exit_intent_carries_to_next_package(tmp_path):
     _seed_bucket(app)
     for ev in _buy_events(day):
         app.submit_order_event(app.scope, ev)
-    paper = _paper(app, tmp_path, box, quote_price="10.30")  # below limit, no fill
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
-    first = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.55")))
-    assert first.status == "open"
-    # Bound session close: order ends terminal-unfilled.
-    box[0] = nextopen.replace(hour=15, minute=1)
-    paper.poll()
-    assert paper._store.get(plan_id, app.scope.account_id).status == "expired"
+    _inject_terminal_sell(app, plan_id, 200, 0, nextopen)
     # Next package adds no new exit signal; the intent still carries.
     box[0] = nextopen.replace(day=23, hour=10)
     app._decisions._set = dataclasses.replace(
@@ -785,8 +842,9 @@ def test_unfilled_exit_intent_carries_to_next_package(tmp_path):
 
 
 def test_carried_reduce_preserves_positive_remainder(tmp_path):
-    # r3-6: an expired 200-share reduce carries as the SAME reduce intent -
-    # the carry plan keeps a positive remainder, never degrades into a flat.
+    # r5: an expired 200-share reduce carries as the SAME reduce intent -
+    # the carry plan keeps a positive remainder, never degrades into a flat,
+    # and stays display-only (confirm refused).
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     nextopen = day.replace(day=20, hour=9, minute=30)
     box = [nextopen]
@@ -795,13 +853,8 @@ def test_carried_reduce_preserves_positive_remainder(tmp_path):
     _seed_bucket(app)
     for ev in _buy_events(day):
         app.submit_order_event(app.scope, ev)
-    paper = _paper(app, tmp_path, box, quote_price="10.30")  # below limit -> no fill
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
-    opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.55")))
-    assert opened.status == "open"
-    box[0] = nextopen.replace(hour=15, minute=1)
-    paper.poll()
-    assert paper._store.get(plan_id, app.scope.account_id).status == "expired"
+    _inject_terminal_sell(app, plan_id, 200, 0, nextopen)
     # Successor HOLD-only package: the carried intent survives identity.
     box[0] = nextopen.replace(day=23, hour=10)
     app._decisions._set = dataclasses.replace(
@@ -810,18 +863,143 @@ def test_carried_reduce_preserves_positive_remainder(tmp_path):
     carry = next(p for p in bench.package.plans if p.plan_id.startswith("plan-carry-600000"))
     # Only the 200-share residual obligation carries; 200 stays held.
     assert carry.delta_qty == -200 and carry.target_qty == 200
-    # The confirm of the carried id also stays inside the residual.
+    # The confirm of the carried id is display-only in phase 1: refused.
+    paper = _paper(app, tmp_path, box)
     paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
     out = paper.submit(
-        OrderCommand("plan:" + carry.plan_id, "sell", "600000", 200, Decimal("10.55"))
+        OrderCommand("plan:plan-carry-600000-2026-11-20", "sell", "600000", 200, Decimal("10.55"))
     )
-    assert out.filled_qty == 200
-    assert app.paper_projection().quantity("600000") == 200
+    assert out.status == "rejected" and out.reason_code == "PLAN_NOT_EXECUTABLE"
+    assert app.paper_projection().quantity("600000") == 400
+
+
+# ---- E8 r5 buy-side items (#723 R5 ruling) ----
+
+
+def _buy_decision(code="600000", qty=200, market_date=None):
+    from quanthus.capabilities.decision_access import EntryIntent
+    md = market_date or datetime(2026, 11, 19, tzinfo=TZ).date()
+    return MarketDecision(
+        opportunity_id=f"OPP-ENTRY-{code}",
+        security_code=code,
+        security_name="测试证券",
+        stage=OpportunityStage.ENTRY_PLAN,
+        reason_codes=("CAPACITY_AVAILABLE",),
+        explanations=(Explanation("CAPACITY_AVAILABLE", ExplanationUse.ACTION, "test@1", "entry"),),
+        next_observation=None,
+        chart=ChartEvidence(
+            price_basis="none",
+            as_of=datetime.combine(md, datetime.min.time(), tzinfo=TZ).replace(hour=15),
+            bars=(
+                PriceBar(
+                    session=md,
+                    open=Decimal("10.50"),
+                    high=Decimal("10.60"),
+                    low=Decimal("10.40"),
+                    close=Decimal("10.55"),
+                    volume=1000,
+                ),
+            ),
+            support=None,
+            volume_baseline=None,
+            volume_baseline_window=None,
+        ),
+        entry=EntryIntent(
+            fraction=Decimal("0.5"),
+            price_bound=Decimal("10.60"),
+            mark_price=Decimal("10.55"),
+            industry_id="test",
+            eligible_at=datetime.combine(md + timedelta(days=1), datetime.min.time(), tzinfo=TZ).replace(hour=9, minute=30),
+            expires_at=datetime.combine(md + timedelta(days=1), datetime.min.time(), tzinfo=TZ).replace(hour=15),
+            window_ref="test",
+            invalidations=(),
+        ),
+        component_ref=REF,
+    )
+
+
+def test_buy_confirm_runs_at_bound_session_open(tmp_path):
+    # R5 buy-1: the plan-bound buy confirm is admitted at the bound
+    # next_session 09:30 open - the same bound-window gate the sell side
+    # keeps - and fills 200 at the bound open quote.
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    nextopen = day.replace(day=20, hour=9, minute=30)
+    box = [nextopen]
+    ds = _set_for(day.date(), (_buy_decision(qty=200),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    paper = _paper(app, tmp_path, box)
+    plan_id = "plan-OPP-ENTRY-600000-" + day.date().isoformat()
+    plan = app.paper_current_plan(plan_id.removeprefix("plan-"))
+    out = paper.submit(OrderCommand(plan_id, "buy", "600000", 200, Decimal("10.60")))
+    assert out.status in ("open", "filled")
+
+
+def test_buy_confirm_on_2026_10_08_reopen_session(tmp_path):
+    # R5 buy-1 + P10 复市 (issuecomment-7145646570): 2026-10-08 is a real
+    # session (the National Day closure is 10-01..10-07), so a package bound
+    # to 10-08 confirms at its 09:30 open - never held as a holiday.
+    day = datetime(2026, 10, 7, 19, 0, tzinfo=TZ)
+    ds = _set_for(day.date(), (_buy_decision(qty=200, market_date=day.date()),))
+    ds = dataclasses.replace(ds, next_session=date(2026, 10, 8))
+    box = [datetime(2026, 10, 8, 9, 30, tzinfo=TZ)]
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    paper = _paper(app, tmp_path, box)
+    plan_id = "plan-OPP-ENTRY-600000-" + day.date().isoformat()
+    out = paper.submit(OrderCommand(plan_id, "buy", "600000", 200, Decimal("10.60")))
+    assert out.status in ("open", "filled")
+
+
+def test_buy_confirm_outside_session_is_advisory_not_plan_lock(tmp_path):
+    # R5 buy-3: an out-of-session buy confirm is refused MARKET_CLOSED as
+    # an advisory - no stored row, no PLAN_NOT_FOUND - and the SAME order
+    # id still resolves at the legal window.
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    closed = day.replace(day=19, hour=20)   # post-close
+    box = [closed]
+    ds = _set_for(day.date(), (_buy_decision(qty=200),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    paper = _paper(app, tmp_path, box)
+    plan_id = "plan:plan-OPP-ENTRY-600000-" + day.date().isoformat()
+    refused = paper.submit(OrderCommand(plan_id, "buy", "600000", 200, Decimal("10.60")))
+    assert refused.status == "rejected" and refused.reason_code == "MARKET_CLOSED"
+    assert paper._store.get(plan_id, app.scope.account_id) is None
+    # The same id confirms inside the bound session - no lock.
+    box[0] = day.replace(day=20, hour=9, minute=31)
+    paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
+    opened = paper.submit(OrderCommand(plan_id, "buy", "600000", 200, Decimal("10.60")))
+    assert opened.status in ("open", "filled")
+
+
+def test_displayed_buy_qty_matches_bound_open_fill(tmp_path):
+    # R5 buy-4: the workbench, plan and fill all agree on the quantity the
+    # bound open actually executed - 400-held/200-buy everywhere, never a
+    # different figure per surface.
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    nextopen = day.replace(day=20, hour=9, minute=30)
+    box = [nextopen]
+    ds = _set_for(day.date(), (_buy_decision(qty=200),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    bench = app.workbench(app.scope)
+    row = next(o for o in bench.opportunities if o.security_code == "600000")
+    assert row.plan is not None and row.plan.delta_qty == 200
+    paper = _paper(app, tmp_path, box)
+    plan_id = "plan:plan-OPP-ENTRY-600000-" + day.date().isoformat()
+    out = paper.submit(OrderCommand(plan_id, "buy", "600000", 200, Decimal("10.60")))
+    assert out.status in ("open", "filled")
+    if out.status == "filled":
+        assert out.filled_qty == 200
+    stored = paper._store.get(plan_id, app.scope.account_id)
+    assert stored is not None and stored.quantity == 200
 
 
 def test_inflight_sell_deducts_before_new_exit_qty(tmp_path):
-    # r3-2: an in-flight sell already covering the reduce target leaves
-    # zero; a partial cover only adds the difference.
+    # r5: preserved netting - a partial in-flight cover only adds the
+    # difference - with the resting sell injected at the facts port (the
+    # phase-1 order entry refuses new sell registrations on this instance).
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     box = [datetime(2026, 11, 20, 10, 0, tzinfo=TZ)]
     ds = _set_for(day.date(), (_exit_decision(exit_kind="reduce", fraction="0.50"),))
@@ -831,7 +1009,7 @@ def test_inflight_sell_deducts_before_new_exit_qty(tmp_path):
         app.submit_order_event(app.scope, ev)
     paper = _paper(app, tmp_path, box, quote_price="10.30")  # resting, no fill
     # 100 already resting -> the 200-target reduce only adds the other 100.
-    paper.submit(OrderCommand("rest-100", "sell", "600000", 100, Decimal("10.60")))
+    _inject_terminal_sell(app, "rest-100", 100, 0, box[0], price="10.60", terminal=False)
     plan = app.paper_current_plan("plan-OPP-EXIT-600000-" + day.date().isoformat())
     assert plan is not None and plan.delta_qty == 100
 
@@ -849,44 +1027,30 @@ def test_consumed_carry_emits_no_further_sell(tmp_path):
     _seed_bucket(app)
     for ev in _buy_events(day):
         app.submit_order_event(app.scope, ev)
-    paper = _paper(app, tmp_path, box, quote_price="10.30")  # below limit -> rests
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
-    opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.55")))
-    assert opened.status == "open"
-    box[0] = nextopen.replace(hour=15, minute=1)
-    paper.poll()  # expires terminal-unfilled inside the bound session
+    # A prior reduce order expired terminal-unfilled, then its continuation
+    # filled the residual - injected at the facts port (phase-1 sell entry
+    # refuses new sell orders).
+    _inject_terminal_sell(app, plan_id, 200, 0, nextopen)
+    monday_open = nextopen.replace(day=23, hour=9, minute=30)
+    _inject_terminal_sell(app, "plan:plan-carry-600000-2026-11-20", 200, 200, monday_open, "10.66")
 
-    # Monday's plain-HOLD package re-offers the intent as a continuation
-    # row; confirming it in-session fills the 200-share residual.
+    # Monday's package: the consumed intent emits NO new sell plan - the
+    # carry ledger reads original-accepted minus all fills = 0.
     box[0] = nextopen.replace(day=23, hour=10)
     app._decisions._set = dataclasses.replace(
         _set_for(nextopen.date(), ()), next_session=box[0].date())
     bench = app.workbench(app.scope)
-    carry = next(p for p in bench.package.plans if p.plan_id.startswith("plan-carry-600000"))
-    carry_row = next(o for o in bench.opportunities if o.opportunity_id == "OPP-CARRY-600000")
-    assert carry_row.action_code == "SELL" and carry_row.plan.plan_id == carry.plan_id
-    paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
-    filled = paper.submit(
-        OrderCommand("plan:" + carry.plan_id, "sell", "600000", 200, Decimal("10.55"))
-    )
-    assert filled.status == "filled" and filled.filled_qty == 200
-    assert app.paper_projection().quantity("600000") == 200
-
-    # Tuesday's plain-HOLD package: the consumed intent emits nothing new.
-    box[0] = nextopen.replace(day=24, hour=10)
-    app._decisions._set = dataclasses.replace(
-        _set_for(box[0].date() - timedelta(days=1), ()), next_session=box[0].date())
-    bench2 = app.workbench(app.scope)
-    assert not any(p.plan_id.startswith("plan-carry-600000") for p in bench2.package.plans)
-    assert not any(p.side == "sell" for p in bench2.package.plans)
-    # And the ledger records no further sell fill.
+    assert not any(p.plan_id.startswith("plan-carry-600000") for p in bench.package.plans)
+    assert not any(p.side == "sell" for p in bench.package.plans)
     sells = [r for r in app.paper_history().reports if r.side == "sell"]
     assert len(sells) == 1 and sells[0].quantity == 200
 
 
 def test_consumed_carry_confirm_resolves_zero(tmp_path):
-    # r4-1: after the continuation fills the residual, a late confirm of
-    # the SAME carry id resolves nothing new to sell.
+    # r5: after the continuation filled the residual (injected at the facts
+    # port), a late confirm of the SAME carry id is refused display-only
+    # and the package emits no new continuation.
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     nextopen = day.replace(day=20, hour=9, minute=30)
     box = [nextopen]
@@ -895,25 +1059,23 @@ def test_consumed_carry_confirm_resolves_zero(tmp_path):
     _seed_bucket(app)
     for ev in _buy_events(day):
         app.submit_order_event(app.scope, ev)
-    paper = _paper(app, tmp_path, box, quote_price="10.30")
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
-    opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.55")))
-    assert opened.status == "open"
-    box[0] = nextopen.replace(hour=15, minute=1)
-    paper.poll()
+    _inject_terminal_sell(app, plan_id, 200, 0, nextopen)
+    monday_open = nextopen.replace(day=23, hour=9, minute=30)
+    _inject_terminal_sell(app, "plan:plan-carry-600000-2026-11-20", 200, 200, monday_open, "10.66")
     box[0] = nextopen.replace(day=23, hour=10)
     app._decisions._set = dataclasses.replace(
         _set_for(nextopen.date(), ()), next_session=box[0].date())
     bench = app.workbench(app.scope)
-    carry = next(p for p in bench.package.plans if p.plan_id.startswith("plan-carry-600000"))
+    # The consumed intent emits no new carry plan.
+    assert not any(p.plan_id.startswith("plan-carry-600000") for p in bench.package.plans)
+    # A late confirm of the consumed carry id is refused display-only.
+    paper = _paper(app, tmp_path, box)
     paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
-    paper.submit(
-        OrderCommand("plan:" + carry.plan_id, "sell", "600000", 200, Decimal("10.55"))
+    out = paper.submit(
+        OrderCommand("plan:plan-carry-600000-2026-11-20", "sell", "600000", 200, Decimal("10.55"))
     )
-    # The same carry id is now terminal-filled; the package emits no new
-    # continuation, and paper_current_plan sees nothing executable left.
-    bench2 = app.workbench(app.scope)
-    assert not any(p.plan_id.startswith("plan-carry-600000") for p in bench2.package.plans)
+    assert out.status == "rejected" and out.reason_code == "PLAN_NOT_EXECUTABLE"
 
 
 def test_workbench_row_final_qty_matches_plan_delta(tmp_path):

@@ -200,12 +200,18 @@ def build_paper_application(
     decision_source=None,
     live_marks: Callable[[Iterable[str]], Mapping[str, Decimal]] | None = None,
     live_valuation_ref: str = "paper-live-quote",
+    sell_execution_open: bool = False,
 ) -> P12DesktopApplication:
     """Bind the dedicated paper account on the system clock.
 
     ``authorization`` must already admit ``SYN-PAPER-A``.  A fresh store gets
     a default 100,000-cash baseline so the paper account is usable on first
     login; reopening the same store replays the recorded baseline.
+
+    Issue #723 E8 r5 (8792 phase-1 execution mode): the dedicated paper
+    account defaults to "sell_execution_open=False" - sell confirms and
+    sell registrations are display-only in this phase.  Callers hosting an
+    earlier-phase or open slice pass "sell_execution_open=True".
     """
     clock = now or _utcnow
     as_of = clock()
@@ -254,6 +260,7 @@ def build_paper_application(
         sizing_trial_cap=True,
         live_marks=live_marks,
         live_valuation_ref=live_valuation_ref,
+        sell_execution_open=sell_execution_open,
     )
     app.establish_baseline(request_id=PAPER_BASELINE_REQUEST, cash=baseline_cash)
     try:

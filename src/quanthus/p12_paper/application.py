@@ -376,6 +376,7 @@ class PaperAccount:
         """Paper account surface: ledger cash/positions + paper holds and T+1 sellable."""
         session = self._quotes.session()
         trading_day = datetime.fromisoformat(session["trading_date"]).date()
+
         projection = self._projection()
         positions = []
         for item in projection.positions:
@@ -479,10 +480,44 @@ class PaperAccount:
         # run the same funding checks.  A plan that is no longer visible, has
         # closed its window, or disagrees with the submitted side/security is
         # refused before any cash is committed.
+        #
+        # Issue #723 E8 r5 (planning ruling, 8792 phase-1 execution mode):
+        # an instance bound display-only refuses EVERY sell-side order at
+        # the confirm entry - plan-bound confirms and self-directed sells
+        # alike - with an advisory rejection that stores no order row, so a
+        # later retry in a legal phase still resolves.  The refusal lives on
+        # the bound application, not the shared PaperAccount path, so open
+        # instances on other slices keep their sell flow unchanged.
         plan = None
         bound_session_date = None
+        sell_closed = not getattr(self._app, "sell_execution_open", True)
+        if sell_closed and command.side == "sell":
+            return self._reject(command, "PLAN_NOT_EXECUTABLE", None, persist=False)
         if command.order_id.startswith("plan:"):
             plan_id = command.order_id.split(":", 1)[1]
+            # Issue #723 E8 r5 (planning ruling): the bound session window
+            # is judged from the package's authoritative next_session, and
+            # an out-of-session confirm on a LIVE plan reports MARKET_CLOSED
+            # (advisory, nothing stored) instead of a terminal row that
+            # would lock the same id out of the legal window.  A plan that
+            # no longer resolves still reports PLAN_NOT_FOUND first.
+            get_decisions = getattr(self._app, "_current_decisions", None)
+            _decisions = get_decisions() if callable(get_decisions) else None
+            _next_session = getattr(_decisions, "next_session", None)
+            _bound_date = (
+                _next_session.isoformat() if _next_session is not None else None
+            )
+            if command.side == "buy" and _bound_date is not None:
+                bound_open = (
+                    session["market_state"] == "trading"
+                    and session["trading_date"] == _bound_date
+                )
+                if not bound_open:
+                    # The bound session is not open: an advisory refusal,
+                    # never a stored row - the same id resolves again at
+                    # the legal window instead of locking under a stale
+                    # PLAN_NOT_FOUND (E8 r5 buy-3).
+                    return self._reject(command, "MARKET_CLOSED", None, persist=False)
             resolver = getattr(self._app, "paper_current_plan", None)
             # E8 r2-3: a sell confirm re-sizes on the confirm-time mark -
             # the live quote last price this order will actually fill
@@ -508,16 +543,10 @@ class PaperAccount:
                 quantity=plan.delta_qty,
                 limit_price=plan.price_cap,
             )
-            # Issue #723 E8 r2-5: the confirming package next_session is the
-            # order session binding.  A post-publish confirm may register while
-            # the generic session is closed and waits for the bound session
-            # open instead of being refused outright.
-            get_decisions = getattr(self._app, "_current_decisions", None)
-            decisions = get_decisions() if callable(get_decisions) else None
-            next_session = getattr(decisions, "next_session", None)
-            bound_session_date = (
-                next_session.isoformat() if next_session is not None else None
-            )
+            # The bound session date was already resolved above for the
+            # early out-of-session check; reuse it for the order row's
+            # session_date so the matcher ties the fill to the bound day.
+            bound_session_date = _bound_date
             # Issue #719 R12 / #723 (r2): typed unavailable gates for the
             # pre-open facts this plan's conditions declare apply ONLY to
             # buy-side confirms.  A sell or reduction confirm is allowed to
@@ -575,20 +604,11 @@ class PaperAccount:
         # BUY keeps the pending registration from E8 r2-5 (publication lands
         # after the T close, so its confirm rests until the bound session
         # open).  A suspended or quoteless security still refuses up front.
-        if command.side == "sell" and bound_session_date is not None:
-            # The confirmable window is the bound session's continuous
-            # auction only - the same window the matcher trades in.  The
-            # midday lunch break sits outside continuous auction, so an
-            # 11:45 confirm is refused like the pre-open/post-close cases;
-            # the same order id may confirm again at the 13:00 resume and
-            # re-sizes on the facts live at that instant (E8 r4 delta).
-            bound_open = (
-                session["market_state"] == "trading"
-                and session["trading_date"] == bound_session_date
-            )
-            if not bound_open:
-                return self._reject(command, "MARKET_CLOSED", quote, persist=False)
-        elif session["market_state"] != "trading" and bound_session_date is None:
+        # A non-plan order keeps the plain session check: a resting limit
+        # order is only accepted inside continuous auction.  Plan-bound
+        # confirms already passed their bound-session gate above (buy) or
+        # were refused outright (sell), so they never reach this line.
+        if bound_session_date is None and session["market_state"] != "trading":
             return self._reject(command, "MARKET_CLOSED", quote)
         if quote.status == "halt":
             return self._reject(command, "SECURITY_SUSPENDED", quote)

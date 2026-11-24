@@ -10,9 +10,12 @@ const has = (src, s) => assert.ok(src.includes(s), 'missing: ' + s)
 test('sell opportunities read consistent direction, quantity and timing', () => {
   has(workbench, "action_code === 'SELL'")
   assert.match(workbench, /卖出 [\s\S]*formatQuantity/)
-  for (const t of ['当前持有', '卖出数量', '已成交', '剩余待成交', '执行窗口']) has(workbench, t)
+  // E8 r5: phase-1 sell is display-only - the detail keeps the sized
+  // quantities and marks the phase, while the registration entry is closed.
+  for (const t of ['当前持有', '卖出数量', '已成交', '剩余待成交', '执行阶段', '本阶段仅展示']) has(workbench, t)
   has(workbench, 'data-testid="p12-sell-plan"')
-  has(workbench, 'data-testid="p12-open-sell-form"')
+  has(workbench, 'data-testid="p12-sell-closed-note"')
+  assert.ok(!workbench.includes('data-testid="p12-open-sell-form"'), 'sell prefill entry stays closed in phase 1')
   has(workbench, "side: 'sell'")
   assert.match(workbench, /已卖出[\s\S]*剩余[\s\S]*待成交并在同委托终结/)
 })
@@ -31,9 +34,10 @@ test('sell timing wording follows the package-bound next_session (E8 r4-3)', () 
   has(workbench, 'boundSessionDate')
   has(workbench, "workbench?.package?.next_session")
   has(workbench, 'boundSessionLabel')
-  assert.match(workbench, /09:30[\s\S]*交易时段内确认卖出/)
-  has(workbench, '09:30–15:00')
-  has(workbench, 'today.slice(5)')
+  // E8 r5: the sell confirm window is closed in phase 1 - no copy coaches
+  // a session confirm; the bound-session derivation stays for the later
+  // sell-open round.
+  assert.ok(!/交易时段内确认卖出/.test(workbench), 'no sell confirm coaching in phase 1')
   has(workbench, '绑定交易日')
   assert.ok(!/该机会已于/.test(workbench), 'ended sentence must not use market_date')
   has(workbench, 'v-if="!(sellTask && sellTask.settled)"')
@@ -49,9 +53,11 @@ test('queue list shows the final sized sell quantity, not the holding (E8 r4-2)'
   has(workbench, 'isResidueLotZero')
   has(workbench, '余仓不足一手，请自行决定是否卖出')
   has(workbench, 'data-testid="p12-residue-note"')
-  // After-hours sell confirm shows the phase-1 entry wording.
-  has(workbench, '开盘后可确认卖出')
+  // Phase-1 display-only: the hint reads the closed phase, never an
+  // after-hours confirm promise.
+  has(workbench, '本阶段仅展示')
   has(workbench, 'data-testid="p12-sell-window-hint"')
+  assert.ok(!workbench.includes('开盘后可确认卖出'), 'no confirm-window hint for sell in phase 1')
 })
 
 test('off-price funding names the recorded fill and the bucket shortfall', () => {

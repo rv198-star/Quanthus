@@ -408,10 +408,18 @@
                   {{ confirmablePlan.side === 'sell' ? Math.abs(confirmablePlan.delta_qty) : confirmablePlan.delta_qty }} 股 · 限价{{ confirmablePlan.side === 'sell' ? '下限' : '上限' }} ¥{{ confirmablePlan.price_cap }}
                   · 窗口 {{ time(confirmablePlan.eligible_at) }}–{{ time(confirmablePlan.expires_at).slice(11) }}
                 </p>
-                <small>确认即按服务端该计划的数量与限价提交模拟委托，无需手工填单。</small>
-                <small v-if="planConfirmDisabled && confirmablePlan.side === 'sell'" class="p12-confirm-window-hint" data-testid="p12-sell-window-hint">开盘后可确认卖出</small>
+                <!-- Issue #723 E8 r5: phase-1 sell is display-only - the plan -->
+                <!-- stays readable with its sized quantity, the confirm entry -->
+                <!-- never opens, and the page says so instead of hinting at a -->
+                <!-- later confirm window. -->
+                <small v-if="confirmablePlan.side === 'sell'" class="p12-confirm-window-hint" data-testid="p12-sell-window-hint">本阶段仅展示，卖出执行未开放</small>
+                <template v-else>
+                  <small>确认即按服务端该计划的数量与限价提交模拟委托，无需手工填单。</small>
+                  <small v-if="planConfirmDisabled" class="p12-confirm-window-hint" data-testid="p12-buy-window-hint">开盘后可确认买入</small>
+                </template>
               </div>
               <a-button
+                v-if="confirmablePlan.side !== 'sell'"
                 type="primary"
                 :loading="simSubmitting"
                 :disabled="planConfirmDisabled"
@@ -463,7 +471,10 @@
                   data-testid="p12-sim-side-buy"
                   @click="simForm.side = 'buy'"
                 >买入 {{ selected.security_code }}</button>
+                <!-- Issue #723 E8 r5: the phase-1 slice keeps every sell
+                     entry closed; the side switch stays buy-only here. -->
                 <button
+                  v-if="sellExecutionOpen"
                   type="button"
                   :class="['p12-side-btn sell', { active: simForm.side === 'sell' }]"
                   data-testid="p12-sim-side-sell"
@@ -619,7 +630,7 @@
                 <div><dt>卖出数量</dt><dd>{{ sellTask ? qty(sellTask.total) : '—' }}</dd></div>
                 <div><dt>已成交</dt><dd data-testid="p12-sell-filled">{{ sellTask ? qty(sellTask.filled) : '0 股' }}</dd></div>
                 <div><dt>剩余待成交</dt><dd data-testid="p12-sell-remaining">{{ sellTask ? qty(sellTask.remaining) : '—' }}</dd></div>
-                <div v-if="!(sellTask && sellTask.settled)"><dt>执行窗口</dt><dd>{{ sellWindowText }}</dd></div>
+                <div v-if="!(sellTask && sellTask.settled)"><dt>执行阶段</dt><dd data-testid="p12-sell-phase">本阶段仅展示</dd></div>
               </dl>
               <p class="p12-next" data-testid="p12-sell-next">{{ sellNext }}</p>
               <div v-if="sellTask && !sellTask.settled" class="p12-form p12-sell-entry" data-testid="p12-sell-entry">
@@ -635,8 +646,10 @@
                 </template>
                 <template v-else>
                   <h3>登记实际卖出成交</h3>
-                  <p class="p12-hint">同一委托可分笔成交；登记每一笔后确认整单费用并终结委托，结算资金才会归回储备。</p>
-                  <a-button size="small" type="primary" data-testid="p12-open-sell-form" @click="prefillSell">登记卖出成交（已预填）</a-button>
+                  <!-- Issue #723 E8 r5: phase-1 sell registration is closed -->
+                  <!-- for new and held positions; the prefill entry stays -->
+                  <!-- hidden instead of offering a refused form. -->
+                  <p class="p12-hint" data-testid="p12-sell-closed-note">本阶段仅展示，卖出成交登记未开放；持仓继续持有。</p>
                 </template>
               </div>
             </template>
@@ -710,7 +723,9 @@
                   <label v-if="orderForm.kind !== 'fee'">买卖方向
                     <select v-model="orderForm.side" class="p12-select" data-testid="p12-order-side">
                       <option value="buy">买入</option>
-                      <option value="sell">卖出</option>
+                      <!-- Issue #723 E8 r5: phase-1 sell registration is
+                           closed; the option stays off the form. -->
+                      <option v-if="sellExecutionOpen" value="sell">卖出</option>
                     </select>
                   </label>
                   <label>发生时间<input v-model="orderForm.time" type="datetime-local" data-testid="p12-order-time" /></label>
@@ -1178,6 +1193,13 @@ export default {
       const session = this.marketSession
       return !!(session && session.market_state && session.market_state !== 'trading')
     },
+    sellExecutionOpen () {
+      // Issue #723 E8 r5: the 8792 phase-1 execution slice keeps every sell
+      // surface display-only.  When the bound instance advertises an open
+      // sell phase on the workbench payload this flag follows it; absent a
+      // flag the phase-1 read stays closed.
+      return this.workbench?.sell_execution_open === true
+    },
     selectedDisplayName () {
       if (!this.selected) return ''
       if (!this.isCurrentSynthetic) {
@@ -1402,7 +1424,10 @@ export default {
         code !== 'CAPACITY_AVAILABLE' &&
         !code.startsWith('NEW_') &&
         code !== 'WAITING_FOR_PULLBACK' &&
-        !(ended && code === 'EXIT_SIGNAL'))
+        // E8 r5: a live sell/reduce row is display-only - its EXIT_SIGNAL
+        // text never surfaces as a current constraint; an ENDED row still
+        // records it as history (endedReasons keeps the ended branch).
+        code !== 'EXIT_SIGNAL')
     },
     endedReasons () {
       const item = this.selected
@@ -1540,10 +1565,10 @@ export default {
         const open = t.open.length
         return `已成交 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)}；同一委托待终结确认${open ? `（${open} 笔进行中）` : ''}`
       }
-      const whenText = this.boundSessionLabel || '下一交易日'
-      return this.sellIsTomorrow
-        ? `${whenText} 09:30 起在交易时段内确认卖出 ${formatQuantity(t.total || 0)}`
-        : `今天任务：卖出 ${formatQuantity(t.total || 0)}，在交易窗口内登记实际成交`
+      // Issue #723 E8 r5: phase-1 sell is display-only - the pending
+      // quantity stays visible, the line never schedules a confirm.
+      const tag2 = item.exit_kind === 'reduce' ? '减仓' : '卖出'
+      return `${tag2}建议 ${formatQuantity(t.total || 0)}，本阶段仅展示，卖出执行未开放；持仓继续持有`
     },
     takeawayActionTitle () {
       const item = this.selected
@@ -1605,9 +1630,11 @@ export default {
             : `已卖出 ${formatQuantity(t.filled)}，待确认费用并终结委托`
         }
         if (t.filled > 0) return `已卖出 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)} 待成交并在同委托终结`
+        // Issue #723 E8 r5: phase-1 sell is display-only - the sized
+        // quantity stays readable, the sentence never coaches a confirm.
         const qty = t.remaining || Math.abs((item.applicability && item.applicability.delta_qty) || 0)
-        const when = this.sellIsTomorrow ? `${this.boundSessionLabel || '下一交易日'} 09:30 起` : '今天'
-        return `${when}在交易时段内确认卖出 ${formatQuantity(qty)}`
+        const tag = item.exit_kind === 'reduce' ? '减仓' : '卖出'
+        return `${tag}建议 ${formatQuantity(qty)}，本阶段仅展示，卖出执行未开放；持仓继续持有`
       }
       if (item.stage === 'exit_plan' && item.status_code === 'ENDED') {
         const t = this.sellTask || { filled: 0, total: 0 }
@@ -1872,16 +1899,15 @@ export default {
         return `买入 ${item.applicability.delta_qty} 股`
       }
       if (item.action_code === 'SELL') {
-        // Issue #723 E8 r4-2: the queue shows the plan's final sized sell
-        // quantity - the same figure the detail, confirm card and receipt
-        // display - never the whole held position (400 held / 200 to sell
-        // reads "卖出 200 股" everywhere).
+        // Issue #723 E8 r5: phase-1 sell is display-only - the queue
+        // reports the sized quantity as a view-only suggestion, never a
+        // confirm CTA.
         const finalQty =
           (item.plan && item.plan.delta_qty < 0 && Math.abs(item.plan.delta_qty)) ||
           (item.applicability && item.applicability.delta_qty < 0 && Math.abs(item.applicability.delta_qty)) ||
           0
-        if (finalQty > 0) return `卖出 ${finalQty} 股`
-        return label('action_code', item.action_code)
+        if (finalQty > 0) return `卖出 ${finalQty} 股（本阶段仅展示）`
+        return '卖出（本阶段仅展示）'
       }
       return label('action_code', item.action_code)
     },
@@ -1924,6 +1950,16 @@ export default {
       }
       if (item.applicability && item.applicability.status === 'NEEDS_REASSESSMENT') {
         return `已买入 ${item.applicability.current_qty} 股入账，剩余股数待次日盘后复核`
+      }
+      if (item.action_code === 'SELL' && item.stage === 'exit_plan') {
+        // Issue #723 E8 r5: a sell or reduce plan is display-only in
+        // phase 1 - the queue never coaches a live sell action.
+        const q =
+          (item.plan && item.plan.delta_qty < 0 && Math.abs(item.plan.delta_qty)) ||
+          (item.applicability && item.applicability.delta_qty < 0 && Math.abs(item.applicability.delta_qty)) ||
+          0
+        const tag = item.exit_kind === 'reduce' ? '减仓建议' : '卖出建议'
+        return q > 0 ? `${tag} ${formatQuantity(q)}，本阶段仅展示` : `${tag}，本阶段仅展示`
       }
       if (item.explanations && item.explanations.length) {
         return item.explanations[0].text

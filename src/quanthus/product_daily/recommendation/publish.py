@@ -231,16 +231,19 @@ def _validate_consumer_object(
     validated: Any,
     *,
     wire_version: str,
+    wire_digest: str | None = None,
 ) -> str:
     """Single validated-object coordinate check + bound-package digest.
 
-    Internal mechanism kept for the future real integration: the consumer callable
-    is invoked exactly once per decision_set by the caller; the returned object is
-    matched on market_date, every opportunity's security_code, stage and
-    exit_kind, and each reduce's target with Decimal semantics; the binding digest
-    is computed from the SAME validated object, resolved through that object's own
-    package so a tree without the bound P12 package fails closed.  This function
-    never opens the release gate by itself - _consumer_pin_unresolved is the gate.
+    The consumer callable is invoked exactly once per decision_set by the caller;
+    the returned object is matched on market_date, every opportunity's
+    security_code, stage and exit_kind, and each reduce's target with Decimal
+    semantics.  On the pinned v2 surface the recorded binding digest is the real
+    loader's own wire digest over the raw bytes (passed in as wire_digest); on the
+    v1 surface the historical digest is recomputed from the validated object
+    through its own package so a tree without the bound P12 package fails closed.
+    This function never opens the release gate by itself - _consumer_pin_unresolved
+    is the gate.
     """
 
     if getattr(validated, "market_date", None) is not None and (
@@ -315,6 +318,12 @@ def _validate_consumer_object(
                         f"pinned consumer dropped or altered the reduce target "
                         f"on {opportunity_id} (Decimal comparison)",
                     )
+    if wire_version == V2_DS_SCHEMA and wire_digest is not None:
+        # The pinned contract's own digest over the raw wire bytes - including the
+        # v2 fields - is the binding identity.  It comes from the same pinned call
+        # that produced the validated object above, so a tampered payload that
+        # never validates can never carry a forged digest through this surface.
+        return wire_digest
     import importlib
 
     top_package = type(validated).__module__.split(".", 1)[0]
@@ -420,10 +429,25 @@ def publish_package(
             "pending - no caller loader, binding dict, attribute or namespace "
             "opens a public release until the real pin is bound",
         )
-    # An executable reduce additionally can never be released without the real
-    # consumer pipeline: once a bound pin exists the loader is the resolved pinned
-    # entry; until then the pin check above has already refused.
-    if has_reduce and p12_loader is None:
+    # Once the versioned pin is bound, the consumer pipeline is resolved from the
+    # binding itself - never from a caller-supplied callable.  A caller p12_loader
+    # remains usable only on the v1 surface where no v2 release is involved; on
+    # the v2 surface it is ignored rather than trusted.
+    if needs_v2_consumer:
+        from quanthus.product_daily.recommendation.runtime_identity import (
+            resolve_pinned_v2_loader,
+        )
+
+        try:
+            pinned_loader = resolve_pinned_v2_loader(find_project_root())
+        except ProductDailyError as exc:
+            raise ProductDailyError(
+                "unpublishable_package",
+                f"the bound P12 v2 consumer could not be resolved from its "
+                f"versioned pin: {exc}",
+            ) from exc
+        p12_loader = pinned_loader
+    elif p12_loader is None and has_reduce:
         raise ProductDailyError(
             "unpublishable_package",
             "an executable reduce requires the pinned consumer pipeline; "
@@ -439,10 +463,7 @@ def publish_package(
         p12_digests = {}
         for raw in _serialize_decision_sets(package, wire_version=wire_version):
             try:
-                if wire_version == V2_DS_SCHEMA:
-                    validated = p12_loader(raw, expected_schema=wire_version)
-                else:
-                    validated = p12_loader(raw)
+                loaded = p12_loader(raw)
             except ProductDailyError:
                 raise
             except Exception as exc:
@@ -453,8 +474,27 @@ def publish_package(
                         f"{raw['market_date']}: {exc}",
                     ) from exc
                 raise
+            if wire_version == V2_DS_SCHEMA:
+                # The pinned contract returns (MarketDecisionSet, wire_digest); the
+                # validated object feeds coordinate checks, the wire digest covers
+                # the raw bytes and is recorded as the binding digest.  An object
+                # without the tuple shape is not the pinned reader and is refused.
+                if (
+                    not isinstance(loaded, tuple)
+                    or len(loaded) != 2
+                    or not isinstance(loaded[1], str)
+                    or not loaded[1].startswith("sha256:")
+                ):
+                    raise ProductDailyError(
+                        "unpublishable_package",
+                        "the pinned v2 consumer did not return the declared "
+                        "(MarketDecisionSet, wire_digest) pair",
+                    )
+                validated, wire_digest = loaded
+            else:
+                validated, wire_digest = loaded, None
             p12_digests[raw["market_date"]] = _validate_consumer_object(
-                raw, validated, wire_version=wire_version
+                raw, validated, wire_version=wire_version, wire_digest=wire_digest
             )
 
     target_dir = Path(directory)

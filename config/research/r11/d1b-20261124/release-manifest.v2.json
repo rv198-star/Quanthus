@@ -90,9 +90,9 @@
   "held_reduction_wire": {
     "wire_version": "p12.decision-set.v2",
     "reduce_denominator": "locked_cycle_budget",
-    "consumer_capability": "versioned p12-consumer-binding.v1 object: consumer_schema=p12.decision-set.v2 + real source_commit/tree/file-hash pin + capabilities.supports_held_reduction_v2 + single-call field-preserving validated object",
+    "consumer_capability": "versioned p12-consumer-binding.v1 object bound to P12 commit 93948784: consumer_schema=p12.decision-set.v2 + real source_commit/tree + per-file sha256 pin + capabilities.supports_held_reduction_v2 + single-call (MarketDecisionSet, wire_digest)",
     "missing_consumer_disposition": "refused or display_only",
-    "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set(raw,*,expected_schema=p12.decision-set.v2)); caller bools/dicts, unpinned bindings and old field-dropping loaders are all refused before write; real pin pending -> refused/display_only"
+    "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set, bound at commit 93948784); caller bools/dicts, unpinned bindings, stale-commit trees and old field-dropping loaders are all refused before write. mode=simulation with purpose=historical_replay; the wire digest returned by the pinned call is the binding digest."
   },
   "release_bindings": {
     "machine_policy": {
@@ -105,7 +105,7 @@
     },
     "consumer": {
       "path": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json",
-      "sha256": "sha256:09aaf05f4468471b2bf5df6765c342f8ab18ade4ec32190a42af0de8974caa0d"
+      "sha256": "sha256:492a2dc4fd9d149e5c5fc7739eb0b1e796d383f2283bc1b67292bab8363d5823"
     }
   }
 }

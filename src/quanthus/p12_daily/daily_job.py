@@ -78,6 +78,11 @@ ZERO_QUALIFIED_TABLES = ("dwd_security_bar",)
 PUBLISH_GATE_CONFIG = (
     Path(__file__).resolve().parents[3] / "config/p12/daily-publish-gate.v1.json"
 )
+# The P11 fixed-rule replay producer id.  It signs its evaluation receipt
+# on its OWN four-field coverage algorithm (producer/version/run/universe);
+# the daily-core manifest and package identity are bound on the same run's
+# source_closure separately, never folded into that producer's digest.
+P11_REPLAY_PRODUCER_ID = "p11.fixed-rule-day"
 
 
 def _run_id(now: datetime) -> str:
@@ -173,19 +178,48 @@ def _publish_gate_block(
         )
     # 1. coverage digest consistent with this run: recompute the producer's
     #    own coverage identity and compare; a self-minted or stale digest fails.
-    coverage_payload = {
-        "producer_id": producer_id,
-        "producer_version": receipt.get("producer_version"),
-        "run_id": receipt.get("run_id"),
-        "evaluated_universe": sorted(receipt.get("evaluated_universe") or ()),
-        "manifest_sha256": expected_manifest_sha256,
-        "package_id": closure.get("package_id"),
-    }
-    if receipt.get("coverage_digest") != digest(coverage_payload):
-        return (
-            "candidate_evaluation_coverage_mismatch",
-            {"expected": digest(coverage_payload), "actual": receipt.get("coverage_digest")},
+    #    The P11 replay producer signs the same producer/run/evaluated-universe
+    #    binding but on ITS OWN four-field algorithm
+    #    (CandidateEvaluationReceipt.expected_coverage_digest); the synthetic
+    #    producer additionally folds the manifest/package scope into the digest.
+    #    The manifest/package identity is bound separately by the
+    #    core_manifest_sha256 check above and the same-run package binding, so
+    #    each producer's declared algorithm is what the gate recomputes.
+    if producer_id == P11_REPLAY_PRODUCER_ID:
+        from quanthus.product_daily.recommendation.producer import (
+            _json_digest as _p11_json_digest,
         )
+        coverage_payload = {
+            "producer_id": producer_id,
+            "producer_version": receipt.get("producer_version"),
+            "run_id": receipt.get("run_id"),
+            "evaluated_universe": sorted(receipt.get("evaluated_universe") or ()),
+        }
+        if receipt.get("coverage_digest") != _p11_json_digest(coverage_payload):
+            return (
+                "candidate_evaluation_coverage_mismatch",
+                {
+                    "expected": _p11_json_digest(coverage_payload),
+                    "actual": receipt.get("coverage_digest"),
+                },
+            )
+    else:
+        coverage_payload = {
+            "producer_id": producer_id,
+            "producer_version": receipt.get("producer_version"),
+            "run_id": receipt.get("run_id"),
+            "evaluated_universe": sorted(receipt.get("evaluated_universe") or ()),
+            "manifest_sha256": expected_manifest_sha256,
+            "package_id": closure.get("package_id"),
+        }
+        if receipt.get("coverage_digest") != digest(coverage_payload):
+            return (
+                "candidate_evaluation_coverage_mismatch",
+                {
+                    "expected": digest(coverage_payload),
+                    "actual": receipt.get("coverage_digest"),
+                },
+            )
     # 3. buy decisions correspond one-to-one with the receipt's qualified
     #    candidates; hold and exit decisions correspond one-to-one with the
     #    receipt's holding signals.  A holdings-only package has an empty

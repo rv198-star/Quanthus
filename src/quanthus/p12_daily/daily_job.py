@@ -24,6 +24,7 @@ import dataclasses
 import json
 import math
 import os
+import sys
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -1522,6 +1523,16 @@ def _load_runner(spec: str | None, candidates_path: Path | None) -> StrategyRule
             "RULE_VERSION_REJECTED",
             f"rule runner {spec!r} is not an admitted batch-A version",
         )
+    if candidates_path is not None:
+        # Issue #722 r9-2: --candidates is a test/debug knob, never part of
+        # the systemd -> wrapper -> CLI production path (the wrapper never
+        # passes it).  Mark the run's startup so an operator-supplied file
+        # is visibly non-production on the receipt/log.
+        print(
+            "p12-daily-job: --candidates is TEST-ONLY (manual/debug); "
+            "it is not part of the production daily run.",
+            file=sys.stderr,
+        )
     path = candidates_path or Path(__file__).resolve().parents[3] / (
         "config/p12/daily-synthetic-candidates.v1.json"
     )
@@ -1564,7 +1575,13 @@ def main(argv: list[str] | None = None) -> int:
         help="optional; the governed calendar decides next_session (M2 F2)",
     )
     parser.add_argument("--runner", default="synthetic-replay")
-    parser.add_argument("--candidates", type=Path)
+    parser.add_argument(
+        "--candidates",
+        type=Path,
+        help="TEST-ONLY: explicit synthetic candidates file for the labelled "
+        "synthetic runner; not part of the daily production run (which uses "
+        "the bundled config fixture).  For tests and manual debugging only.",
+    )
     parser.add_argument(
         "--decision-cutoff",
         default=None,

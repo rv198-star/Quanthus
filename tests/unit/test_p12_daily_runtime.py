@@ -1604,13 +1604,18 @@ def test_reduce_exit_plan_workbench_shows_suggestion_not_sell(tmp_path):
     )
     scope = AccountScope(PAPER_ACCOUNT_ID, "synthetic")
     bench = app.workbench(scope)
+    # Issue #722 r9-1: a held reduction resolves to a held disposition -
+    # stage=holding, exit_kind cleared, the sell reason swapped for a
+    # registered hold reason; the page shows the suggestion note, never a
+    # sell form.
     row = next(
-        o for o in bench.opportunities if o.stage == "exit_plan"
+        o for o in bench.opportunities if o.security_code == "600000"
     )
-    # A reduce exit_plan is a 减仓建议: no full-sell action, exit_kind marks
-    # it reduce so the page renders the suggestion instead of the sell form.
-    assert row.exit_kind == "reduce"
+    assert row.stage == "holding"
+    assert row.exit_kind is None
     assert row.action_code == "HOLD"
+    assert "HOLD_AND_ALERT" in row.reason_codes
+    assert "EXIT_SIGNAL" not in row.reason_codes
     assert not any(
         o.side == "sell" and o.security_code == "600000"
         for o in bench.orders

@@ -119,6 +119,21 @@ def build_local_kernel(
             calendar_next_session_provider,
         )
 
+        # The publish display reuses the nightly job's configured decision
+        # cutoff time-of-day so the workbench next-check matches the timer
+        # that actually publishes (audit R15).  A missing env falls back to
+        # the source's 22:30+08 default.
+        from datetime import time as _time
+        publish_time = None
+        raw_cutoff = os.environ.get("QUANTHUS_P12_DECISION_CUTOFF")
+        if raw_cutoff:
+            try:
+                publish_time = _time.fromisoformat(str(raw_cutoff).strip())
+            except ValueError:
+                publish_time = None
+        source_kwargs = {}
+        if publish_time is not None:
+            source_kwargs["publish_time"] = publish_time
         paper_decisions = PublishedPackageSource(
             state_dir,
             system_clock,
@@ -136,6 +151,7 @@ def build_local_kernel(
                     else None
                 ),
             ),
+            **source_kwargs,
         )
     paper_app = build_paper_application(
         state_dir=state_dir,

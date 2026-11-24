@@ -11,7 +11,7 @@ generated" from the publication status plus the latest run receipt.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 from quanthus.capabilities.decision_access import (
@@ -25,6 +25,14 @@ from quanthus.shared.values import AccountScope, VersionRef
 
 PENDING_REF_ID = "p12-daily-advice"
 PENDING_VERSION = "v1"
+
+EXCHANGE_TZ = timezone(timedelta(hours=8))
+
+# The configured daily publish time-of-day (audit R15): the next workbench
+# check is the next authoritative session at this time, the same moment the
+# nightly timer fires.  A pending placeholder publishes then too, so the
+# publication clock and the displayed next_check_at stay consistent.
+DEFAULT_PUBLISH_TIME = time(22, 30, tzinfo=EXCHANGE_TZ)
 
 
 def calendar_next_session_provider(job_root: Path, calendar_root: Path | None = None):
@@ -71,6 +79,7 @@ class PublishedPackageSource:
         mode: str = "synthetic",
         account_ids: frozenset[str] | None = None,
         next_session_provider=None,
+        publish_time: time = DEFAULT_PUBLISH_TIME,
     ) -> None:
         self._store = DailyPackageStore(Path(state_dir))
         self._clock = clock
@@ -82,6 +91,7 @@ class PublishedPackageSource:
         # guess.  When no authoritative session is resolvable the placeholder
         # is blocked rather than fabricating a date.
         self._next_session_provider = next_session_provider
+        self._publish_time = publish_time
 
     # ---- helpers --------------------------------------------------------------
     def _scope_ok(self, scope: AccountScope) -> None:
@@ -146,6 +156,10 @@ class PublishedPackageSource:
     def latest_run(self) -> dict | None:
         return self._store.latest_run()
 
+    def publish_time(self) -> time:
+        """Configured daily publish time-of-day for the next-check display."""
+        return self._publish_time
+
     def pending_source_ref(self) -> VersionRef:
         '''Identity of the not-yet-published placeholder.
 
@@ -166,7 +180,6 @@ class PublishedPackageSource:
         # the latest run receipt, while the account binding can still open.
         today = self._clock().date()
         cutoff = datetime(today.year, today.month, today.day, 0, 0, tzinfo=timezone.utc)
-        published_at = cutoff + timedelta(days=1, hours=1)
         # Authoritative next session only (audit R6): resolve through the
         # injected provider; an unresolvable calendar fails the placeholder
         # closed instead of fabricating a date by natural-day arithmetic.
@@ -180,6 +193,12 @@ class PublishedPackageSource:
                 "INPUT_UNAVAILABLE",
                 "no authoritative next_session for the pending placeholder",
             )
+        # The placeholder publishes at the configured publish point of the
+        # next authoritative session (audit R15).  Using that moment keeps the
+        # visibility check (now >= published_at) and the displayed
+        # next_check_at on the same configured time-of-day instead of a fixed
+        # next-day wall-clock guess.
+        published_at = datetime.combine(next_session, self._publish_time)
         return validate_decision_set(
             MarketDecisionSet(
                 source_ref=VersionRef(

@@ -1396,13 +1396,17 @@ class P12DesktopApplication:
         if callable(provider):
             nxt = provider(now.date())
             if nxt is not None and nxt > now.date():
+                # The publish time-of-day is the source's configured publish
+                # point (audit R15).  A pending placeholder publishes at the
+                # same moment, so the blocked page and the normal pending page
+                # agree on the next check.  A receipt's decision_cutoff is the
+                # run's configured cutoff, not the publish display.
                 cutoff_time = time(22, 30)
-                raw_cutoff = (run_receipt or {}).get("decision_cutoff")
-                if raw_cutoff:
-                    try:
-                        cutoff_time = datetime.fromisoformat(str(raw_cutoff)).timetz()
-                    except (ValueError, AttributeError):
-                        pass
+                source_publish = getattr(self._decisions, "publish_time", None)
+                if callable(source_publish):
+                    candidate = source_publish()
+                    if candidate is not None:
+                        cutoff_time = candidate.timetz() if hasattr(candidate, "timetz") else candidate
                 next_check_at = datetime.combine(nxt, cutoff_time)
         return WorkbenchView(
             scope=scope,

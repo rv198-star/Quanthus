@@ -1596,3 +1596,31 @@ def test_reduce_exit_plan_workbench_shows_suggestion_not_sell(tmp_path):
         o.side == "sell" and o.security_code == "600000"
         for o in bench.orders
     )
+
+
+def test_pending_placeholder_publishes_at_configured_publish_time(tmp_path):
+    """Audit R15: the pending placeholder's published_at and the derived
+    next_check_at carry the configured publish time-of-day (22:30+08), not a
+    fixed next-day wall-clock guess."""
+    from datetime import time as _time
+
+    state = tmp_path / "state"
+
+    def clock():
+        return datetime(2026, 11, 24, 8, 0, tzinfo=timezone.utc)
+
+    source = PublishedPackageSource(
+        state,
+        clock,
+        mode="synthetic",
+        next_session_provider=lambda _today: date(2026, 11, 25),
+        publish_time=_time(22, 30, tzinfo=TZ),
+    )
+    pending = source.current(AccountScope("SYN-PAPER-A", "synthetic"))
+    # published_at is the next session at 22:30+08 - the same moment the
+    # nightly timer publishes - so now < published_at keeps it NOT_YET_.
+    assert pending.published_at == datetime(2026, 11, 25, 22, 30, tzinfo=TZ)
+    assert pending.published_at.tzinfo is not None
+    next_check = datetime.combine(pending.next_session, pending.published_at.timetz())
+    assert next_check == pending.published_at
+    assert source.publish_time() == _time(22, 30, tzinfo=TZ)

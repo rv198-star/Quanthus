@@ -124,7 +124,7 @@ def make_forward_calendar(
         "status": "PARTIAL",
         "version": version,
         "descriptor": f"{version}/descriptor.json",
-        "descriptor_sha256": "sha256:" + dsha,
+        "descriptor_sha256": dsha,
         "published_at": published_at,
         "available_at": available_at,
     }
@@ -734,7 +734,7 @@ def test_forward_calendar_venue_disagreement_blocks(tmp_path):
     dsha = hashlib.sha256(desc.read_bytes()).hexdigest()
     ptr_path = root / "CURRENT_FORWARD_CALENDAR.json"
     ptr = json.loads(ptr_path.read_text())
-    ptr["descriptor_sha256"] = "sha256:" + dsha
+    ptr["descriptor_sha256"] = dsha
     ptr_path.write_text(json.dumps(ptr))
     make_product(prod, MARKET_DATE.isoformat())
     receipt = run_daily(

@@ -236,10 +236,13 @@ def load_forward_calendar(
 
     # P12 recomputes the descriptor digest itself; the declared sha is a
     # claim to verify, never a value to copy.
-    actual_sha = "sha256:" + _sha256_file(desc_path)
+    recomputed = _sha256_file(desc_path)
+    actual_sha = "sha256:" + recomputed
     receipt["calendar_verified_at"] = datetime.now(EXCHANGE_TZ).isoformat()
     receipt["calendar_sha256"] = actual_sha
-    if actual_sha != declared_sha:
+    # The pointer declares a bare hex digest; compare the recomputed hex,
+    # never the sha256:-prefixed display form.
+    if recomputed != declared_sha:
         return None, CalendarBlock(
             detail=(
                 "descriptor sha256 differs from the pointer's declared "

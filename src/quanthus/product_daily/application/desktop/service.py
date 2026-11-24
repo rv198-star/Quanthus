@@ -191,6 +191,25 @@ def _carried_plan_id(decisions, security_code: str) -> str:
     return f"plan-carry-{security_code}-{decisions.market_date.isoformat()}"
 
 
+# E8 r3-4: the wire invalidations carry a clear Chinese explanation the
+# page can show verbatim - never the internal sizing constant.  The
+# internal code stays in risk_check_ref for audit.
+_SIZING_REASON_HINT = {
+    "ALREADY_BELOW_TARGET": "当前持仓已低于减仓目标，无需卖出",
+    "REDUCE_RESIDUE_LOT_ZERO": "减仓后余仓不足一手，请人工决定是否清仓",
+    "REDUCE_BUDGET_UNKNOWN": "建仓资金桶预算未核实，暂不卖出",
+    "MARK_PRICE_UNAVAILABLE": "缺少有效标记价，暂不卖出",
+    "NOTHING_SELLABLE_T1": "当日无可卖出数量（T+1 未解禁）",
+}
+
+
+def _sizing_invalidations(reason_code):
+    """Project the internal sizing reason to a wire-safe Chinese hint."""
+    if reason_code is None:
+        return ()
+    return (_SIZING_REASON_HINT.get(reason_code, reason_code),)
+
+
 def _active_bucket_and_budget(app, history):
     # security -> (bucket_id, locked_cycle_budget) for RESERVED/HELD cycles.
     # The reduce fraction denominator is that cycle locked_cycle_budget.
@@ -841,6 +860,7 @@ class P12DesktopApplication:
                 locked_cycle_budget=locked,
                 bucket_id=bucket_id,
                 lot_size=self._policy.risk.lot_size,
+                covered_qty=int(sell_reserved.get(item.security_code, 0)),
             )
             target = current - sizing.sell_qty
             plans.append(
@@ -858,7 +878,7 @@ class P12DesktopApplication:
                     eligible_at=decisions.published_at,
                     expires_at=_session_close(decisions.next_session),
                     window_ref=f"close-to-next-open:{decisions.next_session.isoformat()}",
-                    invalidations=(() if sizing.reason_code is None else (sizing.reason_code,)),
+                    invalidations=_sizing_invalidations(sizing.reason_code),
                     # E8 r2-4: an internal sizing reason is projected through
                     # the registered HOLD_AND_ALERT code on the wire, never a
                     # new closed-enum value; the specific Chinese hint rides in
@@ -875,6 +895,8 @@ class P12DesktopApplication:
                         "mark": str(mark),
                     }),
                     depends_on_preopen=(),
+                    exit_kind=item.exit_kind,
+                    target_position_fraction=item.target_position_fraction,
                 )
             )
         # Carried exit intents: securities whose plan sell order ended
@@ -887,6 +909,23 @@ class P12DesktopApplication:
             for item in decisions.decisions
             if item.stage is OpportunityStage.EXIT_PLAN and item.exit_kind is not None
         }
+        # Recover each carried order's ORIGINAL exit intent.  The order's
+        # plan_id is plan-OPP-EXIT-<code>-<pkg-date>; the prior package that
+        # published it kept the exit_kind + fraction on the plan itself, so
+        # a reduce carries its own target ratio and never degrades into a
+        # flat.  When the intent cannot be recovered (an order that was
+        # never a typed exit), the carry keeps the conservative flat.
+        prior_exit_plans = {}
+        for prior in self._decisions.history(self._scope):
+            for d in getattr(prior, "decisions", ()) or ():
+                if (
+                    getattr(d, "stage", None) is OpportunityStage.EXIT_PLAN
+                    and getattr(d, "exit_kind", None) is not None
+                ):
+                    prior_exit_plans[d.security_code] = (
+                        d.exit_kind,
+                        getattr(d, "target_position_fraction", None),
+                    )
         for security_code, prior_orders in carried.items():
             if security_code in fresh_exit_secs or exit_unverified:
                 continue
@@ -896,10 +935,22 @@ class P12DesktopApplication:
             mark = marks_map.get(security_code)
             bucket_id = bucket_by_sec.get(security_code)
             locked = locked_by_sec.get(security_code) if bucket_id else None
+            carry_kind, carry_fraction = prior_exit_plans.get(
+                security_code, ("full", None)
+            )
+            # E8 r3-6: the carry keeps the SAME intent - its remaining
+            # obligation is the unfilled residual of the prior order, never a
+            # fresh flat of the whole holding.  A reduce that left 200
+            # unfilled re-offers at most those 200, re-bounded by today's
+            # sellable and the keep floor its fraction still imposes.
+            residual = sum(
+                int(o.accepted_total_qty) - int(o.known_fill_qty)
+                for o in prior_orders
+            )
             sizing = size_exit(
                 security_code=security_code,
-                exit_kind="full",
-                target_position_fraction=None,
+                exit_kind=carry_kind,
+                target_position_fraction=carry_fraction,
                 held_qty=current,
                 sellable_qty=_sellable_for(
                     security_code,
@@ -910,8 +961,12 @@ class P12DesktopApplication:
                 locked_cycle_budget=locked,
                 bucket_id=bucket_id,
                 lot_size=self._policy.risk.lot_size,
+                covered_qty=int(sell_reserved.get(security_code, 0)),
             )
-            target = current - sizing.sell_qty
+            # Cap the carried sell at the surviving residual obligation.
+            sell_qty = min(sizing.sell_qty, max(0, residual))
+            sizing = dataclasses.replace(sizing, sell_qty=sell_qty)
+            target = current - sell_qty
             plans.append(
                 PublishedPlan(
                     plan_id=_carried_plan_id(decisions, security_code),
@@ -927,7 +982,7 @@ class P12DesktopApplication:
                     eligible_at=decisions.published_at,
                     expires_at=_session_close(decisions.next_session),
                     window_ref=f"close-to-next-open:{decisions.next_session.isoformat()}",
-                    invalidations=(() if sizing.reason_code is None else (sizing.reason_code,)),
+                    invalidations=_sizing_invalidations(sizing.reason_code),
                     reason_codes=(
                         () if sizing.reason_code is None else ("HOLD_AND_ALERT",)
                     ),
@@ -935,11 +990,14 @@ class P12DesktopApplication:
                     risk_check_ref=digest({
                         "plan_id": _carried_plan_id(decisions, security_code),
                         "carry_of": [o.order_id for o in prior_orders],
+                        "exit_kind": carry_kind,
                         "target": str(target),
                         "locked": str(locked),
                         "mark": str(mark),
                     }),
                     depends_on_preopen=(),
+                    exit_kind=carry_kind,
+                    target_position_fraction=carry_fraction,
                 )
             )
         body = {
@@ -2811,11 +2869,22 @@ class P12DesktopApplication:
                 (d for d in decisions.decisions if d.opportunity_id == plan.opportunity_id),
                 None,
             )
-            exit_kind = getattr(decision, "exit_kind", None) or "full"
-            fraction = getattr(decision, "target_position_fraction", None)
+            # A carried intent keeps its original kind/fraction on the plan;
+            # a fresh exit_plan reads the decision.  Reduce never degrades.
+            exit_kind = (
+                getattr(plan, "exit_kind", None)
+                or getattr(decision, "exit_kind", None)
+                or "full"
+            )
+            fraction = (
+                getattr(plan, "target_position_fraction", None)
+                if getattr(plan, "target_position_fraction", None) is not None
+                else getattr(decision, "target_position_fraction", None)
+            )
+            reserved_map = _sell_reserved_by_security(snapshot.history)
             sellable = _sellable_for(
                 plan.security_code, snapshot.projection, snapshot.history,
-                _sell_reserved_by_security(snapshot.history), now.date(),
+                reserved_map, now.date(),
             )
             sizing = size_exit(
                 security_code=plan.security_code,
@@ -2827,10 +2896,39 @@ class P12DesktopApplication:
                 locked_cycle_budget=locked_by_sec.get(plan.security_code) if bucket_id else None,
                 bucket_id=bucket_id,
                 lot_size=self._policy.risk.lot_size,
+                covered_qty=int(reserved_map.get(plan.security_code, 0)),
             )
-            if sizing.sell_qty <= 0:
+            sell_qty = sizing.sell_qty
+            if plan.plan_id.startswith("plan-carry-"):
+                # A carried intent only ever re-offers the surviving residual
+                # of the orders it carries - never a fresh flat.  Re-derive
+                # the residual from the still-terminal plan sell orders.
+                residual = sum(
+                    max(0, int(o.accepted_total_qty) - int(o.known_fill_qty))
+                    for o in getattr(snapshot.history, "orders", ()) or ()
+                    if str(o.order_id).startswith("plan:")
+                    and o.side == "sell"
+                    and o.status == "terminal"
+                    and o.security_code == plan.security_code
+                    and int(o.accepted_total_qty) - int(o.known_fill_qty) > 0
+                )
+                sell_qty = min(sell_qty, residual)
+            if sell_qty <= 0:
                 return None
-            return dataclasses.replace(plan, delta_qty=sizing.sell_qty)
+            # The confirm-time mark fixes the keep target; the sell limit
+            # stays the plan's own floor.  A carried plan published under a
+            # mark-less package holds a 0.00 cap the price band refuses, so
+            # only then does the effective mark restore a tradable floor.
+            price_cap = plan.price_cap
+            if price_cap is None or price_cap <= 0:
+                price_cap = (
+                    confirm_mark
+                    if confirm_mark is not None and confirm_mark > 0
+                    else price_cap
+                )
+            return dataclasses.replace(
+                plan, delta_qty=sell_qty, price_cap=price_cap
+            )
         if plan.delta_qty <= 0:
             return None
         # Re-evaluate the still-open delta against the *current* position:

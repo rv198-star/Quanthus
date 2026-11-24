@@ -51,6 +51,11 @@ class PublishedPlan:
     # with a typed unavailable reason; plans that depend on nothing are
     # unaffected.
     depends_on_preopen: tuple[str, ...] = ()
+    # Issue #723 E8 r3: a sell plan carries its exit intent so a successor
+    # package can re-offer the SAME intent after the order ends unfilled -
+    # a reduce keeps its fraction and never degrades into a full flat.
+    exit_kind: str | None = None
+    target_position_fraction: Decimal | None = None
 
 
 @dataclass(frozen=True)

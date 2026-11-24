@@ -53,10 +53,14 @@ def size_exit(
     locked_cycle_budget: Decimal | None,
     bucket_id: str | None,
     lot_size: int,
+    covered_qty: int = 0,
 ) -> ExitSizing:
     # Compute the sell quantity for one exit_plan decision.  sellable_qty
     # already nets out today buys and other resting sell orders, so a
     # confirmed plan can never oversell or double-sell the same shares.
+    # covered_qty is the in-flight sell quantity already resting toward the
+    # same exit target: the new plan only adds the uncovered difference, so
+    # an existing 100/200-share reservation only ever adds 100/0 more.
     if held_qty <= 0:
         return ExitSizing(
             security_code,
@@ -91,7 +95,7 @@ def size_exit(
             held_qty,
             sellable_qty,
             0,
-            min(held_qty, sellable_qty),
+            max(0, min(held_qty - covered_qty, sellable_qty)),
             mark_price,
             locked_cycle_budget,
             bucket_id,
@@ -143,7 +147,7 @@ def size_exit(
             bucket_id,
             REDUCE_RESIDUE_LOT_ZERO,
         )
-    sell_qty = min(held_qty - keep_qty, sellable_qty)
+    sell_qty = min(held_qty - keep_qty - covered_qty, sellable_qty)
     if sell_qty <= 0:
         return ExitSizing(
             security_code,

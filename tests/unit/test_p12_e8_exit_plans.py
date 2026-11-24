@@ -280,7 +280,8 @@ def test_reduce_below_target_creates_no_order(tmp_path):
     # r2-4: the registered wire code is HOLD_AND_ALERT; the specific internal
     # sizing reason is carried on the plan's invalidations for the hint text.
     assert row.primary_constraint == "HOLD_AND_ALERT"
-    assert "ALREADY_BELOW_TARGET" in row.plan.invalidations
+    # the wire hint is Chinese, the internal code never reaches the client
+    assert not any("ALREADY_BELOW_TARGET" in x for x in row.plan.invalidations)
 
 
 def test_reduce_residue_lot_zero_never_liquidates(tmp_path):
@@ -331,7 +332,9 @@ def test_reduce_residue_lot_zero_never_liquidates(tmp_path):
     row = next(o for o in bench.opportunities if o.stage == "exit_plan")
     assert row.plan.delta_qty == 0 and row.action_code == "HOLD"
     assert row.primary_constraint == "HOLD_AND_ALERT"
-    assert "REDUCE_RESIDUE_LOT_ZERO" in row.plan.invalidations
+    # E8 r3-4: the wire hint is a clear Chinese instruction, not the code.
+    assert any("余仓不足一手" in x for x in row.plan.invalidations)
+    assert not any("REDUCE_RESIDUE_LOT_ZERO" in x for x in row.plan.invalidations)
 
 
 def test_full_exit_sells_sellable_quantity(tmp_path):
@@ -737,3 +740,52 @@ def test_unfilled_exit_intent_carries_to_next_package(tmp_path):
     bench = app.workbench(app.scope)
     carry_ids = [p.plan_id for p in bench.package.plans]
     assert any(pid.startswith("plan-carry-600000") for pid in carry_ids)
+
+
+def test_carried_reduce_preserves_positive_remainder(tmp_path):
+    # r3-6: an expired 200-share reduce carries as the SAME reduce intent -
+    # the carry plan keeps a positive remainder, never degrades into a flat.
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    nextopen = day.replace(day=20, hour=9, minute=30)
+    box = [nextopen]
+    ds = _set_for(day.date(), (_exit_decision(exit_kind="reduce", fraction="0.50"),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    for ev in _buy_events(day):
+        app.submit_order_event(app.scope, ev)
+    paper = _paper(app, tmp_path, box, quote_price="10.30")  # below limit -> no fill
+    plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
+    assert paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.55"))).status == "open"
+    box[0] = nextopen.replace(hour=15, minute=1)
+    paper.poll()
+    assert paper._store.get(plan_id, app.scope.account_id).status == "expired"
+    # Successor HOLD-only package: the carried intent survives identity.
+    box[0] = nextopen.replace(day=23, hour=10)
+    app._decisions._set = dataclasses.replace(
+        _set_for(nextopen.date(), ()), next_session=box[0].date())
+    bench = app.workbench(app.scope)
+    carry = next(p for p in bench.package.plans if p.plan_id.startswith("plan-carry-600000"))
+    # Only the 200-share residual obligation carries; 200 stays held.
+    assert carry.delta_qty == -200 and carry.target_qty == 200
+    # The confirm of the carried id also stays inside the residual.
+    paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
+    out = paper.submit(OrderCommand("plan:" + carry.plan_id, "sell", "600000", 200, Decimal("10.55")))
+    assert out.filled_qty == 200
+    assert app.paper_projection().quantity("600000") == 200
+
+
+def test_inflight_sell_deducts_before_new_exit_qty(tmp_path):
+    # r3-2: an in-flight sell already covering the reduce target leaves
+    # zero; a partial cover only adds the difference.
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    box = [datetime(2026, 11, 20, 10, 0, tzinfo=TZ)]
+    ds = _set_for(day.date(), (_exit_decision(exit_kind="reduce", fraction="0.50"),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    for ev in _buy_events(day):
+        app.submit_order_event(app.scope, ev)
+    paper = _paper(app, tmp_path, box, quote_price="10.30")  # resting, no fill
+    # 100 already resting -> the 200-target reduce only adds the other 100.
+    paper.submit(OrderCommand("rest-100", "sell", "600000", 100, Decimal("10.60")))
+    plan = app.paper_current_plan("plan-OPP-EXIT-600000-" + day.date().isoformat())
+    assert plan is not None and plan.delta_qty == 100

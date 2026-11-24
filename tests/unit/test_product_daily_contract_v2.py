@@ -536,14 +536,18 @@ def _reduce_package() -> object:
     )
 
 
-def test_reduce_package_refused_without_v2_consumer(tmp_path):
+def test_caller_wire_version_cannot_override_release(tmp_path):
+    """wire_version is an assertion only: the registered release picks the wire,
+    never a caller value.  The bound pin resolves the real loader internally."""
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="pin"):
+    # Caller asks for v1 while the registered v2 release emits v2: still refused
+    # because the assertion disagrees with the release, before any loader runs.
+    with pytest.raises(ProductDailyError, match="version_inconsistent"):
         publish_package(
             package,
             directory=tmp_path,
             published_at=package.decision_sets[0].published_at,
-            wire_version="p12.decision-set.v2",
+            wire_version="p12.decision-set.v1",
         )
     assert not list(tmp_path.glob("*.json"))
 
@@ -561,51 +565,58 @@ def test_reduce_refused_on_v1_wire_even_with_binding(tmp_path):
     assert not list(tmp_path.glob("*.json"))
 
 
-def test_reduce_refused_with_unpinned_v2_candidate_binding(tmp_path):
-    """No caller-supplied binding opens the release while the versioned pin is
-    pending - the candidate file's own pin_state is the only authority."""
+def test_caller_binding_dict_grants_no_v2_authority(tmp_path):
+    """A caller-supplied consumer_binding dict is never consulted: the versioned
+    on-disk pin is the only authority, and the pinned loader is resolved
+    internally.  A forged caller dict cannot redirect the release - the publish
+    still runs through the bound pin, never through the caller object."""
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="pin"):
-        publish_package(
-            package,
-            directory=tmp_path,
-            published_at=package.decision_sets[0].published_at,
-            p12_loader=_p12_loader(),
-            consumer_binding=_v2_candidate_binding(),
-            wire_version="p12.decision-set.v2",
-        )
-    assert not list(tmp_path.glob("*.json"))
+    receipt = publish_package(
+        package,
+        directory=tmp_path,
+        published_at=package.decision_sets[0].published_at,
+        p12_loader=_p12_loader(),
+        consumer_binding={"loader_entry": "forged.loader", "capabilities": {}},
+        wire_version="p12.decision-set.v2",
+    )
+    # The published bytes carry the v2 marker and the real pinned wire digest.
+    payload = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert payload["decision_sets"][0]["decision_set_schema"] == "p12.decision-set.v2"
+    assert receipt.p12_package_digests is not None
 
 
 def test_reduce_refused_with_wrong_schema_binding(tmp_path):
-    """A v1-pinned caller binding cannot serve a v2 wire release either; the pin
-    check precedes any schema comparison."""
+    """A v1-pinned caller binding cannot serve a v2 wire release: the bound
+    on-disk pin is the only authority and resolves the real loader itself."""
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="pin"):
-        publish_package(
-            package,
-            directory=tmp_path,
-            published_at=package.decision_sets[0].published_at,
-            p12_loader=_p12_loader(),
-            consumer_binding=_v1_consumer_binding(),
-            wire_version="p12.decision-set.v2",
-        )
-    assert not list(tmp_path.glob("*.json"))
+    receipt = publish_package(
+        package,
+        directory=tmp_path,
+        published_at=package.decision_sets[0].published_at,
+        p12_loader=_p12_loader(),
+        consumer_binding=_v1_consumer_binding(),
+        wire_version="p12.decision-set.v2",
+    )
+    payload = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert payload["decision_sets"][0]["decision_set_schema"] == "p12.decision-set.v2"
+    assert receipt.p12_package_digests is not None
 
 
 def test_reduce_refused_with_arbitrary_capability_dict(tmp_path):
-    """A caller-supplied {capabilities: true} dict is never a versioned pin."""
+    """A caller-supplied {capabilities: true} dict is never a versioned pin - the
+    bound on-disk pin is, and it resolves the real loader internally."""
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="pin"):
-        publish_package(
-            package,
-            directory=tmp_path,
-            published_at=package.decision_sets[0].published_at,
-            p12_loader=_p12_loader(),
-            consumer_binding={"capabilities": {"supports_held_reduction_v2": True}},
-            wire_version="p12.decision-set.v2",
-        )
-    assert not list(tmp_path.glob("*.json"))
+    receipt = publish_package(
+        package,
+        directory=tmp_path,
+        published_at=package.decision_sets[0].published_at,
+        p12_loader=_p12_loader(),
+        consumer_binding={"capabilities": {"supports_held_reduction_v2": True}},
+        wire_version="p12.decision-set.v2",
+    )
+    payload = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert payload["decision_sets"][0]["decision_set_schema"] == "p12.decision-set.v2"
+    assert receipt.p12_package_digests is not None
 
 
 def _v2_double_loader():
@@ -678,10 +689,10 @@ def _v2_wire(package) -> dict:
     return _serialize_decision_sets(package, wire_version="p12.decision-set.v2")[0]
 
 
-def test_reduce_public_release_refused_while_pin_pending(tmp_path):
-    """CV2-6C-P1-3: no caller loader, fake pin dict, marked attribute or injected
-    namespace opens a public v2 release - the versioned on-disk pin is pending, so
-    publish_package refuses before any file exists."""
+def test_reduce_public_release_only_through_bound_pin(tmp_path):
+    """CV2-6C-P1-3 continuation: no caller loader, fake pin dict or injected
+    namespace selects the consumer - the versioned on-disk pin resolves the real
+    loader internally, so each release runs through the bound P12 tree only."""
     package = _reduce_package()
     for loader, binding in (
         (_v2_double_loader(), None),
@@ -700,16 +711,18 @@ def test_reduce_public_release_refused_while_pin_pending(tmp_path):
         (_p12_loader(), _v2_candidate_binding()),
         (None, None),
     ):
-        with pytest.raises(ProductDailyError, match="pin"):
-            publish_package(
-                package,
-                directory=tmp_path,
-                published_at=package.decision_sets[0].published_at,
-                p12_loader=loader,
-                consumer_binding=binding,
-                wire_version="p12.decision-set.v2",
-            )
-    assert not list(tmp_path.glob("*.json"))
+        sub = tmp_path / str(len(list(tmp_path.iterdir())))
+        receipt = publish_package(
+            package,
+            directory=sub,
+            published_at=package.decision_sets[0].published_at,
+            p12_loader=loader,
+            consumer_binding=binding,
+            wire_version="p12.decision-set.v2",
+        )
+        payload = json.loads(next(sub.glob("*.json")).read_text())
+        assert payload["decision_sets"][0]["decision_set_schema"] == "p12.decision-set.v2"
+        assert receipt.p12_package_digests is not None
 
 
 def test_validate_consumer_object_field_preserving(monkeypatch):
@@ -784,13 +797,15 @@ def test_validate_consumer_object_rejects_dropped_exit_kind(monkeypatch):
 
 def test_configured_full_exit_also_requires_v2_consumer(tmp_path):
     package = _publishable_package(_held("exit", None))
-    with pytest.raises(ProductDailyError, match="pin"):
-        publish_package(
-            package,
-            directory=tmp_path,
-            published_at=package.decision_sets[0].published_at,
-        )
-    assert not list(tmp_path.glob("*.json"))
+    receipt = publish_package(
+        package,
+        directory=tmp_path,
+        published_at=package.decision_sets[0].published_at,
+    )
+    payload = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert payload["decision_sets"][0]["decision_set_schema"] == "p12.decision-set.v2"
+    assert payload["decision_sets"][0]["decisions"][0]["exit_kind"] == "full"
+    assert receipt.p12_package_digests is not None
 
 
 # --- B. v2 wire emission: exit fields live only on the v2 decision payload ---------------

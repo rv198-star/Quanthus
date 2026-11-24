@@ -1006,10 +1006,42 @@ def raw_security_inputs_from_history(
         )
         sec_proof: dict[str, str] = {}
         try:
-            # Always resolve equivalent-day proofs into a local sink so the
-            # receipt can name them; mirror into proof_sinks only when the
-            # caller asked for the raw map.  anchor_mode stays a consumer
-            # config - the proof marks, not the mode flag, drive the receipt.
+            # Listing-on-T eligibility is checked BEFORE aging: a security
+            # provably not listed on the signal date (delisted, not yet
+            # listed, or inside a gap between two listing intervals) is a
+            # normal universe-census result and is isolated per-security with
+            # the stable not_listed_on_signal_date reason -- never a
+            # downstream missing_signal_membership / raw_input_closure_invalid
+            # and never a fabricated age.
+            t_active = listing_active_at_market_day(
+                listing_rows=history.listing_rows,
+                calendar_rows=history.calendar_rows,
+                security_id=identity.security_id,
+                listing_id=identity.listing_id,
+                venue_id=identity.venue_id,
+                market_date=history.market_date,
+            )
+            if t_active is False:
+                if is_account_member:
+                    membership = ()
+                    receipts.append(
+                        {
+                            "security_code": code,
+                            "status": "account_member_market_unavailable",
+                            "reason": "not_listed_on_signal_date",
+                            "scope": "per_security",
+                        }
+                    )
+                else:
+                    receipts.append(
+                        {
+                            "security_code": code,
+                            "status": "excluded",
+                            "reason": "not_listed_on_signal_date",
+                            "scope": "per_security",
+                        }
+                    )
+                    continue
             membership = derive_universe_membership(
                 listing_rows=history.listing_rows,
                 calendar_rows=history.calendar_rows,
@@ -1023,61 +1055,29 @@ def raw_security_inputs_from_history(
             if proof_sinks is not None and sec_proof:
                 proof_sinks[identity.listing_code] = sec_proof
         except ProductDailyError as exc:
-            if getattr(exc, "reason_code", "") == "calendar_coverage_incomplete":
-                # The shared coverage gate assumes the security is STILL
-                # listed at T.  Resolve T's local open anchor against the
-                # qualified listing interval FIRST:
-                #   * T provably OUTSIDE the interval (delisted before the
-                #     signal day, e.g. 000005): a normal universe-census
-                #     result -- the security is removed BEFORE the scan with
-                #     the stable not_listed_on_signal_date reason, never the
-                #     shared block and never a fabricated early age.
-                #   * T provably INSIDE the interval (still listed): the
-                #     shared calendar-coverage failure stands verbatim.
-                #   * T unresolved (no listing row / straddling anchor): the
-                #     shared failure also stands -- unverifiable is not a
-                #     free not-listed claim.
-                t_active = listing_active_at_market_day(
-                    listing_rows=history.listing_rows,
-                    calendar_rows=history.calendar_rows,
-                    security_id=identity.security_id,
-                    listing_id=identity.listing_id,
-                    venue_id=identity.venue_id,
-                    market_date=history.market_date,
-                )
-                if t_active is False:
-                    if is_account_member:
-                        # A held/pending position in a delisted security keeps
-                        # its own reminder path: it is preserved below with
-                        # empty membership, never dropped, never a new-entry
-                        # scan and never the shared block.
-                        membership = ()
-                        receipts.append(
-                            {
-                                "security_code": code,
-                                "status": "account_member_market_unavailable",
-                                "reason": "not_listed_on_signal_date",
-                                "scope": "per_security",
-                            }
-                        )
-                    else:
-                        receipts.append(
-                            {
-                                "security_code": code,
-                                "status": "excluded",
-                                "reason": "not_listed_on_signal_date",
-                                "scope": "per_security",
-                            }
-                        )
-                        continue
+            rc = getattr(exc, "reason_code", "")
+            if rc == "calendar_coverage_incomplete":
+                if is_account_member:
+                    membership = ()
+                    receipts.append(
+                        {
+                            "security_code": code,
+                            "status": "account_member_market_unavailable",
+                            "reason": str(exc),
+                            "scope": "per_security",
+                        }
+                    )
                 else:
-                    # t_active True (still listed) or None (unverifiable): the
-                    # shared coverage failure stands -- a still-listed
-                    # security's truncated calendar is a shared whole-day
-                    # gap, and an unverifiable listing is never silently
-                    # called not-listed.
-                    raise
-            if is_account_member:
+                    receipts.append(
+                        {
+                            "security_code": code,
+                            "status": "excluded",
+                            "reason": str(exc),
+                            "scope": "per_security",
+                        }
+                    )
+                    continue
+            elif is_account_member:
                 membership = ()
                 receipts.append(
                     {

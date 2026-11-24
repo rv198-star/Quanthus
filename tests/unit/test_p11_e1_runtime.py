@@ -681,3 +681,42 @@ def test_missing_original_read_never_borrows_the_rerun():
     assert _envelope_read_at(None, rerun, t, t) == t
     with pytest.raises(ProductDailyError, match="missing_original_read_at"):
         _envelope_read_at(None, rerun, physical_read, t)
+
+
+@pytest.mark.parametrize("unknown_implemented", [False, True])
+def test_october_factor_ledger_survives_action_isolation(assets, unknown_implemented):
+    from tests.unit import test_p11_paper_replay as f
+
+    days = tuple(d for d in f.SESSION_DAYS if d <= f.T1)
+    good, affected = (f._security(c, days) for c in ("600000", "600001"))
+    row = {
+        "ledger": "P1_factor_pit_exception",
+        "stock_code": "600001",
+        "exchange": "SH",
+        "effective_date": days[-10].isoformat(),
+        "knowledge_cutoff": days[-4].isoformat(),
+        "exception_type": "factor_pit_visibility",
+        "source_revision": "adj_factors_pit_exception_ledger_v1|bs_adj_v1",
+        "reason_code": "no_proveable_announce_after_em_exact_link",
+    }
+    affected["exceptions"] = [row]
+    if unknown_implemented:
+        affected["actions"] = [
+            {"action_status": "IMPLEMENTED", "ex_date": f.T1.isoformat(), "terms": {}}
+        ]
+    req = f._request(
+        market_dates=(f.T1,), securities=[good, affected],
+        coverage="verified" if unknown_implemented else "partial",
+    )
+    req["listing_rows"].append(f._listing("security-600001"))
+    day = e_run_e1_replay(req, f.T1, assets)
+    assert day["publishable"] and day["delivered"]["600000"]["entry_eligible"]
+    assert not day["delivered"]["600001"]["entry_eligible"]
+    assert day["coverage_isolated"] == 1
+    closed = day["source_closure"]
+    assert day["receipt"]["source_closure_digest"] == sha256_digest(closed)
+    assert day["coverage_exclusions"][0]["source_exceptions"] == [row]
+    assert day["coverage_exclusions"][0] in closed["exclusions"]
+    assert closed["consumption_evidence"]["p1_factor_visibility"]["restrictions"] == [
+        {"security_code": "600001", "source_row": row}
+    ]

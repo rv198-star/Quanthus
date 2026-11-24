@@ -1,0 +1,121 @@
+{
+  "schema_version": "quanthus.p11.calendar-consume-rule.v1",
+  "consumer_rule_id": "p11.e1-october-calendar-consume",
+  "consumer_rule_version": "1.0.0",
+  "purpose": "How the October ENGINEERING_REPLAY_AS_OBSERVED E1 replay reads the venue trading calendar. Trusted per-venue+date schedule basis is a projection of the pinned P10 #747 RESULT (SHA256 722c75b2bd392b71ea4a298f1429ae51f70d93897ede9962bd3dbc3ae59fd1de); a caller claim that lacks proof or conflicts with this rule is refused, never adopted. The rule proves session DATES only - it never substitutes a native open/close instant, a historical-channel-visible instant, or a source archive knowledge_from.",
+  "p10_result_ref": {
+    "schema": "quanthus.p10.calendar-exchange-publication-evidence.v1",
+    "issue": 747,
+    "sha256": "sha256:722c75b2bd392b71ea4a298f1429ae51f70d93897ede9962bd3dbc3ae59fd1de",
+    "source_published_at_state": "UNKNOWN_EXACT_INSTANT",
+    "historical_channel_available_at": null
+  },
+  "sessions": [
+    {
+      "venue_id": "SSE",
+      "session_date": "2026-09-30",
+      "is_open": true,
+      "schedule_basis": "RULE_DERIVED_SCHEDULE",
+      "source_documents": [
+        {
+          "kind": "WEEKLY_RULE",
+          "rule_clause": "2.4.1",
+          "notice_id": null,
+          "publication_date": "2026-04-24",
+          "sha256": "fc922c433438b2636cb631eab25cca405209712acbb6aaded768c45456ff8888",
+          "source_receipt_sha256": "eb3f464c5207eadc004b7c9609fc94569d46da7508810d4b37766b7cb6c7a5d6",
+          "published_at": null,
+          "published_at_grade": "UNKNOWN_EXACT_INSTANT"
+        },
+        {
+          "kind": "ANNUAL_CLOSURES",
+          "rule_clause": null,
+          "notice_id": "上证公告〔2025〕45号",
+          "publication_date": "2025-12-22",
+          "sha256": "6414ab8f4316c318d816b68aefc4843a5ea87ec75d543f614e3e53aa7688f33c",
+          "source_receipt_sha256": "342164f912c083fab15ff24663c9220fbb25c73149b8698deb332aaf74728dcb",
+          "published_at": null,
+          "published_at_grade": "UNKNOWN_EXACT_INSTANT"
+        }
+      ],
+      "source_published_at": null,
+      "source_published_at_state": "UNKNOWN_EXACT_INSTANT",
+      "historical_channel_available_at": null
+    },
+    {
+      "venue_id": "SSE",
+      "session_date": "2026-10-08",
+      "is_open": true,
+      "schedule_basis": "EXPLICIT_EXCHANGE_SCHEDULE",
+      "source_documents": [
+        {
+          "kind": "ANNUAL_CLOSURES",
+          "rule_clause": null,
+          "notice_id": "上证公告〔2025〕45号",
+          "publication_date": "2025-12-22",
+          "sha256": "6414ab8f4316c318d816b68aefc4843a5ea87ec75d543f614e3e53aa7688f33c",
+          "source_receipt_sha256": "342164f912c083fab15ff24663c9220fbb25c73149b8698deb332aaf74728dcb",
+          "published_at": null,
+          "published_at_grade": "UNKNOWN_EXACT_INSTANT"
+        }
+      ],
+      "source_published_at": null,
+      "source_published_at_state": "UNKNOWN_EXACT_INSTANT",
+      "historical_channel_available_at": null
+    },
+    {
+      "venue_id": "SZSE",
+      "session_date": "2026-09-30",
+      "is_open": true,
+      "schedule_basis": "RULE_DERIVED_SCHEDULE",
+      "source_documents": [
+        {
+          "kind": "WEEKLY_RULE",
+          "rule_clause": "2.3.1",
+          "notice_id": null,
+          "publication_date": "2026-04-24",
+          "sha256": "9b66f8b0db70f84a25ef1ccb4ee2351001724e408117552d75f6d8993483c586",
+          "source_receipt_sha256": "c7043c1d454176aa2f696a5f99271fe32ec56ec36003eeb2646190018eae25b6",
+          "published_at": null,
+          "published_at_grade": "UNKNOWN_EXACT_INSTANT"
+        },
+        {
+          "kind": "ANNUAL_CLOSURES",
+          "rule_clause": null,
+          "notice_id": "深证会〔2025〕481号",
+          "publication_date": "2025-12-22",
+          "sha256": "1656d8708d5faed33c7588538639d96128f39fdface02cfa6eb66d796c40f14e",
+          "source_receipt_sha256": "3316ffc528e6811831f71fb5c04a08e8373ac8c70f1f2b300bbf8a220f1da655",
+          "published_at": null,
+          "published_at_grade": "UNKNOWN_EXACT_INSTANT"
+        }
+      ],
+      "source_published_at": null,
+      "source_published_at_state": "UNKNOWN_EXACT_INSTANT",
+      "historical_channel_available_at": null
+    },
+    {
+      "venue_id": "SZSE",
+      "session_date": "2026-10-08",
+      "is_open": true,
+      "schedule_basis": "EXPLICIT_EXCHANGE_SCHEDULE",
+      "source_documents": [
+        {
+          "kind": "ANNUAL_CLOSURES",
+          "rule_clause": null,
+          "notice_id": "深证会〔2025〕481号",
+          "publication_date": "2025-12-22",
+          "sha256": "1656d8708d5faed33c7588538639d96128f39fdface02cfa6eb66d796c40f14e",
+          "source_receipt_sha256": "3316ffc528e6811831f71fb5c04a08e8373ac8c70f1f2b300bbf8a220f1da655",
+          "published_at": null,
+          "published_at_grade": "UNKNOWN_EXACT_INSTANT"
+        }
+      ],
+      "source_published_at": null,
+      "source_published_at_state": "UNKNOWN_EXACT_INSTANT",
+      "historical_channel_available_at": null
+    }
+  ],
+  "announced_before_T": false,
+  "note": "source_published_at / historical_channel_available_at stay UNKNOWN_EXACT_INSTANT: the official pages carry only a publication DATE, no proven instant. A caller's lone early timestamp never writes announced_before_T; only a proven exchange publication/revision version could, and none is proven in this scope."
+}

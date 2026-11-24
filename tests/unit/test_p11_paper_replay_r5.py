@@ -661,3 +661,24 @@ def test_r8_listing_code_action_ok_when_codes_same():
     _, _, window_info, _ = build_replay_envelope(request, T1)
     assert window_info["coverage_isolated"] == 0
     assert window_info["delivered"]["600000"]["entry_eligible"] is True
+
+
+def test_conflicting_coverage_catalogues_or_registers_refused_in_either_order():
+    from copy import deepcopy
+
+    import pytest
+
+    from quanthus.product_daily.contracts import ProductDailyError
+
+    raw = _r5_req([_r5_event(_returns_window()[30])], [])
+    for field, different in (("verified_artifacts", {"rows": []}), ("registers", {"version": "2"})):
+        original = raw["action_coverage"][field][0]
+        req = deepcopy(raw)
+        req["action_coverage"][field] = [original, deepcopy(original)]
+        load_replay_request(req)
+        alternate = {**original, **different}
+        for pair in ([original, alternate], [alternate, original]):
+            req["action_coverage"][field] = pair
+            with pytest.raises(ProductDailyError) as err:
+                load_replay_request(req)
+            assert err.value.reason_code == "conflicting_action_coverage_id"

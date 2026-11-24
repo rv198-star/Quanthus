@@ -604,6 +604,80 @@ def derive_universe_membership(
     return tuple(membership)
 
 
+def listing_active_at_market_day(
+    *,
+    listing_rows: Sequence[ListingRow],
+    calendar_rows: Sequence[CalendarRow],
+    security_id: str,
+    listing_id: str,
+    venue_id: str,
+    market_date: date,
+) -> bool | None:
+    """Eligibility check BEFORE aging: is T inside this security's listing interval?
+
+    The qualified listing interval is the caller-asserted triple (security_id,
+    listing_id, venue_id).  T's local open anchor is the venue calendar row for
+    market_date (open_at when present, else the local-day bound proof).  A
+    security whose qualified interval does NOT cover T -- e.g. delisted before
+    T -- is not an entry-scan candidate at all: it must be isolated per-security,
+    never force the shared "calendar cannot cover listing start" failure that
+    ages a listed security needs.  A still-listed security keeps the strict
+    coverage gate (the calendar must prove its full membership from the
+    listing start).
+
+    Returns True when the T open anchor/day-bound is provably inside one
+    qualified interval, False when it is provably outside every interval, and
+    None when the T anchor is absent and the day straddles an interval
+    boundary (unresolved -- the caller treats it as unverifiable, never
+    assumed listed).
+    """
+    intervals = [
+        row
+        for row in listing_rows
+        if row.security_id == security_id
+        and row.listing_id == listing_id
+        and row.venue_id == venue_id
+    ]
+    if not intervals:
+        return None
+    tz = _venue_tz(venue_id)
+    anchor_row = next(
+        (
+            row
+            for row in calendar_rows
+            if row.venue_id == venue_id and row.session_date == market_date
+        ),
+        None,
+    )
+    if anchor_row is not None and anchor_row.open_at is not None:
+        anchor = anchor_row.open_at
+        for iv in intervals:
+            if iv.effective_from <= anchor and (
+                iv.effective_to is None or anchor < iv.effective_to
+            ):
+                return True
+        return False
+    # The T session carries no stored anchor.  Before falling back to the
+    # local-day bound, discharge the two whole-interval positions: if EVERY
+    # qualified interval ended on a session strictly before market_date the
+    # security is provably not listed at T (False); if EVERY interval begins
+    # on a session strictly after market_date it is not yet listed (False).
+    # Both are resolved without the day-bound proof so a 42-day null-anchor
+    # warmup does not leave a clear delisted/future listing undecided.
+    if all(
+        iv.effective_to is not None and iv.effective_to.astimezone(tz).date() < market_date
+        for iv in intervals
+    ):
+        return False
+    if all(iv.effective_from.astimezone(tz).date() > market_date for iv in intervals):
+        return False
+    # No stored anchor for T's session: prove by the local-day bound.  The
+    # session's whole local day inside one interval -> active; wholly outside
+    # every interval -> not listed at T; straddling a boundary stays
+    # unresolved (returned None so the caller fails closed per-security).
+    return _equivalent_day_membership(session=market_date, intervals=intervals, venue_id=venue_id)
+
+
 # --- securities[] -> RawSecurityInput ------------------------------------------------
 
 
@@ -722,12 +796,21 @@ def _limits_from(sec: Mapping[str, Any], security_index: int) -> tuple[LimitFact
     return tuple(out)
 
 
-def _date_map(raw_map: Any, label: str) -> dict[date, datetime]:
+def _date_map(raw_map: Any, label: str) -> dict[date, datetime | None]:
+    """A per-session instant map: date key -> aware instant, or explicit null.
+
+    A JSON null is a DECLARED absence (the bound calendar row kept the session
+    date/is_open flag but left its native instant empty), which downstream
+    clock policy may refuse or admit as a date-context row -- it is not a
+    parse failure.  A non-null value stays strict ISO + timezone.  Only the
+    close/cutoff maps use this shape; other date maps keep their own parsers.
+    """
     if not isinstance(raw_map, dict):
         _fail("invalid_raw_history", f"{label} must be an object")
-    out: dict[date, datetime] = {}
+    out: dict[date, datetime | None] = {}
     for key, value in raw_map.items():
-        out[_isodate(key, f"{label} key")] = _isodatetime(value, f"{label}[{key}]")
+        day = _isodate(key, f"{label} key")
+        out[day] = None if value is None else _isodatetime(value, f"{label}[{key}]")
     return out
 
 
@@ -862,6 +945,7 @@ def raw_security_inputs_from_history(
     *,
     anchor_mode: str = "strict",
     proof_sinks: dict[str, dict[str, str]] | None = None,
+    as_observed: bool = False,
 ) -> tuple[list[RawSecurityInput], list[dict[str, Any]]]:
     """Project raw_history.securities[] into RawSecurityInput[] + receipts.
 
@@ -875,6 +959,16 @@ def raw_security_inputs_from_history(
     """
     inputs: list[RawSecurityInput] = []
     receipts: list[dict[str, Any]] = []
+    # The source calendar's own knowledge_from keyed by (venue, session_date):
+    # used to prove a per-bar knowledge_cutoff is the source calendar VERSION
+    # clock under the calendar_source_knowledge_from role.  Only consulted
+    # inside the versioned as-observed replay.
+    cal_knowledge: dict[tuple[str, date], datetime] = {}
+    if as_observed:
+        for row in history.calendar_rows:
+            cal_knowledge[(row.venue_id, row.session_date)] = row.knowledge_from
+    # Duplicate guard keys on the LISTING id (a relisted entity reuses
+    # security_id across listings); see the check below.
     seen_ids: set[str] = set()
     for si, sec in enumerate(history.securities):
         sec_o = _obj(sec, f"securities[{si}]")
@@ -891,9 +985,19 @@ def raw_security_inputs_from_history(
             )
             continue
         code = identity.listing_code
-        if identity.security_id in seen_ids:
-            _fail("duplicate_security", f"duplicate security_id {identity.security_id}")
-        seen_ids.add(identity.security_id)
+        # Duplicate guard keys on the LISTING id, not the bare security_id: one
+        # corporate entity legitimately carries several listings over time (a
+        # delisted + a relisted share, e.g. security_7ca1ec46 spanning 000043 /
+        # 001914).  Rejecting on security_id alone would hard-block the whole
+        # day on that relisted shape even though each listing is aged by its
+        # own listing_id interval and isolated per-listing.  The same
+        # listing_id twice stays a hard error (a true duplicate row).
+        if identity.listing_id in seen_ids:
+            _fail(
+                "duplicate_security",
+                f"duplicate listing_id {identity.listing_id} (security_id {identity.security_id})",
+            )
+        seen_ids.add(identity.listing_id)
         position_facts, prior_det = _position_facts_from(sec_o)
         held_membership = _bool3(sec_o.get("held_membership"), "securities[].held_membership")
         pending_kind = (
@@ -914,12 +1018,92 @@ def raw_security_inputs_from_history(
             or position_facts is not None
             or pending_kind is not None
         )
+        # Versioned #749 role.  "calendar_source_knowledge_from" declares the
+        # row's decision coordinate is the source calendar knowledge_from; it
+        # is bound verbatim into the input closure and admitted downstream only
+        # inside the versioned as-observed replay context.  Read BEFORE the
+        # market try so an unknown role is its own named exclusion, never a
+        # mislabelled market_parse failure.
+        knowledge_clock_role = sec_o.get("knowledge_clock_role")
+        if knowledge_clock_role is not None and knowledge_clock_role != (
+            "calendar_source_knowledge_from"
+        ):
+            receipts.append(
+                {
+                    "security_code": code,
+                    "status": "excluded",
+                    "reason": (
+                        f"knowledge_clock_role: {knowledge_clock_role!r} is not a named clock role"
+                    ),
+                    "scope": "per_security",
+                }
+            )
+            continue
         sec_proof: dict[str, str] = {}
         try:
-            # Always resolve equivalent-day proofs into a local sink so the
-            # receipt can name them; mirror into proof_sinks only when the
-            # caller asked for the raw map.  anchor_mode stays a consumer
-            # config - the proof marks, not the mode flag, drive the receipt.
+            # Listing-on-T eligibility is checked BEFORE aging: a security
+            # provably not listed on the signal date (delisted, not yet
+            # listed, or inside a gap between two listing intervals) is a
+            # normal universe-census result and is isolated per-security with
+            # the stable not_listed_on_signal_date reason -- never a
+            # downstream missing_signal_membership / raw_input_closure_invalid
+            # and never a fabricated age.
+            t_active = listing_active_at_market_day(
+                listing_rows=history.listing_rows,
+                calendar_rows=history.calendar_rows,
+                security_id=identity.security_id,
+                listing_id=identity.listing_id,
+                venue_id=identity.venue_id,
+                market_date=history.market_date,
+            )
+            if t_active is False:
+                if is_account_member:
+                    # A held/pending position in a T-not-listed security is a
+                    # single named census receipt, not a scan input: skip the
+                    # membership derivation AND the bar/action market-parse
+                    # entirely so it is never re-derived into a contradictory
+                    # membership or a downstream missing_signal_membership.  It
+                    # still lands as an empty-fact RawSecurityInput so the held
+                    # reminder (hold_alert) fires and the audit row is non-empty.
+                    receipts.append(
+                        {
+                            "security_code": code,
+                            "status": "account_member_market_unavailable",
+                            "reason": "not_listed_on_signal_date",
+                            "scope": "per_security",
+                        }
+                    )
+                    inputs.append(
+                        RawSecurityInput(
+                            identity=identity,
+                            bars=(),
+                            universe_membership=(),
+                            actions=(),
+                            exceptions=(),
+                            limits=(),
+                            close_at_by_date={},
+                            knowledge_cutoff_by_date={},
+                            position_facts=position_facts,
+                            prior_deterioration_sessions=prior_det,
+                            held_membership=held_membership,
+                            pending_kind=pending_kind,
+                            held_unavailable_reason=held_reason,
+                            held_quantity=held_qty,
+                            pending_quantity=pending_qty,
+                            scan_eligible=False,
+                        )
+                    )
+                    continue
+                else:
+                    receipts.append(
+                        {
+                            "security_code": code,
+                            "status": "excluded",
+                            "reason": "not_listed_on_signal_date",
+                            "scope": "per_security",
+                        }
+                    )
+                    continue
             membership = derive_universe_membership(
                 listing_rows=history.listing_rows,
                 calendar_rows=history.calendar_rows,
@@ -933,12 +1117,40 @@ def raw_security_inputs_from_history(
             if proof_sinks is not None and sec_proof:
                 proof_sinks[identity.listing_code] = sec_proof
         except ProductDailyError as exc:
-            if getattr(exc, "reason_code", "") == "calendar_coverage_incomplete":
-                # A shared calendar that cannot cover the listing start is a
-                # shared failure for every security on that venue, not a
-                # per-security isolation.
-                raise
-            if is_account_member:
+            rc = getattr(exc, "reason_code", "")
+            if rc == "calendar_coverage_incomplete":
+                # A venue with NO open sessions at all is a shared whole-venue
+                # gap: every security on it is unverifiable, so the failure is
+                # shared, not per-security.  Re-raise it so the day fails
+                # closed; a per-security truncated-calendar isolation stays in
+                # the branch below.
+                venue_has_sessions = any(
+                    row.venue_id == identity.venue_id and row.is_open
+                    for row in history.calendar_rows
+                )
+                if not venue_has_sessions:
+                    raise
+                if is_account_member:
+                    membership = ()
+                    receipts.append(
+                        {
+                            "security_code": code,
+                            "status": "account_member_market_unavailable",
+                            "reason": str(exc),
+                            "scope": "per_security",
+                        }
+                    )
+                else:
+                    receipts.append(
+                        {
+                            "security_code": code,
+                            "status": "excluded",
+                            "reason": str(exc),
+                            "scope": "per_security",
+                        }
+                    )
+                    continue
+            elif is_account_member:
                 membership = ()
                 receipts.append(
                     {
@@ -1002,6 +1214,34 @@ def raw_security_inputs_from_history(
                     membership_proof=sec_proof,
                 )
             )
+        # Versioned as-observed: prove WHICH rows carry the source calendar
+        # VERSION clock by matching each per-bar knowledge_cutoff against the
+        # SAME venue+session_date calendar_row.knowledge_from.  Only a row
+        # whose cutoff is that exact source stamp moves the PIT coordinate to
+        # the business fact instant downstream; an ordinary/mismatched cutoff
+        # keeps its original identity (and a claimed role with no matching
+        # source row names a real exclusion, never a silently-adopted label).
+        matched_dates: frozenset[date] | None = None
+        if as_observed and knowledge_clock_role == "calendar_source_knowledge_from":
+            unmatched = [
+                d
+                for d, v in cutoff_map.items()
+                if v is not None and cal_knowledge.get((identity.venue_id, d)) != v
+            ]
+            if unmatched:
+                receipts.append(
+                    {
+                        "security_code": code,
+                        "status": "excluded",
+                        "reason": (
+                            "calendar_source_knowledge_from cutoff is not the "
+                            f"source calendar knowledge_from for {unmatched[:3]}"
+                        ),
+                        "scope": "per_security",
+                    }
+                )
+                continue
+            matched_dates = frozenset(d for d, v in cutoff_map.items() if v is not None)
         inputs.append(
             RawSecurityInput(
                 identity=identity,
@@ -1012,6 +1252,8 @@ def raw_security_inputs_from_history(
                 limits=limits,
                 close_at_by_date=close_map,
                 knowledge_cutoff_by_date=cutoff_map,
+                knowledge_clock_role=knowledge_clock_role,
+                source_calendar_matched_dates=matched_dates,
                 position_facts=position_facts,
                 prior_deterioration_sessions=prior_det,
                 held_membership=held_membership,
@@ -1205,9 +1447,7 @@ def run_daily_advice_from_history(
     # caller before entry; this only keeps the archival clocks honest.
     as_observed = kwargs.pop("as_observed", False)
     observed_sink = kwargs.pop("observed_sink", None)
-    history = load_raw_history(
-        raw_history, as_observed=as_observed, observed_sink=observed_sink
-    )
+    history = load_raw_history(raw_history, as_observed=as_observed, observed_sink=observed_sink)
     facts = kwargs.get("facts")
     policy = kwargs.get("policy")
     if facts is None or policy is None:
@@ -1230,7 +1470,10 @@ def run_daily_advice_from_history(
     anchor_mode = kwargs.pop("anchor_mode", "strict")
     proof_sinks: dict[str, dict[str, str]] = {}
     inputs, receipts = raw_security_inputs_from_history(
-        history, anchor_mode=anchor_mode, proof_sinks=proof_sinks
+        history,
+        anchor_mode=anchor_mode,
+        proof_sinks=proof_sinks,
+        as_observed=as_observed,
     )
     if not inputs:
         _fail(
@@ -1245,22 +1488,91 @@ def run_daily_advice_from_history(
     # Adapter-level exclusions are named isolations INSIDE the issued closure,
     # not appended after receipt issuance (a post-hoc dict replace would leave
     # receipt.source_closure_digest pointing at the pre-exclusion bytes).
-    adapter_exclusions = [
-        {
+    def _adapter_exclusion(receipt: Mapping[str, Any]) -> dict[str, Any]:
+        if receipt.get("status") == "excluded":
+            return {
+                "security_code": receipt["security_code"],
+                "reason": "raw_history_security_invalid",
+                "member_or_field": receipt.get("reason", "unparseable securities[] entry"),
+                "scope": "per_security",
+            }
+        # A held/pending account member provably not listed on T is a normal
+        # universe-census result, named once inside the issued closure.  The
+        # held alert and the receipt still come through; only the market scan
+        # is skipped (scan_eligible=False on its RawSecurityInput).
+        return {
             "security_code": receipt["security_code"],
-            "reason": "raw_history_security_invalid",
-            "member_or_field": receipt.get("reason", "unparseable securities[] entry"),
+            "reason": "not_listed_on_signal_date",
+            "member_or_field": "held_account_member: "
+            + receipt.get("reason", "not_listed_on_signal_date"),
             "scope": "per_security",
         }
+
+    adapter_exclusions = [
+        _adapter_exclusion(receipt)
         for receipt in receipts
         if receipt.get("status") == "excluded"
+        or (
+            receipt.get("status") == "account_member_market_unavailable"
+            and receipt.get("reason") == "not_listed_on_signal_date"
+        )
     ]
     runner_exclusions = [*(adapter_exclusions), *(kwargs.pop("input_exclusions", None) or ())]
+    # The single-T numeric context is established only inside the versioned
+    # as-observed replay entry; a strict/forward/H1/M2 caller supplying it is
+    # a contract breach, never a silent widening.  Under as_observed the
+    # context is fixed (not a caller-chosen string), so no anchor or boolean
+    # substitute is accepted elsewhere.  The public raw entry admits the
+    # private OctoberReplayContext token only - this entry mints it from the
+    # verified as_observed projection, so a bare string can never reach the
+    # admission gate.
+    numeric_context = kwargs.pop("numeric_context", None)
+    if numeric_context is not None and (
+        not as_observed or numeric_context != "october_replay_as_observed"
+    ):
+        _fail(
+            "invalid_raw_history",
+            "numeric_context requires the versioned as-observed replay mode",
+        )
+    replay_token = None
+    scan_trading_dates = None
+    if numeric_context is not None:
+        from quanthus.product_daily.recommendation.daily_runner import (
+            _new_october_context,
+        )
+        from quanthus.product_daily.recommendation.paper_replay import (
+            bar_context_window,
+        )
+
+        replay_token = _new_october_context(numeric_context)
+        # Bounded scan calendar for the as-observed single-T replay: the scan
+        # window runs over the NAMED venue open sessions of the current
+        # bar_context_window (the last <=61 contiguous open sessions ending at
+        # T) plus facts.next_session - never the full universe_membership union
+        # (a 1991 listing must not drag pre-scope sessions into
+        # require_scan_date) and never narrowed by which bars exist (gaps and
+        # short windows stay visible).  Derived from the bound calendar_rows'
+        # is_open sessions <= T, the same calendar the replay envelope sliced.
+        open_sessions = tuple(
+            sorted({row.session_date for row in history.calendar_rows if row.is_open})
+        )
+        window = bar_context_window(open_sessions, history.market_date)
+        scan_trading_dates = tuple(sorted({*window, facts.next_session}))
+    # The as-observed replay's actual-read instant is bound into the signed
+    # closure so each row's source clock can be re-read against THIS run's
+    # real read.  It is forwarded to the raw runner ONLY alongside the private
+    # token; a strict/forward caller may legitimately pass the same replay
+    # observed_at on the wire (the replay envelope always carries it), so it
+    # is dropped here rather than rejected as a context breach.
+    as_observed_at = kwargs.pop("as_observed_at", None)
     output = run_daily_advice_from_raw(
         raw=inputs,
         history_receipts=bound_receipts,
         caller_input_exclusions=runner_exclusions,
         consumption_evidence=kwargs.pop("consumption_evidence", None),
+        numeric_context=replay_token,
+        scan_trading_dates=scan_trading_dates,
+        as_observed_at=as_observed_at if replay_token is not None else None,
         **kwargs,
     )
     # The issued receipt's digest must match the closure actually carried on the

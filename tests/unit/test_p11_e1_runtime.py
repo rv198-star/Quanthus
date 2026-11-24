@@ -28,6 +28,51 @@ from tests.unit.test_p11_history_input import (
 ROOT = find_project_root()
 
 
+def test_package_clock_checks_original_receipt_against_bound_trading_day():
+    from types import SimpleNamespace
+
+    from quanthus.product_daily.recommendation.e1_runtime import _october_package_clock
+
+    cutoff = datetime.fromisoformat("2026-10-08T21:30:00+08:00")
+    read = datetime.fromisoformat("2026-11-24T22:31:16+00:00")
+    verified = datetime.fromisoformat("2026-11-24T22:31:17+00:00")
+    observed = datetime.fromisoformat("2026-11-24T22:40:53+00:00")
+    digest = "sha256:" + "a" * 64
+    member = SimpleNamespace(member_id="bar", digest=digest, available_at=verified)
+    request = SimpleNamespace(
+        facts_template={
+            "intake_received_at": read,
+            "intake_first_read_at": read,
+            "intake_verified_at": verified,
+        },
+        member_evidence=[member],
+        required_member_ids=["bar"],
+    )
+    row = dict(
+        member_id="bar",
+        sha_match=True,
+        sha256=digest,
+        verify_at=verified.isoformat(),
+        relevant_for_T=True,
+    )
+    evidence = {
+        "member_consumption": {"run_read_at": read.isoformat(), "members": [row]},
+        "source_clocks": {"logical_decision_cutoff": cutoff.isoformat()},
+        "envelope": {"sha256": digest},
+    }
+    args = (request, evidence, read, observed, cutoff, digest, {"consumer_rule_version": "1.0.0"})
+    proof = _october_package_clock(*args)
+    assert proof["logical_cutoff"] == cutoff.isoformat()
+    assert proof["intake_verified_at"] == verified.isoformat()
+    evidence["source_clocks"]["logical_decision_cutoff"] = "2026-10-09T21:30:00+08:00"
+    with pytest.raises(ProductDailyError, match="replay_package_clock_mismatch"):
+        _october_package_clock(*args)
+    evidence["source_clocks"]["logical_decision_cutoff"] = cutoff.isoformat()
+    row["verify_at"] = "2026-11-25T22:31:17+00:00"
+    with pytest.raises(ProductDailyError, match="replay_package_clock_mismatch"):
+        _october_package_clock(*args)
+
+
 @pytest.fixture(scope="module")
 def assets() -> E1RuleAssets:
     return load_e1_rule_assets(ROOT)
@@ -138,17 +183,25 @@ def test_r2_replay_day_binds_real_panel_not_placeholder(assets):
     assert out1.get("publishable") is True
 
 
-def e_run_e1_replay(req, day, assets, observed_at=None, p12_evidence=None):
+def e_run_e1_replay(
+    req, day, assets, observed_at=None, p12_evidence=None, calendar_schedule_evidence=None
+):
     from quanthus.product_daily.recommendation.e1_runtime import run_e1_replay_day
 
-    observed_clock = (
-        (lambda: datetime.fromisoformat(observed_at)) if observed_at else None
-    )
+    observed_clock = (lambda: datetime.fromisoformat(observed_at)) if observed_at else None
+    # These sealed-archive fixtures model a reader that retained its own clock.
+    evidence = dict(p12_evidence or {})
+    if not evidence.get("read_at") and not evidence.get("member_consumption"):
+        evidence["read_at"] = observed_at or "2026-11-25T02:00:00+08:00"
     return run_e1_replay_day(
-        req, day, assets=assets, snapshot_id="s",
+        req,
+        day,
+        assets=assets,
+        snapshot_id="s",
         snapshot_manifest_digest="sha256:" + "a" * 64,
         observed_clock=observed_clock,
-        p12_evidence=p12_evidence,
+        p12_evidence=evidence,
+        calendar_schedule_evidence=calendar_schedule_evidence,
     )
 
 
@@ -414,9 +467,7 @@ def test_r5_per_security_member_isolates_that_security_only(assets):
         visible_at="2026-12-01T00:00:00+08:00",
     )
     req["source_members"].append(sp)
-    req["securities"][1]["identity"]["depends_on_member_ids"].append(
-        "only-second-security"
-    )
+    req["securities"][1]["identity"]["depends_on_member_ids"].append("only-second-security")
     out = e_run_e1_replay(req, f.T1, assets, observed_at="2026-11-25T03:00:00+08:00")
     assert out.get("disposition") == "publishable"
     use = out["as_observed"]["member_use"]
@@ -443,6 +494,105 @@ def test_r5_p12_evidence_folded_into_closure(assets):
     assert cl.get("p12", {}).get("envelope_sha256") == ev["envelope_sha256"]
 
 
+def test_r6_calendar_schedule_evidence_bound(assets):
+    """R6: a caller may only REQUEST sessions; the pinned consumer rule
+    supplies the trusted basis/digests (a projection of P10 RESULT 722c75b2).
+    The bound closure carries the rule's own identity, the proven per-session
+    basis, named source-document digests and UNKNOWN instants -- never a
+    caller-supplied basis or a T-known claim."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    # Caller supplies ONLY venue+session_date requests; a claimed basis or
+    # source doc is ignored/proven by the pinned rule, not trusted.
+    ev = {
+        "sessions": [
+            {"venue_id": "SSE", "session_date": "2026-10-08"},
+            {"venue_id": "SSE", "session_date": "2026-09-30"},
+        ],
+    }
+    out = e_run_e1_replay(req, f.T1, assets, calendar_schedule_evidence=ev)
+    block = out["source_closure"]["consumption_evidence"]["calendar_schedule_evidence"]
+    # The rule's own identity, never the caller's.
+    assert block["consumer_rule_id"] == "p11.e1-october-calendar-consume"
+    assert block["consumer_rule_version"] == "1.0.0"
+    assert block["p10_result_ref"]["sha256"].startswith("sha256:722c75b2")
+    assert block["announced_before_T"] is False
+    sessions = {s["session_date"]: s for s in block["sessions"]}
+    assert sessions["2026-10-08"]["schedule_basis"] == "EXPLICIT_EXCHANGE_SCHEDULE"
+    assert sessions["2026-10-08"]["source_published_at_state"] == "UNKNOWN_EXACT_INSTANT"
+    assert sessions["2026-10-08"]["source_documents"][0]["notice_id"] == "上证公告〔2025〕45号"
+    assert sessions["2026-09-30"]["schedule_basis"] == "RULE_DERIVED_SCHEDULE"
+
+
+def test_r6_calendar_schedule_evidence_conflict_refused(assets):
+    """R6 fail-first: a caller-supplied basis that conflicts with the trusted
+    rule is refused; so is a caller-named rule id/version (ignored in favour
+    of the rule's own identity)."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    ev = {
+        "consumer_rule_id": "invented-rule",
+        "consumer_rule_version": "99",
+        "sessions": [
+            {
+                "venue_id": "SSE",
+                "session_date": "2026-10-08",
+                "schedule_basis": "not_an_exchange_basis",
+                "source_documents": [
+                    {"notice_id": "invented", "sha256": "0" * 64, "publication_date": "2026-12-01"}
+                ],
+            }
+        ],
+    }
+    with pytest.raises(ProductDailyError) as ei:
+        e_run_e1_replay(req, f.T1, assets, calendar_schedule_evidence=ev)
+    assert "calendar_schedule_evidence_conflict" in str(ei.value)
+
+
+def test_r6_calendar_schedule_evidence_unproven_session_refused(assets):
+    """R6 fail-first: a session the bound calendar carries but the trusted
+    rule does NOT prove (e.g. a date outside the pinned P10 scope) is a named
+    refusal, never a silently-adopted basis."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    ev = {"sessions": [{"venue_id": "SSE", "session_date": "2026-10-07"}]}
+    with pytest.raises(ProductDailyError) as ei:
+        e_run_e1_replay(req, f.T1, assets, calendar_schedule_evidence=ev)
+    assert "calendar_schedule_evidence_unproven" in str(ei.value)
+
+
+def test_r6_calendar_schedule_evidence_unbound_session_refused(assets):
+    """R6 fail-first: schedule evidence for a session the bound calendar does
+    not carry is refused, never silently adopted."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    ev = {
+        "sessions": [
+            {"venue_id": "SSE", "session_date": "2031-01-01"}  # not a bound calendar_row
+        ],
+    }
+    with pytest.raises(ProductDailyError) as ei:
+        e_run_e1_replay(req, f.T1, assets, calendar_schedule_evidence=ev)
+    assert "calendar_schedule_evidence_unbound" in str(ei.value)
+
+
+def test_r6_calendar_schedule_evidence_absent_declared_empty(assets):
+    """R6: no evidence -> the block is present but declared-empty; the run
+    still reads the calendar through the consumer rule, never a guessed label."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    out = e_run_e1_replay(req, f.T1, assets)
+    block = out["source_closure"]["consumption_evidence"]["calendar_schedule_evidence"]
+    assert block["schema_version"] == "p11.calendar-schedule-evidence.v1"
+    assert block["announced_before_T"] is False
+    assert block["sessions"] == []
+
+
 def test_strict_still_rejects_sealed_member(assets):
     """The strict H1 path is unchanged: a post-cutoff member still fails the
     visibility gate when as_observed is not requested."""
@@ -458,3 +608,76 @@ def test_strict_still_rejects_sealed_member(assets):
     env["source_members"][0]["knowledge_at"] = "2027-01-01T00:00:00+08:00"
     with pytest.raises(ProductDailyError):
         load_raw_history(env)  # strict default -> source_visibility_after_cutoff
+
+
+def test_rerun_cannot_use_a_calendar_version_created_after_envelope_read(assets):
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    security = req["securities"][0]
+    security["knowledge_clock_role"] = "calendar_source_knowledge_from"
+    rows = {
+        row["session_date"]: row
+        for row in req["calendar_rows"]
+        if row["venue_id"] == security["identity"]["venue_id"]
+    }
+    version = "2026-11-25T00:00:00+00:00"
+    for bar in security["bars"][-61:]:
+        day = bar["session_date"]
+        rows[day]["knowledge_from"] = version
+        security["knowledge_cutoff_by_date"][day] = version
+    rerun = "2026-11-26T00:00:00+00:00"
+
+    def run(source_read_at):
+        return e_run_e1_replay(
+            req,
+            f.T1,
+            assets,
+            observed_at=rerun,
+            p12_evidence={
+                "read_at": source_read_at,
+                "member_consumption": {"run_read_at": source_read_at},
+            },
+        )
+
+    refused = run("2026-11-24T00:00:00Z")
+    assert not refused.get("publishable") and not refused.get("candidates")
+    allowed = run("2026-11-25T01:00:00Z")
+    assert allowed["publishable"] and allowed["candidates"]
+    assert (
+        allowed["source_closure"]["consumption_evidence"]["actual_read_at"]
+        == "2026-11-25T01:00:00+00:00"
+    )
+    assert allowed["replay_observed_at"] == "2026-11-26T00:00:00+00:00"
+
+
+def test_shenzhen_preholiday_date_binds_weekly_rule_and_annual_notice(assets):
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    day = "2026-09-30"
+    original = next(
+        r for r in req["calendar_rows"] if r["session_date"] == day and r["venue_id"] == "SSE"
+    )
+    req["calendar_rows"].append({**original, "venue_id": "SZSE"})
+    day_result = e_run_e1_replay(
+        req,
+        f.T1,
+        assets,
+        calendar_schedule_evidence={"sessions": [{"venue_id": "SZSE", "session_date": day}]},
+    )
+    evidence = day_result["source_closure"]["consumption_evidence"]["calendar_schedule_evidence"]
+    (record,) = evidence["sessions"]
+    assert record["schedule_basis"] == "RULE_DERIVED_SCHEDULE"
+    assert {doc["kind"] for doc in record["source_documents"]} == {"WEEKLY_RULE", "ANNUAL_CLOSURES"}
+
+
+def test_missing_original_read_never_borrows_the_rerun():
+    from quanthus.product_daily.recommendation.e1_runtime import _envelope_read_at
+
+    t = datetime.fromisoformat("2026-10-08T21:30:00+08:00")
+    physical_read = datetime.fromisoformat("2026-11-24T22:31:00+00:00")
+    rerun = datetime.fromisoformat("2026-11-26T12:00:00+00:00")
+    assert _envelope_read_at(None, rerun, t, t) == t
+    with pytest.raises(ProductDailyError, match="missing_original_read_at"):
+        _envelope_read_at(None, rerun, physical_read, t)

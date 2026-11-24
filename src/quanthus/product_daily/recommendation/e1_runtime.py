@@ -75,10 +75,11 @@ from quanthus.product_daily.recommendation.rule_seam import (
 _CANDIDATE_CARD = "config/p4-candidate-price-volume-transition.research.v1.json"
 _FEATURE_REGISTRY = "config/p3-baseline-features.research.v1.json"
 _TREND_CONFIG = "config/expert-evaluations/experts/trend-stability.v1.json"
-_TREND_SPEC = (
-    "config/expert-evaluations/specs/"
-    "trend-stability-p4-first-passage.evaluation.v1.json"
-)
+# The pinned consumer rule for the October calendar consume: a trusted
+# projection of the P10 #747 RESULT (its own identity + per-venue/date proven
+# basis).  Loaded from the release-verified repository root, never caller bytes.
+_OCTOBER_CALENDAR_RULE = "config/research/r11/d1b-20261124/october-calendar-consume-rule.v1.json"
+_TREND_SPEC = "config/expert-evaluations/specs/trend-stability-p4-first-passage.evaluation.v1.json"
 
 # The E1 production panel evaluator identity, bound to the frozen registry.
 _E1_EVALUATOR_VERSION = "p11-e1-runtime-v1"
@@ -114,6 +115,10 @@ class E1RuleAssets:
     card_digest: str
     registry_digest: str
     topology_digest: str
+    # The release-verified repository root: trusted consumer rules (e.g. the
+    # October calendar-consume rule) are read from it so a caller can never
+    # inject an unproven schedule basis.
+    repository: Path | None = None
 
 
 def load_e1_rule_assets(
@@ -180,6 +185,7 @@ def load_e1_rule_assets(
         card_digest=card_digest,
         registry_digest=registry_digest,
         topology_digest=registry.topology_manifest.digest,
+        repository=repository,
     )
 
 
@@ -257,9 +263,7 @@ def run_e1_from_history(
         decision_at = policy.decision_cutoff
         clock = lambda: decision_at  # noqa: E731
     if source_policy is None:
-        source_policy = _default_source_policy(
-            facts=facts, policy=policy, market_date=signal
-        )
+        source_policy = _default_source_policy(facts=facts, policy=policy, market_date=signal)
 
     # The panel report is built ONCE inside the job from the features the chain
     # computes; the factory is invoked with the actual features_by_security so
@@ -334,8 +338,7 @@ def _default_source_policy(
     return P6Base24CandidatePolicy(
         clock=clock,
         history_start=date(2026, 1, 1),
-        inputs_manifest_sha256=getattr(facts, "manifest_sha256", None)
-        or "sha256:" + "0" * 64,
+        inputs_manifest_sha256=getattr(facts, "manifest_sha256", None) or "sha256:" + "0" * 64,
     )
 
 
@@ -354,9 +357,7 @@ def _panel_report_for(
     re-checkable against the job's inputs.
     """
     ready = sum(1 for f in features_by_security.values() if getattr(f, "feature_ready", False))
-    eligible = sum(
-        1 for f in features_by_security.values() if getattr(f, "entry_eligible", False)
-    )
+    eligible = sum(1 for f in features_by_security.values() if getattr(f, "entry_eligible", False))
     exceptions = sum(
         1 for f in features_by_security.values() if getattr(f, "exception_active", False)
     )
@@ -370,9 +371,7 @@ def _panel_report_for(
         if getattr(f, "unexplained_price_transition", False)
     )
     continuity_excluded = sum(
-        1
-        for f in features_by_security.values()
-        if getattr(f, "scope_continuity_excluded", False)
+        1 for f in features_by_security.values() if getattr(f, "scope_continuity_excluded", False)
     )
     scope_start = min(
         (f.signal_date for f in features_by_security.values() if getattr(f, "signal_date", None)),
@@ -393,10 +392,7 @@ def _panel_report_for(
         unexplained_transition_count=unexplained,
         continuity_excluded_security_count=continuity_excluded,
         data_content_digest=sha256_digest(
-            {
-                code: _feature_row_dict(f)
-                for code, f in sorted(features_by_security.items())
-            }
+            {code: _feature_row_dict(f) for code, f in sorted(features_by_security.items())}
         ),
     )
 
@@ -418,6 +414,106 @@ def _feature_row_dict(facts: Any) -> dict[str, Any]:
     return out
 
 
+def _package_instant(value: Any) -> datetime:
+    try:
+        instant = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        _fail("replay_package_clock_mismatch", "missing or invalid receipt timestamp")
+    if instant.utcoffset() is None:
+        _fail("replay_package_clock_mismatch", "receipt timestamp has no UTC offset")
+    return instant
+
+
+def _october_package_clock(
+    request: Any,
+    evidence: Mapping[str, Any],
+    source_read: datetime,
+    observed: datetime,
+    cutoff: datetime,
+    envelope_digest: str,
+    calendar: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Verify the producer's intake clocks against the reader's same-day receipt."""
+    consumption = evidence.get("member_consumption") or {}
+    envelope = evidence.get("envelope") or {}
+    stated_cutoff = (evidence.get("source_clocks") or {}).get("logical_decision_cutoff")
+    stated_hash = str(envelope.get("sha256", "")).removeprefix("sha256:")
+    if (
+        stated_hash != envelope_digest.removeprefix("sha256:")
+        or _package_instant(stated_cutoff) != cutoff
+        or _package_instant(consumption.get("run_read_at")) != source_read
+        or calendar.get("consumer_rule_version") is None
+    ):
+        _fail("replay_package_clock_mismatch", "envelope, bound day or calendar rule differs")
+    rows = consumption.get("members") or ()
+    if not all(isinstance(row, Mapping) for row in rows):
+        _fail("replay_package_clock_mismatch", "invalid member receipt")
+    by_id = {r.get("member_id"): r for r in rows}
+    if len(by_id) != len(rows):
+        _fail("replay_package_clock_mismatch", "duplicate member receipt")
+    used = {r.get("member_id") for r in rows if r.get("relevant_for_T") is True}
+    if not used or used != set(request.required_member_ids):
+        _fail("replay_package_clock_mismatch", "required members differ from the used receipt rows")
+    verified = []
+    for member in request.member_evidence:
+        row = by_id.get(member.member_id)
+        if row is None or row.get("sha_match") is not True or member.digest != row.get("sha256"):
+            _fail("replay_package_clock_mismatch", f"unverified intake member {member.member_id}")
+        when = _package_instant(row.get("verify_at"))
+        if not source_read <= when <= observed or member.available_at != when:
+            _fail("replay_package_clock_mismatch", f"verify_at differs: {member.member_id}")
+        verified.append(when)
+    facts = request.facts_template
+    received = _package_instant(facts.get("intake_received_at"))
+    first = _package_instant(facts.get("intake_first_read_at"))
+    last = _package_instant(facts.get("intake_verified_at"))
+    if not verified or not received <= first == source_read <= last or last != max(verified):
+        _fail("replay_package_clock_mismatch", "intake differs from the read/hash receipts")
+    return {
+        "schema_version": "p11.october-replay-package-clock.v1",
+        "market_date": cutoff.date().isoformat(),
+        "logical_cutoff": cutoff.isoformat(),
+        "source_read_at": source_read.isoformat(),
+        "intake_verified_at": last.isoformat(),
+        "evaluation_observed_at": observed.isoformat(),
+        "envelope_sha256": envelope_digest,
+        "member_consumption_digest": sha256_digest(consumption),
+        "calendar_rule_version": calendar["consumer_rule_version"],
+        "calendar_evidence_digest": sha256_digest(calendar),
+    }
+
+
+def _envelope_read_at(
+    evidence: Mapping[str, Any] | None,
+    observed: datetime,
+    original_intake: datetime,
+    cutoff: datetime,
+) -> datetime:
+    """Use the original input read when replaying a previously sealed envelope."""
+    evidence = evidence or {}
+    members = evidence.get("member_consumption")
+    stamps = []
+    for record, key in ((evidence, "read_at"), (members, "run_read_at")):
+        if not isinstance(record, Mapping) or key not in record:
+            continue
+        try:
+            value = datetime.fromisoformat(str(record[key]).replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ProductDailyError("invalid_source_read_at", f"{key}: invalid timestamp") from exc
+        if value.utcoffset() is None or value > observed:
+            _fail("invalid_source_read_at", f"{key}: missing timezone or after replay observation")
+        stamps.append(value)
+    if len(set(stamps)) > 1:
+        _fail("conflicting_source_read_at", "envelope and member receipt disagree on read time")
+    if stamps:
+        return stamps[0]
+    if original_intake > min(cutoff, observed):
+        _fail(
+            "missing_original_read_at", "late archive intake requires its original reader receipt"
+        )
+    return original_intake
+
+
 def run_e1_replay_day(
     request: Any,
     market_date: date,
@@ -428,6 +524,7 @@ def run_e1_replay_day(
     clock: Callable[[], datetime] | None = None,
     observed_clock: Callable[[], datetime] | None = None,
     p12_evidence: Mapping[str, Any] | None = None,
+    calendar_schedule_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """P12-facing replay entry: run one T through the signed replay path.
 
@@ -485,6 +582,12 @@ def run_e1_replay_day(
         as_observed=True,
         observed_sink=observed_sink,
         consumption_evidence=consumption_evidence,
+        # The verified October scenario admits date-context warm-up rows
+        # (named open sessions whose native instants are absent keep their
+        # original nulls and qualify by business date).  Forward/H1/M2
+        # entries never receive this string, so they keep the strict
+        # per-bar instant requirement.
+        numeric_context="october_replay_as_observed",
     )
 
     # This run's real read instant, resolved ONCE and shared with the replay
@@ -506,7 +609,12 @@ def run_e1_replay_day(
     # run reads) are excluded from the period's input and named with a reason,
     # never a hard failure.  The container edge and the used-row business date
     # are disclosed separately per member.
-    member_use = _analyze_member_use(req, market_date, observed_at=observed_at)
+    source_read_at = _envelope_read_at(
+        p12_evidence, observed_at,
+        _package_instant(req.facts_template.get("intake_first_read_at")),
+        paper_replay.replay_decision_at(market_date),
+    )
+    member_use = _analyze_member_use(req, market_date, observed_at=source_read_at)
     # Only a SHARED whole-day dependency blocks the whole day; a member bound
     # to one security isolates that security (neighbours keep evaluating),
     # and an unused member never blocks regardless of read timing.
@@ -524,9 +632,7 @@ def run_e1_replay_day(
     # reminder from independently-available facts).  Neighbours keep
     # evaluating.  Isolated securities are named in the closure with reason,
     # original instant and scope.
-    excluded_ids = {
-        str(m["member_id"]) for m in member_use["excluded_late_partitions"]
-    }
+    excluded_ids = {str(m["member_id"]) for m in member_use["excluded_late_partitions"]}
     isolated_securities = set(member_use["isolated_by_security"])
     demoted = []
     for s in req.securities:
@@ -548,16 +654,13 @@ def run_e1_replay_day(
         iso["close_at_by_date"] = {}
         iso["knowledge_cutoff_by_date"] = {}
         iso["entry_isolated_reason"] = "member_unavailable_at_read"
-        iso["entry_isolated_member_ids"] = sorted(
-            member_use["isolated_by_security"][code]
-        )
+        iso["entry_isolated_member_ids"] = sorted(member_use["isolated_by_security"][code])
         demoted.append(iso)
     projected_req = (
         replace(
             req,
             source_members=tuple(
-                m for m in req.source_members
-                if str(_member_id_of(m)) not in excluded_ids
+                m for m in req.source_members if str(_member_id_of(m)) not in excluded_ids
             ),
             securities=tuple(demoted),
         )
@@ -576,7 +679,7 @@ def run_e1_replay_day(
             "manifest_sha256": getattr(req, "manifest_sha256", None),
             "signal_date": market_date.isoformat(),
             "logical_decision_at": None,  # filled by the receipt's logical field
-            "actual_read_at": observed_at.isoformat(),
+            "actual_read_at": source_read_at.isoformat(),
             "member_use": member_use,
             "projected_out_member_ids": sorted(excluded_ids),
             "isolated_securities": {
@@ -593,11 +696,32 @@ def run_e1_replay_day(
             # same-day scenario-ledger digest.  Folded into the closure under
             # the caller's own keys; never back-filled from the run's now.
             "p12": dict(p12_evidence or {}),
+            # The named consumer rule by which this replay reads the exchange
+            # calendar plus the PROVEN schedule evidence for the venue sessions
+            # it actually relies on (P10 #747).  Each claimed session must
+            # match a bound calendar_row's venue/date/is_open; a bare caller
+            # timestamp never writes announced_before_T -- only a proven
+            # exchange publication/revision version can.  Unknown publication
+            # instants stay UNKNOWN_EXACT_INSTANT verbatim.
+            "calendar_schedule_evidence": _calendar_schedule_evidence(
+                req,
+                market_date,
+                calendar_schedule_evidence,
+                _load_calendar_consume_rule(assets),
+            ),
             "anchor_mode": "equivalent_day",
             "pit_disguise": False,
         }
     )
 
+    # Native archive reads can finish weeks after the replay date. Authorize
+    # their physical clock only for a verified receipt for this exact day.
+    logical_cutoff = paper_replay.replay_decision_at(market_date)
+    if p12_evidence and _package_instant(req.facts_template["intake_verified_at"]) > logical_cutoff:
+        consumption_evidence["package_clock"] = _october_package_clock(
+            req, p12_evidence, source_read_at, observed_at, logical_cutoff,
+            snapshot_manifest_digest, consumption_evidence["calendar_schedule_evidence"],
+        )
     receipt = paper_replay.run_replay_day(
         projected_req,
         market_date,
@@ -613,8 +737,11 @@ def run_e1_replay_day(
         split_policy=_split_policy_for(market_date),
         snapshot_id=snapshot_id,
         snapshot_manifest_digest=snapshot_manifest_digest,
-        clock=clock,
+        # Evaluation is as of the verified physical replay observation. The
+        # strategy and decision-set cutoff still come from the bound market date.
+        clock=shared_observed_clock if "package_clock" in consumption_evidence else clock,
         observed_clock=shared_observed_clock,
+        source_read_at=source_read_at,
     )
     # Surface the real same-job panel report on the receipt so the caller sees
     # the actual computation, not the binding placeholder.
@@ -625,7 +752,7 @@ def run_e1_replay_day(
     receipt["as_observed"] = {
         "schema_version": "p11.october-replay-as-observed.v1",
         "logical_decision_at": receipt.get("logical_decision_at"),
-        "actual_read_at": observed_at.isoformat(),
+        "actual_read_at": source_read_at.isoformat(),
         "member_use": member_use,
         "sealed_archives": {
             "members": observed_sink.get("sealed_members", []),
@@ -698,6 +825,168 @@ def _member_id_of(m: Any) -> Any:
     return m.get("member_id") if isinstance(m, Mapping) else getattr(m, "member_id", None)
 
 
+def _text_of(row: Any, field: str) -> Any:
+    return row.get(field) if isinstance(row, Mapping) else getattr(row, field, None)
+
+
+def _load_calendar_consume_rule(assets: E1RuleAssets) -> Mapping[str, Any] | None:
+    """Load the pinned October calendar-consume rule from the release-verified
+    repository root (a trusted projection of the P10 #747 RESULT).
+
+    The rule declares its own identity; it is never read from caller bytes.
+    A missing repository root or a malformed rule fails closed (the replay
+    keeps reading the calendar through the consumer rule but records no proven
+    publication version).
+    """
+    import json
+
+    root = getattr(assets, "repository", None)
+    if root is None:
+        return None
+    path = Path(root) / _OCTOBER_CALENDAR_RULE
+    if not path.is_file():
+        return None
+    rule = json.loads(path.read_text())
+    if rule.get("schema_version") != "quanthus.p11.calendar-consume-rule.v1":
+        _fail(
+            "calendar_consume_rule_invalid",
+            f"{_OCTOBER_CALENDAR_RULE} schema_version is not the pinned v1 rule",
+        )
+    return rule
+
+
+def _calendar_schedule_evidence(
+    request: Any,
+    market_date: date,
+    evidence: Mapping[str, Any] | None,
+    rule: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Bind the PROVEN exchange-schedule evidence into the signed closure.
+
+    The replay reads the venue trading calendar through a NAMED consumer rule
+    (consumer_rule_id/consumer_rule_version).  A caller may supply the P10
+    #747 publication evidence: per venue+session_date the schedule basis
+    (EXPLICIT_EXCHANGE_SCHEDULE / RULE_DERIVED_SCHEDULE), the named source
+    documents (notice id / rule clause + sha256 originals) and the
+    publication instants.
+
+    Hard rules (P10 #747 contract):
+      * only PROVEN exchange calendar facts are consumed -- every claimed
+        session must match a bound calendar_row on venue_id + session_date;
+        a claim for a session the envelope does not carry is refused, never
+        silently adopted;
+      * source_published_at / historical_channel_available_at keep their
+        source grade verbatim (UNKNOWN_EXACT_INSTANT when the official page
+        carries only a date); a bare caller timestamp never writes
+        announced_before_T -- only a proven exchange publication/revision
+        version can, and none is proven here;
+      * a session's schedule basis is a fact ABOUT that session's calendar
+        row; it never back-dates the source calendar's own archive
+        knowledge_from (which stays bound verbatim elsewhere).
+
+    Absent evidence yields a declared-empty block (the run still reads the
+    calendar through the consumer rule; it just has no proven publication
+    version to record), never a guessed label.
+    """
+    bound_rows = {
+        (
+            _text_of(row, "venue_id"),
+            str(_text_of(row, "session_date")),
+        ): (row.get("is_open") if isinstance(row, Mapping) else getattr(row, "is_open", None))
+        for row in getattr(request, "calendar_rows", ()) or ()
+    }
+    block: dict[str, Any] = {
+        "schema_version": "p11.calendar-schedule-evidence.v1",
+        "consumer_rule_id": None,
+        "consumer_rule_version": None,
+        # The run never asserts T-known: a caller's lone timestamp is not a
+        # proven exchange publication, so announced_before_T stays False.
+        "announced_before_T": False,
+        "sessions": [],
+    }
+    # The consumer rule declares its OWN identity; a caller may only ASK for
+    # sessions, never name the rule or the basis.  Trusted facts come from the
+    # pinned rule (a projection of the verified P10 #747 RESULT), never from
+    # caller bytes: the rule's proven basis, named source-document digests and
+    # UNKNOWN instants are what the closure binds.
+    if rule is not None:
+        block["consumer_rule_id"] = rule.get("consumer_rule_id")
+        block["consumer_rule_version"] = rule.get("consumer_rule_version")
+        block["p10_result_ref"] = rule.get("p10_result_ref")
+    trusted = {
+        (_text_of(t, "venue_id"), str(_text_of(t, "session_date"))): t
+        for t in (rule or {}).get("sessions", ()) or ()
+    }
+    requested = [
+        (str(_text_of(e, "session_date")), _text_of(e, "venue_id"))
+        for e in (evidence or {}).get("sessions", ()) or ()
+    ]
+    sessions = []
+    for sess, venue in requested:
+        key = (venue, sess)
+        if key not in bound_rows:
+            _fail(
+                "calendar_schedule_evidence_unbound",
+                f"schedule evidence claims {venue} {sess} but no bound "
+                "calendar_row carries that venue/session_date",
+            )
+        t = trusted.get(key)
+        if t is None:
+            # A claim for a session the trusted rule does not prove is a named
+            # refusal, never a silently-adopted basis.
+            _fail(
+                "calendar_schedule_evidence_unproven",
+                f"schedule claim for {venue} {sess} has no proven basis in the "
+                "pinned consumer rule",
+            )
+        if bound_rows[key] is not t["is_open"]:
+            _fail("calendar_schedule_evidence_conflict", f"calendar open status differs for {key}")
+        # Emit the TRUSTED basis + named digests + UNKNOWN instants, not the
+        # caller's.  A caller-supplied basis/notice that conflicts with the
+        # trusted fact is refused.
+        for field in ("schedule_basis",):
+            want = _text_of(
+                next(
+                    x
+                    for x in (evidence or {}).get("sessions", ()) or ()
+                    if _text_of(x, "session_date") == sess and _text_of(x, "venue_id") == venue
+                ),
+                field,
+            )
+            if want is not None and want != _text_of(t, field):
+                _fail(
+                    "calendar_schedule_evidence_conflict",
+                    f"caller schedule_basis {want!r} for {venue} {sess} "
+                    f"conflicts with the trusted {_text_of(t, field)!r}",
+                )
+        sessions.append(
+            {
+                "venue_id": venue,
+                "session_date": sess,
+                "is_open": bound_rows[key],
+                "schedule_basis": _text_of(t, "schedule_basis"),
+                "source_documents": [
+                    {
+                        "kind": _text_of(d, "kind"),
+                        "notice_id": _text_of(d, "notice_id"),
+                        "rule_clause": _text_of(d, "rule_clause"),
+                        "publication_date": _text_of(d, "publication_date"),
+                        "sha256": _text_of(d, "sha256"),
+                        "source_receipt_sha256": _text_of(d, "source_receipt_sha256"),
+                        "published_at": _text_of(d, "published_at"),
+                        "published_at_grade": _text_of(d, "published_at_grade"),
+                    }
+                    for d in _text_of(t, "source_documents") or ()
+                ],
+                "source_published_at": _text_of(t, "source_published_at"),
+                "source_published_at_state": _text_of(t, "source_published_at_state"),
+                "historical_channel_available_at": _text_of(t, "historical_channel_available_at"),
+            }
+        )
+    block["sessions"] = sessions
+    return block
+
+
 def _date_to_of(m: Any) -> date | None:
     date_to = m.get("date_to") if isinstance(m, Mapping) else getattr(m, "date_to", None)
     if date_to is None:
@@ -728,8 +1017,7 @@ def _member_available_at(m: Any) -> datetime | None:
     unavailable at read and its dependent is refused by dependency.
     """
     instants = [
-        x for x in (_instant_of(m, "visible_at"), _instant_of(m, "knowledge_at"))
-        if x is not None
+        x for x in (_instant_of(m, "visible_at"), _instant_of(m, "knowledge_at")) if x is not None
     ]
     return max(instants) if instants else None
 
@@ -781,7 +1069,23 @@ def _used_member_ids(request: Any) -> dict[str, dict[str, Any]]:
             if isinstance(reg, Mapping):
                 add(reg.get("source_member_id"), "action_register", None)
     for me in getattr(request, "member_evidence", ()) or ():
-        add(_member_id_of(me), "member_evidence", None)
+        me_id = _member_id_of(me)
+        me_required = (
+            bool(me.get("required", True))
+            if isinstance(me, Mapping)
+            else bool(getattr(me, "required", True))
+        )
+        # member_evidence binds the SHA/identity of an opened member; its
+        # content dependency is still carried by the rows above.  A member the
+        # reader opened but marked not relevant_for_T (required=False) is
+        # shared evidence, not a same-T content dependency - it must not be
+        # inflated into the shared required set and must not block neighbours.
+        if me_id is not None and me_id not in used:
+            add(
+                me_id,
+                "member_evidence_opened_not_used" if not me_required else "member_evidence",
+                None,
+            )
     for mid in getattr(request, "required_member_ids", ()) or ():
         add(mid, "required", None)
     return used
@@ -821,18 +1125,29 @@ def _analyze_member_use(
         d_to = _date_to_of(m)
         d_from = _date_from_of(m)
         avail = _member_available_at(m)
-        u = used.get(str(mid), {"shared": set(), "securities": set()}) if mid is not None else {
-            "shared": set(), "securities": set()
-        }
+        u = (
+            used.get(str(mid), {"shared": set(), "securities": set()})
+            if mid is not None
+            else {"shared": set(), "securities": set()}
+        )
         shared = sorted(u["shared"])
         secs = sorted(u["securities"])
         is_used = bool(shared or secs)
-        if shared:
+        # Split "opened" evidence-only members from content dependencies: a
+        # member whose only binding is member_evidence with required=False was
+        # opened by the reader but carries no same-T row this run consumes.
+        # It stays evidence-classified, never a shared blocking member.
+        content_shared = [k for k in shared if k != "member_evidence_opened_not_used"]
+        evidence_only = bool(shared) and not content_shared
+        if content_shared:
             tier = "shared"
         elif secs:
             tier = "per_security" if len(secs) == 1 else "multi_security"
+        elif evidence_only:
+            tier = "opened_not_used"
         else:
             tier = "unused"
+        is_used = bool(content_shared or secs)
         rec = {
             "member_id": mid,
             "container_date_from": d_from.isoformat() if d_from else None,
@@ -847,6 +1162,13 @@ def _analyze_member_use(
         }
         unreadable = avail is not None and observed_at is not None and avail > observed_at
         wholly_late = d_from is not None and d_from > match_end
+        # An evidence-only opened member that was not yet obtainable by this
+        # run's read instant is named on the evidence list, never a block.
+        if unreadable and tier == "opened_not_used":
+            rec["disposition"] = "opened_not_used"
+            rec["obtained_after_actual_read"] = True
+            members.append(rec)
+            continue
         if unreadable and is_used:
             rec["disposition"] = "unavailable_at_read"
             rec["reason"] = "obtained_after_actual_read"
@@ -899,5 +1221,22 @@ def _analyze_member_use(
         "isolated_by_security": {k: sorted(set(v)) for k, v in isolated.items()},
         "excluded_late_partitions": excluded,
         "unavailable_at_read": unavailable,
+        "member_count": len(members),
+        # The three public counts are mutually exclusive by dependency_tier and
+        # sum to member_count: a member is counted by the class that binds it,
+        # not by its read disposition (an opened_not_used member is not also a
+        # registered_not_read member even though it was not read for T).
+        "used_for_T_count": sum(
+            1
+            for m in members
+            if m.get("is_used")
+            and m.get("dependency_tier") in ("shared", "per_security", "multi_security")
+        ),
+        "opened_not_used_count": sum(
+            1 for m in members if m.get("dependency_tier") == "opened_not_used"
+        ),
+        "registered_not_read_count": sum(
+            1 for m in members if m.get("dependency_tier") == "unused"
+        ),
         "match_window_through": match_end.isoformat(),
     }

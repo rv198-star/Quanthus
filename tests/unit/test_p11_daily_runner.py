@@ -284,6 +284,29 @@ def _prospective_split():
     )
 
 
+def _replay_source():
+    """as-observed replay source policy: observation end = T close (the bound
+    calendar's own close instant), decision = T 21:30 - the real
+    _source_policy_for_day shape, never a forward 18:01 availability."""
+
+    from quanthus.forward_validation.base24_runtime import (
+        AfterCloseDecisionClock,
+        P6Base24CandidatePolicy,
+    )
+
+    clock = AfterCloseDecisionClock(
+        market_date=TARGET,
+        source_available_at=datetime(2026, 11, 24, 15, 0, tzinfo=SHANGHAI),
+        decision_at=datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
+        next_session_open=NEXT_OPEN,
+    )
+    return P6Base24CandidatePolicy(
+        clock=clock,
+        history_start=date(2026, 1, 1),
+        inputs_manifest_sha256="sha256:" + "a" * 64,
+    )
+
+
 def test_raw_to_p12_package_positive(runner, resources):
     """Real raw bars -> original panel -> run_daily_advice -> a package with a real entry."""
 
@@ -594,6 +617,8 @@ def _trend_raw(code: str = "600000") -> RawSecurityInput:
 
 def _run(runner, resources, raws, **kw):
     facts, policy, account = _producer_inputs()
+    facts = kw.pop("facts", facts)
+    policy = kw.pop("policy", policy)
     account = kw.pop("account", account)
     return run_daily_advice_from_raw(
         runner=runner,
@@ -852,3 +877,640 @@ def test_r1_raw_to_p12_real_entry_plan(runner, resources):
         validated = validate(ds.to_dict())
     stages = [str(d.stage) for d in validated.decisions]
     assert any("ENTRY_PLAN" in s for s in stages), stages
+
+
+# --- oct08-context-real: single-T numeric context with null warm-up instants -------
+
+
+def _gap_clocked_raw(code: str, gap_days: int = 42) -> RawSecurityInput:
+    """The 600000/2026-10-08 shape: last <=61 sessions, early rows null instants.
+
+    Mirrors the P10 OPEN-AT-GAPS evidence: the bound venue calendar keeps the
+    session date/is_open flag but the native close/cutoff entries are explicit
+    nulls; T keeps its real close instant.  gap_days=42 counts the trailing
+    window sessions ending at T-1 (matching the 08-03..09-30 gap block).
+    """
+
+    from dataclasses import replace as _replace
+
+    raw = _trend_raw(code)
+    days = [bar.session_date for bar in raw.bars]
+    gaps = set(days[-(gap_days + 1) : -1])
+    assert len(gaps) == gap_days
+    close_map = dict(raw.close_at_by_date)
+    cutoff_map = dict(raw.knowledge_cutoff_by_date)
+    for day in gaps:
+        close_map[day] = None
+        cutoff_map[day] = None
+    return _replace(
+        raw,
+        close_at_by_date=close_map,
+        knowledge_cutoff_by_date=cutoff_map,
+    )
+
+
+def _run_context(runner, resources, raws, context=None, **kw):
+    from datetime import timezone
+
+    from quanthus.product_daily.recommendation.daily_runner import _new_october_context
+
+    token = _new_october_context(context) if context is not None else None
+    # The as-observed replay requires the actual-read instant so a sealed
+    # source version's readability is judged; the fixture's real read was
+    # 2026-11-24 23:00+08 (after the Oct version stamps AND the members'
+    # 21:30+08 availability), overridable via kwarg.  It also bounds the
+    # producer's actual intake/evaluation clocks under the replay token.
+    kw.setdefault("as_observed_at", datetime(2026, 11, 24, 15, 0, tzinfo=timezone.utc))
+    consumption_evidence = {"replay": "oct08-42", **dict(kw.pop("consumption_evidence", {}) or {})}
+    return _run(
+        runner,
+        resources,
+        raws,
+        numeric_context=token,
+        consumption_evidence=consumption_evidence,
+        **kw,
+    )
+
+
+def test_date_context_strict_entry_refused(runner, resources):
+    """Without the named context a null warm-up instant stays a shared block."""
+
+    raw = _gap_clocked_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw])
+    assert "missing_raw_inputs" in str(exc.value)
+
+
+def test_date_context_context_kwarg_gated(runner, resources):
+    """numeric_context must be the private token; a bare string is a breach."""
+
+    raw = _gap_clocked_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw], numeric_context="bogus_context")
+    assert "unknown_numeric_context" in str(exc.value)
+
+
+def test_date_context_string_label_refused(runner, resources):
+    """The public raw entry refuses a caller-supplied context string - only the
+    versioned replay entry can mint the private token, so a forward/H1/M2 caller
+    cannot substitute a label for the verified projection."""
+
+    raw = _gap_clocked_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw], numeric_context="october_replay_as_observed")
+    assert "unknown_numeric_context" in str(exc.value)
+
+
+def test_date_context_token_not_constructible_publicly(runner, resources):
+    """OctoberReplayContext cannot be minted without the internal key - a raw
+    caller cannot fabricate the admission token even knowing its shape."""
+    from quanthus.product_daily.recommendation.daily_runner import OctoberReplayContext
+
+    with pytest.raises(ProductDailyError) as exc:
+        OctoberReplayContext("october_replay_as_observed", _key=object())
+    assert "replay_context_not_constructible" in str(exc.value)
+
+
+def _source_clock_raw(code: str, gap_days: int = 42, *, matched: bool = True) -> RawSecurityInput:
+    """The #749 v4 shape: knowledge_clock_role=calendar_source_knowledge_from,
+    warm-up rows keep close_at=None (original) while knowledge_cutoff carries
+    the source calendar knowledge_from as the decision coordinate.
+
+    matched=True mirrors the versioned as-observed entry's proof: each cutoff
+    equals the same venue+session_date source calendar knowledge_from, so the
+    PIT coordinate moves to the business fact instant.  matched=False leaves
+    the role declared but unproven - the rows keep their original cutoff
+    identity (the un-matched r4 path).
+
+    Only the close-missing warm-up rows are source-matched: a close-bearing
+    row's cutoff is its ordinary availability instant, not the archive version
+    stamp, so it is NOT a matched date (its PIT coordinate is the native
+    close)."""
+
+    from dataclasses import replace as _replace
+    from datetime import datetime
+
+    raw = _gap_clocked_raw(code, gap_days)
+    stamp = datetime.fromisoformat("2026-10-14T16:28:52.274625+00:00")
+    cutoff = {d: (stamp if v is None else v) for d, v in raw.knowledge_cutoff_by_date.items()}
+    # A matched date is a close-missing warm-up row whose envelope cutoff was
+    # proven equal to the same venue+date source calendar knowledge_from.
+    matched_days = frozenset(
+        d for d, v in cutoff.items() if v is not None and raw.close_at_by_date.get(d) is None
+    )
+    return _replace(
+        raw,
+        knowledge_clock_role="calendar_source_knowledge_from",
+        knowledge_cutoff_by_date=cutoff,
+        source_calendar_matched_dates=(matched_days if matched else None),
+    )
+
+
+def test_source_clock_role_admits_real_clocked_rows(runner, resources):
+    """Under the verified replay context + named role, a null close with a real
+    source knowledge_from is a clocked row (not date-context, not fail-closed)."""
+
+    raw = _source_clock_raw("600000")
+    out = _run_context(
+        runner,
+        resources,
+        [raw],
+        context="october_replay_as_observed",
+        source_policy=_replay_source(),
+    )
+    assert out.result.publishable is True
+    rows = out.source_closure["consumption_evidence"]["source_knowledge_clock_rows"]
+    # The close-missing warm-up rows under the named role keep their
+    # source_knowledge_clock_row kind (a real source-version coordinate, never
+    # a date-context row); every OTHER row's version stamp is bound as a
+    # generic source_archive_version_clock so the archive-vs-fact separation
+    # is recomputable for the whole window.
+    role_named = [r for r in rows if r["kind"] == "source_knowledge_clock_row"]
+    archive_named = [r for r in rows if r["kind"] == "source_archive_version_clock"]
+    assert len(role_named) == 42
+    assert all(r["knowledge_clock_role"] == "calendar_source_knowledge_from" for r in role_named)
+    assert all(r["source_knowledge_from"] for r in role_named)
+    assert all(r["actual_read_at"] for r in role_named)
+    # Only the close-missing warm-up rows are source-matched: a close-bearing
+    # row's PIT coordinate is its native close (an ordinary availability
+    # instant), so it carries no archive-version clock row.
+    assert not archive_named
+    # Not a date-context row - date_context_rows stays empty under this shape.
+    assert not out.source_closure["consumption_evidence"].get("date_context_rows")
+
+
+def test_source_clock_role_refused_without_context(runner, resources):
+    """A forward/strict caller keeps the per-bar instant requirement even when
+    the role is declared - the role is effective ONLY inside the verified
+    replay context."""
+
+    raw = _source_clock_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw])
+    assert "missing_raw_inputs" in str(exc.value)
+
+
+def test_source_clock_role_refused_on_bare_string(runner, resources):
+    """The role cannot be activated by a caller-supplied context string - only
+    the private token minted inside the verified entry admits it."""
+
+    raw = _source_clock_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw], numeric_context="october_replay_as_observed")
+    assert "unknown_numeric_context" in str(exc.value)
+
+
+def test_source_clock_role_after_real_read_isolated(runner, resources):
+    """A USED source version whose archive knowledge_from is later than this
+    run's actual read was not yet acquired - the row is isolated by
+    dependency, never let a later rerun flatten the gap.  With a clean
+    neighbour the late-version security is isolated (named exclusion) while
+    the neighbour still produces its entry; alone it blocks the day."""
+    from dataclasses import replace as _replace
+    from datetime import timezone
+
+    late = datetime(2026, 12, 1, 16, 28, 52, tzinfo=timezone.utc)
+
+    def _late(raw):
+        matched = raw.source_calendar_matched_dates or frozenset()
+        return _replace(
+            raw,
+            knowledge_cutoff_by_date={
+                d: (late if d in matched else v) for d, v in raw.knowledge_cutoff_by_date.items()
+            },
+        )
+
+    # Two-security: the late-version security is named-isolated while the
+    # clean neighbour still evaluates (per-security blast radius).
+    good = _gap_clocked_raw("600000")
+    bad = _late(_source_clock_raw("600001"))
+    out = _run_context(
+        runner,
+        resources,
+        [good, bad],
+        context="october_replay_as_observed",
+        source_policy=_replay_source(),
+    )
+    excl = out.source_closure["exclusions"]
+    assert any(
+        e["security_code"] == "600001" and "source_version_after_actual_read" in str(e)
+        for e in excl
+    ), excl
+    # The neighbour kept its own entry; the late-version security did not run.
+    assert out.result.publishable is True
+
+    # Single-security: the same late version blocks the whole day (no
+    # qualified input remains), never silently admitted.
+    only = _late(_source_clock_raw("600000"))
+    with pytest.raises(ProductDailyError) as exc:
+        _run_context(
+            runner,
+            resources,
+            [only],
+            context="october_replay_as_observed",
+            source_policy=_replay_source(),
+        )
+    assert "missing_raw_inputs" in str(exc.value)
+
+
+def test_date_context_warmup_rows_equivalent(runner, resources):
+    """Null-instant warm-up rows reach the same numeric path as full clocks.
+
+    Same 61 bars, last 22 scan sessions including T-1: the anchored run must
+    produce identical dispositions/package and identical four scan ratios as
+    the fully-clocked run, with every date-context row named in the closure.
+    """
+
+    gap = _gap_clocked_raw("600000")
+    full = _trend_raw("600000")
+    out_ctx = _run_context(runner, resources, [gap], context="october_replay_as_observed")
+    out_full = _run(runner, resources, [full])
+    assert [d.disposition for d in out_ctx.seam.decisions] == [
+        d.disposition for d in out_full.seam.decisions
+    ]
+    assert (out_ctx.result.package is not None) == (out_full.result.package is not None)
+    # The real entry (same bars trigger the real transition) is preserved.
+    assert [d.entry_allowed for d in out_ctx.seam.decisions] == [
+        d.entry_allowed for d in out_full.seam.decisions
+    ]
+    # The emitted candidate's four real scan ratios are identical: the emitted
+    # entry decision's canonical bytes bind the feature-evidence digest
+    # computed from the 22-session window, so equal digests prove equal ratios
+    # on equal bars.  Both sides keep their own un-matched cutoffs, so the
+    # whole decision envelope is identical.
+    ctx_decs = [d.decision.to_dict() for d in out_ctx.seam.entries]
+    full_decs = [d.decision.to_dict() for d in out_full.seam.entries]
+    assert ctx_decs == full_decs
+    # Every date-context row is named inside the signed closure.
+    named = out_ctx.source_closure["consumption_evidence"]["date_context_rows"]
+    assert len(named) == 42
+    assert {r["session_date"] for r in named} == {
+        b.session_date.isoformat()
+        for b in gap.bars
+        if b.session_date in {d for d, v in gap.close_at_by_date.items() if v is None}
+    }
+    assert all(r["kind"] == "date_context_warmup_row" for r in named)
+
+
+def test_date_context_missing_t_close_still_blocks(runner, resources):
+    """A missing native T close keeps blocking under the numeric context."""
+
+    from dataclasses import replace as _replace
+
+    raw = _gap_clocked_raw("600000")
+    signal = raw.bars[-1].session_date
+    close_map = dict(raw.close_at_by_date)
+    close_map[signal] = None
+    raw = _replace(raw, close_at_by_date=close_map)
+    with pytest.raises(ProductDailyError) as exc:
+        _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    assert "missing_raw_inputs" in str(exc.value)
+
+
+def test_date_context_partial_pair_still_blocks(runner, resources):
+    """close present + cutoff absent (or reverse) stays fail-closed."""
+
+    from dataclasses import replace as _replace
+
+    raw = _gap_clocked_raw("600000")
+    gap_days = [d for d, v in raw.close_at_by_date.items() if v is None]
+    day = gap_days[0]
+    cutoff_map = dict(raw.knowledge_cutoff_by_date)
+    cutoff_map[day] = raw.knowledge_cutoff_by_date[  # restore one side only
+        [d for d in raw.knowledge_cutoff_by_date if raw.knowledge_cutoff_by_date[d] is not None][0]
+    ]
+    raw = _replace(raw, knowledge_cutoff_by_date=cutoff_map)
+    with pytest.raises(ProductDailyError) as exc:
+        _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    assert "missing_raw_inputs" in str(exc.value)
+
+
+def test_date_context_held_member_uses_t_row(runner, resources):
+    """A held security's T row keeps its real instants for the held review."""
+
+    from dataclasses import replace as _replace
+
+    raw = _replace(_gap_clocked_raw("600000"), held_membership=True, held_quantity=1000)
+    out = _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    # Held review ran on the T row with its real instants.
+    held = [d for d in out.seam.held_decisions]
+    assert held, "a held member must produce a held review"
+    named = out.source_closure["consumption_evidence"]["date_context_rows"]
+    assert len(named) == 42
+
+
+# --- oct08-scan-calendar: bounded scan calendar vs full listing-age union -------
+
+
+def _bounded_scan_dates(raw: RawSecurityInput, market_date: date, next_session: date):
+    from quanthus.product_daily.recommendation.paper_replay import bar_context_window
+
+    open_sessions = tuple(sorted({d for d in raw.universe_membership if d <= market_date}))
+    window = bar_context_window(open_sessions, market_date)
+    return tuple(sorted(set(window) | {next_session}))
+
+
+def test_scan_calendar_bounds_1991_listing_age(runner, resources):
+    """A 1991 listing-age membership no longer drags pre-scope sessions into
+    require_scan_date: under the as-observed token the scan runs over the
+    bounded bar_context_window + next_session, while features/membership keep
+    the full listing age (listing_sessions row_number preserved)."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    base = _trend_raw("600000")
+    # A security listed back to ~1991: the full membership is kept complete
+    # (the listing_sessions gate still row_numbers the whole sequence).
+    old_days = _weekdays_ending(date(1991, 12, 31), 260)
+    membership = tuple(sorted(set(old_days) | set(base.universe_membership)))
+    raw = _replace(base, universe_membership=membership)
+    assert raw.universe_membership[0].year <= 1991
+
+    scan_dates = _bounded_scan_dates(raw, facts.market_date, facts.next_session)
+
+    # Strict/forward (no token): the full membership union still fails scope.
+    with pytest.raises(Exception) as exc:
+        _run(runner, resources, [raw])
+    assert "p6_base24_scan_scope" in str(exc.value)
+
+    # Token alone (no bounded calendar): still the membership union -> scope.
+    with pytest.raises(Exception) as exc2:
+        _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    assert "p6_base24_scan_scope" in str(exc2.value)
+
+    # Token + bounded scan calendar: the scan window is in-scope and runs.
+    # Capture features_by_security via the panel factory to prove the full
+    # listing age is preserved (row_number over complete membership).
+    captured = {}
+
+    def _capture(features_by_security):
+        captured.update(features_by_security)
+        return resources.panel_report
+
+    out = _run_context(
+        runner,
+        resources,
+        [raw],
+        context="october_replay_as_observed",
+        scan_trading_dates=scan_dates,
+        panel_report_factory=_capture,
+    )
+    assert out.result.publishable
+    # The scan calendar, not the full membership, bounded the scan: every
+    # trading date is within [window_start, next_session], none before 2026.
+    assert all(d >= date(2026, 1, 1) for d in scan_dates)
+    # The full listing age is preserved inside features (row_number over the
+    # complete membership, not the 61-session scan window).
+    assert captured["600000"].listing_sessions == len(membership)
+
+
+def test_scan_calendar_requires_context(runner, resources):
+    """scan_trading_dates without the private token is a contract breach."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    base = _trend_raw("600000")
+    old_days = _weekdays_ending(date(1991, 12, 31), 260)
+    raw = _replace(
+        base, universe_membership=tuple(sorted(set(old_days) | set(base.universe_membership)))
+    )
+    scan_dates = _bounded_scan_dates(raw, facts.market_date, facts.next_session)
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw], scan_trading_dates=scan_dates)
+    assert "scan_calendar_requires_replay_context" in str(exc.value)
+
+
+def test_scan_calendar_missing_one_bar_not_triggered(runner, resources):
+    """Missing-one-bar control: a gap inside the bounded scan window must
+    still leave the security unevaluated/qualified-no-signal - the bounded
+    calendar is derived from the named open sessions, never narrowed by which
+    bars exist, so a missing bar stays an observation gap, not a trigger."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    base = _trend_raw("600000")
+    old_days = _weekdays_ending(date(1991, 12, 31), 260)
+    membership = tuple(sorted(set(old_days) | set(base.universe_membership)))
+    # Drop one mid-window bar (keep it in membership + clock maps): an
+    # observation gap the bounded calendar must not paper over.
+    bars = list(base.bars)
+    removed = bars[-3].session_date
+    bars = [b for b in bars if b.session_date != removed]
+    raw = _replace(base, bars=tuple(bars), universe_membership=membership)
+
+    scan_dates = _bounded_scan_dates(raw, facts.market_date, facts.next_session)
+    # The dropped session is still a named open session in the calendar.
+    assert removed in scan_dates
+    out = _run_context(
+        runner,
+        resources,
+        [raw],
+        context="october_replay_as_observed",
+        scan_trading_dates=scan_dates,
+    )
+    # No new entry fires on a gapped window.
+    assert not any(d.event_id is not None for d in out.seam.decisions)
+    # The scan named the gap rather than treating the day as a clean window.
+    receipt = [
+        r
+        for r in (out.source_closure.get("history_receipts") or [])
+        if r.get("security_code") == "600000"
+    ]
+    if receipt:
+        ev = (receipt[0].get("gates") or {}).get("events", {})
+        assert ev.get("status") != "satisfied" or "transition" in (ev.get("reason") or "")
+
+
+def _package_clock(market_date, cutoff, source_read, eval_observed):
+    """The e1_runtime package_clock proof bound into consumption_evidence.
+
+    source_read_at is the original run's read (members' source-acquire bound);
+    evaluation_observed_at is THIS run's real evaluation instant (the
+    per-member verify / intake / receipt bound).
+    """
+
+    return {
+        "schema_version": "p11.october-replay-package-clock.v1",
+        "market_date": market_date.isoformat(),
+        "logical_cutoff": cutoff.isoformat(),
+        "source_read_at": source_read.isoformat(),
+        "intake_verified_at": eval_observed.isoformat(),
+        "evaluation_observed_at": eval_observed.isoformat(),
+    }
+
+
+def _late_intake_facts():
+    """Facts whose ACTUAL intake/eval instants postdate the logical cutoff -
+    the genuine #749 replay shape (it reads/verifies sealed archives after T).
+    """
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    cutoff = policy.decision_cutoff  # 2026-11-24 22:30 SHANGHAI
+    late = cutoff + timedelta(hours=2)  # 2026-11-25 00:30 SHANGHAI - after T
+    member = _replace(facts.members[0], available_at=cutoff - timedelta(hours=1))
+    return (
+        _replace(
+            facts,
+            members=(member,),
+            intake_received_at=late,
+            intake_first_read_at=late,
+            intake_verified_at=late,
+        ),
+        policy,
+        account,
+    )
+
+
+def test_package_clock_admits_late_replay_intake(runner, resources):
+    """Under the verified replay context + a matching package_clock, the
+    replay's post-T intake/eval instants admit against evaluation_observed_at
+    (never the logical T); the package is the real qualified output."""
+
+    facts, policy, account = _late_intake_facts()
+    cutoff = policy.decision_cutoff
+    source_read = cutoff + timedelta(hours=1)  # original run read, after cutoff
+    eval_observed = cutoff + timedelta(hours=3)  # this run's real evaluation
+    evidence = {
+        "replay": "oct08-42",
+        "package_clock": _package_clock(facts.market_date, cutoff, source_read, eval_observed),
+    }
+    out = _run_context(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        context="october_replay_as_observed",
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence=evidence,
+        clock=lambda: eval_observed,
+    )
+    # The post-cutoff intake was admitted by the package_clock, not blocked;
+    # and the receipt completion (the real eval instant) sees the verified
+    # intake before it.
+    assert not any(
+        d.get("reason") == "intake_received_after_cutoff" for d in out.result.diagnostics
+    )
+    assert not any(
+        d.get("reason") == "candidate_evaluation_before_intake_verified"
+        for d in out.result.diagnostics
+    )
+
+
+def test_package_clock_missing_keeps_strict(runner, resources):
+    """A replay context WITHOUT a valid package_clock mints no admission
+    clock: the post-T intake instants stay judged against the logical
+    decision_cutoff and the day blocks (the strict outcome)."""
+
+    facts, policy, account = _late_intake_facts()
+    out = _run_context(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        context="october_replay_as_observed",
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence={"replay": "oct08-42"},
+    )
+    assert any(d.get("reason") == "intake_received_after_cutoff" for d in out.result.diagnostics)
+
+
+def test_package_clock_requires_token(runner, resources):
+    """Without the private replay context the same package_clock evidence can
+    never mint an admission clock - the day still blocks on the logical
+    cutoff.  A bare package_clock is not an unlock."""
+
+    facts, policy, account = _late_intake_facts()
+    cutoff = policy.decision_cutoff
+    evidence = {
+        "package_clock": _package_clock(
+            facts.market_date,
+            cutoff,
+            cutoff + timedelta(hours=1),
+            cutoff + timedelta(hours=3),
+        )
+    }
+    # No numeric_context token: a strict caller, despite the package_clock.
+    out = _run(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence=evidence,
+    )
+    assert any(d.get("reason") == "intake_received_after_cutoff" for d in out.result.diagnostics)
+
+
+def test_package_clock_member_verify_bounded_by_eval(runner, resources):
+    """A member's available_at is its per-member VERIFY instant, admitted
+    against evaluation_observed_at (not source_read_at, which already judged
+    source visibility upstream).  A verify that completes AFTER the eval
+    instant is not admitted - the required member fails closed."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _late_intake_facts()
+    cutoff = policy.decision_cutoff
+    source_read = cutoff + timedelta(hours=1)
+    eval_observed = cutoff + timedelta(hours=3)
+    # Member verify completes AFTER the real eval instant -> not admitted.
+    member = _replace(facts.members[0], available_at=eval_observed + timedelta(minutes=30))
+    facts = _replace(facts, members=(member,))
+    evidence = {
+        "package_clock": _package_clock(facts.market_date, cutoff, source_read, eval_observed),
+    }
+    out = _run_context(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        context="october_replay_as_observed",
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence=evidence,
+        clock=lambda: eval_observed,
+    )
+    # The required member's verify postdates the eval bound: it blocks.
+    assert not out.result.publishable or out.result.diagnostics
+
+
+def test_package_clock_member_verify_after_source_read_admits(runner, resources):
+    """The #749 shape: a member's verify_at legitimately FOLLOWS the original
+    source_read_at (verify completes after the read).  Because the member is
+    bounded by evaluation_observed_at - not source_read_at - it still admits;
+    using source_read_at would wrongly reject these members."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _late_intake_facts()
+    cutoff = policy.decision_cutoff
+    source_read = cutoff + timedelta(hours=1)
+    eval_observed = cutoff + timedelta(hours=3)
+    # Member verify completes after the read but before the eval instant.
+    member = _replace(facts.members[0], available_at=source_read + timedelta(minutes=30))
+    facts = _replace(facts, members=(member,))
+    evidence = {
+        "package_clock": _package_clock(facts.market_date, cutoff, source_read, eval_observed),
+    }
+    out = _run_context(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        context="october_replay_as_observed",
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence=evidence,
+        clock=lambda: eval_observed,
+    )
+    # The member's post-read verify is admitted by the eval bound; no member
+    # clock block on the required member.
+    assert out.result.publishable

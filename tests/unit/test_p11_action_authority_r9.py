@@ -22,6 +22,7 @@ from quanthus.product_daily.recommendation.paper_replay import (
     build_replay_envelope,
     build_signed_action_authority,
     load_replay_request,
+    project_signed_actions,
 )
 from tests.unit.test_p11_paper_replay import (
     _request,
@@ -446,3 +447,192 @@ def test_r9c_manifest_pin_mismatch_fail_closed():
     with pytest.raises(ProductDailyError) as exc:
         bind_signed_manifest(b"{}", "sha256:" + "0" * 64)
     assert str(exc.value.args[0]).startswith("action_authority_manifest_pin_mismatch")
+
+
+# --- oct08-action-projection-0043: raw-wire actions -> feature projection ------
+
+
+def _raw_action(
+    code, ex, cash, status="IMPLEMENTED", source="base22_f10/dividend_implemented", ann="2026-07-10"
+):
+    return {
+        "corporate_action_id": f"ca_{code}_{ex}_{cash}",
+        "security_id": None,
+        "action_type": "CASH_DIVIDEND",
+        "action_status": status,
+        "ex_date": ex,
+        "announced_at": ann,
+        "record_source": source,
+        "terms": {
+            "CASH_AMOUNT_PER_SHARE": {"amount_per_share": cash, "currency": "CNY"},
+            "BONUS_SHARES_PER_SHARE": {"ratio_numerator": "0", "ratio_denominator": "1"},
+            "TRANSFER_SHARES_PER_SHARE": {"ratio_numerator": "0", "ratio_denominator": "1"},
+        },
+    }
+
+
+def _index_002040_authority():
+    return _authority(
+        "b10", SZSE_BATCH, SZSE_002040, "2026-10-08", index_member=WINDOW_INDEX_MEMBER
+    )
+
+
+def test_r9d_projection_signed_terms_win_competing_units():
+    # 002040@10-08: raw has IMPLEMENTED base22_f10 0.116 + dividend_history 1.160
+    # (per-10) + PROPOSED.  The signed register proved 0.116 -> ONE feature row
+    # with signed terms + competing versions kept as evidence.
+    cov = _index_002040_authority()
+    raw = [
+        _raw_action("002040", "2026-07-28", "1.1600000000", source="dividend_history"),
+        _raw_action("002040", "2026-07-28", "0.1160000000"),
+        _raw_action("002040", None, "0", status="PROPOSED"),
+    ]
+    feats, aside = project_signed_actions(raw, SZSE_002040 | {"stock_code": "sz.002040"}, cov)
+    assert len(feats) == 1
+    assert feats[0]["effective_date"] == "2026-07-28"
+    assert feats[0]["cash_dividend_per_share"] == "0.116"
+    assert feats[0]["projection_provenance"] == "signed_register"
+    assert feats[0]["security_code"] == "sz.002040"
+    assert len(feats[0]["competing_terms"]) == 2
+    # PROPOSED kept aside (not an adjustment; never bypasses negative check).
+    assert any(a["disposition"] == "not_implemented_no_adjustment" for a in aside)
+
+
+def test_r9d_projection_index_catalogue_row_binds_real_identity():
+    # Index-derived catalogue rows must bind the real security/listing/venue,
+    # not a literal "None" string (which broke _action_row_identity_matches).
+    out = _index_002040_authority()
+    rows = out["verified_artifacts"][0]["rows"]
+    assert rows[0]["security_id"] == SZSE_002040["security_id"]
+    assert rows[0]["listing_id"] == SZSE_002040["listing_id"]
+    assert rows[0]["venue_id"] == SZSE_002040["venue_id"]
+
+
+def test_r9d_projection_no_signed_match_uses_raw_terms_for_isolation():
+    # No action_coverage: an IMPLEMENTED raw row still projects (its own terms)
+    # so the verified_none negative check sees the unproven adjustment.
+    raw = [_raw_action("600000", "2026-07-16", "0.4200000000")]
+    feats, _ = project_signed_actions(raw, SSE_ID, None)
+    assert len(feats) == 1 and feats[0]["projection_provenance"] == "raw_row_unsigned"
+    assert feats[0]["cash_dividend_per_share"] == "0.4200000000"
+
+
+# --- oct08-projection-r2-297b: owner binding + unresolvable IMPLEMENTED ------
+
+
+def test_r2_projection_foreign_owner_not_consumed():
+    # A raw IMPLEMENTED row naming a DIFFERENT security_id/listing_id is not
+    # this security's action: it must not project terms nor pass silently - it
+    # is kept-aside as an unexplained 'implemented_unknown'.
+    cov = _index_002040_authority()
+    raw = _raw_action("002040", "2026-07-28", "0.1160000000")
+    raw["security_id"] = "security_other"
+    raw["listing_id"] = "listing_other"
+    feats, aside = project_signed_actions(
+        raw if isinstance(raw, list) else [raw], SZSE_002040 | {"stock_code": "sz.002040"}, cov
+    )
+    assert feats == []
+    kinds = {a.get("unknown_kind") for a in aside if a["disposition"] == "implemented_unknown"}
+    assert "foreign_owner" in kinds
+
+
+def test_r2_projection_implemented_no_terms_is_unknown_not_silenced():
+    # IMPLEMENTED with terms={} and no signed ruling: unexplained (in-window
+    # ex_date).  It must surface as implemented_unknown so the caller isolates,
+    # not vanish into generic aside evidence.
+    ident = SZSE_000002 | {"stock_code": "sz.000002"}
+    raw = {
+        "corporate_action_id": "ca_unknown",
+        "security_id": ident["security_id"],
+        "action_status": "IMPLEMENTED",
+        "ex_date": "2026-09-15",
+        "terms": {},
+    }
+    feats, aside = project_signed_actions([raw], ident, None)
+    assert feats == []
+    assert any(
+        a["disposition"] == "implemented_unknown" and a.get("unknown_kind") == "no_terms"
+        for a in aside
+    )
+
+
+def test_r2_projection_no_ex_date_is_unknown():
+    ident = SZSE_000002 | {"stock_code": "sz.000002"}
+    raw = {
+        "corporate_action_id": "ca_noex",
+        "security_id": ident["security_id"],
+        "action_status": "IMPLEMENTED",
+        "ex_date": None,
+        "terms": {"CASH_AMOUNT_PER_SHARE": {"amount_per_share": "0.1", "currency": "CNY"}},
+    }
+    feats, aside = project_signed_actions([raw], ident, None)
+    assert feats == []
+    assert any(
+        a["disposition"] == "implemented_unknown" and a.get("unknown_kind") == "no_ex_date"
+        for a in aside
+    )
+
+
+def _wire_action(code, ident, ex, cash, owner=None):
+    """A P12-style raw-wire action row (action_status/ex_date/terms.amount_per_share)."""
+    own = dict(owner or {})
+    return {
+        "corporate_action_id": f"ca_{code}_{ex}",
+        "action_type": "CASH_DIVIDEND",
+        "action_status": "IMPLEMENTED",
+        "ex_date": ex,
+        "security_id": own.get("security_id", ident["security_id"]),
+        "listing_id": own.get("listing_id", ident["listing_id"]),
+        "venue_id": own.get("venue_id", ident["venue_id"]),
+        "terms": {"CASH_AMOUNT_PER_SHARE": {"amount_per_share": cash, "currency": "CNY"}},
+    }
+
+
+def test_r2_envelope_foreign_owner_isolates_security():
+    # wrong_raw_owner probe: the real signed authority stays valid, but the
+    # consumed raw row names a different security_id -> the security is
+    # coverage-isolated (entry_eligible False), not granted the signed terms.
+    req, t = _request_with_authority("b02", SSE_BATCH, SSE_ID, "2026-10-08")
+    req["securities"][0]["actions"] = [
+        _wire_action(
+            "600000",
+            SSE_ID,
+            "2026-07-16",
+            "0.4200000000",
+            owner={"security_id": "security_other", "listing_id": "listing_other"},
+        )
+    ]
+    request = load_replay_request(req)
+    _, _, wi, excl = build_replay_envelope(request, t)
+    assert wi["coverage_isolated"] == 1
+    assert wi["delivered"]["600000"]["entry_eligible"] is False
+    assert any(e["security_code"] == "600000" for e in excl)
+
+
+def test_r2_envelope_unknown_implemented_isolates_verified_none():
+    # unknown_implemented probe: a verified_none security that nonetheless
+    # carries an in-window IMPLEMENTED row with no terms -> isolated, the
+    # verified_none label does not silence the unexplained event.
+    req, t = _request_with_authority("b10", SZSE_BATCH, SZSE_000002, "2026-10-09")
+    # 000002@10-08 is index-only; use the batch-covered 10-09 window (verified_none).
+    auth = _authority("b10", SZSE_BATCH, SZSE_000002, "2026-10-09")
+    opens = [
+        e["sessions"] for e in auth["window_evidence"] if e["purpose"] == "returns_61_session"
+    ][0]
+    req["open_sessions"] = [d for d in opens if d <= "2026-10-09"] + ["2026-10-30"]
+    req["market_dates"] = ["2026-10-09"]
+    req["action_coverage"] = auth
+    sec = req["securities"][0]
+    sec["actions"] = [
+        {
+            "corporate_action_id": "ca_unknown",
+            "action_status": "IMPLEMENTED",
+            "ex_date": "2026-09-15",
+            "security_id": SZSE_000002["security_id"],
+            "terms": {},
+        }
+    ]
+    request = load_replay_request(req)
+    _, _, wi, excl = build_replay_envelope(request, t)
+    assert wi["delivered"]["000002"]["entry_eligible"] is False
+    assert any(e["security_code"] == "000002" for e in excl)

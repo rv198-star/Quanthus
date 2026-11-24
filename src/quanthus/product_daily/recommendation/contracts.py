@@ -25,6 +25,122 @@ from quanthus.product_daily.contracts import (
     require_text,
 )
 
+# Private replay-context token.  The single-T "october_replay_as_observed" date
+# context is established only inside the versioned as-observed replay entry
+# (run_daily_advice_from_history under as_observed, reached via the sealed replay
+# path) - never by a caller-supplied string, anchor or boolean.  The constructor
+# is gated behind an internal key that only the verified projection can supply,
+# so the public raw entry cannot be tricked into admitting a null-clock warm-up
+# row.  The token lives in this leaf contract module so the rule seam and the
+# producer can type-check it without importing the top-level daily_runner.
+_OCTOBER_CONTEXT_KEY = object()
+
+
+@dataclass(frozen=True)
+class OctoberReplayContext:
+    """Verified single-T replay context admitted by the versioned replay entry.
+
+    Carries the named context id and the binding that produced it.  Instances
+    are created only inside history_input's as-observed replay projection; the
+    public entries accept this type (and only this type), so a caller passing
+    the bare string is a contract breach, not an admission.
+    """
+
+    context_id: str
+
+    def __init__(self, context_id: str, *, _key: object) -> None:
+        if _key is not _OCTOBER_CONTEXT_KEY:
+            raise ProductDailyError(
+                "replay_context_not_constructible",
+                "OctoberReplayContext is created only by the versioned replay entry",
+            )
+        require_text(context_id, "context_id")
+        object.__setattr__(self, "context_id", context_id)
+
+
+def _new_october_context(context_id: str) -> OctoberReplayContext:
+    """Internal factory - the only path that can mint the private token."""
+
+    return OctoberReplayContext(context_id, _key=_OCTOBER_CONTEXT_KEY)
+
+
+# The versioned replay package-clock proof.  Under the as-observed replay the
+# producer's ACTUAL intake/evaluation instants legitimately postdate the
+# logical T decision_cutoff; the physical upper bound they are admitted
+# against is this run's real read/evaluation instant, projected by the
+# versioned e1_runtime entry into consumption_evidence.package_clock.  The
+# token is minted only alongside the private OctoberReplayContext, so a bare
+# datetime (or a non-replay caller) can never substitute a late clock.
+_OCTOBER_PACKAGE_CLOCK_KEY = object()
+
+
+@dataclass(frozen=True)
+class OctoberReplayAdmissionClock:
+    """Physical admission bounds for the replay's actual intake/eval clocks.
+
+    Two distinct physical instants, both taken from the signed
+    package_clock proof (never the logical T and never a caller-chosen wall
+    clock):
+
+    * source_read_at - the original run's read instant, retained verbatim for
+      the binding/evidence (the upstream e1_runtime already judged each
+      member's source visibility against it: member_use <= source_read_at).
+    * evaluation_observed_at - THIS run's real evaluation instant; a member's
+      per-member verify instant (available_at), the actual intake instants
+      and the evaluation-receipt completion are judged against this bound
+      (verify/intake/eval <= eval, a later re-run can never re-qualify an
+      input that was not yet verifiable).
+
+    Strict/forward callers never see one - they keep the logical
+    decision_cutoff on every instant.
+    """
+
+    source_read_at: datetime
+    evaluation_observed_at: datetime
+
+    def __init__(
+        self,
+        source_read_at: datetime,
+        evaluation_observed_at: datetime,
+        *,
+        _key: object,
+    ) -> None:
+        if _key is not _OCTOBER_PACKAGE_CLOCK_KEY:
+            raise ProductDailyError(
+                "replay_admission_clock_not_constructible",
+                "OctoberReplayAdmissionClock is minted only by the replay path",
+            )
+        require_aware(source_read_at, "source_read_at")
+        require_aware(evaluation_observed_at, "evaluation_observed_at")
+        object.__setattr__(self, "source_read_at", source_read_at)
+        object.__setattr__(self, "evaluation_observed_at", evaluation_observed_at)
+
+
+def _new_replay_admission_clock(
+    source_read_at: datetime,
+    evaluation_observed_at: datetime,
+    replay_context: OctoberReplayContext,
+) -> OctoberReplayAdmissionClock:
+    """Mint the physical admission bounds for a verified replay context.
+
+    Only a real OctoberReplayContext token - itself minted by the versioned
+    replay entry - may carry an admission clock.  Any other context type or
+    id fails loudly rather than silently granting a late bound.
+    """
+
+    if (
+        type(replay_context) is not OctoberReplayContext
+        or replay_context.context_id != "october_replay_as_observed"
+    ):
+        raise ProductDailyError(
+            "replay_admission_clock_requires_context",
+            "a replay admission clock requires the versioned replay context",
+        )
+    return OctoberReplayAdmissionClock(
+        source_read_at, evaluation_observed_at, _key=_OCTOBER_PACKAGE_CLOCK_KEY
+    )
+
+
 SCHEMA = "quanthus.r11.daily-advice.v1"
 PACKAGE_VERSION = "1.0.0"
 

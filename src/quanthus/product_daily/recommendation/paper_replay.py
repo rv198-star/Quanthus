@@ -94,6 +94,18 @@ def _text(value: Any, label: str) -> str:
     return str(value)
 
 
+def _coverage_records(coverage: dict[str, Any], field: str) -> dict[str, dict[str, Any]]:
+    """Coalesce identical records and reject a key that names two different sources."""
+    records: dict[str, dict[str, Any]] = {}
+    for i, raw in enumerate(_seq(coverage.get(field, ()), f"action_coverage.{field}")):
+        record = _obj(raw, f"{field}[{i}]")
+        key = _text(record.get("coverage_id"), f"{field}[].coverage_id")
+        if key in records and records[key] != record:
+            _fail("conflicting_action_coverage_id", f"{field}: conflicting records for {key!r}")
+        records[key] = record
+    return records
+
+
 def _isodate(value: Any, label: str) -> date:
     if isinstance(value, date) and not isinstance(value, datetime):
         return value
@@ -110,7 +122,8 @@ def _isodatetime(value: Any, label: str) -> datetime:
         out = value
     elif isinstance(value, str):
         try:
-            out = datetime.fromisoformat(value)
+            iso = value[:-1] + "+00:00" if value.endswith("Z") else value
+            out = datetime.fromisoformat(iso)
         except ValueError:
             _fail("invalid_replay_request", f"{label} must be an ISO datetime")
     else:
@@ -352,9 +365,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
         # carries the member bytes identity P12 reads; a register alone is a
         # locator, not proof of a security's window state.
         registers: dict[str, dict[str, Any]] = {}
-        for i, reg in enumerate(_seq(aco.get("registers", ()), "action_coverage.registers")):
-            ro = _obj(reg, f"action_coverage.registers[{i}]")
-            rid = _text(ro.get("coverage_id"), "registers[].coverage_id")
+        for rid, ro in _coverage_records(aco, "registers").items():
             registers[rid] = {
                 "coverage_id": rid,
                 "version": _text(ro.get("version"), "registers[].version"),
@@ -485,11 +496,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
             "register_row",
         )
         verified_artifacts: dict[str, dict[str, Any]] = {}
-        for i, va in enumerate(
-            _seq(aco.get("verified_artifacts", ()), "action_coverage.verified_artifacts")
-        ):
-            vo = _obj(va, f"action_coverage.verified_artifacts[{i}]")
-            cid = _text(vo.get("coverage_id"), "verified_artifacts[].coverage_id")
+        for i, (cid, vo) in enumerate(_coverage_records(aco, "verified_artifacts").items()):
             if cid not in registers:
                 _fail(
                     "invalid_action_coverage",
@@ -718,6 +725,17 @@ def build_replay_envelope(
             key=lambda b: _isodate(_obj(b, "bar").get("session_date"), "bar.session_date"),
         )
         filtered = {**sec_o, "bars": bars}
+        # October as-observed action projection (P11-side single conversion):
+        # the raw typed rows P12 assembles (action_status/ex_date/terms.
+        # amount_per_share) become panel feature actions bound to the signed
+        # register's proven terms; competing units/revisions are kept as
+        # evidence, non-implemented rows never bypass the negative check.
+        projected_actions, action_aside = project_signed_actions(
+            sec_o.get("actions"), identity, request.action_coverage
+        )
+        filtered["actions"] = projected_actions
+        if action_aside:
+            filtered["action_aside"] = action_aside
         for map_key in ("close_at_by_date", "knowledge_cutoff_by_date"):
             raw_map = sec_o.get(map_key) or {}
             filtered[map_key] = {
@@ -732,7 +750,44 @@ def build_replay_envelope(
                 if _isodate(_obj(lim, "limit").get("session_date"), "limit.session_date")
                 in window_set
             ]
-        if not held_member and not _action_coverage_ok(request, sec_o, code, market_date):
+        # An IMPLEMENTED raw row whose owning identity cannot be resolved to
+        # this security - or whose implemented event lands inside (or cannot be
+        # excluded from) the observed window without resolvable terms - is an
+        # unexplained implemented event.  It is kept-aside evidence (never a
+        # silent drop AND never a phantom adjustment), and the security
+        # isolates on the coverage dependency rather than passing verified.
+        unresolvable_aside = any(
+            a.get("disposition") in _UNRESOLVABLE_ACTION_DISPOSITIONS for a in action_aside
+        )
+        if (
+            not held_member
+            and unresolvable_aside
+            and _unresolvable_action_affects_window(
+                action_aside, request.open_sessions, market_date
+            )
+        ):
+            coverage_exclusions.append(
+                {
+                    "security_code": code,
+                    "reason": "replay_action_coverage_unknown",
+                    "member_or_field": "securities[].actions",
+                    "at": market_date.isoformat(),
+                    "scope": "per_security",
+                }
+            )
+            filtered["bars"] = []
+            filtered["actions"] = []
+            filtered["exceptions"] = []
+            filtered["limits"] = []
+            filtered["close_at_by_date"] = {}
+            filtered["knowledge_cutoff_by_date"] = {}
+        # The coverage gate consumes the PROJECTED feature actions (filtered),
+        # not the raw wire rows (sec_o) - same identity, projected shape.
+        if (
+            not held_member
+            and not any(e["security_code"] == code for e in coverage_exclusions)
+            and not _action_coverage_ok(request, filtered, code, market_date)
+        ):
             coverage_exclusions.append(
                 {
                     "security_code": code,
@@ -1438,9 +1493,13 @@ def build_signed_action_authority(
             "currency": _text(e.get("currency"), "events[].currency"),
             "implementation_sha256": impl,
             "notice": _text(e.get("notice_id") or e.get("notice"), "events[].notice_id"),
-            "security_id": str(e.get("security_id")),
-            "listing_id": str(e.get("listing_id")),
-            "venue_id": str(e.get("venue_id")),
+            # Index-sourced rows do not repeat the identity the window already
+            # bound (security/listing/venue were verified equal above); fall
+            # back to the function's own verified identity so the catalogue row
+            # binds the real security, never a literal "None" string.
+            "security_id": str(e.get("security_id") or security_id),
+            "listing_id": str(e.get("listing_id") or listing_id),
+            "venue_id": str(e.get("venue_id") or venue_id),
             "stock_code": stock_code,
         }
         cat_rows[reg_row] = row
@@ -1565,6 +1624,390 @@ def build_signed_action_authority(
             "MANIFEST; caller-copied fields are not independently qualifying"
         ),
     }
+
+
+def _feature_action_rows(actions: Any) -> list[Mapping[str, Any]]:
+    """Rows already in the panel feature-action shape pass through verbatim."""
+    out: list[Mapping[str, Any]] = []
+    if not isinstance(actions, Sequence) or isinstance(actions, str):
+        return out
+    for a in actions:
+        if (
+            isinstance(a, Mapping)
+            and a.get("security_code") is not None
+            and a.get("effective_date") is not None
+            and a.get("cash_dividend_per_share") is not None
+        ):
+            out.append(a)
+    return out
+
+
+def _raw_term_number(term: Any) -> Decimal | None:
+    """Best-effort numeric from one raw term cell (amount or numerator/denominator)."""
+    if not isinstance(term, Mapping):
+        return None
+    for key in ("amount_per_share",):
+        v = term.get(key)
+        if v is not None:
+            try:
+                return Decimal(str(v))
+            except Exception:
+                return None
+    num = term.get("ratio_numerator")
+    den = term.get("ratio_denominator")
+    if num is not None and den is not None:
+        try:
+            d = Decimal(str(den))
+            if d == 0:
+                return None
+            return Decimal(str(num)) / d
+        except Exception:
+            return None
+    return None
+
+
+def _signed_action_terms(
+    action_coverage: Mapping[str, Any] | None,
+    *,
+    security_id: str,
+    ex_iso: str,
+) -> tuple[Decimal | None, Decimal | None, str | None, Mapping[str, Any] | None]:
+    """Look up the proven terms for (security, ex_date) in the signed register.
+
+    Returns (cash_gross_per_share, bonus_share_ratio_incl_transfer, known_at_or_none,
+    the matched catalogue row) when the verified-artifact catalogue binds an
+    event for this ex_date, else (None, None, None, None).  The signed register
+    is the frozen P11/P10 ruling that already resolved competing units/revisions
+    (per-share vs per-10) - the projection uses its terms, not a raw row's.
+    """
+    if not isinstance(action_coverage, Mapping):
+        return None, None, None, None
+    artifacts = action_coverage.get("verified_artifacts") or ()
+    # verified_artifacts is emitted as a list of catalogues (each with a
+    # coverage_id + rows); tolerate a mapping keyed by coverage_id too.
+    if isinstance(artifacts, Mapping):
+        catalogues = list(artifacts.values())
+    elif isinstance(artifacts, Sequence) and not isinstance(artifacts, str):
+        catalogues = list(artifacts)
+    else:
+        return None, None, None, None
+
+    def _dec(v: Any) -> Decimal | None:
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return None
+
+    for cat in catalogues:
+        rows = cat.get("rows", cat) if isinstance(cat, Mapping) else cat
+        seq = rows.values() if isinstance(rows, Mapping) else rows
+        for row in seq or ():
+            if not isinstance(row, Mapping):
+                continue
+            if str(row.get("security_id")) != str(security_id):
+                continue
+            ex = row.get("ex_date")
+            ex_row = ex.isoformat() if isinstance(ex, date) else str(ex)
+            if ex_row != ex_iso:
+                continue
+            cash = _dec(row.get("cash_gross_per_share"))
+            bonus = _dec(row.get("bonus_share_ratio"))
+            transfer = _dec(row.get("transfer_share_ratio"))
+            if cash is None or bonus is None or transfer is None:
+                continue
+            # known_at: the row's day-level source publication date (the
+            # implementation-notice business day) when present, within the
+            # signed October replay's business-day semantics; never a
+            # back-filled historical instant.
+            known: str | None = None
+            oc = row.get("original_clocks")
+            if isinstance(oc, Mapping):
+                spd = oc.get("source_publication_date")
+                if isinstance(spd, str) and spd:
+                    known = spd[:10]
+            if known is None:
+                spd = row.get("source_publication_date") or row.get("announce_date")
+                if isinstance(spd, str) and spd:
+                    known = spd[:10]
+                elif isinstance(spd, date):
+                    known = spd.isoformat()
+            return cash, bonus + transfer, known, row
+    return None, None, None, None
+
+
+# Aside dispositions that mark an IMPLEMENTED raw action row the projection
+# could not resolve to a real adjustment for this security.  These are kept
+# as evidence (never silently dropped), and when the unexplained implemented
+# event lands inside - or cannot be excluded from - the observed window the
+# caller isolates the security's action dependency.
+_UNRESOLVABLE_ACTION_DISPOSITIONS = frozenset({"implemented_unknown"})
+
+
+def _bound_action_venues_for_identity(identity: Mapping[str, Any]) -> frozenset[str]:
+    """The venue ids a raw action row may legitimately name for this security.
+
+    The identity's own venue_id plus its Base-2.5.1 warehouse counterpart
+    (SSE/SZSE <-> venue_<hash>): a source row may carry either wire name.
+    """
+    venue = identity.get("venue_id")
+    out: set[str] = {str(venue)} if venue else set()
+    mapped = _OCTOBER_VENUES.get(str(venue)) if venue is not None else None
+    if mapped is not None:
+        out.add(mapped[0])
+        out.add(mapped[1])
+    else:
+        # A warehouse venue_id maps back to its exchange short name too.
+        for short, (_mic, wh) in _OCTOBER_VENUES.items():
+            if str(venue) == wh:
+                out.add(short)
+    return frozenset(out)
+
+
+def _unresolvable_action_affects_window(
+    aside: Sequence[Mapping[str, Any]],
+    open_sessions: Sequence[date],
+    market_date: date,
+) -> bool:
+    """True when an unexplained IMPLEMENTED aside row touches the window.
+
+    The observed window is the <=BAR_CONTEXT contiguous open sessions ending
+    at T.  An unexplained implemented event whose ex_date lands inside it -
+    or whose ex_date is absent/unparseable so it cannot be excluded - is an
+    adjustment the projection cannot account for; the security isolates.
+    An unexplained row strictly BEFORE the window is out of scope and does
+    not isolate (a real old event already left the observed series).
+    """
+    window = bar_context_window(tuple(open_sessions), market_date)
+    earliest = window[0].isoformat() if window else market_date.isoformat()
+    for a in aside:
+        if a.get("disposition") not in _UNRESOLVABLE_ACTION_DISPOSITIONS:
+            continue
+        ex = a.get("ex_date")
+        if ex is None or str(ex) == "":
+            # Implemented but no usable ex_date: cannot exclude it from the
+            # window - fail closed on the dependency.
+            return True
+        ex_iso = ex.isoformat() if isinstance(ex, date) else str(ex)
+        try:
+            ex_iso = date.fromisoformat(ex_iso).isoformat()
+        except (ValueError, TypeError):
+            return True
+        if ex_iso >= earliest:
+            # Inside the observed window (or after it): unexplained.  An
+            # ex_date BEFORE the window does not affect these returns.
+            return True
+    return False
+
+
+def project_signed_actions(
+    actions: Any,
+    identity: Mapping[str, Any],
+    action_coverage: Mapping[str, Any] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Project raw-wire action rows to the panel feature-action shape.
+
+    The single P11-side conversion for the October as-observed replay.  P12
+    delivers the original typed rows (action_status/ex_date/terms.amount_per_share/
+    record_source); the panel consumes security_code/effective_date/
+    cash_dividend_per_share/bonus_share_ratio/known_at.
+
+    - Rows already in feature shape pass through unchanged.
+    - Every consumed raw row's OWNER is verified: any security_id /
+      listing_id / stock_code / venue_id field the row fills must equal this
+      security's identity (venue admits the bound exchange<->warehouse pair).
+      A row naming a different owner is an unexplained foreign IMPLEMENTED
+      event - kept-aside evidence; the caller isolates the dependency and the
+      row never contributes terms nor silently passes through.
+    - Only IMPLEMENTED rows project; PROPOSED / NO_DISTRIBUTION / other
+      statuses are kept-aside evidence (they are not adjustments and must not
+      bypass the verified_none negative check by being silently dropped NOR
+      emitted as phantom actions).  An IMPLEMENTED row with no ex_date, or no
+      resolvable terms and no signed ruling, is 'implemented_unknown' aside -
+      unexplained, never a silent drop.
+    - One feature row per ex_date: the signed register's proven per-share terms
+      (the frozen ruling that resolved competing unit/revision versions) win;
+      the raw rows' competing terms are recorded as audit evidence.  When the
+      register binds no event for that ex_date the raw row's own normalized
+      terms project so the coverage join's verified_none / multiplicity checks
+      still see the unproven adjustment and isolate it.
+    - known_at is the day-level source-publication date (the implementation
+      notice's business day) inside signed replay semantics; never a
+      back-filled historical instant.
+    Returns (feature_actions, kept_aside_evidence).
+    """
+    feature = [dict(a) for a in _feature_action_rows(actions)]
+    aside: list[dict[str, Any]] = []
+    if not isinstance(actions, Sequence) or isinstance(actions, str):
+        return feature, aside
+
+    stock_code = str(identity.get("stock_code") or identity.get("listing_code") or "")
+    security_id = str(identity.get("security_id") or "")
+    # The P11 projection consumes only rows whose raw ownership resolves to
+    # this security's verified identity.  A wire row that names a DIFFERENT
+    # security/listing/venue/stock owner is foreign material: it must not
+    # contribute terms to this security's feature action nor silently pass
+    # through as aside evidence - it is an unexplained IMPLEMENTED row and
+    # the caller isolates the dependency.
+    venues = _bound_action_venues_for_identity(identity)
+
+    def _row_owner_matches(a: Mapping[str, Any]) -> bool:
+        """Each consumed raw row must resolve to THIS security's identity.
+
+        A field the row leaves empty is unconstraining (the wire keeps the
+        security-level owner implicit); a field the row fills must equal the
+        security's own security_id / listing_id / venue (bound venues incl.)
+        / stock_code.  Any filled field that disagrees is a foreign row.
+        """
+        checks = (
+            (a.get("security_id"), identity.get("security_id")),
+            (a.get("listing_id"), identity.get("listing_id")),
+        )
+        for row_v, id_v in checks:
+            if row_v is not None and id_v is not None and str(row_v) != str(id_v):
+                return False
+            if row_v is not None and id_v is None:
+                return False
+        sc = a.get("stock_code")
+        if sc is not None:
+            id_sc = identity.get("stock_code")
+            if id_sc is not None and str(sc) != str(id_sc):
+                return False
+            if id_sc is None and str(sc) != str(identity.get("listing_code")):
+                return False
+        ven = a.get("venue_id")
+        return not (ven is not None and str(ven) not in venues)
+
+    def _dec(v: Any) -> Decimal | None:
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return None
+
+    # Group raw IMPLEMENTED rows by ex_date.
+    implemented: dict[str, list[Mapping[str, Any]]] = {}
+    for a in actions:
+        if not isinstance(a, Mapping) or a.get("action_status") is None:
+            continue
+        status = str(a.get("action_status"))
+        ex = a.get("ex_date")
+        ex_iso = ex.isoformat() if isinstance(ex, date) else (str(ex) if ex else None)
+        if status != "IMPLEMENTED":
+            # NO_DISTRIBUTION / PROPOSED / withdrawn: not an adjustment.  Kept
+            # as evidence so a raw row never silently skips the negative check.
+            aside.append(
+                {
+                    "corporate_action_id": a.get("corporate_action_id"),
+                    "action_status": status,
+                    "ex_date": ex_iso,
+                    "disposition": "not_implemented_no_adjustment",
+                }
+            )
+            continue
+        # Owner binding is checked on EVERY consumed IMPLEMENTED row: a row
+        # whose named owner is not this security is an unexplained foreign
+        # implemented event (ex_date kept for the caller's window test).
+        if not _row_owner_matches(a):
+            aside.append(
+                {
+                    "corporate_action_id": a.get("corporate_action_id"),
+                    "action_status": status,
+                    "ex_date": ex_iso,
+                    "security_id": a.get("security_id"),
+                    "listing_id": a.get("listing_id"),
+                    "venue_id": a.get("venue_id"),
+                    "stock_code": a.get("stock_code"),
+                    "disposition": "implemented_unknown",
+                    "unknown_kind": "foreign_owner",
+                }
+            )
+            continue
+        if ex_iso is None:
+            aside.append(
+                {
+                    "corporate_action_id": a.get("corporate_action_id"),
+                    "action_status": status,
+                    "disposition": "implemented_unknown",
+                    "unknown_kind": "no_ex_date",
+                }
+            )
+            continue
+        implemented.setdefault(ex_iso, []).append(a)
+    for ex_iso, rows in implemented.items():
+        signed_cash, signed_bonus, signed_known, matched = _signed_action_terms(
+            action_coverage, security_id=security_id, ex_iso=ex_iso
+        )
+        # Normalize each raw row's own terms for evidence + fallback.
+        raw_terms = []
+        for a in rows:
+            terms = a.get("terms") or {}
+            rt_cash = _raw_term_number(terms.get("CASH_AMOUNT_PER_SHARE"))
+            rt_bonus = _raw_term_number(terms.get("BONUS_SHARES_PER_SHARE"))
+            rt_transfer = _raw_term_number(terms.get("TRANSFER_SHARES_PER_SHARE"))
+            shares: Decimal | None = None
+            parts = [b for b in (rt_bonus, rt_transfer) if b is not None]
+            if parts:
+                shares = Decimal(sum(parts))
+            raw_terms.append(
+                {
+                    "corporate_action_id": a.get("corporate_action_id"),
+                    "record_source": a.get("record_source"),
+                    "source_revision": a.get("source_revision"),
+                    "cash_dividend_per_share": rt_cash,
+                    "bonus_share_ratio": shares,
+                    "announced_at": a.get("announced_at"),
+                }
+            )
+        cash: Decimal | None
+        bonus: Decimal | None
+        if matched is not None and signed_cash is not None:
+            cash, bonus = signed_cash, signed_bonus
+            provenance = "signed_register"
+        else:
+            # No signed event for this ex_date: use the raw row's own terms so
+            # the coverage join's negative check can still isolate the unproven
+            # adjustment (never dropped).  Distinct competing raw terms on the
+            # same date stay a multiplicity conflict downstream.
+            cash = raw_terms[0]["cash_dividend_per_share"]
+            bonus = raw_terms[0]["bonus_share_ratio"]
+            provenance = "raw_row_unsigned"
+        # known_at: signed source-publication date first, else the matching raw
+        # IMPLEMENTED row's announced_at business date; must precede ex_date.
+        known = signed_known
+        if known is None:
+            for rt in raw_terms:
+                ann = rt.get("announced_at")
+                if isinstance(ann, str) and ann:
+                    known = ann[:10]
+                    break
+                if isinstance(ann, (date, datetime)):
+                    known = ann.date().isoformat() if isinstance(ann, datetime) else ann.isoformat()
+                    break
+        if cash is None and bonus is None:
+            # IMPLEMENTED but no numeric term and no signed ruling: the row
+            # asserts an adjustment the projection cannot price.  It is
+            # unexplained - the caller isolates the dependency when it lands
+            # in (or cannot be excluded from) the window; never a silent drop.
+            aside.append(
+                {
+                    "ex_date": ex_iso,
+                    "disposition": "implemented_unknown",
+                    "unknown_kind": "no_terms",
+                    "raw": raw_terms,
+                }
+            )
+            continue
+        feature.append(
+            {
+                "security_code": stock_code,
+                "effective_date": ex_iso,
+                "cash_dividend_per_share": str(cash if cash is not None else Decimal(0)),
+                "bonus_share_ratio": str(bonus if bonus is not None else Decimal(0)),
+                "known_at": known,
+                "projection_provenance": provenance,
+                "competing_terms": raw_terms if len(raw_terms) > 1 else [],
+            }
+        )
+    return feature, aside
 
 
 def _dedupe_action_rows(actions: Any) -> list[Any]:
@@ -2101,6 +2544,7 @@ def run_replay_day(
     snapshot_manifest_digest: str,
     clock: Callable[[], datetime] | None = None,
     observed_clock: Callable[[], datetime] | None = None,
+    source_read_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Run ONE replay session through the real chain; return a day receipt.
 
@@ -2178,6 +2622,12 @@ def run_replay_day(
             source_policy=source_policy,
             clock=domain_clock,
             input_exclusions=list(coverage_exclusions),
+            # The as-observed replay's actual-read instant: each sealed source
+            # version's readability is judged against THIS run's real read
+            # (knowledge_from <= observed_at); a version only readable later
+            # still blocks.  Bound on its own named field, never the domain
+            # (logical T) clock.
+            as_observed_at=source_read_at or observed_at,
         )
     except ProductDailyError as exc:
         day_block = {
@@ -2275,6 +2725,47 @@ def _rule_day_projection(output: Any, window_info: Mapping[str, Any]) -> dict[st
         for item in pkg.decision_sets:
             raw = item.to_wire_dict()
             raw[DECISION_SET_SCHEMA_FIELD] = V2_DS_SCHEMA
+            if (
+                result.publishable
+                and item.audit.admission_disposition == "empty_advice"
+                and not output.candidates
+                and not output.held_signals
+                and output.receipt is not None
+                and seam.scan_result is not None
+            ):
+                # A quiet day comes from the scan that actually evaluated T.
+                # The P12 receipt keeps the full signed input closure; carry the
+                # qualified rows into the package so it can explain its own date.
+                t = item.market_date.isoformat()
+                verdicts = {
+                    sec_id: verdict
+                    for sec_id, session, verdict in seam.scan_result.signal_verdicts
+                    if session == t
+                }
+                scans = [
+                    {
+                        "security_code": r["security_code"],
+                        "security_id": r["security_id"],
+                        "verdict": verdicts.get(r["security_id"]),
+                        "gates": r["gates"],
+                    }
+                    for r in output.source_closure.get("history_receipts", ())
+                    if r["status"] == "qualified"
+                ]
+                if scans and all(row["verdict"] == "not_triggered" for row in scans):
+                    raw["audit"]["replay_no_action"] = {
+                        "schema_version": "p11.replay-no-action.v1",
+                        "market_date": t,
+                        "run_id": output.receipt.run_id,
+                        "source_closure_digest": output.receipt.source_closure_digest,
+                        "candidate_count": 0,
+                        "scans": scans,
+                        "message": "今日无操作",
+                    }
+                    raw["decisions"][0]["explanations"][0] = {
+                        **raw["decisions"][0]["explanations"][0],
+                        "text": "今日无操作",
+                    }
             sets.append(raw)
         wire = pkg.to_dict()
         wire["decision_sets"] = sets

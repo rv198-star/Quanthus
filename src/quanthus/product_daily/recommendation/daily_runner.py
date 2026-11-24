@@ -371,6 +371,13 @@ def run_daily_advice_from_raw(
     # actual same-job computation (no second market pass, no caller label);
     # when omitted the supplied resources.panel_report is used unchanged.
     panel_report_factory: Callable[[Mapping[str, SecurityFeatureFacts]], Any] | None = None,
+    # Versioned October as-observed consumption evidence: bound into the
+    # issued source_closure before its digest so the job identity recomputes
+    # from receipt + closure together (original envelope identity, selected
+    # member/row versions, original clocks, this run's actual open/verify/
+    # observe instants, exclusions and the member catalogue).  Strict/daily
+    # callers omit it and see no field.
+    consumption_evidence: Mapping[str, Any] | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Build real panel facts + the scan series from raw inputs, then run the core.
@@ -509,5 +516,6 @@ def run_daily_advice_from_raw(
         shared_prereq_ok=shared_prereq_ok,
         shared_prereq_reason=shared_prereq_reason,
         history_receipts=history_receipts,
+        consumption_evidence=consumption_evidence,
         clock=clock,
     )

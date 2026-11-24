@@ -1136,6 +1136,9 @@ def run_daily_advice(
     shared_prereq_ok: bool = True,
     shared_prereq_reason: str | None = None,
     history_receipts: Sequence[Mapping[str, Any]] | None = None,
+    # Versioned October as-observed consumption evidence, bound into the
+    # issued source_closure before its digest.  Strict/daily callers omit it.
+    consumption_evidence: Mapping[str, Any] | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Run domain evaluation and issue its receipt in one job, before package assembly.
@@ -1318,6 +1321,15 @@ def run_daily_advice(
     )
     source_closure["history_receipts"] = enriched_history
     source_closure["history_receipts_digest"] = sha256_digest(enriched_history)
+
+    # Versioned October as-observed consumption evidence is folded into the
+    # closure BEFORE its digest: the original envelope identity, selected
+    # member/row versions and original clocks, this run's actual open/verify/
+    # observe instants, exclusions and the member catalogue are all signed so
+    # the job identity recomputes from receipt + final closure together.  A
+    # change to any of them drifts the digest rather than passing silently.
+    if consumption_evidence is not None:
+        source_closure["consumption_evidence"] = dict(consumption_evidence)
 
     # H1-R2 P1-1: a history gate is a publish gate, not a label.  A receipt
     # marked not_qualified means the original algorithm did NOT qualify that

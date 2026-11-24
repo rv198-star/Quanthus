@@ -617,6 +617,8 @@ def _trend_raw(code: str = "600000") -> RawSecurityInput:
 
 def _run(runner, resources, raws, **kw):
     facts, policy, account = _producer_inputs()
+    facts = kw.pop("facts", facts)
+    policy = kw.pop("policy", policy)
     account = kw.pop("account", account)
     return run_daily_advice_from_raw(
         runner=runner,
@@ -915,14 +917,17 @@ def _run_context(runner, resources, raws, context=None, **kw):
     token = _new_october_context(context) if context is not None else None
     # The as-observed replay requires the actual-read instant so a sealed
     # source version's readability is judged; the fixture's real read was
-    # 2026-11-24 (later than the Oct version stamps), overridable via kwarg.
-    kw.setdefault("as_observed_at", datetime(2026, 11, 24, 10, 0, tzinfo=timezone.utc))
+    # 2026-11-24 23:00+08 (after the Oct version stamps AND the members'
+    # 21:30+08 availability), overridable via kwarg.  It also bounds the
+    # producer's actual intake/evaluation clocks under the replay token.
+    kw.setdefault("as_observed_at", datetime(2026, 11, 24, 15, 0, tzinfo=timezone.utc))
+    consumption_evidence = {"replay": "oct08-42", **dict(kw.pop("consumption_evidence", {}) or {})}
     return _run(
         runner,
         resources,
         raws,
         numeric_context=token,
-        consumption_evidence={"replay": "oct08-42"},
+        consumption_evidence=consumption_evidence,
         **kw,
     )
 
@@ -1317,3 +1322,195 @@ def test_scan_calendar_missing_one_bar_not_triggered(runner, resources):
     if receipt:
         ev = (receipt[0].get("gates") or {}).get("events", {})
         assert ev.get("status") != "satisfied" or "transition" in (ev.get("reason") or "")
+
+
+def _package_clock(market_date, cutoff, source_read, eval_observed):
+    """The e1_runtime package_clock proof bound into consumption_evidence.
+
+    source_read_at is the original run's read (members' source-acquire bound);
+    evaluation_observed_at is THIS run's real evaluation instant (the
+    per-member verify / intake / receipt bound).
+    """
+
+    return {
+        "schema_version": "p11.october-replay-package-clock.v1",
+        "market_date": market_date.isoformat(),
+        "logical_cutoff": cutoff.isoformat(),
+        "source_read_at": source_read.isoformat(),
+        "intake_verified_at": eval_observed.isoformat(),
+        "evaluation_observed_at": eval_observed.isoformat(),
+    }
+
+
+def _late_intake_facts():
+    """Facts whose ACTUAL intake/eval instants postdate the logical cutoff -
+    the genuine #749 replay shape (it reads/verifies sealed archives after T).
+    """
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    cutoff = policy.decision_cutoff  # 2026-11-24 22:30 SHANGHAI
+    late = cutoff + timedelta(hours=2)  # 2026-11-25 00:30 SHANGHAI - after T
+    member = _replace(facts.members[0], available_at=cutoff - timedelta(hours=1))
+    return (
+        _replace(
+            facts,
+            members=(member,),
+            intake_received_at=late,
+            intake_first_read_at=late,
+            intake_verified_at=late,
+        ),
+        policy,
+        account,
+    )
+
+
+def test_package_clock_admits_late_replay_intake(runner, resources):
+    """Under the verified replay context + a matching package_clock, the
+    replay's post-T intake/eval instants admit against evaluation_observed_at
+    (never the logical T); the package is the real qualified output."""
+
+    facts, policy, account = _late_intake_facts()
+    cutoff = policy.decision_cutoff
+    source_read = cutoff + timedelta(hours=1)  # original run read, after cutoff
+    eval_observed = cutoff + timedelta(hours=3)  # this run's real evaluation
+    evidence = {
+        "replay": "oct08-42",
+        "package_clock": _package_clock(facts.market_date, cutoff, source_read, eval_observed),
+    }
+    out = _run_context(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        context="october_replay_as_observed",
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence=evidence,
+        clock=lambda: eval_observed,
+    )
+    # The post-cutoff intake was admitted by the package_clock, not blocked;
+    # and the receipt completion (the real eval instant) sees the verified
+    # intake before it.
+    assert not any(
+        d.get("reason") == "intake_received_after_cutoff" for d in out.result.diagnostics
+    )
+    assert not any(
+        d.get("reason") == "candidate_evaluation_before_intake_verified"
+        for d in out.result.diagnostics
+    )
+
+
+def test_package_clock_missing_keeps_strict(runner, resources):
+    """A replay context WITHOUT a valid package_clock mints no admission
+    clock: the post-T intake instants stay judged against the logical
+    decision_cutoff and the day blocks (the strict outcome)."""
+
+    facts, policy, account = _late_intake_facts()
+    out = _run_context(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        context="october_replay_as_observed",
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence={"replay": "oct08-42"},
+    )
+    assert any(d.get("reason") == "intake_received_after_cutoff" for d in out.result.diagnostics)
+
+
+def test_package_clock_requires_token(runner, resources):
+    """Without the private replay context the same package_clock evidence can
+    never mint an admission clock - the day still blocks on the logical
+    cutoff.  A bare package_clock is not an unlock."""
+
+    facts, policy, account = _late_intake_facts()
+    cutoff = policy.decision_cutoff
+    evidence = {
+        "package_clock": _package_clock(
+            facts.market_date,
+            cutoff,
+            cutoff + timedelta(hours=1),
+            cutoff + timedelta(hours=3),
+        )
+    }
+    # No numeric_context token: a strict caller, despite the package_clock.
+    out = _run(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence=evidence,
+    )
+    assert any(d.get("reason") == "intake_received_after_cutoff" for d in out.result.diagnostics)
+
+
+def test_package_clock_member_verify_bounded_by_eval(runner, resources):
+    """A member's available_at is its per-member VERIFY instant, admitted
+    against evaluation_observed_at (not source_read_at, which already judged
+    source visibility upstream).  A verify that completes AFTER the eval
+    instant is not admitted - the required member fails closed."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _late_intake_facts()
+    cutoff = policy.decision_cutoff
+    source_read = cutoff + timedelta(hours=1)
+    eval_observed = cutoff + timedelta(hours=3)
+    # Member verify completes AFTER the real eval instant -> not admitted.
+    member = _replace(facts.members[0], available_at=eval_observed + timedelta(minutes=30))
+    facts = _replace(facts, members=(member,))
+    evidence = {
+        "package_clock": _package_clock(facts.market_date, cutoff, source_read, eval_observed),
+    }
+    out = _run_context(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        context="october_replay_as_observed",
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence=evidence,
+        clock=lambda: eval_observed,
+    )
+    # The required member's verify postdates the eval bound: it blocks.
+    assert not out.result.publishable or out.result.diagnostics
+
+
+def test_package_clock_member_verify_after_source_read_admits(runner, resources):
+    """The #749 shape: a member's verify_at legitimately FOLLOWS the original
+    source_read_at (verify completes after the read).  Because the member is
+    bounded by evaluation_observed_at - not source_read_at - it still admits;
+    using source_read_at would wrongly reject these members."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _late_intake_facts()
+    cutoff = policy.decision_cutoff
+    source_read = cutoff + timedelta(hours=1)
+    eval_observed = cutoff + timedelta(hours=3)
+    # Member verify completes after the read but before the eval instant.
+    member = _replace(facts.members[0], available_at=source_read + timedelta(minutes=30))
+    facts = _replace(facts, members=(member,))
+    evidence = {
+        "package_clock": _package_clock(facts.market_date, cutoff, source_read, eval_observed),
+    }
+    out = _run_context(
+        runner,
+        resources,
+        [_trend_raw("600000")],
+        context="october_replay_as_observed",
+        facts=facts,
+        policy=policy,
+        account=account,
+        consumption_evidence=evidence,
+        clock=lambda: eval_observed,
+    )
+    # The member's post-read verify is admitted by the eval bound; no member
+    # clock block on the required member.
+    assert out.result.publishable

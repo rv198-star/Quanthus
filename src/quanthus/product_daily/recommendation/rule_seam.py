@@ -77,6 +77,9 @@ from quanthus.product_daily.recommendation.contracts import (
     USE_ACTION,
     USE_EXPLANATION,
     DailyFactsView,
+    OctoberReplayAdmissionClock,
+    OctoberReplayContext,
+    _new_replay_admission_clock,
 )
 from quanthus.product_daily.recommendation.producer import (
     RULE_DAY_PRODUCER_VERSION,
@@ -1208,6 +1211,15 @@ def run_daily_advice(
     # Versioned October as-observed consumption evidence, bound into the
     # issued source_closure before its digest.  Strict/daily callers omit it.
     consumption_evidence: Mapping[str, Any] | None = None,
+    # The verified single-T replay context token, minted upstream by the
+    # versioned as-observed replay entry.  Its presence is the ONLY thing that
+    # lets the producer admit the replay's actual intake/evaluation instants
+    # against the run's real evaluation bound instead of the logical T
+    # decision_cutoff; a strict/daily caller passes no token and keeps the
+    # logical-cutoff semantics on every instant.  A bare instant can never be
+    # passed - the physical bound is taken from the signed
+    # consumption_evidence.package_clock, not from the caller.
+    replay_context: OctoberReplayContext | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Run domain evaluation and issue its receipt in one job, before package assembly.
@@ -1240,6 +1252,58 @@ def run_daily_advice(
     library_root = find_project_root(Path(__file__))
     started_at = clock()
     require_aware(started_at, "evaluation_started_at")
+    # The private OctoberReplayContext token is the ONLY thing that can admit a
+    # replay admission clock.  It is the same unforgeable token the public raw
+    # entry already requires; a strict/daily caller passing nothing (or any
+    # non-token value) can never reach the late-clock branch.
+    if replay_context is not None and (
+        type(replay_context) is not OctoberReplayContext
+        or replay_context.context_id != "october_replay_as_observed"
+    ):
+        raise ProductDailyError("unknown_replay_context", f"replay_context {replay_context!r}")
+    # Derive the physical admission bounds from the signed package_clock proof
+    # the versioned e1_runtime entry projected into consumption_evidence.  The
+    # proof supplies two distinct instants: source_read_at (the members'
+    # original source-acquire read) and evaluation_observed_at (THIS run's
+    # real evaluation).  A bare caller-chosen wall clock can never be passed;
+    # a replay context without a complete, matching package_clock mints NO
+    # admission clock, so every actual instant stays judged against the
+    # logical decision_cutoff (the strict outcome).
+    replay_admission_clock: OctoberReplayAdmissionClock | None = None
+    if replay_context is not None:
+        package_clock = consumption_evidence.get("package_clock") if consumption_evidence else None
+        if isinstance(package_clock, Mapping):
+            schema_ok = package_clock.get("schema_version") == "p11.october-replay-package-clock.v1"
+            market_ok = package_clock.get("market_date") == facts.market_date.isoformat()
+            cutoff_ok = package_clock.get("logical_cutoff") == policy.decision_cutoff.isoformat()
+
+            def _parse_clock(name: str) -> datetime | None:
+                raw = package_clock.get(name)
+                if not isinstance(raw, str):
+                    return None
+                try:
+                    parsed = datetime.fromisoformat(raw)
+                except ValueError:
+                    return None
+                if parsed.tzinfo is None or parsed.utcoffset() is None:
+                    return None
+                return parsed
+
+            source_read_at = _parse_clock("source_read_at")
+            evaluation_observed_at = _parse_clock("evaluation_observed_at")
+            if (
+                schema_ok
+                and market_ok
+                and cutoff_ok
+                and source_read_at is not None
+                and evaluation_observed_at is not None
+            ):
+                # Mint the bounds through the verified token; the proof
+                # supplies the instants, the token supplies the authority.  A
+                # proof that fails any check leaves the bound at None (strict).
+                replay_admission_clock = _new_replay_admission_clock(
+                    source_read_at, evaluation_observed_at, replay_context
+                )
     stage_start = perf_counter()
     current_rows = tuple(row for row in rows if row.session_date <= facts.market_date)
     seam = evaluate_day(
@@ -1476,6 +1540,7 @@ def run_daily_advice(
         candidates=candidates,
         held_signals=held,
         evaluation_receipt=receipt,
+        replay_admission_clock=replay_admission_clock,
     )
     if seam.day_blocked:
         result = dataclasses.replace(

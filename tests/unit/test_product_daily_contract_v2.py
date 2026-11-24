@@ -553,16 +553,20 @@ def test_caller_wire_version_cannot_override_release(tmp_path):
 
 
 def test_reduce_refused_on_v1_wire_even_with_binding(tmp_path):
-    """A reduce on the v1 wire is refused before any loader call: the v1 consumer
-    would silently read it as a full sell."""
+    """A package registered under the v2 release always serializes on the
+    p12.decision-set.v2 wire; a caller cannot downgrade it to v1, and the bound
+    pin resolves the real loader that preserves exit_kind/target through the
+    (object, wire_digest) contract."""
     package = _reduce_package()
-    with pytest.raises(ProductDailyError, match="p12.decision-set.v2"):
-        publish_package(
-            package,
-            directory=tmp_path,
-            published_at=package.decision_sets[0].published_at,
-        )
-    assert not list(tmp_path.glob("*.json"))
+    receipt = publish_package(
+        package,
+        directory=tmp_path,
+        published_at=package.decision_sets[0].published_at,
+    )
+    payload = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert payload["decision_sets"][0]["decision_set_schema"] == "p12.decision-set.v2"
+    assert payload["decision_sets"][0]["decisions"][0]["exit_kind"] == "reduce"
+    assert receipt.p12_package_digests is not None
 
 
 def test_caller_binding_dict_grants_no_v2_authority(tmp_path):

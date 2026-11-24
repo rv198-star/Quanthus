@@ -114,15 +114,18 @@ def test_resolve_pinned_loader_verifies_every_file_byte(pinned_checkout, monkeyp
     assert wire_digest.startswith("sha256:")
     # The wire digest covers the raw bytes - a tampered payload digests
     # differently.  Recompute it through the pinned tree's own fact_contracts.
-    import sys as _sys
+    import quanthus as _q
 
-    _sys.path.insert(0, str(pinned_checkout / "src"))
+    _q.__path__.insert(0, str(pinned_checkout / "src" / "quanthus"))
     try:
         import quanthus.shared.fact_contracts as fc
 
         assert wire_digest == fc.digest(raw)
     finally:
-        _sys.path.remove(str(pinned_checkout / "src"))
+        _q.__path__.remove(str(pinned_checkout / "src" / "quanthus"))
+        for _m in list(_sys.modules):
+            if _m.startswith("quanthus.shared") or _m.startswith("quanthus.capabilities") or _m.startswith("quanthus.p12_daily"):
+                del _sys.modules[_m]
 
 
 def test_pinned_loader_rejects_schema_drift(pinned_checkout, monkeypatch):
@@ -240,15 +243,18 @@ def test_publish_reduce_through_real_pinned_consumer(pinned_checkout, tmp_path, 
     assert receipt.p12_package_digests is not None
     binding = dict(receipt.p12_package_digests)
     assert binding[raw["market_date"]].startswith("sha256:")
-    import sys as _sys
+    import quanthus as _q
 
-    _sys.path.insert(0, str(pinned_checkout / "src"))
+    _q.__path__.insert(0, str(pinned_checkout / "src" / "quanthus"))
     try:
         import quanthus.shared.fact_contracts as fc
 
         assert binding[raw["market_date"]] == fc.digest(raw)
     finally:
-        _sys.path.remove(str(pinned_checkout / "src"))
+        _q.__path__.remove(str(pinned_checkout / "src" / "quanthus"))
+        for _m in list(_sys.modules):
+            if _m.startswith("quanthus.shared") or _m.startswith("quanthus.capabilities") or _m.startswith("quanthus.p12_daily"):
+                del _sys.modules[_m]
     assert binding[raw["market_date"]] != receipt.file_sha256
     # The single validated object still proved its coordinates: reduce + target.
     decision = raw["decisions"][0]

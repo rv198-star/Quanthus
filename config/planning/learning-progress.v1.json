@@ -16270,6 +16270,90 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-20261124T183335440016Z",
+      "recorded_at": "2026-11-24T18:33:35.440016+00:00",
+      "actor": "P11-root-october-first-owner",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "十月回放的两项公司行为输入由18券日增至48，全部新增用途按同一固定源复核。CN02定位三券上市年龄受42个开市日缺开盘时刻影响，回放及E5证据门退回修复。",
+      "evidence": [
+        {
+          "id": "OCT-ACTION-48",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/ACCEPTED-OCTOBER-ACTION-COVERAGE.v2.json",
+          "sha256": "dbb1da5c1c18e3b74dbf68293610a82832d76dc1cc99e6182c580068616bb13a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Full 3 x 16 admission to two company-action inputs, as-observed October replay only."
+        },
+        {
+          "id": "OCT-ACTION-WINDOWS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/WINDOW-USE.json",
+          "sha256": "0f98f60d69290f7d371994a0e744cced5f331ccd083a7eb1173a8d0d78e8ab13",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Two pilot securities, 60 new use decisions previously reconstructed from existing sealed inputs and checked with the new P10 version."
+        },
+        {
+          "id": "OCT-SCAN-KNOWN",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/SCAN-ACTION-BOUNDARIES.json",
+          "sha256": "928d71da9deab48c9450d3148e04e161294864780a9de0d481de2c7e6dd19818",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "576 security-signal dates with a known ex-date in the scan pair."
+        },
+        {
+          "id": "H1-EXACT-ANCHOR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/H1-749-ANCHORS.json",
+          "sha256": "e4d6e16d670b4100e17c602743458a0166d9881029ae1e331ecb764d81dec1da",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Both venues have 42 open sessions without a native opening instant. Three October securities and 002238 intersect all 42."
+        },
+        {
+          "id": "OCT-REPLAY-R3-INTAKE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/REPLAY-R3-CONTROLS.json",
+          "sha256": "2d1bb75f621cabb0f23e11bfc355967d2b2cba13a7570e3d57c7b1bf3f499475",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R3 entry still accepts unbound ex-date and incomplete evidence at full calendar lengths."
+        },
+        {
+          "id": "OCT-E5-R3-INTAKE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/REPLAY-R3-ROOT-PROBE.json",
+          "sha256": "e754e2f195038fe7ee1c4175f74e52f4efd1bdce29e6035c7a1c7d72df4df3a2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Missing independent E5 pins still permit activation in synthetic R3 test."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "新增为个人历史工程回放输入资格，上市日计数和回放使用仍在工程修复阶段，E5尚未签发。",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T18:33:02Z",
+          "body_sha256": "a0bd73446eab2c0b4a3b60d8a6ab4e76ceaf12dc6efa95010c02fc230b0b08de"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

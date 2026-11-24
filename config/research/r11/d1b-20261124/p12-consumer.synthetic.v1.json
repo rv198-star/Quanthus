@@ -12,9 +12,5 @@
     "src/quanthus/shared/fact_contracts.py": "54ba64674c76e3392bb6d649ab52db35d96f9eae8caa1e19f5c4635e6ee6f07e",
     "src/quanthus/shared/values.py": "6059bfd2f55102fe5b5a8a3effbab852c736a4f6618f44435fb02aa21c5ef8d9"
   },
-  "production_adoption": "NOT_REGISTERED",
-  "capabilities": {
-    "supports_held_reduction_v2": false,
-    "note": "the pinned synthetic consumer at source_commit 9de1cdb9 silently drops exit_kind/target_position_fraction; an executable reduce stays display-only until a pinned p12.daily-advice-package.v2 loader is bound"
-  }
+  "production_adoption": "NOT_REGISTERED"
 }

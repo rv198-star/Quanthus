@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from quanthus.p12_history.clocks import parse_ts
@@ -44,6 +45,10 @@ class SecurityIdentity:
     invalidations: tuple
     price_bound: Decimal | None
     source_evidence_digest: str
+    # True when the qualifying listing row is in force at T but its archive
+    # knowledge_from post-dates the decision cutoff (October as-observed
+    # use): the security stays a candidate and the rule reads the late flag.
+    late_visible: bool = False
 
 
 def _read_table(source_map, table, columns):
@@ -68,7 +73,7 @@ def _read_table(source_map, table, columns):
     return rows, reads
 
 
-def build_universe(source_map: SourceMap, market_date, holdings, pending, verify, decision_cutoff=None):
+def build_universe(source_map: SourceMap, market_date, holdings, pending, verify, decision_cutoff=None, open_at_by_venue=None, late_archive_as_observed=False):
     """Scan-domain identities: SSE/SZSE common_equity + account members.
 
     Returns (securities_identity_list, coverage_report).  Every identity
@@ -148,19 +153,24 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
     securities = []
     seen = set()
     dup_ids = set()
+    ambiguous_ids = set()
     cutoff_ts = decision_cutoff
-    mkt_ts = market_date
+    open_at_by_venue = open_at_by_venue or {}
     for s in sec_rows:
         sid = str(s.get("security_id") or "")
         itype = str(s.get("instrument_type") or "")
         if not sid or itype != COMMON_EQUITY:
             continue
         cid = str(s.get("company_id") or "")
-        # Pick the listing row effective at T: the half-open
-        # [effective_from, effective_to) interval must cover the market
-        # date and be known by the cutoff.  A future listing and an
-        # already-retired boundary stay off the candidate pool (audit
-        # 749-03); the rule still sees every raw listing_row.
+        # Pick the listing row effective at the VENUE's actual open instant
+        # (audit 749-03): the half-open [effective_from, effective_to)
+        # interval is tested against the real native open_at for that
+        # venue's T session, not the bare calendar date.  A row that opens
+        # later than the venue open (e.g. effective_from=02:00Z vs
+        # open_at=01:30Z) is not yet listed at the open; a row that ends
+        # after the open is still in force.  Rows whose interval cannot be
+        # resolved to an instant fall back to the market date.
+        qualifying = []
         for lst in listing_by_security.get(sid, ()):
             mic = venue_by_id.get(str(lst.get("venue_id") or ""), "")
             venue = "SSE" if mic == "XSHG" else ("SZSE" if mic == "XSHE" else str(lst.get("venue_id") or ""))
@@ -168,41 +178,80 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
                 continue
             eff_from = parse_ts(lst.get("effective_from"))
             eff_to = parse_ts(lst.get("effective_to"))
-            if mkt_ts is not None:
-                if eff_from is not None and eff_from.date() > mkt_ts:
+            open_instant = open_at_by_venue.get(venue)
+            if open_instant is not None:
+                # Half-open test against the real open instant.
+                if eff_from is not None and eff_from > open_instant:
+                    continue  # opens after the venue open: not yet listed
+                if eff_to is not None and eff_to <= open_instant:
+                    continue  # already ended before/at the open
+            else:
+                # No native open for this venue/date (e.g. closed or the
+                # open instant is null): fall back to the session date.
+                if eff_from is not None and eff_from.date() > market_date:
                     continue  # future listing
-                if eff_to is not None and eff_to.date() <= mkt_ts:
+                if eff_to is not None and eff_to.date() <= market_date:
                     continue  # already retired at the open boundary
             if cutoff_ts is not None:
                 kf = parse_ts(lst.get("knowledge_from"))
                 if kf is not None and kf > cutoff_ts:
+                    # Late archival visibility (audit 749-03): under the
+                    # engineering-replay-as-observed purpose an in-force
+                    # listing whose archive knowledge_from post-dates the
+                    # decision cutoff is NOT deleted - the October use
+                    # keeps the original in-force row and marks it
+                    # late_visible so the rule judges per-security.  A
+                    # formal read still drops it on real availability.
+                    if late_archive_as_observed:
+                        qualifying.append((lst, venue, eff_from, True))
+                        continue
                     continue  # not yet known at the decision cutoff
-            pair = (sid, str(lst.get("listing_id") or ""))
+            qualifying.append((lst, venue, eff_from, False))
+        # Resolve to ONE qualifying listing per security by its named
+        # qualification at T (audit 749-03): when several rows survive the
+        # half-open test (a board move carried overlapping intervals), pick
+        # the row whose effective_from is latest - the currently-in-force
+        # listing - with a deterministic listing_id tiebreak so the choice
+        # never depends on physical source order.  A genuine ambiguity (two
+        # rows with identical effective_from) names the security as
+        # ambiguous rather than silently picking one.
+        if qualifying:
+            qualifying.sort(
+                key=lambda t: (
+                    t[2] or datetime.min.replace(tzinfo=timezone.utc),
+                    str(t[0].get("listing_id") or ""),
+                )
+            )
+            chosen_lst, venue, _, chosen_late = qualifying[-1]
+            top_from = qualifying[-1][2]
+            ties = [q for q in qualifying if q[2] == top_from]
+            if len({str(q[0].get("listing_id") or "") for q in ties}) > 1:
+                # Same in-force instant on several listing ids: ambiguous.
+                ambiguous_ids.add(sid)
+                continue
+            pair = (sid, str(chosen_lst.get("listing_id") or ""))
             if pair in seen:
                 continue
             if sid in seen:
-                # Distinct listing row for an already-emitted security:
-                # collapse to one identity (one security_id) and record the
-                # duplicate so the coverage names it instead of silently
-                # emitting a second securities[] entry.
                 dup_ids.add(sid)
                 continue
-            code = code_by_security.get(sid) or str(lst.get("listing_code") or sid)
+            code = code_by_security.get(sid) or str(chosen_lst.get("listing_code") or sid)
             securities.append(
                 SecurityIdentity(
                     security_id=sid,
                     stock_code=code,
-                    listing_code=str(lst.get("listing_code") or code),
+                    listing_code=str(chosen_lst.get("listing_code") or code),
                     security_name=company_name.get(cid) or UNKNOWN,
                     industry_id=company_industry.get(cid) or UNKNOWN,
                     venue_id=venue,
                     instrument_type=itype,
-                    listing_id=str(lst.get("listing_id") or ""),
+                    listing_id=str(chosen_lst.get("listing_id") or ""),
                     company_id=cid,
                     depends_on_member_ids=tuple(member_ids),
                     invalidations=(),
                     price_bound=None,
                     source_evidence_digest="sha256:" + digest,
+                    late_visible=bool(chosen_late),
                 )
             )
             seen.add(sid)
@@ -247,4 +296,5 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
         "pending_only": sorted(pending_sids - seen),
         "pending_typed": pending_typed,
         "duplicate_security_ids": sorted(dup_ids),
+        "ambiguous_security_ids": sorted(ambiguous_ids),
     }

@@ -116,7 +116,11 @@ class SourceMap:
         if table == "dwd_trading_calendar" and self._calendar_members:
             base, daily = self._calendar_members
             out = []
-            for e in base + daily:
+            # Base history partitions are "base"; the 17 November Daily
+            # calendar partitions are "daily-core" (audit 749-05) - the
+            # coverage counts them under their real package kind, never
+            # rolled into the Base total.
+            for e in base:
                 out.append(
                     ResolvedMember(
                         member_id=str(e["path"]).split("/published/DWD/")[-1]
@@ -129,6 +133,22 @@ class SourceMap:
                         size_bytes=int(e.get("size_bytes") or 0),
                         readability="READABLE",
                         package_kind="base",
+                        market_date=e.get("target"),
+                    )
+                )
+            for e in daily:
+                out.append(
+                    ResolvedMember(
+                        member_id=str(e["path"]).split("/published/DWD/")[-1]
+                        if "/published/DWD/" in str(e["path"])
+                        else str(e["path"]),
+                        package_id=str(e.get("package_id") or "dwd-daily-calendar"),
+                        version=BASE_VERSION,
+                        abs_path=Path(e["path"]),
+                        sha256="sha256:" + str(e["sha256"]).replace("sha256:", ""),
+                        size_bytes=int(e.get("size_bytes") or 0),
+                        readability="READABLE",
+                        package_kind="daily-core",
                         market_date=e.get("target"),
                     )
                 )
@@ -258,7 +278,7 @@ class SourceMap:
         never raised - the caller decides whether that member is a
         shared hard dependency (whole-day block) or an isolated
         per-security fault."""
-        verified_at = iso(VerificationClock.now())
+        hash_started_at = iso(VerificationClock.now())
         try:
             actual = sha256_file(member.abs_path)
         except Exception as exc:  # noqa: BLE001
@@ -270,7 +290,12 @@ class SourceMap:
                 "matches": False,
                 "unreadable": True,
                 "error": f"{type(exc).__name__}: {exc}",
-                "verified_at": verified_at,
+                # verified_at stamps the hash START instant (audit 749-05) -
+                # the member's own verification clock begins when the bytes
+                # are opened for hashing, recorded separately from the
+                # hash-finish and run-start clocks.
+                "verified_at": hash_started_at,
+                "hash_started_at": hash_started_at,
                 "size_bytes": None,
             }
         return {
@@ -279,7 +304,8 @@ class SourceMap:
             "declared_sha256": member.sha256,
             "actual_sha256": actual,
             "matches": actual == member.sha256,
-            "verified_at": verified_at,
+            "verified_at": hash_started_at,
+            "hash_started_at": hash_started_at,
             "size_bytes": (
                 member.abs_path.stat().st_size if member.abs_path.exists() else None
             ),

@@ -31,7 +31,7 @@ _COLUMNS = [
     "source_record_id", "observation_end", "listing_id", "calendar_session_id",
     "interval_size", "price_basis", "currency",
     "open", "high", "low", "close", "volume", "turnover",
-    "source_revision", "record_source", "knowledge_from",
+    "source_revision", "record_source", "knowledge_from", "knowledge_to",
 ]
 
 
@@ -107,6 +107,7 @@ def _project_member(member, sessions_set, needed_listings, security_by_listing, 
                 "source_revision": str(rec.get("source_revision") or ""),
                 "record_source": str(rec.get("record_source") or ""),
                 "knowledge_from": rec.get("knowledge_from"),
+                "knowledge_to": rec.get("knowledge_to"),
             }
         except Exception:  # noqa: BLE001
             continue

@@ -118,6 +118,7 @@ def publish_package(
     published_at: datetime,
     elapsed_ms: int = 0,
     p12_loader: Callable[[dict[str, Any]], Any] | None = None,
+    consumer_supports_held_reduction_v2: bool = False,
 ) -> PublishReceipt:
     """Write one package file append-only and return a receipt with all digest surfaces.
 
@@ -147,6 +148,26 @@ def publish_package(
             "unpublishable_package",
             "a package containing any blocked decision is a diagnostic artifact, "
             "never a published advice day",
+        )
+
+    # Held-reduction wire v2 gate: an executable reduce must only be handed to a pinned
+    # consumer that preserves exit_kind/target_position_fraction.  An older loader that
+    # silently drops the fields would read the same exit_plan as a full liquidation, so
+    # without an explicit consumer capability declaration the reduce may only ever be
+    # published as display-only (never an executable wire decision).  The caller passes
+    # consumer_supports_held_reduction_v2 only from a pinned consumer binding that
+    # declares the capability; the default False keeps the fail-closed posture.
+    has_reduce = any(
+        decision.stage == "exit_plan" and decision.exit_kind == "reduce"
+        for item in package.decision_sets
+        for decision in item.decisions
+    )
+    if has_reduce and not consumer_supports_held_reduction_v2:
+        raise ProductDailyError(
+            "unpublishable_package",
+            "an executable reduce requires a pinned P12 v2 consumer "
+            "(supports_held_reduction_v2); the current consumer would drop "
+            "exit_kind/target_position_fraction and read it as a full sell",
         )
 
     # The P12 binding digest is computed and validated *before* any bytes land so a loader

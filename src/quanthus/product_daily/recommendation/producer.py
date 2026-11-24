@@ -47,6 +47,8 @@ from quanthus.product_daily.recommendation.contracts import (
     ENDED,
     ENTRY_PLAN,
     ENTRY_REASON_CODES,
+    EXIT_KIND_FULL,
+    EXIT_KIND_REDUCE,
     EXIT_PLAN,
     EXPLANATION_CODES,
     HOLDING,
@@ -1315,7 +1317,48 @@ class DailyAdviceProducer:
                 )
                 continue
             stage = EXIT_PLAN if held.action in {"reduce", "exit"} else HOLDING
+            # Held-reduction wire v2: a reduce must publish the expert's own target
+            # remaining-position fraction; it is copied from the actual
+            # FormalStrategyDecision.target_maximum_position the runner produced for this
+            # held unit, never inferred from an explanation or supplied by P12.  A reduce
+            # without that real decision (or with a missing/non-positive target) cannot be
+            # serialized as an executable reduce and falls back to display-only hold+alert
+            # rather than a synthetic full exit.
+            exit_kind: str | None = None
+            target_fraction = None
+            if stage == EXIT_PLAN:
+                if held.action == "exit":
+                    exit_kind = EXIT_KIND_FULL
+                else:
+                    formal_target = (
+                        held.formal_decision.target_maximum_position
+                        if type(held.formal_decision) is FormalStrategyDecision
+                        else None
+                    )
+                    target_fraction = (
+                        formal_target if formal_target is not None else held.target_maximum_position
+                    )
+                    if (
+                        target_fraction is None
+                        or not target_fraction.is_finite()
+                        or target_fraction <= 0
+                        or target_fraction > 1
+                    ):
+                        stage = HOLDING
+                    else:
+                        exit_kind = EXIT_KIND_REDUCE
             explanations: tuple[dict[str, str], ...] = held.explanations
+            if stage == HOLDING and held.action == "reduce" and exit_kind is None:
+                explanations = (
+                    *explanations,
+                    {
+                        "code": "QUALIFICATION_EVIDENCE",
+                        "use": USE_EXPLANATION,
+                        "component_ref": f"{experts.ref_id}@{experts.version}",
+                        "text": "reduce intent missing a valid expert target fraction; "
+                        "held with alert, never a full sale",
+                    },
+                )
             if held.action == "hold_alert" and not any(
                 item.get("use") == USE_EXPLANATION for item in explanations
             ):
@@ -1339,6 +1382,8 @@ class DailyAdviceProducer:
                     reason_codes=held.reason_codes,
                     explanations=explanations,
                     next_observation=held.next_observation,
+                    exit_kind=exit_kind,
+                    target_position_fraction=target_fraction,
                 )
             )
 

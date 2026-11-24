@@ -1418,12 +1418,22 @@ def load_action_receipts(path: Any) -> tuple[dict[str, Any], ...]:
 
 
 def load_machine_policy(path: Any) -> dict[str, Any]:
-    """Strict-load the machine invalidation/position policy."""
+    """Strict-load the machine invalidation/position policy.
+
+    v1 files keep the original schema gate.  v2 additionally declares the seven
+    fact-dependency conditions and the confirm_buy action scope from the P11/P12
+    machine-fact contract (#723 comment7116501586): missing or unverified T+1
+    preopen facts may only block the buy confirmations that depend on them, while
+    eligible sell/reduce continues with an alert.  The conditions apply at the
+    T+1 preopen/confirmation phase; they are not a requirement to hold future T+1
+    quotes while producing the T-evening package.
+    """
 
     raw = _load_json(path)
     if not isinstance(raw, dict):
         raise ProductDailyError("invalid_three_piece", "machine-policy must be an object")
-    if raw.get("schema_version") != "quanthus.p11-d1b.machine-policy.v1":
+    schema = raw.get("schema_version")
+    if schema not in {"quanthus.p11-d1b.machine-policy.v1", "quanthus.p11-d1b.machine-policy.v2"}:
         raise ProductDailyError("invalid_three_piece", "machine-policy schema_version differs")
     caps = raw.get("position_caps")
     if not isinstance(caps, list):
@@ -1431,7 +1441,129 @@ def load_machine_policy(path: Any) -> dict[str, Any]:
     for cap in caps:
         if not isinstance(cap, dict) or "denominator" not in cap:
             raise ProductDailyError("invalid_three_piece", "position_cap missing denominator")
+    if schema == "quanthus.p11-d1b.machine-policy.v2":
+        _validate_machine_policy_v2(raw)
     return raw
+
+
+# Actions that a T+1 preopen fact may block.  confirm_buy is the only action a missing
+# or unverified preopen dependency can suppress; sell and reduce confirmations are
+# outside its scope and continue with an alert.
+MACHINE_BUY_ACTIONS = frozenset({"new_entry", "confirm_buy"})
+
+
+def _validate_machine_policy_v2(raw: dict[str, Any]) -> None:
+    """Fail closed on a malformed v2 fact-dependency declaration."""
+
+    if raw.get("adoption_state") != "proposed" or raw.get("daily_adopted") is not False:
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 must stay proposed with daily_adopted=false",
+        )
+    scopes = raw.get("action_scope_definition")
+    if not isinstance(scopes, dict) or "confirm_buy" not in scopes:
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 must define the confirm_buy action scope",
+        )
+    if raw.get("sell_reduce_on_missing_preopen_facts") != "continue_with_alert":
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "missing preopen facts must leave sell/reduce as continue_with_alert",
+        )
+    phase = raw.get("evaluation_phase")
+    if not isinstance(phase, str) or "preopen" not in phase:
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 must evaluate at the T+1 preopen/confirmation phase",
+        )
+    conditions = raw.get("conditions")
+    if not isinstance(conditions, list) or not conditions:
+        raise ProductDailyError("invalid_three_piece", "machine-policy v2 conditions missing")
+    for index, cond in enumerate(conditions):
+        if not isinstance(cond, dict) or "field" not in cond:
+            raise ProductDailyError(
+                "invalid_three_piece", f"machine-policy v2 conditions[{index}] malformed"
+            )
+        preopen_deps = cond.get("preopen_fact_dependencies")
+        if not isinstance(preopen_deps, list):
+            raise ProductDailyError(
+                "invalid_three_piece",
+                f"machine-policy v2 {cond.get('field')} missing preopen_fact_dependencies",
+            )
+        if preopen_deps:
+            applies = cond.get("applies_to_actions")
+            if not isinstance(applies, list) or "confirm_buy" not in applies:
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} preopen scope must include confirm_buy",
+                )
+            if any(action not in MACHINE_BUY_ACTIONS for action in applies):
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} may only block buy actions "
+                    f"{sorted(MACHINE_BUY_ACTIONS)}, never sell/reduce",
+                )
+            if cond.get("on_missing_or_unverified") != (
+                "block_only_buy_confirmation_depending_on_this_fact"
+            ):
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} on_missing_or_unverified "
+                    "must be block_only_buy_confirmation_depending_on_this_fact",
+                )
+            if cond.get("sell_reduce_on_missing_preopen_facts") != "continue_with_alert":
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} must keep "
+                    "sell_reduce_on_missing_preopen_facts=continue_with_alert",
+                )
+            for key in ("required_provenance", "semantic_limits"):
+                if not isinstance(cond.get(key), list) or not cond.get(key):
+                    raise ProductDailyError(
+                        "invalid_three_piece",
+                        f"machine-policy v2 {cond.get('field')} missing {key}",
+                    )
+        else:
+            if not isinstance(cond.get("non_preopen_dependencies"), list):
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} missing non_preopen_dependencies",
+                )
+    wire = raw.get("held_reduction_wire")
+    if not isinstance(wire, dict):
+        raise ProductDailyError(
+            "invalid_three_piece", "machine-policy v2 held_reduction_wire missing"
+        )
+    if wire.get("reduce_denominator") != "locked_cycle_budget":
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "reduce target_position_fraction must divide by the held funding cycle's "
+            "locked_cycle_budget, never account_equity or a sell fraction",
+        )
+
+
+def machine_policy_action_scope(policy: dict[str, Any], field: str) -> frozenset[str]:
+    """Actions a machine-policy field may block when its facts are missing/unverified.
+
+    Under v2 a preopen dependency only ever yields {confirm_buy} (plus the package-time
+    new_entry invalidation for the halt/limit fact); under v1 the declared
+    applies_to_actions are returned verbatim.  An unregistered field is an empty scope:
+    it blocks nothing.
+    """
+
+    if policy.get("schema_version") == "quanthus.p11-d1b.machine-policy.v2":
+        for cond in policy.get("conditions", ()):
+            if isinstance(cond, dict) and cond.get("field") == field:
+                return frozenset(cond.get("applies_to_actions", ()))
+        for rule in policy.get("invalidations", ()):
+            if isinstance(rule, dict) and rule.get("field") == field:
+                return frozenset(rule.get("applies_to_actions", ()))
+        return frozenset()
+    for rule in policy.get("invalidations", ()):
+        if isinstance(rule, dict) and rule.get("field") == field:
+            return frozenset(rule.get("applies_to_actions", ()))
+    return frozenset()
 
 
 def load_release_manifest(path: Any) -> dict[str, Any]:
@@ -1440,8 +1572,18 @@ def load_release_manifest(path: Any) -> dict[str, Any]:
     raw = _load_json(path)
     if not isinstance(raw, dict):
         raise ProductDailyError("invalid_three_piece", "release-manifest must be an object")
-    if raw.get("schema_version") != "quanthus.p11-d1b.release-manifest.v1":
+    if raw.get("schema_version") not in {
+        "quanthus.p11-d1b.release-manifest.v1",
+        "quanthus.p11-d1b.release-manifest.v2",
+    }:
         raise ProductDailyError("invalid_three_piece", "release-manifest schema_version differs")
+    if raw.get("schema_version") == "quanthus.p11-d1b.release-manifest.v2":
+        wire = raw.get("held_reduction_wire")
+        if not isinstance(wire, dict) or not wire.get("wire_version"):
+            raise ProductDailyError(
+                "invalid_three_piece",
+                "release-manifest v2 must declare held_reduction_wire.wire_version",
+            )
     closure = raw.get("input_closure")
     if not isinstance(closure, dict):
         raise ProductDailyError("invalid_three_piece", "release-manifest input_closure missing")
@@ -1509,3 +1651,16 @@ def check_three_piece_consistency(
             "inconsistent_three_piece",
             "single_security_fraction must not use account_equity as denominator",
         )
+    if machine_policy.get("schema_version") == "quanthus.p11-d1b.machine-policy.v2":
+        wire = machine_policy.get("held_reduction_wire") or {}
+        # The manifest must carry the same held-reduction wire version the policy
+        # serializes, so a consumer can pin one contract version end to end.
+        manifest_wire = release_manifest.get("held_reduction_wire")
+        if not isinstance(manifest_wire, dict) or manifest_wire.get("wire_version") != (
+            wire.get("wire_version")
+        ):
+            raise ProductDailyError(
+                "inconsistent_three_piece",
+                "release-manifest must declare the same held_reduction_wire version as "
+                "the v2 machine policy",
+            )

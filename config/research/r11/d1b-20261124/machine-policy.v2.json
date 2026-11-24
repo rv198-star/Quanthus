@@ -1,0 +1,233 @@
+{
+  "schema_version": "quanthus.p11-d1b.machine-policy.v2",
+  "policy_version": "2.0.0",
+  "adoption_state": "proposed",
+  "daily_adopted": false,
+  "base_machine_policy": "config/research/r11/d1b-20261124/machine-policy.v1.json",
+  "base_sha256": "5dcc84c833828a62555b9588ec5341cdb78d63ec87a5a9930a39b495e4c49896",
+  "invalidations": [
+    {
+      "field": "price_limit_or_halt_unavailable",
+      "value": "block",
+      "type": "boolean",
+      "unit": "flag",
+      "observed_at": "T+1 pre-open",
+      "timezone": "Asia/Shanghai",
+      "applies_to_actions": [
+        "new_entry",
+        "confirm"
+      ],
+      "reason": "T+1 suspension/native price limit not yet a named qualified source",
+      "veto": true
+    },
+    {
+      "field": "auction_snapshot_unavailable",
+      "value": "unavailable",
+      "type": "enum",
+      "unit": "state",
+      "observed_at": "T+1 09:00-09:25",
+      "timezone": "Asia/Shanghai",
+      "applies_to_actions": [
+        "confirm"
+      ],
+      "reason": "no named auction semantic snapshot; zero-volume/last_price not a substitute",
+      "veto": false
+    }
+  ],
+  "position_caps": [
+    {
+      "field": "single_security_fraction",
+      "value": "from card position_and_execution base_trial_position_fraction",
+      "denominator": "unit_notional_bucket_budget",
+      "priority": "expert_ceiling",
+      "veto": false,
+      "note": "base_trial_position_fraction is a fraction of the trial unit_notional/bucket budget (same bucket as the expert allowed_maximum_position ceiling); P12 sizes the actual quantity against real account equity/cash/fees. NOT the historical 4/8/20 research caps"
+    },
+    {
+      "field": "per_industry_max",
+      "value": "EntryLimits.max_active_or_reserved_per_industry",
+      "denominator": "active_or_reserved_count",
+      "priority": "entry_limit",
+      "veto": false
+    },
+    {
+      "field": "new_buckets_per_day",
+      "value": "EntryLimits.max_new_buckets_per_day",
+      "denominator": "buckets",
+      "priority": "entry_limit",
+      "veto": false
+    },
+    {
+      "field": "total_position",
+      "value": "quantity_limits.total",
+      "denominator": "account_equity",
+      "priority": "capacity",
+      "veto": false
+    }
+  ],
+  "veto_precedence": [
+    "force_liquidate_veto",
+    "reduce_only_veto",
+    "block_new"
+  ],
+  "expert_veto": "system/position guardian + scorer; a veto always suppresses executable entry",
+  "action_scope_definition": {
+    "new_entry": "new buy plan",
+    "confirm_buy": "buy confirmation only; sell and reduce confirmation excluded"
+  },
+  "evaluation_phase": "T+1 preopen or user confirmation; not T package generation",
+  "sell_reduce_on_missing_preopen_facts": "continue_with_alert",
+  "opening_auction_window": "09:15-09:25 Asia/Shanghai; 09:00 unavailable",
+  "paper_quote_feed_acceptance": "accepted_only_for_P10_727_verified_fields",
+  "real_account_fact_grade": "formal_named_supply_727",
+  "scope": "T+1 preopen three fact classes for personal simulated accounts only",
+  "conditions": [
+    {
+      "field": "price_limit_or_halt_unavailable",
+      "preopen_fact_dependencies": [
+        "suspension_resumption",
+        "limit_prices"
+      ],
+      "paper_quote_feed_acceptance": "accepted_only_for_P10_727_verified_fields",
+      "paper_required_qualification": "P10 #727 field/scope/source/clock receipt",
+      "real_account_fact_grade": "formal_named_supply_727",
+      "applies_to_actions": [
+        "new_entry",
+        "confirm_buy"
+      ],
+      "on_missing_or_unverified": "block_only_buy_confirmation_depending_on_this_fact",
+      "conditional_activation": "only_when_active_predicate_depends_on_this_fact",
+      "preserved_veto_flag": true,
+      "required_provenance": [
+        "source_ref",
+        "fact_class",
+        "fact_grade",
+        "security_code",
+        "applicable_session",
+        "observed_at",
+        "received_at",
+        "qualification_receipt"
+      ],
+      "semantic_limits": [
+        "zero_volume_is_not_suspension",
+        "ordinary_last_is_not_relabelled_as_auction",
+        "unknown_remains_unavailable"
+      ],
+      "evaluation_phase": "T+1 preopen or user confirmation; not T package generation",
+      "sell_reduce_on_missing_preopen_facts": "continue_with_alert"
+    },
+    {
+      "field": "auction_snapshot_unavailable",
+      "preopen_fact_dependencies": [
+        "opening_auction"
+      ],
+      "paper_quote_feed_acceptance": "accepted_only_for_P10_727_verified_fields",
+      "paper_required_qualification": "P10 #727 field/scope/source/clock receipt",
+      "real_account_fact_grade": "formal_named_supply_727",
+      "applies_to_actions": [
+        "confirm_buy"
+      ],
+      "on_missing_or_unverified": "block_only_buy_confirmation_depending_on_this_fact",
+      "conditional_activation": "only_when_active_predicate_depends_on_this_fact",
+      "preserved_veto_flag": false,
+      "required_provenance": [
+        "source_ref",
+        "fact_class",
+        "fact_grade",
+        "security_code",
+        "applicable_session",
+        "observed_at",
+        "received_at",
+        "qualification_receipt"
+      ],
+      "semantic_limits": [
+        "zero_volume_is_not_suspension",
+        "ordinary_last_is_not_relabelled_as_auction",
+        "unknown_remains_unavailable"
+      ],
+      "evaluation_phase": "T+1 preopen or user confirmation; not T package generation",
+      "sell_reduce_on_missing_preopen_facts": "continue_with_alert"
+    },
+    {
+      "field": "single_security_fraction",
+      "preopen_fact_dependencies": [],
+      "paper_quote_feed_acceptance": "not_applicable_to_this_preopen_contract",
+      "non_preopen_dependencies": [
+        "fixed_strategy_card",
+        "qualified_expert_decision",
+        "unit_notional_bucket_budget"
+      ],
+      "preserved_value_ref": "from card position_and_execution base_trial_position_fraction",
+      "preserved_denominator": "unit_notional_bucket_budget",
+      "on_missing_or_unverified": "preserve_existing_account_or_rule_admission"
+    },
+    {
+      "field": "per_industry_max",
+      "preopen_fact_dependencies": [],
+      "paper_quote_feed_acceptance": "not_applicable_to_this_preopen_contract",
+      "non_preopen_dependencies": [
+        "qualified_industry_binding",
+        "active_or_reserved_account_state",
+        "EntryLimits"
+      ],
+      "preserved_value_ref": "EntryLimits.max_active_or_reserved_per_industry",
+      "preserved_denominator": "active_or_reserved_count",
+      "on_missing_or_unverified": "preserve_existing_account_or_rule_admission"
+    },
+    {
+      "field": "new_buckets_per_day",
+      "preopen_fact_dependencies": [],
+      "paper_quote_feed_acceptance": "not_applicable_to_this_preopen_contract",
+      "non_preopen_dependencies": [
+        "daily_account_intake_state",
+        "EntryLimits"
+      ],
+      "preserved_value_ref": "EntryLimits.max_new_buckets_per_day",
+      "preserved_denominator": "buckets",
+      "on_missing_or_unverified": "preserve_existing_account_or_rule_admission"
+    },
+    {
+      "field": "total_position",
+      "preopen_fact_dependencies": [],
+      "paper_quote_feed_acceptance": "not_applicable_to_this_preopen_contract",
+      "non_preopen_dependencies": [
+        "account_equity",
+        "existing_and_pending_commitments",
+        "quantity_limits.total"
+      ],
+      "preserved_value_ref": "quantity_limits.total",
+      "preserved_denominator": "account_equity",
+      "on_missing_or_unverified": "preserve_existing_account_or_rule_admission"
+    },
+    {
+      "field": "expert_veto",
+      "preopen_fact_dependencies": [],
+      "paper_quote_feed_acceptance": "not_applicable_to_this_preopen_contract",
+      "non_preopen_dependencies": [
+        "actual_qualified_guardian_constraint_scorer_decision"
+      ],
+      "precedence": [
+        "force_liquidate_veto",
+        "reduce_only_veto",
+        "block_new"
+      ],
+      "on_missing_or_unverified": "no_executable_new_entry_and_alert; preserve_independently_qualified_held_exit"
+    }
+  ],
+  "held_reduction_wire": {
+    "wire_version": "p12.daily-advice-package.v2",
+    "exit_kind_field": "exit_kind",
+    "target_field": "target_position_fraction",
+    "reduce_denominator": "locked_cycle_budget",
+    "reduce_denominator_note": "the matching held funding cycle's locked_cycle_budget fixed at cycle activation; 45,000 CNY is a paper-account example, not a P11 constant",
+    "consumer_capability": "supports_held_reduction_v2",
+    "missing_consumer_disposition": "display_only"
+  },
+  "not_changed": [
+    "strategy thresholds",
+    "daily/historical input qualification",
+    "P6",
+    "account adoption",
+    "sentiment parked739"
+  ]
+}

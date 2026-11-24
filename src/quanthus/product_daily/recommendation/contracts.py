@@ -58,6 +58,19 @@ STALE_MARKET_INPUT = "STALE_MARKET_INPUT"
 INPUT_UNAVAILABLE = "INPUT_UNAVAILABLE"
 BLOCKED_REASON_CODES = frozenset({STALE_MARKET_INPUT, INPUT_UNAVAILABLE})
 
+# Held-reduction wire contract v2 (P11 side of #723 comment7118368788).  An exit_plan
+# decision must declare whether it is a full liquidation or a bounded reduction, and a
+# reduction must carry the expert's own target remaining-position fraction.  Older P12
+# loaders silently drop these fields and would read every exit_plan as a full sell, so a
+# package containing a reduce must only be handed to a pinned consumer that declares
+# supports_held_reduction_v2; until then the reduce stays display-only.
+EXIT_KIND_FULL = "full"
+EXIT_KIND_REDUCE = "reduce"
+EXIT_KINDS = frozenset({EXIT_KIND_FULL, EXIT_KIND_REDUCE})
+# P12 v2 package schema identity (planned handoff; the exact consumer pin arrives with
+# the fixed P12 loader).  Used for the version declaration embedded in new packages.
+HELD_REDUCTION_WIRE_VERSION = "p12.daily-advice-package.v2"
+
 # Reason codes a produced entry_plan decision may carry on the wire.  The P12 gate
 # (validate_decision_set) does not police entry reason codes, so the producer keeps its own
 # registered set: an injected candidate carrying anything else is an input defect and is
@@ -258,6 +271,8 @@ class Decision:
     explanations: tuple[dict[str, str], ...]
     next_observation: str
     entry: EntryPlan | None = None
+    exit_kind: str | None = None
+    target_position_fraction: Decimal | None = None
 
     def __post_init__(self) -> None:
         for name in ("opportunity_id", "security_code", "component_ref_id", "component_version"):
@@ -268,6 +283,53 @@ class Decision:
             raise ProductDailyError("invalid_stage", "entry_plan requires an entry block")
         if self.stage != ENTRY_PLAN and self.entry is not None:
             raise ProductDailyError("invalid_stage", "only entry_plan carries an entry block")
+        # Held-reduction wire v2: an exit_plan must declare its kind explicitly.  A full
+        # exit carries no target; a reduce must carry the expert's own remaining-position
+        # fraction in (0, 1].  A missing kind, a target on full, or an invalid/missing
+        # reduce target is a contract error before publication.  The fraction is the
+        # maximum remaining marked position over the held funding cycle's
+        # locked_cycle_budget (fixed at cycle activation), never a sell fraction and never
+        # a share of whole-account equity.
+        if self.stage == EXIT_PLAN:
+            if self.exit_kind not in EXIT_KINDS:
+                raise ProductDailyError(
+                    "invalid_exit_contract",
+                    "exit_plan requires exit_kind full|reduce",
+                )
+            if self.exit_kind == EXIT_KIND_FULL:
+                if self.target_position_fraction is not None:
+                    raise ProductDailyError(
+                        "invalid_exit_contract",
+                        "a full exit carries no target_position_fraction",
+                    )
+            else:
+                if self.target_position_fraction is None:
+                    raise ProductDailyError(
+                        "invalid_exit_contract",
+                        "a reduce requires target_position_fraction",
+                    )
+                require_decimal(
+                    self.target_position_fraction,
+                    "target_position_fraction",
+                    minimum=Decimal("0"),
+                    maximum=Decimal("1"),
+                )
+                if self.target_position_fraction <= 0:
+                    raise ProductDailyError(
+                        "invalid_exit_contract",
+                        "reduce target_position_fraction must be > 0",
+                    )
+                if not self.target_position_fraction.is_finite():
+                    raise ProductDailyError(
+                        "invalid_exit_contract",
+                        "reduce target_position_fraction must be finite",
+                    )
+        else:
+            if self.exit_kind is not None or self.target_position_fraction is not None:
+                raise ProductDailyError(
+                    "invalid_exit_contract",
+                    "exit fields belong only to exit_plan decisions",
+                )
         for code in self.reason_codes:
             if code not in REGISTERED_REASON_CODES:
                 raise ProductDailyError("invalid_reason", f"unregistered reason code: {code}")
@@ -324,6 +386,12 @@ class Decision:
             "explanations": list(self.explanations),
             "next_observation": self.next_observation,
             "entry": None if self.entry is None else self.entry.to_dict(),
+            "exit_kind": self.exit_kind,
+            "target_position_fraction": (
+                None
+                if self.target_position_fraction is None
+                else decimal_text(self.target_position_fraction)
+            ),
         }
 
 

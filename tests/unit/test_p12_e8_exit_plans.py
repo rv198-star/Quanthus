@@ -973,6 +973,35 @@ def test_buy_confirm_outside_session_is_advisory_not_plan_lock(tmp_path):
     assert opened.status in ("open", "filled")
 
 
+def test_buy_confirm_resizes_on_bound_open_mark(tmp_path):
+    # R5 buy-4 (裁定 issuecomment-7146584175): the bound-session open price
+    # re-sizes the buy - a higher confirm-time mark yields a smaller
+    # whole-lot quantity than the package-time figure.  The resolver
+    # returns the NEW quantity for display-first confirmation; the stale
+    # published number is never silently bound.
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    nextopen = day.replace(day=20, hour=9, minute=30)
+    box = [nextopen]
+    ds = _set_for(day.date(), (_buy_decision(qty=200, market_date=day.date()),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    bench = app.workbench(app.scope)
+    row = next(o for o in bench.opportunities if o.security_code == "600000")
+    published = row.plan.delta_qty
+    assert published == 200
+    plan_id = "plan:plan-OPP-ENTRY-600000-" + day.date().isoformat()
+    # A confirm-time mark of 55.00 re-sizes 200 -> 100 under the same
+    # budget ceiling; the resolver returns the new figure.
+    resolved = app.paper_current_plan(plan_id.removeprefix("plan:"), live_mark=Decimal("55.00"))
+    assert resolved is not None and resolved.delta_qty == 100
+    # The submitted client-echoed 200 is bound to the server-resolved 100.
+    paper = _paper(app, tmp_path, box, quote_price="55.00")
+    out = paper.submit(OrderCommand(plan_id, "buy", "600000", published, Decimal("10.60")))
+    stored = paper._store.get(plan_id, app.scope.account_id)
+    assert out.status in ("open", "filled")
+    assert stored is not None and stored.quantity == 100
+
+
 def test_displayed_buy_qty_matches_bound_open_fill(tmp_path):
     # R5 buy-4: the workbench, plan and fill all agree on the quantity the
     # bound open actually executed - 400-held/200-buy everywhere, never a
@@ -994,6 +1023,57 @@ def test_displayed_buy_qty_matches_bound_open_fill(tmp_path):
         assert out.filled_qty == 200
     stored = paper._store.get(plan_id, app.scope.account_id)
     assert stored is not None and stored.quantity == 200
+
+
+def test_workbench_buy_plan_shows_resized_confirm_qty(tmp_path):
+    # R5 buy-4 (裁定 issuecomment-7146584175): when the confirm-time
+    # (bound-open) mark re-sizes the buy, the workbench plan carries
+    # confirm_qty = the NEW figure the confirm card asks the user to
+    # confirm - never the stale package number.  The order path binds
+    # that same 100, and the receipt echoes it back.
+    from decimal import Decimal as D
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    nextopen = day.replace(day=20, hour=9, minute=30)
+    box = [nextopen]
+    ds = _set_for(day.date(), (_buy_decision(qty=200, market_date=day.date()),))
+    app = _app(tmp_path, ds, box)
+    app._live_marks = lambda codes: {c: D("55.00") for c in codes}
+    _seed_bucket(app)
+    bench = app.workbench(app.scope)
+    row = next(o for o in bench.opportunities if o.security_code == "600000")
+    assert row.plan.delta_qty == 200
+    assert row.plan.confirm_qty == 100
+
+
+def test_workbench_next_session_compatible_transport(tmp_path):
+    # R5 compat (issuecomment-7146584175 gap-1): a client that explicitly
+    # pins p12.desktop.v2 gets the v2 projection - package.next_session is
+    # stripped and schema_version rewritten, so the old closed-object
+    # validator still reads the payload.  Version-unpinned and >=v3
+    # clients keep the field and the confirm window still counts from the
+    # bound-session 09:30 open.
+    import logging
+    from types import SimpleNamespace
+    from quanthus.platform.p12.http import P12AccountBinding, P12Runtime, P12Endpoints
+    logging.disable(logging.CRITICAL)
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    box = [day]
+    ds = _set_for(day.date(), (_exit_decision(exit_kind="reduce", fraction="0.50"),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    for ev in _buy_events(day):
+        app.submit_order_event(app.scope, ev)
+    key = app.scope.account_id
+    ep = P12Endpoints(P12Runtime("fixture", {key: P12AccountBinding(app, key, frozenset(["auditor"]), True)}))
+    principal = SimpleNamespace(username="auditor")
+    seen = {}
+    for qs in ("", "schema_version=p12.desktop.v2", "schema_version=p12.desktop.v3"):
+        status, resp = ep.workbench(principal, key, qs, "audit")
+        pkg = resp["package"]
+        seen[qs or "default"] = (status, pkg.get("next_session"), pkg["schema_version"])
+    assert seen["default"] == (200, "2026-11-20", "p12.daily-decision-package.v1")
+    assert seen["schema_version=p12.desktop.v2"] == (200, None, "p12.desktop.v2")
+    assert seen["schema_version=p12.desktop.v3"] == (200, "2026-11-20", "p12.daily-decision-package.v1")
 
 
 def test_inflight_sell_deducts_before_new_exit_qty(tmp_path):

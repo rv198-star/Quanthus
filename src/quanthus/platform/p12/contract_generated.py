@@ -7,7 +7,7 @@ from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
 SCHEMA_VERSION = 'p12.desktop.v2'
-SCHEMA_DIGEST = 'sha256:2729c3c5a0495dfd70fb966f0d7385fa24b11a92a34b4b7e52adc43a581edeb5'
+SCHEMA_DIGEST = 'sha256:21e9e2c0fe4ea424623cee44bd9dbe9c90578bdac0ab3e5bc840044486d10d3f'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -876,6 +876,7 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
  'PublishedPlan': {'additionalProperties': False,
                    'properties': {'cash_bound': {'anyOf': [{'$ref': '#/components/schemas/Money'},
                                                            {'type': 'null'}]},
+                                  'confirm_qty': {'type': 'integer'},
                                   'current_qty': {'minimum': 0, 'type': 'integer'},
                                   'delta_qty': {'type': 'integer'},
                                   'eligible_at': {'$ref': '#/components/schemas/Timestamp'},

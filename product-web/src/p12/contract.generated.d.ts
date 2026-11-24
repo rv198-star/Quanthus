@@ -337,6 +337,7 @@ export interface PublicationStatus {
 
 export interface PublishedPlan {
   cash_bound: Money | null
+  confirm_qty: number
   current_qty: number
   delta_qty: number
   eligible_at: Timestamp

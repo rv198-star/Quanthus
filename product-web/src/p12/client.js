@@ -19,6 +19,10 @@ async function call (operationId, accountId, body, params) {
   for (const [key, val] of Object.entries(params || {})) {
     path = path.replace('{' + key + '}', encodeURIComponent(val || ''))
   }
+  // A version-pinned client asks the server for the projection its
+  // contract can read: p12.desktop.v2 predates package.next_session, so
+  // the server strips that field for this negotiated version.
+  path += (path.includes('?') ? '&' : '?') + 'schema_version=' + encodeURIComponent(P12_SCHEMA_VERSION)
   const session = loadSession()
   const headers = { Accept: 'application/json' }
   if (session) headers.Authorization = `Bearer ${session.token}`

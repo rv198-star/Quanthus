@@ -408,6 +408,13 @@
                   {{ confirmablePlan.side === 'sell' ? Math.abs(confirmablePlan.delta_qty) : confirmablePlan.delta_qty }} 股 · 限价{{ confirmablePlan.side === 'sell' ? '下限' : '上限' }} ¥{{ confirmablePlan.price_cap }}
                   · 窗口 {{ time(confirmablePlan.eligible_at) }}–{{ time(confirmablePlan.expires_at).slice(11) }}
                 </p>
+                <!-- Issue #723 E8 r5 (buy): when the confirm-time (bound-open)
+                     mark re-sizes the buy, the card shows the NEW quantity the
+                     order will bind and asks the user to confirm THAT figure -
+                     never the stale package number. -->
+                <p v-if="confirmablePlan.confirm_qty != null && confirmablePlan.confirm_qty !== confirmablePlan.delta_qty" class="p12-confirm-resize" data-testid="p12-confirm-resized-qty">
+                  按当前开盘价重算，本次确认将提交 <strong>{{ confirmablePlan.confirm_qty }}</strong> 股（原建议 {{ confirmablePlan.delta_qty }} 股）
+                </p>
                 <!-- Issue #723 E8 r5: phase-1 sell is display-only - the plan -->
                 <!-- stays readable with its sized quantity, the confirm entry -->
                 <!-- never opens, and the page says so instead of hinting at a -->
@@ -451,6 +458,11 @@
               <dl class="p12-num">
                 <div v-if="simOutcome.order_id"><dt>委托单号</dt><dd><code>{{ simOutcome.order_id }}</code></dd></div>
                 <div><dt>委托状态</dt><dd>{{ label('sim_order_status', simOutcome.status) }}</dd></div>
+                <!-- Issue #723 E8 r5: the receipt shows the server's
+                     authoritative accepted quantity, which may be the
+                     confirm-time re-sized figure (bound-open mark) rather
+                     than the client-echoed package quantity. -->
+                <div v-if="simOutcome.quantity != null"><dt>委托数量</dt><dd data-testid="p12-sim-accepted-qty">{{ qty(simOutcome.quantity) }}</dd></div>
                 <div v-if="simOutcome.status === 'rejected'"><dt>成交结果</dt><dd>未成交（未生成挂单）</dd></div>
                 <div v-else-if="simOutcome.status === 'cancelled'"><dt>已撤回数量</dt><dd>{{ qty(simOutcome.cancelled_qty || 0) }}</dd></div>
                 <div v-else><dt>已成交数量</dt><dd>{{ qty(simOutcome.filled_qty || 0) }}</dd></div>
@@ -2108,7 +2120,10 @@ export default {
           security_code: targetCode,
           // The server re-derives authoritative quantity/window server-side;
           // send the positive order quantity for a sell (delta_qty is signed).
-          quantity: plan.side === 'sell' ? Math.abs(plan.delta_qty) : plan.delta_qty,
+          // Issue #723 E8 r5 (buy): echo the confirm-time re-sized quantity
+          // the card asked the user to confirm (confirm_qty), falling back to
+          // the package delta_qty when no re-size applied.
+          quantity: plan.side === 'sell' ? Math.abs(plan.delta_qty) : (plan.confirm_qty != null ? plan.confirm_qty : plan.delta_qty),
           limit_price: plan.price_cap,
           occurred_at: nowIso
         })

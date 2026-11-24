@@ -138,7 +138,20 @@ class PaperService:
                 else Decimal(str(body.get("limit_price") or "0"))
             ),
         )
-        return self._account(account_id).submit(command).to_dict()
+        outcome = self._account(account_id).submit(command)
+        body_out = outcome.to_dict()
+        # Issue #723 E8 r5 (buy): the server binds the confirm to the
+        # resolver's confirm-time re-sized quantity, never the client-echoed
+        # number.  Surface that authoritative accepted quantity in the
+        # receipt so list/detail/card/receipt all agree on the NEW figure
+        # the bound open actually sized - a resized confirm reads 100, not
+        # the stale published 200.
+        store = getattr(self._account(account_id), "_store", None)
+        if store is not None:
+            stored = store.get(command.order_id, account_id)
+            if stored is not None:
+                body_out["quantity"] = stored.quantity
+        return body_out
 
     def cancel(self, account_id: str, order_id: str) -> dict[str, Any]:
         return self._account(account_id).cancel(order_id)

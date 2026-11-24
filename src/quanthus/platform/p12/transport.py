@@ -134,8 +134,8 @@ def _account(value: AccountSummary) -> dict[str, Any]:
     }
 
 
-def _plan(value: PublishedPlan) -> dict[str, Any]:
-    return {
+def _plan(value: PublishedPlan, schema_version: str | None = None) -> dict[str, Any]:
+    plan = {
         "plan_id": value.plan_id,
         "opportunity_id": value.opportunity_id,
         "security_code": value.security_code,
@@ -156,21 +156,39 @@ def _plan(value: PublishedPlan) -> dict[str, Any]:
         else reason(value.primary_constraint),
         "risk_check_ref": value.risk_check_ref,
     }
+    # Issue #723 E8 r5 (buy): confirm_qty is the confirm-time re-sized
+    # figure (optional contract field).  A version-pinned p12.desktop.v2
+    # reader predates it, so it is stripped for that negotiated version.
+    confirm = getattr(value, "confirm_qty", None)
+    if schema_version != "p12.desktop.v2" and confirm is not None:
+        plan["confirm_qty"] = confirm
+    return plan
 
 
-def _package(value: PublishedPackage) -> dict[str, Any]:
-    return {
+def _package(value: PublishedPackage, schema_version: str | None = None) -> dict[str, Any]:
+    # Issue #723 E8 r5 (compat): a client that explicitly pins the original
+    # p12.desktop.v2 transport gets the v2 projection - next_session was
+    # added after that frozen contract closed the object, so it is stripped
+    # (and the schema_version rewritten) for old readers.  Newer or
+    # version-unpinned clients keep the field.
+    v2 = schema_version == "p12.desktop.v2"
+    pkg = {
         "package_id": value.package_id,
-        "schema_version": value.schema_version,
+        "schema_version": (
+            "p12.desktop.v2" if v2 else value.schema_version
+        ),
         "mode": value.mode,
         "synthetic": value.synthetic,
         "market_date": value.market_date.isoformat(),
         "knowledge_cutoff": _ts(value.knowledge_cutoff),
-        "next_session": (
+    }
+    if not v2:
+        pkg["next_session"] = (
             value.next_session.isoformat()
             if getattr(value, "next_session", None) is not None
             else None
-        ),
+        )
+    pkg.update({
         "published_at": _ts(value.published_at),
         "account_revision": value.account_revision,
         "composition_ref": _ref(value.composition_ref),
@@ -178,7 +196,8 @@ def _package(value: PublishedPackage) -> dict[str, Any]:
         "plans": [_plan(item) for item in value.plans],
         "digest": value.digest,
         "superseded": False,
-    }
+    })
+    return pkg
 
 
 def _publication(value: PublicationStatus) -> dict[str, Any]:
@@ -214,7 +233,7 @@ def _publication(value: PublicationStatus) -> dict[str, Any]:
     return out
 
 
-def _opportunity(value: OpportunityView) -> dict[str, Any]:
+def _opportunity(value: OpportunityView, schema_version: str | None = None) -> dict[str, Any]:
     chart = value.chart
     applicability = value.applicability
     return {
@@ -262,7 +281,7 @@ def _opportunity(value: OpportunityView) -> dict[str, Any]:
             ],
         },
         "cost_price": _maybe(value.cost_price, ratio=True),
-        "plan": None if value.plan is None else _plan(value.plan),
+        "plan": None if value.plan is None else _plan(value.plan, schema_version),
         "applicability": None
         if applicability is None
         else {
@@ -331,16 +350,18 @@ def _run_receipt(value: dict | None) -> dict | None:
     }
 
 
-def workbench_dto(value: WorkbenchView) -> dict[str, Any]:
+def workbench_dto(value: WorkbenchView, schema_version: str | None = None) -> dict[str, Any]:
     payload = {
             "schema_version": SCHEMA_VERSION,
             "scope": _scope(value.scope),
-            "package": None if value.package is None else _package(value.package),
+            "package": (
+                None if value.package is None else _package(value.package, schema_version)
+            ),
             "publication": _publication(value.publication),
             "clock": _ts(value.clock),
             "clock_kind": value.clock_kind,
             "account": _account(value.account),
-            "opportunities": [_opportunity(item) for item in value.opportunities],
+            "opportunities": [_opportunity(item, schema_version) for item in value.opportunities],
             "orders": [
                 {
                     "order_id": o.order_id,
@@ -369,16 +390,18 @@ def workbench_dto(value: WorkbenchView) -> dict[str, Any]:
     return _out("Workbench", payload)
 
 
-def records_dto(value: RecordsView) -> dict[str, Any]:
+def records_dto(value: RecordsView, schema_version: str | None = None) -> dict[str, Any]:
     history = value.history
     return _out(
         "Records",
         {
             "schema_version": SCHEMA_VERSION,
             "scope": _scope(value.scope),
-            "package": None if value.package is None else _package(value.package),
+            "package": (
+                None if value.package is None else _package(value.package, schema_version)
+            ),
             "prior_packages": [
-                {**_package(item), "superseded": True}
+                {**_package(item, schema_version), "superseded": True}
                 for item in value.prior_packages
             ],
             "publication": _publication(value.publication),

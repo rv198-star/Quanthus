@@ -56,6 +56,12 @@ class PublishedPlan:
     # a reduce keeps its fraction and never degrades into a full flat.
     exit_kind: str | None = None
     target_position_fraction: Decimal | None = None
+    # Issue #723 E8 r5 (buy): the confirm-time quantity the order path
+    # binds - re-sized on the bound-open mark under the same budget/cash
+    # ceiling.  When it differs from the package delta_qty the confirm
+    # card shows THIS figure so the user confirms the new quantity, never
+    # the stale published number.  None = confirm at delta_qty.
+    confirm_qty: int | None = None
 
 
 @dataclass(frozen=True)

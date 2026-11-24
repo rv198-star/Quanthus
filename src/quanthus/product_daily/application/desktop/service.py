@@ -15,6 +15,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from types import SimpleNamespace
 
 from quanthus.capabilities.accounting import AccountProjection, Position, value_account
 from quanthus.capabilities.decision_access import (
@@ -1468,6 +1469,25 @@ class P12DesktopApplication:
         applicability = (
             self._applicability(plan, projection, history, blockers, now) if plan else None
         )
+        # Issue #723 E8 r5 (buy): the confirm card shows the quantity the
+        # order path will actually bind - re-sized on the confirm-time
+        # (bound-open) mark, never the stale package figure.  Resolve it
+        # against the same live mark supply the confirm uses so the
+        # displayed new quantity equals the submitted bound quantity.
+        if (
+            plan is not None
+            and plan.side == "buy"
+            and plan.delta_qty > 0
+            and plan.eligible_at <= now <= plan.expires_at
+        ):
+            resized = self._resized_buy_qty(
+                plan,
+                decisions,
+                SimpleNamespace(history=history, projection=projection),
+                None,
+            )
+            if resized is not None and resized != plan.delta_qty:
+                plan = dataclasses.replace(plan, confirm_qty=resized)
         reconcile = any(
             r.security_code == item.security_code and r.status == "NEEDS_RECONCILIATION"
             for r in history.reports
@@ -2933,6 +2953,77 @@ class P12DesktopApplication:
                 return mark
         return marks_map.get(security_code)
 
+    def _resized_buy_qty(self, plan, decisions, snapshot, live_mark):
+        """Confirm-time whole-lot quantity a buy plan binds to.
+
+        Re-sizes the buy against the CONFIRM-TIME mark (the caller-injected
+        live quote, else the bound live-mark/quote supply, else the package
+        mark) under the same budget/trial-fraction/cash ceiling the package
+        publish used.  Returns the resized quantity (0 when unaffordable),
+        or ``None`` when no confirm-time sizing applies and the caller
+        should keep its prior remaining-delta fallback.
+        """
+        marks_map = dict(_marks(decisions))
+        injected = _optional_decimal(live_mark)
+        confirm_mark = (
+            injected if injected is not None and injected > 0
+            else self._confirm_mark(plan.security_code, marks_map)
+        )
+        decision = next(
+            (d for d in decisions.decisions if d.opportunity_id == plan.opportunity_id),
+            None,
+        )
+        if decision is None or decision.entry is None or confirm_mark is None:
+            return None
+        baseline = AccountProjection(
+            0, 0, snapshot.history.baseline_cash,
+            (
+                (
+                    Position(
+                        snapshot.history.baseline_security_code,
+                        snapshot.history.baseline_quantity,
+                    ),
+                )
+                if snapshot.history.baseline_quantity
+                else ()
+            ),
+            0,
+        )
+        valuation = value_account(
+            baseline,
+            marks={**marks_map, plan.security_code: confirm_mark},
+            valuation_ref=_valuation_ref(decisions),
+            cost_principal={},
+        )
+        trial_fraction = (
+            getattr(self._policy.funding, "trial_fraction", None)
+            if self._sizing_trial_cap else None
+        )
+        effective_fraction = decision.entry.fraction
+        if trial_fraction is not None:
+            effective_fraction = min(decision.entry.fraction, trial_fraction)
+        sizing = size_entry(
+            self._policy.risk,
+            EntrySizingInput(
+                decision_snapshot_id=f"{decisions.source_ref.digest}:rev0",
+                as_of=decisions.knowledge_cutoff,
+                opportunity_id=decision.opportunity_id,
+                security_code=decision.security_code,
+                industry_id=decision.entry.industry_id,
+                mark_price=confirm_mark,
+                price_bound=decision.entry.price_bound,
+                bucket_budget=self._policy.funding.bucket_budget,
+                fraction=effective_fraction,
+                equity=valuation.economic_equity,
+                cash_available=MaybeDecimal.known(snapshot.projection.cash),
+                held=tuple(
+                    HeldExposure(p.security_code, None, p.quantity, marks_map.get(p.security_code))
+                    for p in snapshot.projection.positions
+                ),
+            ),
+        )
+        return sizing.quantity
+
     def paper_current_plan(self, plan_id: str, live_mark=None):
         """The account's currently effective published plan for ``plan_id``.
 
@@ -3063,11 +3154,27 @@ class P12DesktopApplication:
             )
         if plan.delta_qty <= 0:
             return None
-        # Re-evaluate the still-open delta against the *current* position:
-        # after a fill the account already holds the security, so the
-        # remaining executable quantity is target - current, which may now be
-        # zero.  The order path then refuses instead of reopening a spent
-        # suggestion above the live trial headroom.
+        # Issue #723 E8 r5 (buy-2): the confirming order re-sizes the buy
+        # against the CONFIRM-TIME mark - the live quote last price the
+        # fill will actually take, never the stale package mark.  The new
+        # quantity is the whole-lot size the bound open price affords
+        # under the same budget/cash ceiling the published plan used;
+        # when it differs from the published figure the resolver returns
+        # it for display-first confirmation instead of silently binding
+        # the stale number.
+        resized = self._resized_buy_qty(plan, decisions, snapshot, live_mark)
+        if resized is not None:
+            if resized <= 0:
+                return None
+            # Bind the order to the re-sized figure but keep the package
+            # delta_qty visible - the confirm card shows the NEW confirm_qty
+            # beside the published number so a resized confirm is confirmed
+            # at the bound-open quantity, never the stale published one.
+            return dataclasses.replace(
+                plan, delta_qty=resized, confirm_qty=resized
+            )
+        # Fallback (no live mark): re-evaluate the still-open delta against
+        # the *current* position, the same spent-suggestion check as before.
         remaining = plan.target_qty - current
         if remaining <= 0:
             return None

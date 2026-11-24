@@ -166,23 +166,29 @@ class P12Endpoints:
     def workbench(
         self, principal: AuthenticatedPrincipal, account_id: str, query: str, request_id: str
     ) -> Result:
+        negotiated = urllib.parse.parse_qs(query).get("schema_version", [None])[0]
         return self._read(
             principal,
             account_id,
             query,
             request_id,
-            lambda app: _transport().workbench_dto(app.workbench(app.scope)),
+            lambda app: _transport().workbench_dto(
+                app.workbench(app.scope), schema_version=negotiated
+            ),
         )
 
     def records(
         self, principal: AuthenticatedPrincipal, account_id: str, query: str, request_id: str
     ) -> Result:
+        negotiated = urllib.parse.parse_qs(query).get("schema_version", [None])[0]
         return self._read(
             principal,
             account_id,
             query,
             request_id,
-            lambda app: _transport().records_dto(app.records(app.scope)),
+            lambda app: _transport().records_dto(
+                app.records(app.scope), schema_version=negotiated
+            ),
         )
 
     def funding_rules(

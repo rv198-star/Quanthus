@@ -661,7 +661,10 @@
                 本账户此前未买入 {{ selectedDisplayName }}（当前持仓 0 股），本轮退出计划对你的账户不产生卖出任务或待办费用。
               </p>
               <p v-else-if="selected.stage === 'exit_plan' && isReduceExit(selected)" data-testid="p12-reduce-note">减仓建议（执行将在批次 B 接入）：建议减少对 {{ selectedDisplayName }} 的持仓，本批不生成卖出任务，持仓继续持有。</p>
-              <p v-else-if="selected.stage === 'exit_plan' && isUnverifiedExit(selected)" data-testid="p12-unverified-note">退出类型无法核实，暂不确认；持仓继续持有。</p>
+              <!-- Issue #722 r7-1: an unverifiable exit now reads as a HELD row -->
+              <!-- (stage holding, HOLD + MISSING_INPUT + INPUT_UNAVAILABLE); the -->
+              <!-- note still names it so the holding is never read as a sell. -->
+              <p v-else-if="isUnverifiedExit(selected)" data-testid="p12-unverified-note">退出类型无法核实，暂不确认；持仓继续持有。</p>
               <p v-else-if="selected.stage === 'exit_plan' && selected.status_code === 'ENDED'" data-testid="p12-ended-note">{{ actionSentence }}</p>
               <p v-else-if="selected.stage === 'exit_plan'" data-testid="p12-sell-note">{{ actionSentence }}</p>
               <p v-if="selected.stage === 'exit_plan'" class="p12-precheck-warn" data-testid="p12-sell-unverified-note">无法核验停牌或跌停，委托可能无法成交；卖出确认照常放行。</p>
@@ -1772,11 +1775,15 @@ export default {
       return Boolean(item && item.stage === 'exit_plan' && item.exit_kind === 'reduce')
     },
     isUnverifiedExit (item) {
-      // Issue #722 r6-3: an exit_plan whose reduce/full type cannot be
-      // verified stays held and shows no sell task or prefilled sell entry.
+      // Issue #722 r6-3 + r7-1: an exit whose reduce/full type cannot be
+      // verified reads as a HELD row (backend rewrites the stage to holding
+      // with no sell action/quantity/explanation), carrying the
+      // INPUT_UNAVAILABLE reason.  The note explains "退出类型无法核实".
       return Boolean(
-        item && item.stage === 'exit_plan' && item.exit_kind == null
+        item && item.exit_kind == null
         && item.action_code === 'HOLD' && item.status_code === 'MISSING_INPUT'
+        && (item.reason_codes || []).includes('INPUT_UNAVAILABLE')
+        && item.stage !== 'entry_plan'
       )
     },
     groupTitle (key) {

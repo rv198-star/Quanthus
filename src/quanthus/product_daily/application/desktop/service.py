@@ -1111,6 +1111,7 @@ class P12DesktopApplication:
         stage = item.stage
         reasons = list(item.reason_codes)
         primary = plan.primary_constraint if plan else None
+        next_observation_override: str | None = None
         window_issue = (
             execution_window_issue(self._policy.execution_profile, decisions, item.entry)
             if item.entry is not None
@@ -1179,13 +1180,28 @@ class P12DesktopApplication:
                 # verified.  The plan stays visible but is not confirmable:
                 # HOLD + MISSING_INPUT ("退出类型无法核实") rather than a
                 # guessed full sell.
+                # Issue #722 r7-1: the plan reads as HELD, not as an exit -
+                # the backend no longer hands the desktop a sell action,
+                # quantity or sell explanation, so neither the new nor the
+                # R4 desktop can show "卖出 N 股" / "触发卖出计划" / "卖出
+                # 确认照常放行".  The stage rewrites to a held row and the
+                # reason text explains the unverifiable exit.
+                stage = OpportunityStage.HOLDING
                 action, status = "HOLD", "MISSING_INPUT"
                 # Issue #722 r6-2: reuse the registered INPUT_UNAVAILABLE
                 # reason (no new closed enum) - the unverifiable-exit note is
                 # carried in the explanation text, not a new reason value.
                 if "INPUT_UNAVAILABLE" not in reasons:
                     reasons.append("INPUT_UNAVAILABLE")
+                # Issue #722 r7-1: the sell-signal reason and the producer's
+                # sell explanation never reach the page for an unverifiable
+                # exit - no desktop generation may render a guessed sell
+                # action, quantity or "达到退出条件，按计划卖出" for it.
+                reasons = [r for r in reasons if r != "EXIT_SIGNAL"]
                 primary = "INPUT_UNAVAILABLE"
+                next_observation_override = (
+                    "退出类型无法核实，暂不确认；持仓继续持有。"
+                )
             else:
                 is_reduce = item.opportunity_id in reduce_exit_ids
                 action, status = (
@@ -1252,7 +1268,11 @@ class P12DesktopApplication:
             primary_constraint=primary,
             changes=tuple(changes),
             explanations=item.explanations,
-            next_observation=item.next_observation,
+            next_observation=(
+                next_observation_override
+                if next_observation_override is not None
+                else item.next_observation
+            ),
             chart=item.chart,
             cost_price=cost,
             plan=plan,

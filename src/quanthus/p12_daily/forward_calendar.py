@@ -296,8 +296,16 @@ def load_forward_calendar(
         ), receipt
 
     # P12 recomputes the descriptor digest itself; the declared sha is a
-    # claim to verify, never a value to copy.
-    recomputed = _sha256_file(desc_path)
+    # claim to verify, never a value to copy.  Issue #722 r7-5: a descriptor
+    # that exists but cannot be read (PermissionError or another OSError) is
+    # a calendar block, never an unhandled crash that leaves no run receipt.
+    try:
+        recomputed = _sha256_file(desc_path)
+    except OSError as exc:
+        return None, CalendarBlock(
+            detail="forward calendar descriptor unreadable: " + str(exc),
+            missing_member="forward_calendar",
+        ), receipt
     actual_sha = "sha256:" + recomputed
     receipt["calendar_verified_at"] = datetime.now(EXCHANGE_TZ).isoformat()
     receipt["calendar_sha256"] = actual_sha
@@ -314,6 +322,11 @@ def load_forward_calendar(
 
     try:
         descriptor = json.loads(desc_path.read_bytes())
+    except OSError as exc:
+        return None, CalendarBlock(
+            detail="forward calendar descriptor unreadable: " + str(exc),
+            missing_member="forward_calendar",
+        ), receipt
     except json.JSONDecodeError as exc:
         return None, CalendarBlock(
             detail="descriptor is not JSON: " + str(exc),

@@ -2157,18 +2157,31 @@ def test_exit_type_unverified_blocks_confirmation(tmp_path):
         decision_source=source,
     )
     workbench = app.workbench(app.scope)
-    exits = [
+    # Issue #722 r7-1: the backend hands the desktop a HELD row, never a
+    # sell action/quantity/explanation - no desktop generation can render
+    # "卖出 N 股" / "触发卖出计划" / "卖出确认照常放行" for an
+    # unverifiable exit.  The stage rewrites to holding and the row
+    # carries only the unverifiable note.
+    candidates = [
         item for item in workbench.opportunities
-        if item.stage == "exit_plan"
+        if item.security_code == "600000"
     ]
-    assert exits
-    for item in exits:
+    assert candidates
+    for item in candidates:
         assert item.action_code == "HOLD"
         assert item.status_code == "MISSING_INPUT"
         assert item.exit_kind is None
-        # Issue #722 r6-2: the unverifiable note reuses the registered
-        # INPUT_UNAVAILABLE code - no new closed enum value.
+        assert item.stage != "exit_plan", (
+            "an unverifiable exit reads as a held row, not an exit task"
+        )
+        # Issue #722 r6-2 + r7-1: the unverifiable note reuses the
+        # registered INPUT_UNAVAILABLE code; the sell-signal EXIT_SIGNAL
+        # reason and the sell quantity/explanation never reach the page.
         assert "INPUT_UNAVAILABLE" in item.reason_codes
+        assert "EXIT_SIGNAL" not in item.reason_codes
+        assert item.next_observation == (
+            "退出类型无法核实，暂不确认；持仓继续持有。"
+        )
 
 
 def test_ledger_dangling_symlink_is_a_read_failure(env):
@@ -2530,5 +2543,107 @@ def test_unreadable_input_manifest_writes_blocked_receipt(tmp_path):
             account_id="SYN-PAPER-A", now=now, decision_cutoff=CUTOFF,
         )
     assert receipt["status"] == "INPUT_BLOCKED"
+    store = DailyPackageStore(state)
+    assert len(store.runs()) == 1
+
+
+def test_unreadable_forward_calendar_descriptor_writes_blocked_receipt(tmp_path):
+    """Issue #722 r7-5: the forward-calendar descriptor hashing/reading
+    step cannot crash the run - a descriptor that exists but refuses to be
+    read still produces an INPUT_BLOCKED run receipt."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    cal_dir = prod / "calendar"
+    descriptor = next(cal_dir.glob("*/descriptor.json"))
+
+    original_open = Path.open
+
+    def denied(self, *args, **kwargs):
+        if self == descriptor:
+            raise PermissionError(13, "denied fixture", str(self))
+        return original_open(self, *args, **kwargs)
+
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(Path, "open", denied)
+        receipt = run_daily(
+            state_dir=state, job_root=prod, runner=runner,
+            market_date=MARKET_DATE, next_session=NEXT_SESSION,
+            account_id="SYN-PAPER-A", now=now, decision_cutoff=CUTOFF,
+        )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert "forward_calendar" in receipt["input_block"]["missing_members"]
+    store = DailyPackageStore(state)
+    assert len(store.runs()) == 1
+
+
+def test_wrapper_unreadable_dates_writes_blocked_receipt(tmp_path):
+    """Issue #722 r7-5: the p12-daily-run wrapper records an INPUT_BLOCKED
+    run receipt itself when DATES.json cannot be read - it never exits with
+    zero receipts."""
+    import os
+    import subprocess
+
+    job = tmp_path / "job"
+    job.mkdir()
+    # DATES.json exists but is a directory -> unreadable as an index.
+    (job / "DATES.json").mkdir()
+    state = tmp_path / "state"
+    env = {
+        **os.environ,
+        "QUANTHUS_P12_DAILY_JOB_ROOT": str(job),
+        "QUANTHUS_P12_DAILY_STATE_DIR": str(state),
+        "QUANTHUS_P12_DECISION_CUTOFF": "22:30:00+08:00",
+        "P12_VENV_PYTHON": os.sys.executable,
+        "PYTHONPATH": "src",
+    }
+    env.pop("P12_MARKET_DATE", None)
+    result = subprocess.run(
+        ["bash", "ops/bin/p12-daily-run"],
+        env=env, text=True, capture_output=True, cwd=str(tmp_path.parent.parent) if False else None,
+    )
+    assert result.returncode != 0
+    store = DailyPackageStore(state)
+    runs = store.runs()
+    assert len(runs) == 1
+    assert runs[0]["status"] == "INPUT_BLOCKED"
+    assert "DATES.json" in runs[0]["input_block"]["missing_members"]
+
+
+def test_unhandled_inner_exception_writes_failed_receipt(tmp_path):
+    """Issue #722 r7-5: an exception that escapes the typed input guards
+    still lands as a FAIL-closed run receipt (status FAILED with the real
+    exception), never zero receipts and never a fabricated package."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    cal_dir = prod / "calendar"
+    descriptor = next(cal_dir.glob("*/descriptor.json"))
+
+    original = Path.read_bytes
+
+    def boom(self, *args, **kwargs):
+        if self == descriptor:
+            raise RuntimeError("inner crash bypassing typed guards")
+        return original(self, *args, **kwargs)
+
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(Path, "read_bytes", boom)
+        receipt = run_daily(
+            state_dir=state, job_root=prod, runner=runner,
+            market_date=MARKET_DATE, next_session=NEXT_SESSION,
+            account_id="SYN-PAPER-A", now=now, decision_cutoff=CUTOFF,
+        )
+    # The inner descriptor JSON read crashed outside OSError/typed guards ->
+    # the public wrapper lands a FAILED receipt carrying the real exception.
+    assert receipt["status"] == "FAILED"
+    assert "RuntimeError" in receipt["error"]["detail"]
+    assert "input_read" in receipt["input_block"]["missing_members"]
     store = DailyPackageStore(state)
     assert len(store.runs()) == 1

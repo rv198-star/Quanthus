@@ -19,6 +19,7 @@ later retry inside the job window.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import json
 import math
@@ -507,6 +508,105 @@ def _blocked_receipt(
 
 
 def run_daily(
+    *,
+    state_dir: Path,
+    job_root: Path,
+    runner: StrategyRuleRunner,
+    market_date: date,
+    next_session: date | None,
+    account_id: str,
+    account_mode: str = "synthetic",
+    now: datetime | None = None,
+    holdings: tuple[HeldPositionFact, ...] | None = None,
+    sidecar_path: Path | None = None,
+    decision_cutoff: datetime | None = None,
+    publish_gate_config: Path | None = None,
+    calendar_root: Path | None = None,
+) -> dict:
+    '''Public entry: run one daily job and ALWAYS land a run receipt.
+
+    Issue #722 r7-5: every input-read or in-job exception that escaped the
+    typed guards (an unreadable input byte/shape the loaders did not
+    translate, or an unexpected failure) still lands as a FAIL-closed run
+    receipt - the day never exits with no receipt and never fabricates a
+    package.  A typed InputBlock already returns INPUT_BLOCKED inside
+    _run_daily_inner; this wrapper is the last line, so the status stays
+    FAILED with the real exception - the workbench flags the run instead of
+    reading a routine missing-input day.'''
+
+    moment = (now or datetime.now(EXCHANGE_TZ)).astimezone(EXCHANGE_TZ)
+    try:
+        return _run_daily_inner(
+            state_dir=state_dir,
+            job_root=job_root,
+            runner=runner,
+            market_date=market_date,
+            next_session=next_session,
+            account_id=account_id,
+            account_mode=account_mode,
+            now=now,
+            holdings=holdings,
+            sidecar_path=sidecar_path,
+            decision_cutoff=decision_cutoff,
+            publish_gate_config=publish_gate_config,
+            calendar_root=calendar_root,
+        )
+    except Exception as exc:  # noqa: BLE001 - last line: still leave a receipt
+        receipt: dict[str, Any] = {
+            "schema_version": RUN_SCHEMA,
+            "run_id": _run_id(moment),
+            "market_date": market_date.isoformat(),
+            "next_session": next_session.isoformat() if next_session else None,
+            "decision_cutoff": (
+                decision_cutoff.isoformat() if decision_cutoff is not None else None
+            ),
+            "account_id": account_id,
+            "runner": {
+                "ref_id": runner.runner_ref.ref_id,
+                "version": runner.runner_ref.version,
+                "digest": runner.runner_ref.digest,
+            },
+            "started_at": moment.isoformat(),
+            "stages": [
+                {
+                    "stage": "input",
+                    "elapsed_ms": 0,
+                    "result": "blocked",
+                    "reason_code": "INPUT_UNAVAILABLE",
+                }
+            ],
+            "status": STATUS_FAILED,
+            "error": {
+                "reason_code": "INPUT_UNAVAILABLE",
+                "detail": (
+                    "daily run aborted on an unhandled input/step "
+                    + type(exc).__name__ + ": " + str(exc)
+                ),
+            },
+            "input_block": {
+                "reason_code": "INPUT_UNAVAILABLE",
+                "detail": (
+                    "input read or step raised "
+                    + type(exc).__name__ + ": " + str(exc)
+                ),
+                "checked_at": moment.isoformat(),
+                "expected_market_date": market_date.isoformat(),
+                "observed_market_date": None,
+                "affected_scope": "new_entries",
+                "missing_members": ["input_read"],
+                "recovery_condition": (
+                    "the failing input read/step is repaired; the next "
+                    "scheduled run then re-qualifies and may publish"
+                ),
+            },
+            "elapsed_ms": 0,
+        }
+        with contextlib.suppress(Exception):  # nothing left to persist
+            DailyPackageStore(state_dir).write_run(receipt)
+        return receipt
+
+
+def _run_daily_inner(
     *,
     state_dir: Path,
     job_root: Path,

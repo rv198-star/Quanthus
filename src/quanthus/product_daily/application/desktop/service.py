@@ -2565,6 +2565,7 @@ class P12DesktopApplication:
             quotes=quotes if quotes is not None else _NullQuotes(),
             now=moment,
             sellable_for=_sellable,
+            account_mode=scope.mode,
         )
     def write_preopen_pool(self, scope: AccountScope, *, as_of=None):
         """Build and persist the day's named pre-open stock pool (issue #723 E6).

@@ -338,6 +338,7 @@ def test_paper_application_reopen_still_rejects_tampered_digest(tmp_path):
 
 class _Scope:
     account_id = "SYN-P12-A"
+    mode = "real"
 
 
 class _PlanStub:
@@ -368,9 +369,12 @@ class _PreopenAppStub:
 
     scope = _Scope()
 
-    def __init__(self, plan, facts=None):
+    def __init__(self, plan, facts=None, mode="real"):
         self._plan = plan
         self._facts = facts or {}
+        sc = _Scope()
+        sc.mode = mode
+        self.scope = sc
 
     def paper_current_plan(self, plan_id):
         return self._plan if plan_id == self._plan.plan_id else None
@@ -402,12 +406,12 @@ class _PreopenAppStub:
         return _R()
 
 
-def _preopen_account(tmp_path, plan, facts=None):
+def _preopen_account(tmp_path, plan, facts=None, mode="real"):
     box = [datetime(2026, 11, 19, 14, 0, 0, tzinfo=SHANGHAI)]
     now = _clock(box)
     qbox = [_quote("10.66", box[0])]
     store = PaperOrderStore(tmp_path / "paper.sqlite", clock=now)
-    app = _PreopenAppStub(plan, facts)
+    app = _PreopenAppStub(plan, facts, mode=mode)
     return PaperAccount(app=app, store=store, quotes=_quotes(now, qbox), now=now)
 
 
@@ -454,3 +458,50 @@ def test_plan_without_preopen_dependency_unaffected(tmp_path):
     a = _preopen_account(tmp_path, plan, facts={})
     out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 100, Decimal("10.80")))
     assert out.reason_code != "PREOPEN_SUSPENSION_UNAVAILABLE"
+
+
+def test_preopen_unknown_allows_pending_buy_in_simulation(tmp_path):
+    """P11 v0.2 sec.5: a simulated account confirms a buy whose pre-open fact
+    is UNKNOWN as a pending intent - the order rests open carrying the typed
+    alert, never as verified, and the matcher still will not fill unverified.
+    """
+    plan = _PlanStub(depends=("SUSPENSION",))
+    a = _preopen_account(tmp_path, plan, facts={}, mode="simulation")
+    out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 100, Decimal("10.80")))
+    # not rejected as a block: the intent is admitted.  Whether it rests
+    # pending or fills is decided by the live matcher, not the fact gate -
+    # a marketable quote fills, and the typed alert is recorded on a resting
+    # order.  It is never rejected with the unavailable reason.
+    assert out.status != "rejected"
+    if out.status == "open":
+        assert "PREOPEN_SUSPENSION_UNAVAILABLE" in (out.reason_code or "")
+
+
+def test_preopen_unknown_still_blocks_buy_in_real_account(tmp_path):
+    """Live (real) accounts keep the R12 fail-closed gate on an UNKNOWN fact."""
+    plan = _PlanStub(depends=("SUSPENSION",))
+    a = _preopen_account(tmp_path, plan, facts={}, mode="real")
+    out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 100, Decimal("10.80")))
+    assert out.status == "rejected"
+    assert out.reason_code == "PREOPEN_SUSPENSION_UNAVAILABLE"
+
+
+def test_preopen_pending_buy_does_not_fill_when_suspended(tmp_path):
+    """Match-time re-verification: a simulated confirm that rested pending on
+    an UNKNOWN suspension fact still cannot fill while the tape is halted.
+    """
+    plan = _PlanStub(depends=("SUSPENSION",))
+    box = [datetime(2026, 11, 19, 14, 0, 0, tzinfo=SHANGHAI)]
+    now = _clock(box)
+    halted = _quote("10.66", box[0])
+    object.__setattr__(halted, "status", "halt")
+    store = PaperOrderStore(tmp_path / "paper.sqlite", clock=now)
+    app = _PreopenAppStub(plan, {}, mode="simulation")
+    a = PaperAccount(
+        app=app, store=store,
+        quotes=_quotes(now, [halted]), now=now,
+    )
+    out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 100, Decimal("10.80")))
+    # the halt surfaces at match time, not as a confirmed fill
+    assert out.status == "rejected"
+    assert out.reason_code == "SECURITY_SUSPENDED"

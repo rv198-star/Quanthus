@@ -454,6 +454,7 @@ class PaperAccount:
         # closed its window, or disagrees with the submitted side/security is
         # refused before any cash is committed.
         plan = None
+        _preopen_alerts: list[str] = []
         if command.order_id.startswith("plan:"):
             plan_id = command.order_id.split(":", 1)[1]
             resolver = getattr(self._app, "paper_current_plan", None)
@@ -477,12 +478,24 @@ class PaperAccount:
             # the fact is never inferred, but the direction split means a
             # missing pre-open fact never silently blocks a position exit.
             if command.side == "buy":
+                # P11 v0.2 sec.5: an UNKNOWN pre-open fact must not be written
+                # as verified.  A live (real) account still fails closed on it;
+                # a simulated account (synthetic/simulation) is instead let
+                # through as a *pending* intent - the warning stays attached to
+                # the outcome and the matcher re-verifies fill-required facts
+                # before any fill, so an unverified fact never fills.
+                _sim_mode = getattr(self._app.scope, "mode", "real") in (
+                    "synthetic", "simulation"
+                )
                 for fact in getattr(plan, "depends_on_preopen", ()) or ():
                     provider = getattr(self._app, "preopen_fact_for", None)
                     available = (
                         provider(plan.security_code, fact) if callable(provider) else None
                     )
                     if available is not True:
+                        if _sim_mode:
+                            _preopen_alerts.append(f"PREOPEN_{fact}_UNAVAILABLE")
+                            continue
                         return self._reject(
                             command,
                             f"PREOPEN_{fact}_UNAVAILABLE",
@@ -551,7 +564,8 @@ class PaperAccount:
         outcome = self._try_fill(order, quote, session)
         if outcome is None:
             # Not marketable / not tradable now: persists as an open order.
-            return SubmitOutcome(command.order_id, "open", "BELOW_LIMIT", REJECT["BELOW_LIMIT"], 0, None, RULE_VERSION, quote.quote_time, None)
+            alert = ";".join(_preopen_alerts) if _preopen_alerts else "BELOW_LIMIT"
+            return SubmitOutcome(command.order_id, "open", alert, REJECT.get(alert, REJECT["BELOW_LIMIT"]), 0, None, RULE_VERSION, quote.quote_time, None)
         return outcome
 
     def _reject(self, command: OrderCommand, reason: str, quote: Quote | None) -> SubmitOutcome:

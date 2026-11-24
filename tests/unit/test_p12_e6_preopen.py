@@ -161,11 +161,31 @@ def test_buy_blocked_when_dependent_fact_missing():
         history=_History(),
         quotes=_Quotes({"600000": _Quote()}),
         now=_at(9, 20),
+        account_mode="real",
     )
     r = receipt["plans"][0]
     assert r["executable"] is False
     assert "PREOPEN_SUSPENSION_UNAVAILABLE" in r["reason_codes"]
     assert receipt["summary"]["blocked"] == 1
+
+
+def test_buy_pending_unverified_in_simulation():
+    # P11 v0.2 sec.5: a simulated buy with an UNKNOWN pre-open fact stays
+    # confirmable-pending under the typed alert, never written as verified.
+    plan = _Plan(depends_on_preopen=(preopen.FACT_SUSPENSION,))
+    receipt = preopen.run_check(
+        package=_Package(plans=(plan,)),
+        projection=_Projection(),
+        history=_History(),
+        quotes=_Quotes({"600000": _Quote()}),
+        now=_at(9, 20),
+        account_mode="simulation",
+    )
+    r = receipt["plans"][0]
+    assert r["executable"] is True
+    assert "PREOPEN_SUSPENSION_UNAVAILABLE" in r["reason_codes"]
+    assert "preopen_unverified_alert" in r["reason_codes"]
+    assert receipt["summary"]["blocked"] == 0
 
 
 def test_sell_proceeds_with_alert_when_fact_missing():

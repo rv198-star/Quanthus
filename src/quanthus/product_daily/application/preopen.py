@@ -262,7 +262,16 @@ def resolve_fact(quote, code, fact, now) -> FactVerdict:
 # ---------------------------------------------------------------------------
 # Pre-open check run
 # ---------------------------------------------------------------------------
-def run_check(*, package, projection, history, quotes, now: datetime, sellable_for=None) -> dict:
+def run_check(
+    *,
+    package,
+    projection,
+    history,
+    quotes,
+    now: datetime,
+    sellable_for=None,
+    account_mode: str = "real",
+) -> dict:
     """Run the 09:00-09:25 verification over the day's package and account.
 
     Only the failure conditions already inside the package are applied.  For
@@ -274,6 +283,7 @@ def run_check(*, package, projection, history, quotes, now: datetime, sellable_f
     now = now.astimezone(EXCHANGE_TZ)
     in_window = CHECK_OPEN <= now.time() <= CHECK_CLOSE
     cash = getattr(projection, "cash", None)
+    _sim = account_mode in ("synthetic", "simulation")
     results = []
     blocked = 0
     alerted = 0
@@ -312,9 +322,17 @@ def run_check(*, package, projection, history, quotes, now: datetime, sellable_f
                 recheck_qty = max(0, affordable)
                 reasons.append("cash_reduced")
             if missing:
-                executable = False
-                for fact in missing:
-                    reasons.append(f"PREOPEN_{fact}_UNAVAILABLE")
+                # P11 v0.2 sec.5: a simulated buy may still confirm as a
+                # pending intent under the typed unavailable alert; a real
+                # account fails closed on the same missing fact.
+                if _sim:
+                    for fact in missing:
+                        reasons.append(f"PREOPEN_{fact}_UNAVAILABLE")
+                    reasons.append("preopen_unverified_alert")
+                else:
+                    executable = False
+                    for fact in missing:
+                        reasons.append(f"PREOPEN_{fact}_UNAVAILABLE")
         else:
             sellable = _sellable(code)
             if sellable <= 0:

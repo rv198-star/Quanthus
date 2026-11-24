@@ -8,6 +8,7 @@ unproven coverage, and never fabricates bars / listing age / a member.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -29,14 +30,23 @@ def _write(path: Path, table: pa.Table) -> None:
 
 
 def _member(root: Path, rel: str, package_id: str = "test-base", kind: str = "base",
-            market_date: str | None = None) -> ResolvedMember:
+            market_date: str | None = None, declared_sha256: str | None = None) -> ResolvedMember:
     p = root / rel
+    # Real sha256 of the member bytes (the audit rejected the earlier
+    # placeholder "a"*64 which made every member SHA_MISMATCH and left an
+    # empty universe).  A caller may pass declared_sha256 to stage a
+    # deliberate-wrong-digest contrast; otherwise hash the real file.
+    if declared_sha256 is None:
+        declared_sha256 = (
+            "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+            if p.exists() else "sha256:" + "0" * 64
+        )
     return ResolvedMember(
         member_id=rel,
         package_id=package_id,
         version="2.5.1",
         abs_path=p,
-        sha256="sha256:" + "a" * 64,
+        sha256=declared_sha256,
         size_bytes=p.stat().st_size if p.exists() else 0,
         readability="READABLE",
         package_kind=kind,
@@ -68,6 +78,17 @@ class StubSourceMap(SourceMap):
 
     def daily_core(self, market_date):
         return None  # members resolved via daily_member
+
+    def resolve(self, member_id):
+        for members in self._members_by_table.values():
+            for m in members:
+                if m.member_id == member_id or str(m.abs_path) == member_id:
+                    return m
+        for members in self._daily.values():
+            for m in members:
+                if m.member_id == member_id or str(m.abs_path) == member_id:
+                    return m
+        return None
 
 
 def _calendar_table(days, venue="SSE"):
@@ -155,12 +176,13 @@ def _build_map(tmp_path: Path, n_sessions=130, with_bars=True, with_listing=True
         _write(p, tbl)
         members[table] = [_member(tmp_path, f"{table}.parquet")]
     if with_bars:
-        p = tmp_path / "bars-2026-11.parquet"
-        _write(p, _bar_table(cal_days))
+        # Write the member bytes FIRST so _member hashes the real file
+        # (the prior order declared sha256 on a not-yet-written path ->
+        # placeholder digest -> SHA_MISMATCH -> empty bars).
+        _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet", _bar_table(cal_days))
         members["dwd_security_bar"] = [
             _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")
         ]
-        _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet", _bar_table(cal_days))
     for t in ("dwd_corporate_action", "dwd_corporate_action_term", "dwd_quality_exception",
               "dwd_observation_gap", "dwd_price_limit_regime", "dwd_tradability_state"):
         members.setdefault(t, [])

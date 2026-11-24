@@ -32,8 +32,8 @@ final-display day -- no raw-H1 shortcut that skips them.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass
-from datetime import date, datetime, time, timedelta
+from dataclasses import asdict, dataclass, replace
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
@@ -477,6 +477,16 @@ def run_e1_replay_day(
         observed_sink=observed_sink,
     )
 
+    # This run's real read instant, resolved ONCE and shared with the replay
+    # receipt's replay_observed_at so the binding is recomputable from the
+    # receipt and final source_closure together.  A member sealed later than
+    # this instant was not yet obtained by the actual verification and is
+    # refused by dependency (sealed_after_actual_read).
+    observed_at = (observed_clock or (lambda: datetime.now(timezone.utc)))()
+    if observed_at.tzinfo is None:
+        observed_at = observed_at.replace(tzinfo=timezone.utc)
+    shared_observed_clock = lambda: observed_at  # noqa: E731
+
     # Used-member analysis, keyed on the member ids the run actually consumes
     # (identity depends_on_member_ids, calendar/listing/register rows,
     # member_evidence, required_member_ids).  A member's declared coverage edge
@@ -486,16 +496,42 @@ def run_e1_replay_day(
     # run reads) are excluded from the period's input and named with a reason,
     # never a hard failure.  The container edge and the used-row business date
     # are disclosed separately per member.
-    member_use = _analyze_member_use(req, market_date)
+    member_use = _analyze_member_use(req, market_date, observed_at=observed_at)
     if member_use["blocking_used_members"]:
         _fail(
             "as_observed_post_T_content",
             "member used business rows run past the T+1 match window of signal "
             f"{market_date}: {member_use['blocking_used_members']}",
         )
+    if member_use["unavailable_at_read"]:
+        ids = [m["member_id"] for m in member_use["unavailable_at_read"]]
+        _fail(
+            "as_observed_unavailable_at_read",
+            "member obtained later than this run's actual read/verify instant "
+            f"{observed_at.isoformat()}: {sorted(ids)}",
+        )
+
+    # Real projection: unused wholly-late partitions are moved OUT of the
+    # period's input (not merely annotated), so the envelope handed to H1
+    # carries only the members this period can actually consume.  The full
+    # member catalogue stays disclosed in member_use for the closure.
+    excluded_ids = {
+        str(m["member_id"]) for m in member_use["excluded_late_partitions"]
+    }
+    projected_req = (
+        replace(
+            req,
+            source_members=tuple(
+                m for m in req.source_members
+                if str(_member_id_of(m)) not in excluded_ids
+            ),
+        )
+        if excluded_ids
+        else req
+    )
 
     receipt = paper_replay.run_replay_day(
-        req,
+        projected_req,
         market_date,
         run_daily_advice_from_history=hist_with_panel,
         runner=assets.runner,
@@ -510,7 +546,7 @@ def run_e1_replay_day(
         snapshot_id=snapshot_id,
         snapshot_manifest_digest=snapshot_manifest_digest,
         clock=clock,
-        observed_clock=observed_clock,
+        observed_clock=shared_observed_clock,
     )
     # Surface the real same-job panel report on the receipt so the caller sees
     # the actual computation, not the binding placeholder.
@@ -521,6 +557,7 @@ def run_e1_replay_day(
     receipt["as_observed"] = {
         "schema_version": "p11.october-replay-as-observed.v1",
         "logical_decision_at": receipt.get("logical_decision_at"),
+        "actual_read_at": observed_at.isoformat(),
         "member_use": member_use,
         "sealed_archives": {
             "members": observed_sink.get("sealed_members", []),
@@ -531,8 +568,10 @@ def run_e1_replay_day(
         "pit_disguise": False,
         "note": (
             "Post-cutoff archives keep their original publish/acquire clocks; "
-            "business content is asserted on/before T.  No clock is rewritten "
-            "to fake October-known."
+            "each used member must be obtainable by this run's actual read "
+            "instant; a member sealed later is refused by dependency.  Wholly "
+            "post-T partitions are projected out of the period input.  No "
+            "clock is rewritten to fake October-known."
         ),
     }
     return receipt
@@ -605,6 +644,28 @@ def _date_from_of(m: Any) -> date | None:
     return date_from if isinstance(date_from, date) else date.fromisoformat(str(date_from)[:10])
 
 
+def _instant_of(m: Any, field: str) -> datetime | None:
+    value = m.get(field) if isinstance(m, Mapping) else getattr(m, field, None)
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
+def _member_available_at(m: Any) -> datetime | None:
+    """The LATER of the member's publish (visible_at) and acquire
+    (knowledge_at) instants -- the earliest instant a consumer could actually
+    read it.  A member not yet obtained by THIS run's real read instant is
+    unavailable at read and its dependent is refused by dependency.
+    """
+    instants = [
+        x for x in (_instant_of(m, "visible_at"), _instant_of(m, "knowledge_at"))
+        if x is not None
+    ]
+    return max(instants) if instants else None
+
+
 def _used_member_ids(request: Any) -> dict[str, set[str]]:
     """Collect the member ids the run actually consumes, by binding kind.
 
@@ -648,7 +709,9 @@ def _used_member_ids(request: Any) -> dict[str, set[str]]:
     return used
 
 
-def _analyze_member_use(request: Any, market_date: date) -> dict[str, Any]:
+def _analyze_member_use(
+    request: Any, market_date: date, observed_at: datetime | None = None
+) -> dict[str, Any]:
     """Classify each source member by USED-row business content vs the period.
 
     The envelope slices every consumed row (bars, calendar, listing) to <=T;
@@ -671,19 +734,38 @@ def _analyze_member_use(request: Any, market_date: date) -> dict[str, Any]:
     members: list[dict[str, Any]] = []
     blocking: list[str] = []
     excluded: list[dict[str, Any]] = []
+    unavailable: list[dict[str, Any]] = []
     for m in getattr(request, "source_members", ()) or ():
         mid = _member_id_of(m)
         d_to = _date_to_of(m)
         d_from = _date_from_of(m)
+        avail = _member_available_at(m)
         kinds = sorted(used.get(str(mid), ())) if mid is not None else []
         is_used = bool(kinds)
         rec = {
             "member_id": mid,
             "container_date_from": d_from.isoformat() if d_from else None,
             "container_date_to": d_to.isoformat() if d_to else None,
+            "available_at": avail.isoformat() if avail else None,
             "used_by": kinds,
             "is_used": is_used,
         }
+        # A member the consumer could not have obtained by THIS run's real
+        # read/verify instant is unavailable at read -- material later than
+        # the actual verification is refused by dependency, never admitted.
+        if avail is not None and observed_at is not None and avail > observed_at:
+            rec["disposition"] = "unavailable_at_read"
+            unavailable.append(
+                {
+                    "member_id": mid,
+                    "available_at": avail.isoformat(),
+                    "actual_read_at": observed_at.isoformat(),
+                    "used_by": kinds,
+                    "reason": "obtained_after_actual_read",
+                }
+            )
+            members.append(rec)
+            continue
         # A partition that only BEGINS after the signal carries no on/before-T
         # business row at all.
         wholly_late = d_from is not None and d_from > match_end
@@ -709,5 +791,6 @@ def _analyze_member_use(request: Any, market_date: date) -> dict[str, Any]:
         "members": members,
         "blocking_used_members": sorted(set(blocking)),
         "excluded_late_partitions": excluded,
+        "unavailable_at_read": unavailable,
         "match_window_through": match_end.isoformat(),
     }

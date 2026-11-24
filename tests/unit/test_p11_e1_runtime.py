@@ -8,6 +8,8 @@ fixture label).
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from quanthus.event_library.contracts import sha256_digest
@@ -136,11 +138,16 @@ def test_r2_replay_day_binds_real_panel_not_placeholder(assets):
     assert out1.get("publishable") is True
 
 
-def e_run_e1_replay(req, day, assets):
+def e_run_e1_replay(req, day, assets, observed_at=None):
     from quanthus.product_daily.recommendation.e1_runtime import run_e1_replay_day
 
+    observed_clock = (
+        (lambda: datetime.fromisoformat(observed_at)) if observed_at else None
+    )
     return run_e1_replay_day(
-        req, day, assets=assets, snapshot_id="s", snapshot_manifest_digest="sha256:" + "a" * 64
+        req, day, assets=assets, snapshot_id="s",
+        snapshot_manifest_digest="sha256:" + "a" * 64,
+        observed_clock=observed_clock,
     )
 
 
@@ -288,6 +295,53 @@ def test_asobserved_late_partition_excluded_not_refused(assets):
     excl = use["excluded_late_partitions"]
     assert excl and excl[0]["member_id"] == "nov-daily-1d"
     assert use["blocking_used_members"] == []
+
+
+def test_asobserved_member_sealed_after_actual_read_refused(assets):
+    """R3 fail-first: a member sealed LATER than this run's real read instant
+    was not yet obtained by the actual verification -> refused by dependency.
+    The same member sealed BEFORE the read is admitted (paired control)."""
+    from tests.unit import test_p11_paper_replay as f
+
+    read_at = "2026-11-25T03:00:00+08:00"
+    # Control: sealed 11-01 (< read 11-25) -> admitted.
+    ok = _sealed_member_request()
+    ok["source_members"][0]["knowledge_at"] = "2026-11-01T00:00:00+08:00"
+    ok["source_members"][0]["visible_at"] = "2026-11-01T00:00:00+08:00"
+    out = e_run_e1_replay(ok, f.T1, assets, observed_at=read_at)
+    assert out.get("disposition") == "publishable"
+    # Fail: sealed 12-01 (> read 11-25) -> not yet obtained at the real read.
+    late = _sealed_member_request()
+    late["source_members"][0]["knowledge_at"] = "2026-12-01T00:00:00+08:00"
+    late["source_members"][0]["visible_at"] = "2026-12-01T00:00:00+08:00"
+    with pytest.raises(ProductDailyError) as ei:
+        e_run_e1_replay(late, f.T1, assets, observed_at=read_at)
+    assert "unavailable_at_read" in str(ei.value)
+
+
+def test_asobserved_late_partition_projected_out_of_envelope(assets):
+    """R3: excluded late partitions are projected OUT of the envelope handed
+    to H1 -- the used member set is a real projection, not only a label."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    req["source_members"].append(
+        {
+            "member_id": "nov-daily-1d",
+            "package_id": "standard-base-2.5.1-8cd966be87fc",
+            "version": "synthetic.v1",
+            "member_path": "nov/daily.parquet",
+            "sha256": "sha256:" + "2" * 64,
+            "date_from": "2026-11-02",
+            "date_to": "2026-11-24",
+            "knowledge_at": "2026-11-10T16:00:00+08:00",
+            "visible_at": "2026-11-10T16:00:00+08:00",
+        }
+    )
+    out = e_run_e1_replay(req, f.T1, assets)
+    members = out.get("source_closure", {}).get("source_members") or []
+    ids = {m.get("member_id") for m in members}
+    assert "nov-daily-1d" not in ids
 
 
 def test_strict_still_rejects_sealed_member(assets):

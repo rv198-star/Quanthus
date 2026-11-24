@@ -110,6 +110,119 @@ def _clock_blocked_reason(gate_receipt: Mapping[str, Any] | None) -> str | None:
     return None
 
 
+
+_CHECK_LABELS = {
+    "quiet_range_ratio_max": "前日振幅",
+    "quiet_turnover_ratio_max": "前日成交额",
+    "active_range_ratio_min": "当日振幅",
+    "active_turnover_ratio_min": "当日成交额",
+}
+
+
+def _ratio_text(check: Mapping[str, Any]) -> str | None:
+    """'626587/367434' -> '1.7053x' - actual as a plain multiple."""
+    actual = str(check.get("actual") or "")
+    if "/" not in actual:
+        return None
+    num_s, den_s = actual.split("/", 1)
+    try:
+        from fractions import Fraction
+        ratio = float(Fraction(num_s) / Fraction(den_s))
+    except (ValueError, ZeroDivisionError):
+        return None
+    return f"{ratio:.4f}x"
+
+
+def _check_label(key: str, check: Mapping[str, Any]) -> str:
+    """'active_range_ratio_min' + '>=3/2' -> '当日振幅 ≥1.50x'."""
+    base = _CHECK_LABELS.get(key) or key
+    op = str(check.get("op") or "")
+    threshold = str(check.get("threshold") or "")
+    if "/" in threshold:
+        try:
+            from fractions import Fraction
+            threshold = f"{float(Fraction(threshold)):.2f}"
+        except ValueError:
+            pass
+    symbol = {"<=": "≤", ">=": "≥", "<": "<", ">": ">", "==": "="}.get(op, op)
+    return f"{base} {symbol}{threshold}x" if threshold else base
+
+
+def _scan_details_from_package(receipt: Mapping[str, Any]) -> dict[str, dict]:
+    """security_code -> the day's per-security scan detail.
+
+    Reads the published package's decision_sets[0].audit.replay_no_action
+    bound to the same day receipt (P11 v2 package carried on the
+    p11.paper-replay-day.v1 day dict).  Each scan holds the three
+    admission gates plus the four transition checks with raw values - the
+    evidence the Owner reads on a qualified no-signal day.  Returns {} when
+    no replay_no_action is bound to this package.
+    """
+    package = receipt.get("package")
+    if not isinstance(package, Mapping):
+        return {}
+    decision_sets = package.get("decision_sets") or ()
+    if not isinstance(decision_sets, (list, tuple)) or not decision_sets:
+        return {}
+    audit = (
+        decision_sets[0].get("audit")
+        if isinstance(decision_sets[0], Mapping)
+        else None
+    )
+    if not isinstance(audit, Mapping):
+        return {}
+    rna = audit.get("replay_no_action")
+    if not isinstance(rna, Mapping):
+        return {}
+    out: dict[str, dict] = {}
+    for scan in rna.get("scans") or ():
+        if not isinstance(scan, Mapping):
+            continue
+        code = str(scan.get("security_code") or "")
+        if not code:
+            continue
+        gates = scan.get("gates") or {}
+        gate_lines = []
+        for name, label in (
+            ("events", "事件窗"),
+            ("features", "特征"),
+            ("listing", "上市"),
+        ):
+            g = gates.get(name)
+            if not isinstance(g, Mapping):
+                continue
+            observed = g.get("observed")
+            required = g.get("required")
+            mark = "✓" if str(g.get("status") or "") == "satisfied" else "✗"
+            gate_lines.append(f"{label} {observed}/{required} {mark}")
+        transition = scan.get("transition") or {}
+        checks = []
+        for key, check in (transition.get("checks") or {}).items():
+            if not isinstance(check, Mapping):
+                continue
+            checks.append(
+                {
+                    "key": key,
+                    "label": _check_label(key, check),
+                    "actual": _ratio_text(check)
+                    or str(check.get("actual") or ""),
+                    "passed": bool(check.get("passed")),
+                }
+            )
+        out[code] = {
+            "verdict": scan.get("verdict"),
+            "gates": gate_lines,
+            "checks": checks,
+            "prior_session": transition.get("prior_session"),
+            "signal_date": transition.get("signal_date"),
+            "prior_quiet": transition.get("prior_quiet"),
+            "current_active": transition.get("current_active"),
+            "message": rna.get("message"),
+            "candidate_count": rna.get("candidate_count"),
+        }
+    return out
+
+
 def _scan_reason_for(
     code: str,
     *,
@@ -315,6 +428,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
         for e in coverage_exclusions
         if isinstance(e, Mapping) and e.get("security_code")
     }
+    scan_details = _scan_details_from_package(receipt)
 
     rows = []
     for code in pool:
@@ -386,6 +500,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
                 "scan_reason": scan,
                 "entry_eligible": eligible,
                 "in_pool": True,
+                "scan_detail": scan_details.get(code),
             }
         )
 
@@ -415,6 +530,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
                 "scan_reason": scan,
                 "entry_eligible": False,
                 "in_pool": False,
+                "scan_detail": scan_details.get(code),
             }
         )
 
@@ -496,6 +612,10 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
         "pending_count": len(pending),
         "day_block": day_block,
         "securities": rows,
+        "replay_message": next(
+            (d.get("message") for d in scan_details.values() if d.get("message")),
+            None,
+        ),
         "note": "；".join(note_parts),
         "note_text": (
             "本日可评估 "

@@ -77,14 +77,25 @@ def _venue_code_map(source_map: SourceMap):
     the P11 loader admits a venue only by its named code or mic.  Resolve
     the hash to the admitted code through dwd_trading_venue.mic_code so
     downstream rows carry the admitted venue key, never the raw hash.
+    Mic variants are normalised (BJSE -> BSE); a venue whose mic is not in
+    the admitted set maps to None and its rows are dropped from the
+    envelope (the scan domain is SSE/SZSE common_equity).
     """
-    mic_to_code = {"XSHG": "SSE", "XSHE": "SZSE", "XBEI": "BSE"}
+    # Mic variants normalised to the loader's named set (BJSE is the BSE
+    # board; the loader admits the BSE code).  A venue whose mic has no
+    # admitted code maps to None and its rows drop out of the envelope.
+    mic_to_code = {
+        "XSHG": "SSE", "XSHE": "SZSE", "XBEI": "BSE", "BJSE": "BSE",
+    }
     out = {}
     for member in source_map.base_members("dwd_trading_venue"):
         try:
             for rec in _rows(member.abs_path, ["venue_id", "mic_code"]):
                 mic = str(rec.get("mic_code") or "")
-                out[str(rec.get("venue_id") or "")] = mic_to_code.get(mic, mic)
+                code = mic_to_code.get(mic)
+                # Admit only venues the loader names (SSE/SZSE/BSE); any
+                # other source venue drops out of the envelope.
+                out[str(rec.get("venue_id") or "")] = code
         except Exception:  # noqa: BLE001
             continue
     return out
@@ -125,9 +136,9 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
             knowledge_from = parse_ts(rec.get("knowledge_from"))
             if session is None or session > market_date or knowledge_from is None:
                 continue
-            venue_id = venue_code.get(
-                str(rec.get("venue_id") or ""), str(rec.get("venue_id") or "")
-            )
+            venue_id = venue_code.get(str(rec.get("venue_id") or ""))
+            if venue_id is None:
+                continue  # not an admitted venue for this scan domain
             row = CalendarRow(
                 venue_id=venue_id,
                 session_date=session,
@@ -175,13 +186,14 @@ def read_listing_rows(source_map: SourceMap, market_date: date):
             if eff_from is None or knowledge_from is None:
                 continue
             eff_to = parse_ts(rec.get("effective_to"))
+            venue_id = venue_code.get(str(rec.get("venue_id") or ""))
+            if venue_id is None:
+                continue  # not an admitted venue for this scan domain
             rows.append(
                 ListingRow(
                     security_id=str(rec.get("security_id") or ""),
                     listing_id=str(rec.get("listing_id") or ""),
-                    venue_id=venue_code.get(
-                        str(rec.get("venue_id") or ""), str(rec.get("venue_id") or "")
-                    ),
+                    venue_id=venue_id,
                     effective_from=eff_from,
                     effective_to=eff_to,
                     knowledge_from=knowledge_from,

@@ -42,7 +42,7 @@ V2_TARGET_FRACTION_PATTERN = re.compile(r"^0\.[0-9]*[1-9]$")
 
 
 def v2_target_fraction_text(value: Decimal | None) -> str | None:
-    """Canonical p12.decision-set.v2 wire string for a reduce target fraction.
+    r"""Canonical p12.decision-set.v2 wire string for a reduce target fraction.
 
     None stays None (a full exit).  Any other value must be finite and satisfy
     0 < value < 1, then serialize through format(value, "f") with fractional

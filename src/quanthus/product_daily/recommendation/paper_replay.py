@@ -743,9 +743,44 @@ def build_replay_envelope(
                 if _isodate(_obj(lim, "limit").get("session_date"), "limit.session_date")
                 in window_set
             ]
+        # An IMPLEMENTED raw row whose owning identity cannot be resolved to
+        # this security - or whose implemented event lands inside (or cannot be
+        # excluded from) the observed window without resolvable terms - is an
+        # unexplained implemented event.  It is kept-aside evidence (never a
+        # silent drop AND never a phantom adjustment), and the security
+        # isolates on the coverage dependency rather than passing verified.
+        unresolvable_aside = any(
+            a.get("disposition") in _UNRESOLVABLE_ACTION_DISPOSITIONS for a in action_aside
+        )
+        if (
+            not held_member
+            and unresolvable_aside
+            and _unresolvable_action_affects_window(
+                action_aside, request.open_sessions, market_date
+            )
+        ):
+            coverage_exclusions.append(
+                {
+                    "security_code": code,
+                    "reason": "replay_action_coverage_unknown",
+                    "member_or_field": "securities[].actions",
+                    "at": market_date.isoformat(),
+                    "scope": "per_security",
+                }
+            )
+            filtered["bars"] = []
+            filtered["actions"] = []
+            filtered["exceptions"] = []
+            filtered["limits"] = []
+            filtered["close_at_by_date"] = {}
+            filtered["knowledge_cutoff_by_date"] = {}
         # The coverage gate consumes the PROJECTED feature actions (filtered),
         # not the raw wire rows (sec_o) - same identity, projected shape.
-        if not held_member and not _action_coverage_ok(request, filtered, code, market_date):
+        if (
+            not held_member
+            and not any(e["security_code"] == code for e in coverage_exclusions)
+            and not _action_coverage_ok(request, filtered, code, market_date)
+        ):
             coverage_exclusions.append(
                 {
                     "security_code": code,
@@ -1693,6 +1728,70 @@ def _signed_action_terms(
     return None, None, None, None
 
 
+# Aside dispositions that mark an IMPLEMENTED raw action row the projection
+# could not resolve to a real adjustment for this security.  These are kept
+# as evidence (never silently dropped), and when the unexplained implemented
+# event lands inside - or cannot be excluded from - the observed window the
+# caller isolates the security's action dependency.
+_UNRESOLVABLE_ACTION_DISPOSITIONS = frozenset({"implemented_unknown"})
+
+
+def _bound_action_venues_for_identity(identity: Mapping[str, Any]) -> frozenset[str]:
+    """The venue ids a raw action row may legitimately name for this security.
+
+    The identity's own venue_id plus its Base-2.5.1 warehouse counterpart
+    (SSE/SZSE <-> venue_<hash>): a source row may carry either wire name.
+    """
+    venue = identity.get("venue_id")
+    out: set[str] = {str(venue)} if venue else set()
+    mapped = _OCTOBER_VENUES.get(str(venue)) if venue is not None else None
+    if mapped is not None:
+        out.add(mapped[0])
+        out.add(mapped[1])
+    else:
+        # A warehouse venue_id maps back to its exchange short name too.
+        for short, (_mic, wh) in _OCTOBER_VENUES.items():
+            if str(venue) == wh:
+                out.add(short)
+    return frozenset(out)
+
+
+def _unresolvable_action_affects_window(
+    aside: Sequence[Mapping[str, Any]],
+    open_sessions: Sequence[date],
+    market_date: date,
+) -> bool:
+    """True when an unexplained IMPLEMENTED aside row touches the window.
+
+    The observed window is the <=BAR_CONTEXT contiguous open sessions ending
+    at T.  An unexplained implemented event whose ex_date lands inside it -
+    or whose ex_date is absent/unparseable so it cannot be excluded - is an
+    adjustment the projection cannot account for; the security isolates.
+    An unexplained row strictly BEFORE the window is out of scope and does
+    not isolate (a real old event already left the observed series).
+    """
+    window = bar_context_window(tuple(open_sessions), market_date)
+    earliest = window[0].isoformat() if window else market_date.isoformat()
+    for a in aside:
+        if a.get("disposition") not in _UNRESOLVABLE_ACTION_DISPOSITIONS:
+            continue
+        ex = a.get("ex_date")
+        if ex is None or str(ex) == "":
+            # Implemented but no usable ex_date: cannot exclude it from the
+            # window - fail closed on the dependency.
+            return True
+        ex_iso = ex.isoformat() if isinstance(ex, date) else str(ex)
+        try:
+            ex_iso = date.fromisoformat(ex_iso).isoformat()
+        except (ValueError, TypeError):
+            return True
+        if ex_iso >= earliest:
+            # Inside the observed window (or after it): unexplained.  An
+            # ex_date BEFORE the window does not affect these returns.
+            return True
+    return False
+
+
 def project_signed_actions(
     actions: Any,
     identity: Mapping[str, Any],
@@ -1706,10 +1805,18 @@ def project_signed_actions(
     cash_dividend_per_share/bonus_share_ratio/known_at.
 
     - Rows already in feature shape pass through unchanged.
+    - Every consumed raw row's OWNER is verified: any security_id /
+      listing_id / stock_code / venue_id field the row fills must equal this
+      security's identity (venue admits the bound exchange<->warehouse pair).
+      A row naming a different owner is an unexplained foreign IMPLEMENTED
+      event - kept-aside evidence; the caller isolates the dependency and the
+      row never contributes terms nor silently passes through.
     - Only IMPLEMENTED rows project; PROPOSED / NO_DISTRIBUTION / other
       statuses are kept-aside evidence (they are not adjustments and must not
       bypass the verified_none negative check by being silently dropped NOR
-      emitted as phantom actions).
+      emitted as phantom actions).  An IMPLEMENTED row with no ex_date, or no
+      resolvable terms and no signed ruling, is 'implemented_unknown' aside -
+      unexplained, never a silent drop.
     - One feature row per ex_date: the signed register's proven per-share terms
       (the frozen ruling that resolved competing unit/revision versions) win;
       the raw rows' competing terms are recorded as audit evidence.  When the
@@ -1726,14 +1833,49 @@ def project_signed_actions(
     if not isinstance(actions, Sequence) or isinstance(actions, str):
         return feature, aside
 
+    stock_code = str(identity.get("stock_code") or identity.get("listing_code") or "")
+    security_id = str(identity.get("security_id") or "")
+    # The P11 projection consumes only rows whose raw ownership resolves to
+    # this security's verified identity.  A wire row that names a DIFFERENT
+    # security/listing/venue/stock owner is foreign material: it must not
+    # contribute terms to this security's feature action nor silently pass
+    # through as aside evidence - it is an unexplained IMPLEMENTED row and
+    # the caller isolates the dependency.
+    venues = _bound_action_venues_for_identity(identity)
+
+    def _row_owner_matches(a: Mapping[str, Any]) -> bool:
+        """Each consumed raw row must resolve to THIS security's identity.
+
+        A field the row leaves empty is unconstraining (the wire keeps the
+        security-level owner implicit); a field the row fills must equal the
+        security's own security_id / listing_id / venue (bound venues incl.)
+        / stock_code.  Any filled field that disagrees is a foreign row.
+        """
+        checks = (
+            (a.get("security_id"), identity.get("security_id")),
+            (a.get("listing_id"), identity.get("listing_id")),
+        )
+        for row_v, id_v in checks:
+            if row_v is not None and id_v is not None and str(row_v) != str(id_v):
+                return False
+            if row_v is not None and id_v is None:
+                return False
+        sc = a.get("stock_code")
+        if sc is not None:
+            id_sc = identity.get("stock_code")
+            if id_sc is not None and str(sc) != str(id_sc):
+                return False
+            if id_sc is None and str(sc) != str(identity.get("listing_code")):
+                return False
+        ven = a.get("venue_id")
+        return not (ven is not None and str(ven) not in venues)
+
     def _dec(v: Any) -> Decimal | None:
         try:
             return Decimal(str(v))
         except Exception:
             return None
 
-    stock_code = str(identity.get("stock_code") or identity.get("listing_code") or "")
-    security_id = str(identity.get("security_id") or "")
     # Group raw IMPLEMENTED rows by ex_date.
     implemented: dict[str, list[Mapping[str, Any]]] = {}
     for a in actions:
@@ -1754,17 +1896,35 @@ def project_signed_actions(
                 }
             )
             continue
+        # Owner binding is checked on EVERY consumed IMPLEMENTED row: a row
+        # whose named owner is not this security is an unexplained foreign
+        # implemented event (ex_date kept for the caller's window test).
+        if not _row_owner_matches(a):
+            aside.append(
+                {
+                    "corporate_action_id": a.get("corporate_action_id"),
+                    "action_status": status,
+                    "ex_date": ex_iso,
+                    "security_id": a.get("security_id"),
+                    "listing_id": a.get("listing_id"),
+                    "venue_id": a.get("venue_id"),
+                    "stock_code": a.get("stock_code"),
+                    "disposition": "implemented_unknown",
+                    "unknown_kind": "foreign_owner",
+                }
+            )
+            continue
         if ex_iso is None:
             aside.append(
                 {
                     "corporate_action_id": a.get("corporate_action_id"),
                     "action_status": status,
-                    "disposition": "implemented_no_ex_date",
+                    "disposition": "implemented_unknown",
+                    "unknown_kind": "no_ex_date",
                 }
             )
             continue
         implemented.setdefault(ex_iso, []).append(a)
-
     for ex_iso, rows in implemented.items():
         signed_cash, signed_bonus, signed_known, matched = _signed_action_terms(
             action_coverage, security_id=security_id, ex_iso=ex_iso
@@ -1816,10 +1976,15 @@ def project_signed_actions(
                     known = ann.date().isoformat() if isinstance(ann, datetime) else ann.isoformat()
                     break
         if cash is None and bonus is None:
+            # IMPLEMENTED but no numeric term and no signed ruling: the row
+            # asserts an adjustment the projection cannot price.  It is
+            # unexplained - the caller isolates the dependency when it lands
+            # in (or cannot be excluded from) the window; never a silent drop.
             aside.append(
                 {
                     "ex_date": ex_iso,
-                    "disposition": "implemented_no_terms",
+                    "disposition": "implemented_unknown",
+                    "unknown_kind": "no_terms",
                     "raw": raw_terms,
                 }
             )

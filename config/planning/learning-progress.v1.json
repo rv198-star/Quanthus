@@ -15934,6 +15934,90 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-20261124T171722152168Z",
+      "recorded_at": "2026-11-24T17:17:22.152168+00:00",
+      "actor": "P11-root-october-first-owner",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "十月回放采用完整官方除权名录的逐券窗口证明。H1 R3 的两处日历边界已交修，回放和 E5 新候选已交独审。",
+      "evidence": [
+        {
+          "id": "P11-H1-R3-C6",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/h1-r3-6b4ad2fa-c6/RESULT.json",
+          "sha256": "53c9446f56aa20dfbd15d744f865f0b6348be6da8703ef8e54eef0b8e845018d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed H1 correctness review. Two calendar findings assigned to R4."
+        },
+        {
+          "id": "P11-H1-R3-CN02-FOCUSED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/history-input-h1/root-intake-6b4ad2fa/CN02-RECEIPT.root.json",
+          "sha256": "7678a970ce4e387375321eff0f7306e4eecce95dbf5dc1e14481003c54f8a85d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "H1 module on exact CN02 candidate, 47 tests. Integrated make check pending."
+        },
+        {
+          "id": "P11-D7-REPLAY-INTAKE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/replay-r1-d7c23f17-root/INTAKE.json",
+          "sha256": "5077652dbac3a5dcf590fe0c92ec4959925348eaaf13fb4babdef97e6351041f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed 7-file engineering candidate received and independently assigned, adoption proposed."
+        },
+        {
+          "id": "P10-REGISTER-ROUTES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-25/quanthus-p10-action-source-routes/v1/RESULT.json",
+          "sha256": "76615526bafb57c2220a77f453a48296572d3f39174fb6a78d47e62d01067ce8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Metadata feasibility for October alternatives. First qualified security/window will require new P10 coverage evidence."
+        },
+        {
+          "id": "P11-OCT-REGISTER-CONTRACT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/P11-P10-ACTION-REGISTER-EVIDENCE-v1.md",
+          "sha256": "cff28f5f365164835bbe2aebc935c2c49c20f29990e9098eb929ed06e190b241",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Consumed event and absence evidence defined for two action-dependent windows and isolated paper replay."
+        },
+        {
+          "id": "P11-OCT-REGISTER-HANDOFF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/REGISTER-ROUTING-RECEIPT.json",
+          "sha256": "bddd71b6b8d60bb13bce7cb328f683d71b97bf0e0f77bc1b57968e7d19642174",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Operational handoff made to P10 and the current P12 product and engineering recipients."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "记录真实规则回放的资料适用范围与退修决定。首个合格券窗、H1 后继、E5 和 P12 v2/E8 联验继续开放。",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T17:16:41Z",
+          "body_sha256": "60ec93b121e0b0c418207d30f67c90d0b5974f9b4e2e60b4237411f5b884c32c"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

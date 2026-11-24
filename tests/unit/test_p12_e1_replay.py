@@ -152,7 +152,8 @@ def test_e1_replay_runner_carries_p12_evidence_into_closure(assets):
     out = runner.run(_request(raw))
     assert out.publishable is True
     closure = dict(out.source_closure or {})
-    assert closure.get("p12") == evidence
+    consumption = dict(closure.get("consumption_evidence") or {})
+    assert consumption.get("p12") == evidence
 
 
 def test_e1_replay_runner_blocks_missing_envelope(assets):

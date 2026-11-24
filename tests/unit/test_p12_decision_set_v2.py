@@ -232,7 +232,17 @@ def test_reduce_without_target_is_refused() -> None:
 
 @pytest.mark.parametrize(
     "target",
-    ["0", "1", "1.5", "-0.2", 0.5, "5e-1", "abc", ""],
+    [
+        "0", "1", "1.5", "-0.2", 0.5, "5e-1", "abc", "",
+        # Non-canonical forms the shared (0,1) wire does NOT admit:
+        "0.50",          # trailing zero
+        "0.500",         # trailing zeros
+        "00.5",          # leading zero
+        "0.50\n",        # trailing newline
+        "1E-1",          # exponent notation
+        "0.",            # no fraction digits
+        ".5",            # no leading zero
+    ],
 )
 def test_reduce_target_must_be_strict_decimal_in_open_range(target) -> None:
     """JSON numbers, exponent forms, out-of-range and non-string targets are
@@ -242,6 +252,30 @@ def test_reduce_target_must_be_strict_decimal_in_open_range(target) -> None:
     raw["decisions"][0]["target_position_fraction"] = target
     with pytest.raises(FactError):
         load_decision_set(raw, expected_schema=DECISION_SET_SCHEMA_V2)
+
+
+@pytest.mark.parametrize(
+    "canonical",
+    [
+        "0.5",
+        "0.50000001",
+        "0.00000000000000001",          # Decimal(1E-17) canonical form
+        "0.5000000000000000000000000000000001",   # >28-digit precision kept
+        "0.99999999999999999999999999999999999",
+    ],
+)
+def test_reduce_target_canonical_form_reads_byte_identical(canonical) -> None:
+    """The unique 0.<digits> form (non-zero last digit) is admitted and the
+    writer emits the SAME bytes - format(d,'f') never normalizes away a long
+    precision tail."""
+    raw = _raw("reduce.json")
+    raw["decisions"][0]["target_position_fraction"] = canonical
+    value, _ = load_decision_set(raw, expected_schema=DECISION_SET_SCHEMA_V2)
+    wire = decision_set_to_dict(value)
+    emitted = wire["decisions"][0]["target_position_fraction"]
+    assert emitted == canonical
+    # and the emitted wire reloads byte-identical under the v2 pin.
+    load_decision_set(wire, expected_schema=DECISION_SET_SCHEMA_V2)
 
 
 def test_full_exit_must_not_carry_target() -> None:

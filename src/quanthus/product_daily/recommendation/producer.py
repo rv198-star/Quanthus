@@ -65,6 +65,7 @@ from quanthus.product_daily.recommendation.contracts import (
     Decision,
     DecisionSet,
     EntryPlan,
+    OctoberReplayAdmissionClock,
 )
 
 RULE_DAY_PRODUCER_VERSION = "1.1.0"
@@ -769,9 +770,27 @@ class DailyAdviceProducer:
         candidates: tuple[CandidateSignal, ...],
         held_signals: tuple[HeldSignal, ...] = (),
         evaluation_receipt: CandidateEvaluationReceipt | None = None,
+        replay_admission_clock: OctoberReplayAdmissionClock | None = None,
     ) -> ProducerResult:
         diagnostics: list[dict[str, Any]] = []
-        assessment = assess_members(facts.members, policy.decision_cutoff)
+        # A member's available_at is its per-member VERIFY instant (the
+        # completion of that member's verification), which legitimately follows
+        # the original source read - the source-archive visibility
+        # (member_use <= source_read_at) was already judged upstream in
+        # e1_runtime.  Here the verify instants are admitted against THIS
+        # run's real evaluation instant (evaluation_observed_at from the
+        # signed package_clock proof).  Only the verified replay path mints a
+        # replay_admission_clock, so a strict/forward caller keeps the logical
+        # decision_cutoff on every actual instant.
+        member_cutoff = (
+            replay_admission_clock.evaluation_observed_at
+            if replay_admission_clock is not None
+            else policy.decision_cutoff
+        )
+        assessment = assess_members(
+            facts.members,
+            member_cutoff,
+        )
         per_member_clock = tuple(
             (item.member_id, item.available_at.isoformat()) for item in facts.members
         )
@@ -790,6 +809,7 @@ class DailyAdviceProducer:
                 assessment=assessment,
                 per_member_clock=per_member_clock,
                 git_revision=git_revision,
+                replay_admission_clock=replay_admission_clock,
             )
         except ProductDailyError as exc:
             # A contract-level refusal while building a decision (bad explanation, bogus
@@ -822,10 +842,26 @@ class DailyAdviceProducer:
         assessment: MemberAssessment,
         per_member_clock: tuple[tuple[str, str], ...],
         git_revision: str | None,
+        replay_admission_clock: OctoberReplayAdmissionClock | None = None,
     ) -> ProducerResult:
 
         # --- hard input gates, all fail closed -----------------------------------------
-        if facts.intake_received_at > policy.decision_cutoff:
+        # The ACTUAL intake/evaluation instants (received/first_read/verified
+        # and the evaluation-receipt completion) are admitted against THIS
+        # run's real evaluation instant under the versioned as-observed replay
+        # (the replay legitimately reads/verifies sealed archives AFTER the
+        # logical T).  A strict/forward caller keeps the logical
+        # decision_cutoff.  The ordering constraints (received <= first_read
+        # <= verified, intake_verified <= evaluation completed) are unchanged
+        # -- only the boundary they are compared against moves.  Members'
+        # source-acquire instants were already judged against the separate
+        # source_read_at bound in _assemble.
+        admission_cutoff = (
+            replay_admission_clock.evaluation_observed_at
+            if replay_admission_clock is not None
+            else policy.decision_cutoff
+        )
+        if facts.intake_received_at > admission_cutoff:
             return self._block(
                 diagnostics=diagnostics,
                 assessment=assessment,
@@ -836,7 +872,7 @@ class DailyAdviceProducer:
                     "decision_cutoff": policy.decision_cutoff.isoformat(),
                 },
             )
-        if facts.intake_verified_at > policy.decision_cutoff:
+        if facts.intake_verified_at > admission_cutoff:
             return self._block(
                 diagnostics=diagnostics,
                 assessment=assessment,
@@ -847,7 +883,7 @@ class DailyAdviceProducer:
                     "decision_cutoff": policy.decision_cutoff.isoformat(),
                 },
             )
-        if facts.intake_first_read_at > policy.decision_cutoff:
+        if facts.intake_first_read_at > admission_cutoff:
             return self._block(
                 diagnostics=diagnostics,
                 assessment=assessment,
@@ -869,7 +905,7 @@ class DailyAdviceProducer:
                 reason="candidate_evaluation_receipt_missing",
                 detail={"decision_cutoff": policy.decision_cutoff.isoformat()},
             )
-        if evaluation_receipt.completed_at > policy.decision_cutoff:
+        if evaluation_receipt.completed_at > admission_cutoff:
             return self._block(
                 diagnostics=diagnostics,
                 assessment=assessment,

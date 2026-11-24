@@ -1872,35 +1872,10 @@ def verify_release_manifest_closure(
             "tests/",
         )
         try:
-            declared_tracked = subprocess.check_output(
-                ["git", "ls-tree", "-r", declared_commit, "--name-only"],
-                cwd=root,
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).splitlines()
-        except (OSError, subprocess.CalledProcessError):
-            declared_tracked = []
-        # The union of the declared commit's tree and the current index matters:
-        # a tracked file added after the declaration must not be silently
-        # omitted, and a deletion from the declared set is a drift too.
-        try:
-            index_tracked = subprocess.check_output(
-                ["git", "-C", str(root), "ls-files"],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).splitlines()
-        except (OSError, subprocess.CalledProcessError):
-            index_tracked = []
-        semantic: list[str] = [
-            rel
-            for rel in sorted(set(declared_tracked) | set(index_tracked))
-            if isinstance(rel, str)
-            and rel.startswith(semantic_prefixes)
-            and not rel.startswith(allowed_diff_prefixes)
-            and rel not in allowed_diff_exact
-        ]
-        try:
-            # Tracked/index modifications, additions and deletions vs declared.
+            # git diff <commit> -- <roots> reports every tracked/index path that
+            # differs from the declared commit: modifications, staged additions
+            # and deletions all appear, so a file added after the declaration or
+            # removed from the declared set is a drift, never silently omitted.
             diff_out = subprocess.check_output(
                 ["git", "-C", str(root), "diff", "--name-only", declared_commit, "--"]
                 + list(semantic_prefixes),

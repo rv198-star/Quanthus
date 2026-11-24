@@ -236,9 +236,7 @@ def test_manifest_closure_rejects_uncovered_test_drift():
     try:
         manifest = load_release_manifest(MANIFEST_V2)
         with pytest.raises(ProductDailyError, match="semantic closure drifted"):
-            verify_release_manifest_closure(
-                manifest, project_root=ROOT, pending_is_failure=False
-            )
+            verify_release_manifest_closure(manifest, project_root=ROOT, pending_is_failure=False)
     finally:
         target.write_bytes(original)
 
@@ -250,9 +248,7 @@ def test_manifest_closure_rejects_untracked_semantic_file():
     try:
         manifest = load_release_manifest(MANIFEST_V2)
         with pytest.raises(ProductDailyError, match="semantic closure drifted"):
-            verify_release_manifest_closure(
-                manifest, project_root=ROOT, pending_is_failure=False
-            )
+            verify_release_manifest_closure(manifest, project_root=ROOT, pending_is_failure=False)
     finally:
         target.unlink()
 

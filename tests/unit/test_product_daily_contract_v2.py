@@ -731,16 +731,36 @@ def test_reduce_public_release_only_through_bound_pin(tmp_path):
 
 def test_validate_consumer_object_field_preserving(monkeypatch):
     """The internal single-object matcher accepts a coordinate-faithful validated
-    object and returns the bound-package digest; pure mechanism, no release."""
+    object and returns the account binding digest - the same digest() over the
+    validated object's package content the P12 ConfigurationBinding records.
+    Pure mechanism, no release."""
     from quanthus.product_daily.recommendation.publish import _validate_consumer_object
 
     _self_contained_p12_digest(monkeypatch)
     package = _reduce_package()
     raw = _v2_wire(package)
     validated = _v2_double_loader()(raw, expected_schema="p12.decision-set.v2")
-    assert _validate_consumer_object(raw, validated, wire_version="p12.decision-set.v2") == (
-        "sha256:" + "ab" * 32
+    assert _validate_consumer_object(
+        raw, validated, wire_version="p12.decision-set.v2", wire_digest="sha256:" + "cd" * 32
+    ) == ("sha256:" + "ab" * 32)
+
+
+def test_validate_consumer_object_never_returns_wire_digest(monkeypatch):
+    """The wire digest is the raw-byte identity, not the account binding
+    identity: even when the pinned loader returns one, the matcher must answer
+    with the digest of the SAME validated object's package content."""
+    from quanthus.product_daily.recommendation.publish import _validate_consumer_object
+
+    _self_contained_p12_digest(monkeypatch)
+    package = _reduce_package()
+    raw = _v2_wire(package)
+    validated = _v2_double_loader()(raw, expected_schema="p12.decision-set.v2")
+    wire = "sha256:" + "cd" * 32
+    matched = _validate_consumer_object(
+        raw, validated, wire_version="p12.decision-set.v2", wire_digest=wire
     )
+    assert matched == "sha256:" + "ab" * 32
+    assert matched != wire
 
 
 def test_validate_consumer_object_rejects_altered_target(monkeypatch):

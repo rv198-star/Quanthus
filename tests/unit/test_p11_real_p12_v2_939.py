@@ -6,7 +6,10 @@ They are NOT synthetic doubles: every case resolves the actual
 quanthus.p12_daily.decision_loader.load_decision_set from the byte-verified
 pinned checkout (or proves the byte check fails first), calls it exactly once
 per decision_set through the publish seam, and records the real
-(MarketDecisionSet, wire_digest) binding identity.
+(MarketDecisionSet, wire_digest) tuple.  The receipt keeps the two digest
+surfaces separate: p12_package_digests is the account binding identity the P12
+ConfigurationBinding stores (digest(_package_content(validated)) over the same
+validated object), p12_wire_digests is the loader's raw-byte identity.
 
 A missing pinned tree is a hard failure, never a skip - same rule as the earlier
 synthetic integration cases.  Each case materializes its own pinned checkout
@@ -240,25 +243,44 @@ def test_publish_reduce_through_real_pinned_consumer(pinned_checkout, tmp_path, 
     assert payload["schema_version"] == "p11.daily-advice-package.v2"
     raw = payload["decision_sets"][0]
     assert raw["decision_set_schema"] == "p12.decision-set.v2"
-    # The receipt carries the real pinned wire digest - not the file sha256 and
-    # not a recomputed object hash.
+    # The receipt carries both real surfaces, kept separate: the account binding
+    # digest (what the P12 ConfigurationBinding stores) and the pinned loader's
+    # raw-byte wire digest - never the file sha256.
     assert receipt.p12_package_digests is not None
+    assert receipt.p12_wire_digests is not None
     binding = dict(receipt.p12_package_digests)
+    wires = dict(receipt.p12_wire_digests)
     assert binding[raw["market_date"]].startswith("sha256:")
+    assert wires[raw["market_date"]].startswith("sha256:")
+    import dataclasses as _dc
     import sys as _sys
 
     import quanthus as _q
 
     _q.__path__.insert(0, str(pinned_checkout / "src" / "quanthus"))
     try:
+        import quanthus.p12_daily.decision_loader as pinned_dl
         import quanthus.shared.fact_contracts as fc
 
-        assert binding[raw["market_date"]] == fc.digest(raw)
+        # Same single-call contract: the loader returns (validated, wire_digest),
+        # the account digest is digest(_package_content(validated)) exactly as
+        # quanthus.product_daily.application.desktop.service computes it.
+        validated, wire = pinned_dl.load_decision_set(
+            raw, expected_schema="p12.decision-set.v2"
+        )
+        assert wires[raw["market_date"]] == wire == fc.digest(raw)
+        account_content = json.loads(
+            json.dumps(_dc.asdict(validated), default=str, sort_keys=True)
+        )
+        assert binding[raw["market_date"]] == fc.digest(account_content)
     finally:
         _q.__path__.remove(str(pinned_checkout / "src" / "quanthus"))
         for _m in list(_sys.modules):
             if _m.startswith("quanthus.shared") or _m.startswith("quanthus.capabilities") or _m.startswith("quanthus.p12_daily"):
                 del _sys.modules[_m]
+    # The account binding digest is a different identity from the wire bytes and
+    # from the artifact sha256; the fixture oracle records the exact pair.
+    assert binding[raw["market_date"]] != wires[raw["market_date"]]
     assert binding[raw["market_date"]] != receipt.file_sha256
     # The single validated object still proved its coordinates: reduce + target.
     decision = raw["decisions"][0]
@@ -280,6 +302,76 @@ def test_publish_full_exit_through_real_pinned_consumer(pinned_checkout, tmp_pat
     decision = payload["decision_sets"][0]["decisions"][0]
     assert decision["exit_kind"] == "full"
     assert receipt.p12_package_digests is not None
+    assert receipt.p12_wire_digests is not None
+
+
+def test_published_fixture_account_and_wire_digests_match_p12_oracle(
+    pinned_checkout, monkeypatch
+):
+    """The actual published-fixture matching gate: the bound P12 tree ships the
+    exact decision_set payloads the P12 account consumed, and the P12 oracle
+    for the ConfigurationBinding is digest(_package_content(validated)) - the
+    same helper shape as product_daily.application.desktop.service._package_content.
+
+    Each fixture is loaded exactly once through the pinned loader; the
+    coordinate matcher then recomputes the account digest from THAT validated
+    object.  Both expected pairs are the live P12 account values recorded for
+    these exact fixtures, so a regression that swaps the wire digest back into
+    the binding surface (or vice versa) fails here.
+    """
+    monkeypatch.setenv("QUANTHUS_P12_CONSUMER_ROOT", str(pinned_checkout))
+    import dataclasses as _dc
+    import sys as _sys
+
+    from quanthus.product_daily.recommendation.publish import (
+        _validate_consumer_object,
+    )
+
+    loader = resolve_pinned_v2_loader(ROOT)
+    fixture_dir = pinned_checkout / "tests" / "fixtures" / "p12" / "daily-advice-v2"
+    expected = {
+        "p11-f36fa95e-reduce.json": (
+            "sha256:a9b29b59ef10a5f10295110c46548f9d0fcb181cf4c51d8acf0aceaf42bac7cc",
+            "sha256:0033fe5b1c6d76628141eef443e9b78fdc9381812e6dc7c31234c4c2698972a2",
+        ),
+        "full.json": (
+            "sha256:925071d06417e55df872ca417cde584141e7f359ebbc94b9d2fd7d2b1071cef6",
+            "sha256:91d834f18b20b576ee47cf4f7d0cdb91ddab450f7fbfd969e34b88fd7cf7be44",
+        ),
+    }
+    for name, (expected_wire, expected_account) in expected.items():
+        raw = json.loads((fixture_dir / name).read_text())
+        # One pinned call per set; the returned (object, wire) pair is reused
+        # for every surface so no second invocation can diverge.
+        validated, wire_digest = loader(raw)
+        assert wire_digest == expected_wire, name
+        matched = _validate_consumer_object(
+            raw, validated, wire_version="p12.decision-set.v2", wire_digest=wire_digest
+        )
+        # The matcher returns the account binding identity from the SAME
+        # validated object - equal to the P12 oracle, and distinct from the
+        # wire identity.
+        assert matched == expected_account, name
+        assert matched != wire_digest, name
+
+        # Cross-check against the pinned tree's own fact_contracts so the
+        # expected value is tied to the real oracle, not only to a constant.
+        import quanthus as _q
+
+        _q.__path__.insert(0, str(pinned_checkout / "src" / "quanthus"))
+        try:
+            import quanthus.shared.fact_contracts as fc
+
+            account_content = json.loads(
+                json.dumps(_dc.asdict(validated), default=str, sort_keys=True)
+            )
+            assert fc.digest(account_content) == expected_account, name
+            assert fc.digest(raw) == expected_wire, name
+        finally:
+            _q.__path__.remove(str(pinned_checkout / "src" / "quanthus"))
+            for _m in list(_sys.modules):
+                if _m.startswith("quanthus.shared") or _m.startswith("quanthus.capabilities") or _m.startswith("quanthus.p12_daily"):
+                    del _sys.modules[_m]
 
 
 def test_publish_fails_before_write_when_loader_refuses(pinned_checkout, tmp_path, monkeypatch):

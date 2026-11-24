@@ -571,12 +571,20 @@ class PublishReceipt:
     path: str
     file_sha256: str
     decision_set_digests: tuple[tuple[str, str], ...]
+    # The digest the P12 account ConfigurationBinding records for each released
+    # date: digest(_package_content(validated)) over the SAME validated object
+    # the consumer loader returned.  This is the binding-continuity identity.
     p12_package_digests: tuple[tuple[str, str], ...] | None
     decision_count: int
     entry_plan_count: int
     admission_disposition: str
     published_at: datetime
     elapsed_ms: int
+    # The pinned loader's own digest over the raw wire bytes, returned alongside
+    # the validated object on the p12.decision-set.v2 surface.  It covers the
+    # exact payload bytes - a different surface from the account binding digest
+    # above, so it is recorded separately and never substitutes for it.
+    p12_wire_digests: tuple[tuple[str, str], ...] | None = None
 
     def __post_init__(self) -> None:
         require_text(self.package_id, "package_id")
@@ -594,6 +602,9 @@ class PublishReceipt:
             "decision_set_digests": dict(self.decision_set_digests),
             "p12_package_digests": (
                 None if self.p12_package_digests is None else dict(self.p12_package_digests)
+            ),
+            "p12_wire_digests": (
+                None if self.p12_wire_digests is None else dict(self.p12_wire_digests)
             ),
             "decision_count": self.decision_count,
             "entry_plan_count": self.entry_plan_count,

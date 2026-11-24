@@ -6,15 +6,19 @@ market dates; re-publishing the same market date with different content would be
 the consumer, so this module refuses that case up front instead of letting an unusable file
 exist on disk.
 
-Three digest surfaces are kept distinct on purpose and named explicitly:
+Four digest surfaces are kept distinct on purpose and named explicitly:
 
 - file_sha256: SHA-256 of the exact bytes written to the package file.  It is the
   identity of the on-disk artifact.
 - decision_set_digests: SHA-256 of each decision_set canonical JSON (compact,
   sort-keys, ASCII-free).  It identifies the decision_set content independent of file
   framing.
-- p12_package_digests: the digest the P12 account binding records for the same content,
-  computed through the real P12 loader so the identity is what the consumer actually binds.
+- p12_package_digests: the digest the P12 account ConfigurationBinding records for the
+  same content - digest(_package_content(validated)) over the same validated object the
+  pinned loader returned - so the identity is what the consumer actually binds.
+- p12_wire_digests: the pinned loader's own digest over the raw wire bytes.  It covers
+  the payload framing, not the account-side content, and is recorded separately so a
+  caller can never conflate wire identity with binding identity.
 
 A caller must never conflate them: binding continuity is judged on p12_package_digests,
 artifact identity on file_sha256.
@@ -233,15 +237,22 @@ def _validate_consumer_object(
     wire_version: str,
     wire_digest: str | None = None,
 ) -> str:
-    """Single validated-object coordinate check + bound-package digest.
+    """Single validated-object coordinate check + account binding digest.
 
     The consumer callable is invoked exactly once per decision_set by the caller;
     the returned object is matched on market_date, every opportunity's
     security_code, stage and exit_kind, and each reduce's target with Decimal
-    semantics.  On the pinned v2 surface the recorded binding digest is the real
-    loader's own wire digest over the raw bytes (passed in as wire_digest); on the
-    v1 surface the historical digest is recomputed from the validated object
-    through its own package so a tree without the bound P12 package fails closed.
+    semantics.
+
+    The returned binding digest is the same surface the P12 account
+    ConfigurationBinding records: digest(_package_content(validated)), computed
+    through the validated object's own package (the pinned consumer tree's
+    fact_contracts) so a tree without the bound P12 package fails closed.  The
+    loader's wire_digest is accepted as an argument only to prove the caller saw
+    the declared (object, digest) tuple shape; it is the raw-byte identity, not
+    the account binding identity, and is recorded on the receipt under
+    p12_wire_digests by the caller.
+
     This function never opens the release gate by itself - _consumer_pin_unresolved
     is the gate.
     """
@@ -318,12 +329,11 @@ def _validate_consumer_object(
                         f"pinned consumer dropped or altered the reduce target "
                         f"on {opportunity_id} (Decimal comparison)",
                     )
-    if wire_version == V2_DS_SCHEMA and wire_digest is not None:
-        # The pinned contract's own digest over the raw wire bytes - including the
-        # v2 fields - is the binding identity.  It comes from the same pinned call
-        # that produced the validated object above, so a tampered payload that
-        # never validates can never carry a forged digest through this surface.
-        return wire_digest
+    # Both the v1 historical surface and the pinned p12.decision-set.v2 surface
+    # record the same binding identity: the account-side digest of the validated
+    # object's full content, computed through the object's own package.  The v2
+    # loader's wire_digest covers the raw bytes instead and is kept on a separate
+    # receipt field; it is never returned here.
     import importlib
 
     top_package = type(validated).__module__.split(".", 1)[0]
@@ -456,11 +466,15 @@ def publish_package(
 
     # Single-call consumer pipeline: the loader is invoked exactly once per
     # decision_set (with expected_schema on the v2 surface), the returned object
-    # is matched on every coordinate by _validate_consumer_object, and the binding
-    # digest comes from the SAME validated object - all before any bytes land.
+    # is matched on every coordinate by _validate_consumer_object, and the account
+    # binding digest is recomputed from the SAME validated object - all before any
+    # bytes land.  The loader's raw-byte wire digest is kept on a parallel receipt
+    # field so the two identities never collapse into one value.
     p12_digests: dict[str, str] | None = None
+    p12_wires: dict[str, str] | None = None
     if p12_loader is not None:
         p12_digests = {}
+        p12_wires = {}
         for raw in _serialize_decision_sets(package, wire_version=wire_version):
             try:
                 loaded = p12_loader(raw)
@@ -476,9 +490,10 @@ def publish_package(
                 raise
             if wire_version == V2_DS_SCHEMA:
                 # The pinned contract returns (MarketDecisionSet, wire_digest); the
-                # validated object feeds coordinate checks, the wire digest covers
-                # the raw bytes and is recorded as the binding digest.  An object
-                # without the tuple shape is not the pinned reader and is refused.
+                # validated object feeds coordinate checks and the account binding
+                # digest; the wire digest covers the raw bytes and is recorded on
+                # its own receipt surface.  An object without the tuple shape is
+                # not the pinned reader and is refused.
                 if (
                     not isinstance(loaded, tuple)
                     or len(loaded) != 2
@@ -496,6 +511,8 @@ def publish_package(
             p12_digests[raw["market_date"]] = _validate_consumer_object(
                 raw, validated, wire_version=wire_version, wire_digest=wire_digest
             )
+            if wire_digest is not None:
+                p12_wires[raw["market_date"]] = wire_digest
 
     target_dir = Path(directory)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -543,6 +560,11 @@ def publish_package(
         file_sha256="sha256:" + hashlib.sha256(payload).hexdigest(),
         decision_set_digests=tuple(sorted(decision_set_digests(package).items())),
         p12_package_digests=(None if p12_digests is None else tuple(sorted(p12_digests.items()))),
+        p12_wire_digests=(
+            None
+            if p12_wires is None or not p12_wires
+            else tuple(sorted(p12_wires.items()))
+        ),
         decision_count=decision_count,
         entry_plan_count=entry_count,
         admission_disposition=package.decision_sets[0].audit.admission_disposition

@@ -49,17 +49,17 @@ from quanthus.product_daily.recommendation.producer import (
 from quanthus.product_daily.recommendation.rule_seam import (
     RULE_DAY_PRODUCER_ID,
 )
-from tests.unit.test_p11_history_input import (
-    _cal_null_anchor,
-    _envelope,
-    _listing,
-    _security_entry,
-)
 from tests.unit.test_p11_daily_runner import (
     NEXT_OPEN,
     TARGET,
     _trend_raw,
     _weekdays_ending,
+)
+from tests.unit.test_p11_history_input import (
+    _cal_null_anchor,
+    _envelope,
+    _listing,
+    _security_entry,
 )
 
 ROOT = find_project_root()

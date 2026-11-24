@@ -227,7 +227,12 @@ class E1ReplayRunner:
                 "raw_history envelope missing or wrong schema_version; the job "
                 "blocks the day rather than fabricating history",
             )
-        if self._context is None or self._assets is None:
+        # The context may be bound per-T by a supplier (the 8792 web entry
+        # rebuilds it inside the same run's history read); fall back to the
+        # constructor-supplied fixed context.
+        supplier = getattr(self, "_context_supplier", None)
+        context = supplier() if callable(supplier) else self._context
+        if context is None or self._assets is None:
             raise FactError(
                 HISTORY_INPUTS_UNAVAILABLE,
                 "E1 replay context (scenario account / October window / coverage) "
@@ -247,7 +252,7 @@ class E1ReplayRunner:
                 "P11 e1_runtime / paper_replay module unavailable: " + repr(exc),
             ) from exc
 
-        c = self._context
+        c = context
         market_date_raw = raw_history.get("market_date")
         if market_date_raw is None:
             raise FactError(

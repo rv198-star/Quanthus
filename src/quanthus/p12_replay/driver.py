@@ -23,6 +23,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
+from quanthus.p12_daily.e1_replay import E1ReplayRunner
 from quanthus.p12_daily.rule_runner import SyntheticRuleRunner
 from quanthus.p12_replay.assembly import build_replay_app
 from quanthus.p12_replay.bar_slice import read_month_bars
@@ -295,6 +296,9 @@ def make_engine(
     account_mode: str = "synthetic",
     exclusion_receipt: dict | None = None,
     observed_sessions_by_day: dict | None = None,
+    e1_runner: E1ReplayRunner | None = None,
+    history_reader=None,
+    account_projection=None,
     base_manifest_path: Path = BASE_MANIFEST,
     base_manifest_sha256: str = BASE_MANIFEST_SHA256,
     knowledge_cutoff: str | None = None,
@@ -307,7 +311,14 @@ def make_engine(
         shutil.rmtree(state_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
 
-    if candidates_path is not None:
+    if e1_runner is not None:
+        # 8792 phase-1 real-rule path: the bound E1ReplayRunner consumes the
+        # same T's #749 fixed envelope (history_reader) and projects the
+        # P11 run_e1_replay_day result.  The named synthetic path below is
+        # only a fallback when no real runner is wired.
+        runner = e1_runner
+        runner_factory = None
+    elif candidates_path is not None:
         candidates_doc = json.loads(Path(candidates_path).read_text())
         all_candidates = tuple(candidates_doc.get("candidates") or ())
 
@@ -335,6 +346,8 @@ def make_engine(
         exclusion_receipt=exclusion_receipt,
         spec=default_spec(len(sessions), knowledge_cutoff),
         observed_sessions_by_day=observed_sessions_by_day,
+        history_reader=history_reader,
+        account_projection=account_projection,
         base_manifest_path=Path(base_manifest_path),
         base_manifest_sha256=base_manifest_sha256,
         account_id=account_id,

@@ -129,6 +129,19 @@ class ReplayEngine:
     # Per-T real observed open-session counts (the honest history-floor
     # evidence the manifest reports for that day - never a window count).
     observed_sessions_by_day: dict | None = None
+    # Injectable #749 raw-history reader: called once per materialized day as
+    # history_reader(day, decision_cutoff) -> p11.raw-history-input.v1 envelope
+    # (or None).  The engine's own bars-only projection is NOT a substitute -
+    # it lacks the calendar_rows / listing_rows / securities the P11 public
+    # loader requires, so when no real reader is bound the run records a
+    # named history_inputs_unavailable block instead of fabricating members.
+    history_reader: Any = None
+    # Injectable per-T account projection: called once per materialized day as
+    # account_projection(day) -> (holdings_rows, pending_rows) for the #749
+    # reader's universe build (held+alert merge).  The replay ledger's own
+    # projection is the source; absent a supplier the reader sees empty
+    # tuples.  Kept separate from run_daily's own account_facts read.
+    account_projection: Any = None
 
     # runtime state
     day_index: int = 0
@@ -299,6 +312,28 @@ class ReplayEngine:
         )
 
         self._raw_history = raw_history
+        # The real #749 fixed envelope for this T.  read_history returns the
+        # p11.raw-history-input.v1 envelope the E1 runner consumes; a missing
+        # reader leaves _real_raw_history None so evening_run blocks honestly
+        # rather than passing the engine's bars-only diagnostic projection.
+        self._real_raw_history = None
+        if callable(self.history_reader):
+            day_holdings, day_pending = (), ()
+            if callable(self.account_projection):
+                day_holdings, day_pending = self.account_projection(day)
+            reader = self.history_reader
+            try:
+                self._real_raw_history = reader(
+                    day,
+                    _sh_now(day, self.decision_cutoff_time),
+                    day_holdings,
+                    day_pending,
+                )
+            except TypeError:
+                # a 2-arg reader (older signature) still binds the T
+                self._real_raw_history = reader(
+                    day, _sh_now(day, self.decision_cutoff_time)
+                )
         spec = self.spec
         if self.observed_sessions_by_day is not None:
             observed = self.observed_sessions_by_day.get(day.isoformat())
@@ -503,6 +538,7 @@ class ReplayEngine:
             now=self.now(),
             decision_cutoff=_sh_now(day, self.decision_cutoff_time),
             calendar_root=self._calendar_root,
+            raw_history=getattr(self, "_real_raw_history", None),
         )
         self._log(
             "evening_run",

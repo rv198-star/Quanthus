@@ -5,6 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# agentdock group grants read access to the P10 forward-calendar
+# product root under /srv/agentdock (750 agentdock:agentdock).
+SupplementaryGroups=agentdock
 DynamicUser=yes
 User=quanthus-p12-isolated
 StateDirectory=quanthus-p12-isolated

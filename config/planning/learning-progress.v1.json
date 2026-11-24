@@ -16018,6 +16018,108 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-20261124T173809976510Z",
+      "recorded_at": "2026-11-24T17:38:09.976510+00:00",
+      "actor": "P11-root-october-first-owner",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "P11 已采纳十月回放历史输入接口，并签收浦发 16 日和南京港单日可用的公司行为证据。真实规则回放仍需逐券验证覆盖和完成 P12 联调。",
+      "evidence": [
+        {
+          "id": "P11-H1-R4-ROOT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/history-input-h1/root-intake-9584f70c/ROOT-ACCEPTANCE.json",
+          "sha256": "222ff012d5fce0aabf7816ff83dc3ec9e9ec78d30543d629ec0e4327347d0e91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "October E1 historical-input engineering acceptance for 9584f70c."
+        },
+        {
+          "id": "P11-H1-R4-C6",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/h1-r4-9584f70c-c6/RESULT.json",
+          "sha256": "867861892955892929f300c4a85941d37097a66fbeafaa8cafaceb3b4319d938",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-scope review with 171 test cases."
+        },
+        {
+          "id": "P11-H1-R4-CN02",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/history-input-h1/root-intake-9584f70c/CN02-RECEIPT.json",
+          "sha256": "57c95e98c34a524d8dd8352466c1234a8cf01ce8102fe03af8c0e55d01b4a4e9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "52 H1 tests and style checks at exact CN02 checkout."
+        },
+        {
+          "id": "P11-OCT-SPDB-16",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/P10-SPDB-16-CONSUMER-RECEIPT.json",
+          "sha256": "fa67f11c501779dfb1a20177655be98d949f6ca74c672fac597198a83266d578",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Eligible corporate action inputs for 16 Shanghai signal dates and both branches."
+        },
+        {
+          "id": "P11-OCT-B02-HOLDER",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/P10-B02-CONSUMER-DECISION.json",
+          "sha256": "0cf0a654d509b069f3a294019b3cf1756489a3c0ee815ec14a8a5a380587a934",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Scan on Oct 8 for Shenzhen 002040 and gross cash/share return for an ordinary unrestricted holder. Reference price remains unknown."
+        },
+        {
+          "id": "P11-OCT-B03-SUPPLY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/P10-B03-CONSUMER-RECEIPT.json",
+          "sha256": "ef16bcb68029c46d0641133212c0f510ffbdf29e5f081a623044be0e2220e05c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed Shenzhen 61-session source metadata and permission receipt with P11 CN02 byte checks."
+        },
+        {
+          "id": "P11-OCT-JOINT-PROBE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/replay-r1-d7c23f17-root/JOINT-CALENDAR-RESULT.json",
+          "sha256": "75b5bbd80b659f62c2d7dc997d0480d7e47d62ffea00ebee1b6b9ac437f64f70",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Joint synthetic probe found coverage by unsupported declaration and confirmed open_at as required for the tested entry."
+        },
+        {
+          "id": "P11-OCT-V2-B756-INTAKE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/execution/v2-b756-root-intake/BRIEF.md",
+          "sha256": "af227a1887a1092ceef7becacd39c8f2eb08965b63a90ea3f93c7ebfdd20fea2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed successor b756c63c for the actual P12 reader integration. Joint acceptance pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本次进展是历史输入接口和两个具名证券的工程回放资料。策略价值、动作采用和上线验收各由其对应测试和用途回执判定。",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T17:37:33Z",
+          "body_sha256": "7b3801912a3e3e2a1ba0d61f463d8d729474f50bd4379cd1d02bd19d194b69aa"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

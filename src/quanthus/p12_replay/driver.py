@@ -412,6 +412,7 @@ def main(argv=None) -> int:
             fixture_path=args.fixture,
             window_map=window_map,
             exclusion_receipt=exclusion_receipt,
+            observed_sessions_by_day=observed_by_day,
             reset=reset,
         )
 

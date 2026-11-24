@@ -346,3 +346,51 @@ class TestFillDay:
         assert second.get("idempotent_replay") is True
         assert second["fill_price"] == first["fill_price"]
         assert len(app.reports) == 1  # one fill only, never double-posted
+
+    def test_observed_sessions_override_reaches_spec(self, tmp_path):
+        """Regression: make_engine must wire observed_sessions_by_day into the
+        per-T spec - otherwise the floors report the replay window's few
+        sessions (INPUT_BLOCKED everywhere) instead of the authoritative
+        Base count through T."""
+        from datetime import date
+        from decimal import Decimal
+        from unittest.mock import patch
+        from quanthus.p12_replay.driver import make_engine
+        from quanthus.p12_replay.replay_quotes import DayBar
+
+        sessions = [date(2026, 10, 28), date(2026, 10, 29)]
+        bars_by_day = {
+            d: {"600000": DayBar(security_code="600000", trade_date=d,
+                                 open=Decimal("9.7"), high=Decimal("9.9"),
+                                 low=Decimal("9.6"), close=Decimal("9.8"),
+                                 volume=1, amount=Decimal("1"))}
+            for d in sessions
+        }
+        observed = {"2026-10-28": 188, "2026-10-29": 189}
+        eng = make_engine(
+            state_dir=tmp_path / "st",
+            sessions=sessions,
+            bars_by_day=bars_by_day,
+            candidates_path=None,
+            fixture_path=None,
+            observed_sessions_by_day=observed,
+            reset=True,
+        )
+        # The engine applies the per-T override itself; verify by calling
+        # materialize and inspecting the spec it hands write_replay_day.
+        seen = {}
+
+        def _spy(*args, **kwargs):
+            seen["spec"] = kwargs["spec"]
+            raise SystemExit("stop")  # we only need the spec
+
+        with patch(
+            "quanthus.p12_replay.engine.write_replay_day", side_effect=_spy
+        ):
+            try:
+                eng.materialize_day(date(2026, 10, 28))
+            except SystemExit:
+                pass
+        spec_used = seen["spec"]
+        assert spec_used.history["listing_sessions"]["observed_sessions"] == 188
+        assert spec_used.history["event_window_sessions"]["observed_sessions"] == 188

@@ -411,6 +411,13 @@ class SourceMap:
             for m in self.base_members("dwd_trading_calendar"):
                 if m.member_id == member_id:
                     return m
+        p1 = self.p1_exception_member()
+        if (
+            member_id == p1.member_id
+            or str(p1.abs_path) == member_id
+            or member_id == f"{p1.package_id}::{p1.member_id}"
+        ):
+            return p1
         for day in self.daily_open_days():
             pkg = self.daily_core(day)
             if pkg is None:

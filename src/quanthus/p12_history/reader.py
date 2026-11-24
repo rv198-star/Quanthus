@@ -206,6 +206,7 @@ def read_history(
     actions, act_cov = sup_mod.read_actions(smap, market_date)
     exceptions, exc_cov = sup_mod.read_exceptions(smap, market_date)
     limits, lim_cov = sup_mod.read_limits(smap, market_date)
+    p1_exc, p1_exc_cov = sup_mod.read_p1_exceptions(smap, market_date)
 
     sessions_needed = set()
     for venue in {c.venue_id for c in calendar_rows}:
@@ -353,6 +354,32 @@ def read_history(
             "knowledge_from": iso(parse_ts(qe.get("knowledge_from"))),
         })
 
+    # P1 factor-PIT exceptions by bare stock_code (audit 749-05): the
+    # ledger keys on bare stock_code + exchange + effective_date.  Match
+    # the security's bare code and admitted venue, keep the original keys
+    # verbatim - a same-code exception outside the security's bar window
+    # is filtered by its effective_date below.
+    p1_by_code = {}
+    for pe in (p1_exc.get("p1_exceptions") or []):
+        code = str(pe.get("stock_code") or "")
+        exch = str(pe.get("exchange") or "")
+        if not code:
+            continue
+        p1_by_code.setdefault(code, []).append({
+            "stock_code": code,
+            "exchange": exch,
+            "effective_date": str(pe.get("effective_date") or ""),
+            "exception_type": str(pe.get("exception_type") or ""),
+            "reason_code": str(pe.get("reason_code") or ""),
+            "event_type": str(pe.get("event_type") or ""),
+            "visibility_origin": str(pe.get("visibility_origin") or ""),
+            "knowledge_cutoff": str(pe.get("knowledge_cutoff") or ""),
+            "source_revision": str(pe.get("source_revision") or ""),
+            "recorded_at": str(pe.get("recorded_at") or ""),
+            "policy": str(pe.get("policy") or ""),
+            "ledger": "P1_factor_pit_exception",
+        })
+
     # #737: a (stock_code, market_date) hit on the frozen exclusion list is
     # dropped BEFORE the envelope is assembled - the security never enters
     # this replay day.  The October window does not intersect the listed
@@ -482,6 +509,20 @@ def read_history(
                 # No date on the key -> keep it (the dependency is the
                 # listing itself); a dated key must land in the window.
                 sec_exceptions.append(qe)
+        # P1 factor-PIT exceptions for this security (audit 749-05): match
+        # the bare stock_code and the venue's exchange, keep a row only
+        # when its effective_date lands inside this security's actual bar
+        # window - the 10-08 window's single hit (301583, 2026-07-10) is a
+        # named block, never collapsed to UNKNOWN or hard-coded.
+        bare = _bare(ident.stock_code)
+        exch_map = {"SSE": "SH", "SZSE": "SZ"}
+        want_exch = exch_map.get(ident.venue_id)
+        for pe in p1_by_code.get(bare) or []:
+            if want_exch and pe.get("exchange") and pe["exchange"] != want_exch:
+                continue
+            ed = _date_iso(pe.get("effective_date"))
+            if ed is None or ed.isoformat() in bar_dates:
+                sec_exceptions.append(pe)
         # Per-security dependency reasons (audit 749-04): name exactly why a
         # fact is missing instead of leaving an unexplained null - the P11
         # adapter distinguishes "no source rows" from "rows present but
@@ -637,6 +678,7 @@ def read_history(
     _collect(act_cov, "term_reads")
     _collect(exc_cov, "reads")
     _collect(lim_cov, "reads")
+    _collect(p1_exc_cov, "reads")
 
     # A member is "relevant for this T" unless it is a November daily-core
     # partition - those post-date T and are registered for sealed-October
@@ -699,6 +741,7 @@ def read_history(
         "actions": act_cov,
         "exceptions": exc_cov,
         "limits": lim_cov,
+        "p1_exceptions": p1_exc_cov,
         "security_count": len(securities),
         "bar_sessions": BAR_SESSIONS,
         "listing_proof_sessions": LISTING_PROOF_SESSIONS,

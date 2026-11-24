@@ -514,7 +514,7 @@ def test_duplicate_security_id_collapses(tmp_path):
 
 
 def test_overlapping_listing_resolves_to_latest(tmp_path):
-    """749-03: a board move with overlapping intervals resolves to the listing in force at T."""
+    """749-03: overlapping intervals on distinct listing_id are ambiguous - block, never auto-pick later."""
     smap = _build_map(tmp_path)
     lp = tmp_path / "listing.parquet"
     dup = pa.concat_tables([_listing_table(), pa.table({
@@ -534,8 +534,11 @@ def test_overlapping_listing_resolves_to_latest(tmp_path):
         date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
         observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
     secs = [x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000"]
-    assert len(secs) == 1
-    assert secs[0]["identity"]["listing_id"] == "listing-600000-new"
+    # Two distinct listing_ids both cover the open with different
+    # effective_from: no named version proves one is live -> ambiguous,
+    # blocked from new candidates regardless of source order.
+    assert len(secs) == 0
+    assert "security-600000" in res.coverage["universe"]["ambiguous_security_ids"]
 
 
 def test_late_bar_revision_preserved(tmp_path):

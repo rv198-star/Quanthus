@@ -207,28 +207,21 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
                         continue
                     continue  # not yet known at the decision cutoff
             qualifying.append((lst, venue, eff_from, False))
-        # Resolve to ONE qualifying listing per security by its named
-        # qualification at T (audit 749-03): when several rows survive the
-        # half-open test (a board move carried overlapping intervals), pick
-        # the row whose effective_from is latest - the currently-in-force
-        # listing - with a deterministic listing_id tiebreak so the choice
-        # never depends on physical source order.  A genuine ambiguity (two
-        # rows with identical effective_from) names the security as
-        # ambiguous rather than silently picking one.
+        # Resolve to ONE qualifying listing per security ONLY when the
+        # source names a unique in-force row (audit 749-03): when several
+        # rows cover the open with different effective_from values, the
+        # original rows carry no named version or qualification proving
+        # one is the live listing - that is a genuine ambiguity, not a
+        # "take the later one" decision.  Block the security from new
+        # candidates (ambiguous) rather than resolve it by source order or
+        # later start.  An identical-pair duplicate still collapses.
         if qualifying:
-            qualifying.sort(
-                key=lambda t: (
-                    t[2] or datetime.min.replace(tzinfo=timezone.utc),
-                    str(t[0].get("listing_id") or ""),
-                )
-            )
-            chosen_lst, venue, _, chosen_late = qualifying[-1]
-            top_from = qualifying[-1][2]
-            ties = [q for q in qualifying if q[2] == top_from]
-            if len({str(q[0].get("listing_id") or "") for q in ties}) > 1:
-                # Same in-force instant on several listing ids: ambiguous.
+            distinct_listings = {str(q[0].get("listing_id") or "") for q in qualifying}
+            if len(distinct_listings) > 1:
+                # Several distinct listing ids cover the open - ambiguous.
                 ambiguous_ids.add(sid)
                 continue
+            chosen_lst, venue, _, chosen_late = qualifying[0]
             pair = (sid, str(chosen_lst.get("listing_id") or ""))
             if pair in seen:
                 continue

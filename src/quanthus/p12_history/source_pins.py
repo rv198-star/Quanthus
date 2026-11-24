@@ -42,6 +42,19 @@ H1_DAILY_MEMBERS = Path(
     "quanthus-p10-h1-history-supply/v1/DAILY-MEMBERS.json"
 )
 
+# P1 factor-PIT visibility exception ledger (audit 749-05): the 4,173-row
+# ODS member the P1 conditional acceptance preserved as fail-closed.  It
+# is NOT a dwd_quality_exception row - a separate canonical ledger that the
+# reader projects per security + dependency window with the original keys.
+P1_EXCEPTION_MEMBER = Path(
+    "/srv/quanthus-base22-data/build/base25-20261031/work/"
+    "paired-base251-adce892e-a1/published/ODS/members/base-ods/"
+    "payload/canonical/ref_adjustment_factor_pit_exceptions.parquet"
+)
+P1_EXCEPTION_SHA256 = (
+    "sha256:9a2158a55e7e351049f242e66b21a01e96d3cf2af55e7517c0aa4bf507577be2"
+)
+
 
 def sha256_file(path: Path) -> str:
     d = hashlib.sha256()
@@ -266,6 +279,23 @@ class SourceMap:
         return self.daily_knowledge_at(market_date)
 
     # ---- verification ---------------------------------------------------------
+    def p1_exception_member(self) -> ResolvedMember:
+        """The pinned P1 factor-PIT visibility exception ledger member."""
+        return ResolvedMember(
+            member_id="ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet",
+            package_id="base-ods",
+            version="P1",
+            abs_path=P1_EXCEPTION_MEMBER,
+            sha256=P1_EXCEPTION_SHA256,
+            size_bytes=(
+                P1_EXCEPTION_MEMBER.stat().st_size
+                if P1_EXCEPTION_MEMBER.exists() else 0
+            ),
+            readability="READABLE",
+            package_kind="base",
+            market_date=None,
+        )
+
     def verify_member(self, member: ResolvedMember) -> dict:
         """Re-hash a member's bytes and compare to its pinned sha.
 

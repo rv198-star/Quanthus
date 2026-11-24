@@ -142,6 +142,35 @@ def read_exceptions(source_map: SourceMap, market_date: date):
     return {"quality_exceptions": qe, "observation_gaps": gaps}, {"reads": reads}
 
 
+def read_p1_exceptions(source_map: SourceMap, market_date: date):
+    """P1 factor-PIT visibility exceptions, verbatim with original keys.
+
+    The 4,173-row ODS ledger (ref_adjustment_factor_pit_exceptions) is the
+    fail-closed P1 exception table - separate from dwd_quality_exception.
+    Each row carries the original stock_code / exchange / effective_date /
+    source_revision / knowledge_cutoff; the reader projects it per
+    security + dependency window and never fabricates a factor block.
+    """
+    member = source_map.p1_exception_member()
+    verify = source_map.verify_member(member)
+    reads = []
+    if not verify.get("matches"):
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH", "declared_sha256": member.sha256, "actual_sha256": verify.get("actual_sha256"), "sha_match": False, "verified_at": verify.get("verified_at")})
+        return {"p1_exceptions": []}, {"reads": reads, "p1_unverified": True}
+    try:
+        recs = _rows(
+            member.abs_path,
+            ["stock_code", "exchange", "effective_date", "exception_type",
+             "reason_code", "event_type", "visibility_origin",
+             "knowledge_cutoff", "source_revision", "recorded_at", "policy"],
+        )
+    except Exception as exc:  # noqa: BLE001
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
+        return {"p1_exceptions": []}, {"reads": reads, "p1_unverified": True}
+    reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+    return {"p1_exceptions": recs}, {"reads": reads}
+
+
 def read_limits(source_map: SourceMap, market_date: date):
     """Price-limit regimes + per-session tradability state."""
     regimes, tradability, reads = [], [], []

@@ -1406,7 +1406,11 @@ class P12DesktopApplication:
                 if callable(source_publish):
                     candidate = source_publish()
                     if candidate is not None:
-                        cutoff_time = candidate.timetz() if hasattr(candidate, "timetz") else candidate
+                        cutoff_time = (
+                            candidate.timetz()
+                            if hasattr(candidate, "timetz")
+                            else candidate
+                        )
                 next_check_at = datetime.combine(nxt, cutoff_time)
         return WorkbenchView(
             scope=scope,

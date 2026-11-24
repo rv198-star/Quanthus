@@ -112,18 +112,18 @@ def build_local_kernel(
         )
     elif daily_packages:
         import os
-        from pathlib import Path
-
-        from quanthus.p12_daily.package_source import (
-            PublishedPackageSource,
-            calendar_next_session_provider,
-        )
 
         # The publish display reuses the nightly job's configured decision
         # cutoff time-of-day so the workbench next-check matches the timer
         # that actually publishes (audit R15).  A missing env falls back to
         # the source's 22:30+08 default.
         from datetime import time as _time
+        from pathlib import Path
+
+        from quanthus.p12_daily.package_source import (
+            PublishedPackageSource,
+            calendar_next_session_provider,
+        )
         publish_time = None
         raw_cutoff = os.environ.get("QUANTHUS_P12_DECISION_CUTOFF")
         if raw_cutoff:

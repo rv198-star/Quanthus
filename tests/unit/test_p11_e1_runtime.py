@@ -197,3 +197,63 @@ def test_r3_replay_day_injects_equivalent_day_anchor(assets):
     proof = receipts[0].get("membership_proof") or {}
     assert proof.get("anchor_mode") == "equivalent_day"
     assert proof.get("equivalent_day_sessions")
+
+
+# --- october as-observed: sealed post-cutoff archives named, content <= T -------
+
+
+def _sealed_member_request():
+    """A replay request whose source member is sealed AFTER T but whose
+    declared business content ends on/before T (the real October shape)."""
+    from tests.unit import test_p11_paper_replay as f
+
+    days = tuple(d for d in f.SESSION_DAYS if d <= f.T1)
+    req = f._request(market_dates=(f.T1,), securities=[f._security("600000", days)])
+    for m in req["source_members"]:
+        # Sealed/acquired after the logical T (honest archival clocks);
+        # business content still ends <= T.
+        m["knowledge_at"] = "2026-11-20T10:00:00+08:00"
+        m["visible_at"] = "2026-11-20T10:00:00+08:00"
+        m["date_to"] = "2026-10-30"
+    return req
+
+
+def test_asobserved_sealed_member_named_not_relabelled(assets):
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    out = e_run_e1_replay(req, f.T1, assets)
+    block = out.get("as_observed") or {}
+    sealed = block.get("sealed_archives", {}).get("members", [])
+    assert sealed, "a post-cutoff sealed member must be named, not hidden"
+    assert sealed[0]["kind"] == "sealed_post_cutoff_archive"
+    assert sealed[0]["visible_at"] > out["logical_decision_at"]
+    assert block["pit_disguise"] is False
+
+
+def test_asobserved_post_T_content_refused(assets):
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    # A member whose business rows run past T carries post-T business fact;
+    # it is isolated fail-closed, never consumed.
+    req["source_members"][0]["date_to"] = "2026-11-30"
+    with pytest.raises(ProductDailyError):
+        e_run_e1_replay(req, f.T1, assets)
+
+
+def test_strict_still_rejects_sealed_member(assets):
+    """The strict H1 path is unchanged: a post-cutoff member still fails the
+    visibility gate when as_observed is not requested."""
+    from tests.unit.test_p11_history_input import (
+        _envelope,
+        _security_entry,
+        _trend_raw,
+        load_raw_history,
+    )
+
+    env = _envelope([_security_entry(_trend_raw("600000"))])
+    env["source_members"][0]["visible_at"] = "2027-01-01T00:00:00+08:00"
+    env["source_members"][0]["knowledge_at"] = "2027-01-01T00:00:00+08:00"
+    with pytest.raises(ProductDailyError):
+        load_raw_history(env)  # strict default -> source_visibility_after_cutoff

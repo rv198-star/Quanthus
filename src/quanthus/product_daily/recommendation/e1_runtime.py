@@ -463,14 +463,24 @@ def run_e1_replay_day(
         report_holder["report"] = report
         return report
 
-    # anchor_mode=equivalent_day is an explicit versioned consumer config: the
-    # October real listings carry is_open rows with open_at=null (a real
-    # strict-mode block, never backfilled).  The day-boundary proof resolves a
-    # missing-anchor session wholly inside/outside the listing, so the replay
-    # gets exact equivalent-day aging; strict stays the default elsewhere.
+    # Versioned as-observed replay: post-cutoff sealed members/calendar/
+    # listings are admitted as NAMED archives on observed_sink (original clocks
+    # preserved verbatim, never relabelled October-known); strict stays the
+    # default elsewhere.  Their business content is asserted on/before T before
+    # the day runs -- a post-T business fact stays isolated, never back-dated.
+    observed_sink: dict[str, Any] = {}
     hist_with_panel = partial(
-        _hist, panel_report_factory=_factory, anchor_mode="equivalent_day"
+        _hist,
+        panel_report_factory=_factory,
+        anchor_mode="equivalent_day",
+        as_observed=True,
+        observed_sink=observed_sink,
     )
+
+    # Business-content assertion: every sealed member's declared business rows
+    # must end on/before the signal T.  A member whose content runs past T
+    # carries post-T business fact and is refused here (named, never consumed).
+    _assert_business_content_on_or_before(req, market_date)
 
     receipt = paper_replay.run_replay_day(
         req,
@@ -494,6 +504,24 @@ def run_e1_replay_day(
     # the actual computation, not the binding placeholder.
     if "report" in report_holder:
         receipt["feature_panel_report"] = report_holder["report"].to_dict()
+    # The three clocks stay distinct on the signed receipt: logical T, original
+    # source clocks (named post-cutoff archives), and this run's actual read.
+    receipt["as_observed"] = {
+        "schema_version": "p11.october-replay-as-observed.v1",
+        "logical_decision_at": receipt.get("logical_decision_at"),
+        "sealed_archives": {
+            "members": observed_sink.get("sealed_members", []),
+            "calendar": observed_sink.get("sealed_calendar", []),
+            "listings": observed_sink.get("sealed_listings", []),
+        },
+        "anchor_mode": "equivalent_day",
+        "pit_disguise": False,
+        "note": (
+            "Post-cutoff archives keep their original publish/acquire clocks; "
+            "business content is asserted on/before T.  No clock is rewritten "
+            "to fake October-known."
+        ),
+    }
     return receipt
 
 
@@ -544,3 +572,24 @@ def _pending_panel_placeholder(assets: E1RuleAssets) -> BaselineFeaturePanelRepo
         unexplained_transition_count=0,
         continuity_excluded_security_count=0,
     )
+
+
+def _assert_business_content_on_or_before(request: Any, market_date: date) -> None:
+    """Refuse the replay day when a member declares business rows past T.
+
+    A sealed post-cutoff archive is admitted for its historical fact rows
+    only; a member whose declared date_to exceeds the signal date carries
+    post-T business data and is isolated fail-closed, never silently consumed
+    or back-dated.
+    """
+    for m in request.source_members:
+        date_to = m.get("date_to") if isinstance(m, Mapping) else getattr(m, "date_to", None)
+        if date_to is None:
+            continue
+        d = date_to if isinstance(date_to, date) else date.fromisoformat(str(date_to)[:10])
+        if d > market_date:
+            _fail(
+                "as_observed_post_T_content",
+                f"source_member {m.get('member_id') if isinstance(m, Mapping) else m.member_id} "
+                f"declares business content through {d} past signal {market_date}",
+            )

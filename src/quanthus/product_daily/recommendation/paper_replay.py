@@ -917,6 +917,30 @@ _SIGNED_ACTION_PRODUCER = "p10.signed-action-members.v1"
 _SIGNED_ACTION_READER = "p12.e1-signed-member-reader"
 
 
+def _pointer_rows(pointer_root: Mapping[str, Any]) -> dict[str, dict[str, str]]:
+    """Normalize a batch RESULT pointer to {basename: {path, sha256}}."""
+    out: dict[str, dict[str, str]] = {}
+    ml = pointer_root.get("members")
+    if isinstance(ml, (list, tuple)):
+        for m in ml:
+            if not isinstance(m, Mapping):
+                continue
+            rel = _text(m.get("path"), "pointer_root.members[].path")
+            out[rel.rsplit("/", 1)[-1]] = {
+                "path": rel,
+                "sha256": _sha256(m.get("sha256"), "pointer_root.members[].sha256"),
+            }
+    for key in ("events", "windows", "coverage"):
+        p = pointer_root.get(key)
+        if isinstance(p, Mapping) and p.get("path") is not None:
+            rel = _text(p.get("path"), "pointer_root." + key + ".path")
+            out[rel.rsplit("/", 1)[-1]] = {
+                "path": rel,
+                "sha256": _sha256(p.get("sha256"), "pointer_root." + key + ".sha256"),
+            }
+    return out
+
+
 def _member_bytes(members: Mapping[str, bytes], rel_path: str) -> bytes:
     b = members.get(rel_path)
     if not isinstance(b, (bytes, bytearray)):
@@ -931,22 +955,61 @@ def _member_sha(b: bytes) -> str:
     return "sha256:" + hashlib.sha256(b).hexdigest()
 
 
-def _pointer(pointer_root: Mapping[str, Any], name: str) -> tuple[str, str]:
-    p = pointer_root.get(name)
-    if not isinstance(p, Mapping):
+def _resolve(
+    manifest_members: Mapping[str, Any],
+    members: Mapping[str, bytes],
+    rel_path: str,
+) -> tuple[bytes, str]:
+    """Locate member bytes by exact MANIFEST path and verify declared sha256.
+
+    MANIFEST.members is keyed by the path under the P10 source_prefix; each
+    entry carries {path, sha256, bytes}.  The caller names the member by that
+    MANIFEST path (or a unique trailing suffix of it); we require the entry
+    then verify the recomputed bytes equal the declared sha256.  A basename
+    alone is NOT sufficient - many batches share filenames like RESULT.json.
+    """
+    entry = manifest_members.get(rel_path)
+    if entry is None:
+        matches = [
+            (k, e)
+            for k, e in manifest_members.items()
+            if isinstance(e, Mapping)
+            and (str(k).endswith("/" + rel_path) or str(e.get("path", "")) == rel_path)
+        ]
+        if len(matches) == 1:
+            entry = matches[0][1]
+        elif len(matches) > 1:
+            _fail(
+                "action_authority_member_ambiguous",
+                "member path "
+                + repr(rel_path)
+                + " matches "
+                + str(len(matches))
+                + " MANIFEST entries",
+            )
+    if not isinstance(entry, Mapping):
         _fail(
-            "action_authority_pointer_missing", "pointer_root." + name + " must name {path, sha256}"
+            "action_authority_manifest_member_missing",
+            "MANIFEST has no member entry for " + repr(rel_path),
         )
-    rel = _text(p.get("path"), "pointer_root." + name + ".path")
-    declared = _sha256(p.get("sha256"), "pointer_root." + name + ".sha256")
-    return rel, declared
+    declared = _sha256(entry.get("sha256"), "manifest.members[].sha256")
+    b = _member_bytes(members, rel_path)
+    if _member_sha(b) != declared:
+        _fail(
+            "action_authority_member_sha_mismatch",
+            "member " + rel_path + " sha " + _member_sha(b) + " != MANIFEST " + declared,
+        )
+    return b, declared
 
 
 def build_signed_action_authority(
     *,
-    accepted: Mapping[str, Any],
-    pointer_root: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+    manifest_sha256: str,
+    accepted_member: str,
+    result_member: str,
     members: Mapping[str, bytes],
+    accepted_manifest_members: Mapping[str, Any] | None = None,
     security_code: str,
     listing_code: str,
     stock_code: str,
@@ -956,30 +1019,66 @@ def build_signed_action_authority(
     signal_date: str,
     coverage_id: str | None = None,
 ) -> dict[str, Any]:
-    """Rebuild the action_coverage wire for ONE signed security-day."""
-    iso = _isodate(signal_date, "signal_date").isoformat()
+    """Rebuild action_coverage for ONE signed security-day from real P10 members.
 
-    # 1. member bytes + pointer cross-check.
-    events_rel, events_decl = _pointer(pointer_root, "events")
-    windows_rel, windows_decl = _pointer(pointer_root, "windows")
-    coverage_rel, coverage_decl = _pointer(pointer_root, "coverage")
-    events_b = _member_bytes(members, events_rel)
-    windows_b = _member_bytes(members, windows_rel)
-    coverage_b = _member_bytes(members, coverage_rel)
-    for name, b, decl in (
-        ("events", events_b, events_decl),
-        ("windows", windows_b, windows_decl),
-        ("coverage", coverage_b, coverage_decl),
-    ):
-        if _member_sha(b) != decl:
+    The content root is the pinned release MANIFEST
+    (quanthus.p10.action-evidence-reader-map.v1): ``manifest.members`` names
+    every member's path under the P10 source_prefix and its declared sha256,
+    and ``manifest_sha256`` is the real sha256 of the MANIFEST file bytes.
+    ``result_member`` / ``accepted_member`` are the MANIFEST paths of the
+    batch RESULT pointer and the Owner-signed accepted-uses table; both are
+    resolved by content sha256 out of the same members map, so the file the
+    caller read must equal the MANIFEST-declared member.
+
+    ``members`` maps MANIFEST path -> raw bytes P12 read once.  Every resolved
+    member is recomputed and compared to the MANIFEST-declared sha256; a
+    substituted member fails closed.  The emitted credential carries the
+    actual manifest/result/accepted file sha256 - never a recomputed JSON
+    digest - so the bound provenance is the named original, not a hash the
+    caller could fill in.
+    """
+    iso = _isodate(signal_date, "signal_date").isoformat()
+    mroot = _obj(manifest, "manifest")
+    manifest_members = _obj(mroot.get("members"), "manifest.members")
+    manifest_sha = _sha256(manifest_sha256, "manifest_sha256")
+
+    # accepted table bytes -> the versioned Owner-signed uses table.  It may
+    # live in this release's MANIFEST or in the separate MANIFEST that pins the
+    # signed uses (e.g. B10 when the batch itself is B02); resolve by sha.
+    acc_members = manifest_members
+    if accepted_member not in acc_members and accepted_manifest_members is not None:
+        acc_members = _obj(accepted_manifest_members, "accepted_manifest_members")
+    accepted_b, _ = _resolve(acc_members, members, accepted_member)
+    accepted = json.loads(accepted_b.decode("utf-8"))
+    # batch RESULT pointer -> which member files belong to this batch.
+    pointer_b, result_decl = _resolve(manifest_members, members, result_member)
+    pointer_root = json.loads(pointer_b.decode("utf-8"))
+
+    # Resolve this batch's events/windows/coverage members by their declared
+    # sha256 out of the same MANIFEST-pinned members map.
+    prows = _pointer_rows(pointer_root)
+    for need in ("events", "security-windows", "coverage"):
+        name = "security-windows.json" if need == "security-windows" else need + ".json"
+        if name not in prows:
             _fail(
-                "action_authority_member_sha_mismatch",
-                name + " member sha " + _member_sha(b) + " != pointer-declared " + decl,
+                "action_authority_pointer_missing",
+                "batch RESULT does not name member " + name,
             )
+    batch_dir = result_member.rsplit("/", 1)[0]
+
+    def _batch_rel(p: str) -> str:
+        # Pointer paths may already be MANIFEST paths or batch-relative names.
+        return p if p in manifest_members else (batch_dir + "/" + p)
+
+    events_rel = _batch_rel(prows["events.json"]["path"])
+    windows_rel = _batch_rel(prows["security-windows.json"]["path"])
+    coverage_rel = _batch_rel(prows["coverage.json"]["path"])
+    events_b, _ = _resolve(manifest_members, members, events_rel)
+    windows_b, _ = _resolve(manifest_members, members, windows_rel)
+    coverage_b, _ = _resolve(manifest_members, members, coverage_rel)
     events_doc = json.loads(events_b.decode("utf-8"))
     windows_doc = json.loads(windows_b.decode("utf-8"))
     coverage_doc = json.loads(coverage_b.decode("utf-8"))
-
     # 2. The Owner-signed table must name this security/date and both uses.
     acc = _obj(accepted, "accepted")
     acc_codes = _obj(acc.get("accepted_codes_by_date"), "accepted.accepted_codes_by_date")
@@ -1002,14 +1101,11 @@ def build_signed_action_authority(
             "action_authority_required_uses_missing",
             "signed table does not require both window purposes",
         )
-    # windows_sha256 pins the signed windows INDEX document (accepted.windows_file).
-    # The per-security detail rows live in the batch windows member; that member
-    # is bound by the pointer-declared sha (checked above) and by the member-map
-    # digest below.  When the caller also passes the index member bytes we verify
-    # them against the signed table - a mismatched index is fail-closed.
-    acc_windows_sha = _sha256(acc.get("windows_sha256"), "accepted.windows_sha256")
+    # windows_sha256 pins the signed windows INDEX document; verify the bytes
+    # the caller supplied for accepted.windows_file when present.
     acc_windows_file = acc.get("windows_file")
-    if acc_windows_file is not None and isinstance(members, Mapping):
+    if acc_windows_file is not None:
+        acc_windows_sha = _sha256(acc.get("windows_sha256"), "accepted.windows_sha256")
         idx_b = members.get(str(acc_windows_file))
         if idx_b is not None and _member_sha(idx_b) != acc_windows_sha:
             _fail(
@@ -1017,6 +1113,7 @@ def build_signed_action_authority(
                 "signed windows index member sha != accepted.windows_sha256",
             )
     member_map_sha = _sha256(acc.get("source_members_sha256"), "accepted.source_members_sha256")
+
     # 3. Rebuild the two windows for THIS security/T.
     rows = [
         w
@@ -1081,6 +1178,9 @@ def build_signed_action_authority(
     ]
     returns_state = _text(returns_w.get("event_state"), "window.event_state")
     # 4. Catalogue of named original rows the bound credential verified.
+    #    SSE events carry sse_directory_positive.evidence.source_row_ordinal;
+    #    SZSE events name the issuer notice_id and a version/raw implementation
+    #    sha instead - both resolve to the row's register key + impl digest.
     ev_rows = [
         e
         for e in _seq(events_doc.get("events"), "events.events")
@@ -1105,8 +1205,21 @@ def build_signed_action_authority(
         reg_row: Any = pos_e.get("source_row_ordinal")
         if reg_row is None:
             reg_row = _text(e.get("notice_id"), "events[].notice_id")
-        pdf = _obj(e.get("official_pdf"), "events[].official_pdf")
-        impl = _sha256(pdf.get("sha256"), "events[].official_pdf.sha256")
+        # implementation digest: official_pdf.sha256 (SSE) or version / raw.sha256
+        impl_raw = e.get("official_pdf")
+        impl: str | None = None
+        if isinstance(impl_raw, Mapping) and impl_raw.get("sha256"):
+            impl = _sha256(impl_raw.get("sha256"), "events[].official_pdf.sha256")
+        else:
+            for cand in (
+                e.get("version"),
+                (e.get("raw") or {}).get("sha256") if isinstance(e.get("raw"), Mapping) else None,
+            ):
+                if cand:
+                    impl = _sha256(cand, "events[].implementation sha")
+                    break
+        if impl is None:
+            _fail("action_authority_event_no_implementation", "event has no implementation sha")
         row = {
             "register_row": reg_row,
             "ex_date": _text(e.get("ex_date"), "events[].ex_date"),
@@ -1141,23 +1254,21 @@ def build_signed_action_authority(
                     "notice": row["notice"],
                 }
             )
-    cov_id = coverage_id or _text(coverage_doc.get("coverage_id"), "coverage.coverage_id")
-    manifest_sha = (
-        "sha256:"
-        + hashlib.sha256(
-            json.dumps(pointer_root, sort_keys=True, default=str).encode("utf-8")
-        ).hexdigest()
-    )
-    result_sha = (
-        "sha256:"
-        + hashlib.sha256(
-            json.dumps(accepted, sort_keys=True, default=str).encode("utf-8")
-        ).hexdigest()
-    )
+    cov_id = coverage_id or coverage_doc.get("coverage_id") or coverage_doc.get("id")
+    if not cov_id:
+        # SZSE coverage.json carries no coverage_id; derive a stable register id
+        # from the batch RESULT id + venue, never from the member bytes' hash.
+        cov_id = (
+            str(pointer_root.get("id", "batch"))
+            + "-"
+            + str(coverage_doc.get("register", {}).get("venue", venue_id)).replace("XSHE", "XSHE")
+            + "-action-coverage"
+        )
+    batch_id = _text(pointer_root.get("batch", pointer_root.get("id")), "pointer_root.batch")
     cred = {
-        "batch_id": _text(pointer_root.get("batch"), "pointer_root.batch"),
+        "batch_id": batch_id,
         "manifest_sha256": manifest_sha,
-        "result_sha256": result_sha,
+        "result_sha256": result_decl,
         "reader": _SIGNED_ACTION_READER,
     }
     catalog = {
@@ -1168,8 +1279,8 @@ def build_signed_action_authority(
         "producer": _SIGNED_ACTION_PRODUCER,
         "authority": {
             "manifest_sha256": manifest_sha,
-            "result_sha256": result_sha,
-            "batch_id": cred["batch_id"],
+            "result_sha256": result_decl,
+            "batch_id": batch_id,
         },
         "rows": list(cat_rows.values()),
     }
@@ -1229,8 +1340,8 @@ def build_signed_action_authority(
         ],
         "verified_artifacts": [catalog],
         "note": (
-            "derived from Owner-signed member bytes; caller-copied fields are "
-            "not independently qualifying"
+            "derived from Owner-signed member bytes resolved through the pinned "
+            "MANIFEST; caller-copied fields are not independently qualifying"
         ),
     }
 

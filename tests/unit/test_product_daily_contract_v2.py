@@ -38,6 +38,7 @@ from quanthus.product_daily.recommendation.rule_seam import (
     load_machine_policy,
     load_release_manifest,
     machine_policy_action_scope,
+    verify_release_manifest_closure,
 )
 from tests.unit.test_product_daily_rule_seam import _p12_loader, _producer_inputs
 
@@ -203,6 +204,57 @@ def test_manifest_v2_requires_wire(tmp_path):
     path.write_text(json.dumps(raw))
     with pytest.raises(ProductDailyError, match="held_reduction_wire"):
         load_release_manifest(path)
+
+
+def _mutate(path: Path, marker: bytes):
+    original = path.read_bytes()
+    path.write_bytes(original + b"\n# CLOSURE MUTATION " + marker + b"\n")
+    return original
+
+
+def test_manifest_closure_rejects_unlisted_source_drift():
+    """A tampered file under src/ outside the named code roles must fail."""
+    target = ROOT / "src" / "quanthus" / "policy.py"
+    original = _mutate(target, b"src-unlisted")
+    try:
+        manifest = load_release_manifest(MANIFEST_V2)
+        with pytest.raises(ProductDailyError, match="semantic closure drifted"):
+            check_three_piece_consistency(
+                action_receipts=load_action_receipts(RECEIPTS_V1),
+                machine_policy=load_machine_policy(POLICY_V2),
+                release_manifest=manifest,
+            )
+    finally:
+        target.write_bytes(original)
+
+
+def test_manifest_closure_rejects_uncovered_test_drift():
+    """test_p11_daily_runner.py is inside tests/ but outside the old
+    test_product_daily prefix - drift there must still fail."""
+    target = ROOT / "tests" / "unit" / "test_p11_daily_runner.py"
+    original = _mutate(target, b"runner-test")
+    try:
+        manifest = load_release_manifest(MANIFEST_V2)
+        with pytest.raises(ProductDailyError, match="semantic closure drifted"):
+            verify_release_manifest_closure(
+                manifest, project_root=ROOT, pending_is_failure=False
+            )
+    finally:
+        target.write_bytes(original)
+
+
+def test_manifest_closure_rejects_untracked_semantic_file():
+    """A new file under a semantic root not in the declared tree is drift."""
+    target = ROOT / "tests" / "unit" / "__closure_probe_untracked.py"
+    target.write_text("# probe\n")
+    try:
+        manifest = load_release_manifest(MANIFEST_V2)
+        with pytest.raises(ProductDailyError, match="semantic closure drifted"):
+            verify_release_manifest_closure(
+                manifest, project_root=ROOT, pending_is_failure=False
+            )
+    finally:
+        target.unlink()
 
 
 # --- B. held-reduction wire on Decision ---------------------------------------------------------

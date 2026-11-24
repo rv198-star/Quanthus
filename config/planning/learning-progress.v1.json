@@ -15151,6 +15151,109 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-743-20261123T232905002119Z",
+      "recorded_at": "2026-11-23T23:36:31.307589+00:00",
+      "actor": "P10 data Owner",
+      "work_item": "P10-DATA-CALENDAR-NEXT-001",
+      "outcome": "progress",
+      "summary": "Register independent calendar repair #743 for P12; narrow pinned source builder candidate and partial venue boundary. Real publication/consumer integration are pending.",
+      "evidence": [
+        {
+          "id": "REQ-743-V1",
+          "kind": "assessment",
+          "sha256": "0aa7f63bd34ff502e65f96de5d719c3c993785fc04c68e1c8eca9ea3008f2c25",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Bounded independent calendar delivery scope only; no source or consumer acceptance.",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/REQUEST-v1.json"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Current blueprint DATA historical quality/admission is unchanged by a new prospective P12 calendar candidate. Official date-only sources do not repair old acquisition clocks or grant consumer use.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-CALENDAR-NEXT-001",
+          "number": 743,
+          "title": "[P10-DATA-CALENDAR-NEXT-001] daily-core 提供权威的下一交易日（next_session）",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T23:21:32Z",
+          "body_sha256": "6b55eb2f6a12dd99e907b12858a8a35730fc9ed502b649450de3fa243838872c"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
+    },
+    {
+      "id": "CP-743-20261124T000232406651Z",
+      "recorded_at": "2026-11-24T00:04:00.755073+00:00",
+      "actor": "P10 data Owner",
+      "work_item": "P10-DATA-CALENDAR-NEXT-001",
+      "outcome": "progress",
+      "summary": "Delivered immutable official SSE/SZSE forward-calendar facts and actual publisher clocks to P12; original full-check failures and Git-evidence recovery are separately retained.",
+      "evidence": [
+        {
+          "id": "CALENDAR-743-RESULT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/RESULT.json",
+          "sha256": "8d75e055d69bf70b31e5ce52370b5e056fa66f967309a4efab5fd60eaa2885be",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Only #743 pinned date-only calendar engineering and actual CN02 SSE/SZSE publication; P12 reader/use acceptance pending; BSE unavailable and no 2027 extrapolation."
+        }
+      ],
+      "updates": [
+        {
+          "module": "DATA",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "#743 only: pinned SSE/SZSE date-only builder and immutable CN02 2026-11-24..12-31 product, 28 sessions/venue; 16 focused, static/type and full-suite plus targeted Git-evidence recovery complete. This is a bounded engineering/source-facts handoff.",
+          "remaining": "P12 reader receipt/admission and ordinary PR745 review; BSE raw originals unavailable; 2027 source not bound. Other historical DATA quality/admission scopes retain their existing receipts.",
+          "next_action": "P12 #719/#723 binds independent pointer and records actual receipt; new official BSE/2027 evidence produces a new immutable version.",
+          "evidence": [
+            "CALENDAR-743-RESULT"
+          ],
+          "supersedes": "CP-566-PREFIX128-20261027T130854Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-CALENDAR-NEXT-001",
+          "number": 743,
+          "title": "[P10-DATA-CALENDAR-NEXT-001] daily-core 提供权威的下一交易日（next_session）",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T00:02:30Z",
+          "body_sha256": "af0d6363147ec7e855bcfd42afcd87aaf55da2f5c73a56056555a7444f3ce539"
+        }
+      ]
+    },
+    {
+      "id": "CP-TRACE-743-MEMORY-REFRESH-20261124",
+      "recorded_at": "2026-11-24T00:06:01.973705+00:00",
+      "actor": "P10 data Owner; routine metadata followup to #743",
+      "work_item": "META-TRACE-001",
+      "outcome": "progress",
+      "summary": "Append #743 calendar conclusion and refresh existing next-request memory digest; preserve all prior request semantics and current TRACE maturity.",
+      "evidence": [
+        {
+          "id": "META-743-REUSE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-calendar/METADATA-REUSE-PROOF.json",
+          "sha256": "f12062d8e3de8674954cecc9e59527613f4b9fcfaf3e4012f92287c2ea9c8e72",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Only byte-identical runtime reuse and unchanged existing request semantics after memory digest refresh."
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Only the existing next-request memory SHA changes after the calendar conclusion; no TRACE runtime, mechanism, scope, admission or maturity change."
     }
   ],
   "history_imports": [

@@ -873,6 +873,14 @@
         "TRACE"
       ],
       "contribution": "R11C13/C15共同候选/资金/账户风险用途合同和共享合成政策，按完整问题验证或具名受限停止；不改原模块采用或P12事实责任"
+    },
+    {
+      "id": "P10-DATA-CALENDAR-NEXT-001",
+      "issue": 743,
+      "modules": [
+        "DATA"
+      ],
+      "contribution": "Independent authoritative forward calendar/next_session for P12 #719/#723; no historical calendar rewriting or consumer activation."
     }
   ]
 }

@@ -299,45 +299,64 @@ def resolve_pinned_v2_loader(
             "consumer_unavailable", "quanthus top-level package has no __path__"
         )
     mounted = str(consumer_root / "src" / "quanthus")
-    pkg_path.insert(0, mounted)
-    try:
-        # A previously resolved consumer module could belong to another tree;
-        # evict the whole quanthus.p12_daily subtree (and its dependency names)
-        # so this resolution binds exactly the byte-verified bound checkout.
-        consumer_prefix = str(consumer_root.resolve()) + "/"
+    consumer_prefix = str(consumer_root.resolve()) + "/"
+
+    _CONSUMER_SUBTREES = (
+        "quanthus.p12_daily",
+        "quanthus.capabilities",
+        "quanthus.shared",
+    )
+
+    def _evict_stale() -> None:
         for name in list(sys.modules):
-            if not (
-                name == "quanthus.p12_daily"
-                or name.startswith("quanthus.p12_daily.")
-                or name == "quanthus.capabilities"
-                or name.startswith("quanthus.capabilities.")
-                or name == "quanthus.shared"
-                or name.startswith("quanthus.shared.")
+            if not any(
+                name == t or name.startswith(t + ".") for t in _CONSUMER_SUBTREES
             ):
                 continue
-            # These subpackages exist only inside the pinned consumer tree - the
-            # host never ships quanthus.p12_daily/capabilities/shared, so evicting
-            # a previously cached entry can only clear consumer state.  Rebinding
-            # always re-imports from the byte-verified checkout mounted above.
+            # These subpackages exist only inside the pinned consumer tree;
+            # the host never ships them, so evicting clears consumer state.
             del sys.modules[name]
-        import quanthus.p12_daily.decision_loader as pinned_loader
-    finally:
-        pkg_path.remove(mounted)
-    module_file = Path(getattr(pinned_loader, "__file__", "")).resolve()
-    expected_loader = (consumer_root / "src/quanthus/p12_daily/decision_loader.py").resolve()
-    if module_file != expected_loader:
-        raise ProductDailyError(
-            "consumer_release_mismatch",
-            f"pinned loader resolved outside the bound checkout: {module_file}",
-        )
-    load = pinned_loader.load_decision_set
+
+    def _load_and_call(raw: dict[str, Any]) -> Any:
+        """Mount -> evict -> import the pinned loader -> call -> restore.
+
+        The import happens at call time so each decision_set binds exactly the
+        byte-verified checkout; afterwards the host ``quanthus.__path__`` and
+        ``sys.modules`` are restored so a later sibling (e.g. the v1 synthetic
+        loader) never sees pinned consumer classes.
+        """
+
+        pkg_path.insert(0, mounted)
+        prior_modules = {
+            name: sys.modules[name]
+            for name in list(sys.modules)
+            if any(name == t or name.startswith(t + ".") for t in _CONSUMER_SUBTREES)
+        }
+        try:
+            _evict_stale()
+            import quanthus.p12_daily.decision_loader as pinned_loader
+
+            module_file = Path(getattr(pinned_loader, "__file__", "")).resolve()
+            expected_loader = (
+                consumer_root / "src/quanthus/p12_daily/decision_loader.py"
+            ).resolve()
+            if module_file != expected_loader:
+                raise ProductDailyError(
+                    "consumer_release_mismatch",
+                    f"pinned loader resolved outside the bound checkout: {module_file}",
+                )
+            return pinned_loader.load_decision_set(
+                raw,
+                expected_schema=PINNED_V2_SCHEMA,
+            )
+        finally:
+            pkg_path.remove(mounted)
+            _evict_stale()
+            sys.modules.update(prior_modules)
 
     def _loader(raw: dict[str, Any]) -> Any:
         """One real pinned call; returns the (validated object, wire_digest) tuple."""
 
-        return load(
-            raw,
-            expected_schema=PINNED_V2_SCHEMA,
-        )
+        return _load_and_call(raw)
 
     return _loader

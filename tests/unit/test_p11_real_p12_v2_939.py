@@ -19,7 +19,6 @@ under tmp_path so a drifted/missing file cannot hide behind a shared worktree.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from decimal import Decimal
 from pathlib import Path
@@ -50,6 +49,23 @@ def _git(root: Path, *args: str) -> str:
     return subprocess.check_output(
         ["git", *args], cwd=root, text=True, stderr=subprocess.DEVNULL
     ).strip()
+
+
+_PINNED_PREFIXES = ("quanthus.shared", "quanthus.capabilities", "quanthus.p12_daily")
+
+
+def _evict_pinned() -> None:
+    """Drop pinned-tree modules the host must never retain between probes."""
+    import sys as _sys
+
+    for _m in list(_sys.modules):
+        if _m.startswith(_PINNED_PREFIXES):
+            del _sys.modules[_m]
+
+
+def _written_payload(directory: Path, package) -> dict:
+    written = directory / (package.package_id + ".v" + package.version + ".json")
+    return json.loads(written.read_text())
 
 
 @pytest.fixture(scope="module")
@@ -103,7 +119,10 @@ def test_binding_is_bound_to_real_commit_and_files():
     assert binding["consumer_schema"] == "p12.decision-set.v2"
     assert binding["capabilities"]["supports_held_reduction_v2"] is True
     # The pinned commit really exists in the shared object store.
-    assert _git(ROOT, "rev-parse", binding["source_commit"] + "^{commit}") == binding["source_commit"]
+    assert (
+        _git(ROOT, "rev-parse", binding["source_commit"] + "^{commit}")
+        == (binding["source_commit"])
+    )
     assert _git(ROOT, "rev-parse", binding["source_commit"] + "^{tree}") == binding["source_tree"]
 
 
@@ -120,7 +139,6 @@ def test_resolve_pinned_loader_verifies_every_file_byte(pinned_checkout, monkeyp
     # validated object's package content - both recomputed here through the
     # pinned tree's own fact_contracts.
     import dataclasses as _dc
-    import sys as _sys
 
     import quanthus as _q
 
@@ -129,16 +147,12 @@ def test_resolve_pinned_loader_verifies_every_file_byte(pinned_checkout, monkeyp
         import quanthus.shared.fact_contracts as fc
 
         assert wire_digest == fc.digest(raw)
-        account_content = json.loads(
-            json.dumps(_dc.asdict(validated), default=str, sort_keys=True)
-        )
+        account_content = json.loads(json.dumps(_dc.asdict(validated), default=str, sort_keys=True))
         assert account_digest == fc.digest(account_content)
         assert account_digest != wire_digest
     finally:
         _q.__path__.remove(str(pinned_checkout / "src" / "quanthus"))
-        for _m in list(_sys.modules):
-            if _m.startswith("quanthus.shared") or _m.startswith("quanthus.capabilities") or _m.startswith("quanthus.p12_daily"):
-                del _sys.modules[_m]
+        _evict_pinned()
 
 
 def test_pinned_loader_rejects_schema_drift(pinned_checkout, monkeypatch):
@@ -261,7 +275,6 @@ def test_publish_reduce_through_real_pinned_consumer(pinned_checkout, tmp_path, 
     assert binding[raw["market_date"]].startswith("sha256:")
     assert wires[raw["market_date"]].startswith("sha256:")
     import dataclasses as _dc
-    import sys as _sys
 
     import quanthus as _q
 
@@ -273,19 +286,13 @@ def test_publish_reduce_through_real_pinned_consumer(pinned_checkout, tmp_path, 
         # Same single-call contract: the loader returns (validated, wire_digest),
         # the account digest is digest(_package_content(validated)) exactly as
         # quanthus.product_daily.application.desktop.service computes it.
-        validated, wire = pinned_dl.load_decision_set(
-            raw, expected_schema="p12.decision-set.v2"
-        )
+        validated, wire = pinned_dl.load_decision_set(raw, expected_schema="p12.decision-set.v2")
         assert wires[raw["market_date"]] == wire == fc.digest(raw)
-        account_content = json.loads(
-            json.dumps(_dc.asdict(validated), default=str, sort_keys=True)
-        )
+        account_content = json.loads(json.dumps(_dc.asdict(validated), default=str, sort_keys=True))
         assert binding[raw["market_date"]] == fc.digest(account_content)
     finally:
         _q.__path__.remove(str(pinned_checkout / "src" / "quanthus"))
-        for _m in list(_sys.modules):
-            if _m.startswith("quanthus.shared") or _m.startswith("quanthus.capabilities") or _m.startswith("quanthus.p12_daily"):
-                del _sys.modules[_m]
+        _evict_pinned()
     # The account binding digest is a different identity from the wire bytes and
     # from the artifact sha256; the fixture oracle records the exact pair.
     assert binding[raw["market_date"]] != wires[raw["market_date"]]
@@ -306,16 +313,14 @@ def test_publish_full_exit_through_real_pinned_consumer(pinned_checkout, tmp_pat
         directory=tmp_path,
         published_at=package.decision_sets[0].published_at,
     )
-    payload = json.loads((tmp_path / (package.package_id + ".v" + package.version + ".json")).read_text())
+    payload = _written_payload(tmp_path, package)
     decision = payload["decision_sets"][0]["decisions"][0]
     assert decision["exit_kind"] == "full"
     assert receipt.p12_package_digests is not None
     assert receipt.p12_wire_digests is not None
 
 
-def test_published_fixture_account_and_wire_digests_match_p12_oracle(
-    pinned_checkout, monkeypatch
-):
+def test_published_fixture_account_and_wire_digests_match_p12_oracle(pinned_checkout, monkeypatch):
     """The actual published-fixture matching gate: the bound P12 tree ships the
     exact decision_set payloads the P12 account consumed, and the P12 oracle
     for the ConfigurationBinding is digest(_package_content(validated)) - the
@@ -329,7 +334,6 @@ def test_published_fixture_account_and_wire_digests_match_p12_oracle(
     """
     monkeypatch.setenv("QUANTHUS_P12_CONSUMER_ROOT", str(pinned_checkout))
     import dataclasses as _dc
-    import sys as _sys
 
     from quanthus.product_daily.recommendation.publish import (
         _validate_consumer_object,
@@ -382,9 +386,7 @@ def test_published_fixture_account_and_wire_digests_match_p12_oracle(
             assert fc.digest(raw) == expected_wire, name
         finally:
             _q.__path__.remove(str(pinned_checkout / "src" / "quanthus"))
-            for _m in list(_sys.modules):
-                if _m.startswith("quanthus.shared") or _m.startswith("quanthus.capabilities") or _m.startswith("quanthus.p12_daily"):
-                    del _sys.modules[_m]
+            _evict_pinned()
 
 
 def test_publish_fails_before_write_when_loader_refuses(pinned_checkout, tmp_path, monkeypatch):
@@ -406,7 +408,7 @@ def test_publish_fails_before_write_when_loader_refuses(pinned_checkout, tmp_pat
     object.__setattr__(tampered_decision, "exit_kind", None)
     tampered_ds = dataclasses.replace(ds, decisions=(tampered_decision,))
     tampered_package = dataclasses.replace(package, decision_sets=(tampered_ds,))
-    with pytest.raises(Exception):
+    with pytest.raises(ProductDailyError):
         publish_package(
             tampered_package,
             directory=tmp_path,
@@ -451,17 +453,18 @@ def test_v1_release_still_uses_v1_loader_and_bytes(pinned_checkout, tmp_path, mo
     """The pinned v1 synthetic consumer path is untouched: old bytes, old digest
     surface, no decision_set_schema marker."""
     monkeypatch.setenv("QUANTHUS_P12_CONSUMER_ROOT", str(pinned_checkout))
-    from tests.unit.test_product_daily_recommendation import _p12_loader
     from quanthus.product_daily.recommendation.publish import publish_package
+    from tests.unit.test_product_daily_recommendation import _p12_loader
 
     validate_raw, _ = _p12_loader()
 
     def v1_loader(raw):
         decision = validate_raw(raw["decisions"][0], raw)
+        from datetime import date, datetime
+
         from quanthus.capabilities.decision_access import MarketDecisionSet
         from quanthus.shared.fact_contracts import digest as p12_digest
         from quanthus.shared.values import VersionRef
-        from datetime import date, datetime
 
         return MarketDecisionSet(
             source_ref=VersionRef(raw["source_id"], raw["version"], p12_digest(raw)),
@@ -494,7 +497,7 @@ def test_v1_release_still_uses_v1_loader_and_bytes(pinned_checkout, tmp_path, mo
         published_at=result.package.decision_sets[0].published_at,
         p12_loader=v1_loader,
     )
-    payload = json.loads((tmp_path / (result.package.package_id + ".v" + result.package.version + ".json")).read_text())
+    payload = _written_payload(tmp_path, result.package)
     assert payload["schema_version"] == "quanthus.r11.daily-advice.v1"
     assert "decision_set_schema" not in payload["decision_sets"][0]
     assert "exit_kind" not in payload["decision_sets"][0]["decisions"][0]

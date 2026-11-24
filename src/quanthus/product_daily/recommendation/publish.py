@@ -463,8 +463,7 @@ def publish_package(
         except ProductDailyError as exc:
             raise ProductDailyError(
                 "unpublishable_package",
-                f"the bound P12 v2 consumer could not be resolved from its "
-                f"versioned pin: {exc}",
+                f"the bound P12 v2 consumer could not be resolved from its versioned pin: {exc}",
             ) from exc
         p12_loader = pinned_loader
     elif p12_loader is None and has_reduce:
@@ -578,9 +577,7 @@ def publish_package(
         decision_set_digests=tuple(sorted(decision_set_digests(package).items())),
         p12_package_digests=(None if p12_digests is None else tuple(sorted(p12_digests.items()))),
         p12_wire_digests=(
-            None
-            if p12_wires is None or not p12_wires
-            else tuple(sorted(p12_wires.items()))
+            None if p12_wires is None or not p12_wires else tuple(sorted(p12_wires.items()))
         ),
         decision_count=decision_count,
         entry_plan_count=entry_count,

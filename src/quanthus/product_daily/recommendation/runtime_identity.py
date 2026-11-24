@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -128,24 +129,19 @@ def consumer_identity_v2(root: Path) -> dict[str, Any]:
     files = raw.get("source_files_sha256")
     if raw.get("pin_state") == "bound":
         if raw.get("consumer_schema") != PINNED_V2_SCHEMA:
-            raise ProductDailyError(
-                "consumer_binding_invalid", "bound v2 consumer schema differs"
-            )
+            raise ProductDailyError("consumer_binding_invalid", "bound v2 consumer schema differs")
         if raw.get("loader_entry") != PINNED_V2_LOADER:
-            raise ProductDailyError(
-                "consumer_binding_invalid", "bound v2 loader entry differs"
-            )
+            raise ProductDailyError("consumer_binding_invalid", "bound v2 loader entry differs")
         if raw.get("mode") not in {"simulation", "synthetic", "real"}:
             raise ProductDailyError(
                 "consumer_binding_invalid", "bound v2 mode is not an admitted account mode"
             )
         if not isinstance(raw.get("purpose"), str) or not raw["purpose"]:
-            raise ProductDailyError(
-                "consumer_binding_invalid", "bound v2 purpose must be declared"
-            )
-        if not isinstance(raw.get("capabilities"), dict) or raw["capabilities"].get(
-            "supports_held_reduction_v2"
-        ) is not True:
+            raise ProductDailyError("consumer_binding_invalid", "bound v2 purpose must be declared")
+        if (
+            not isinstance(raw.get("capabilities"), dict)
+            or raw["capabilities"].get("supports_held_reduction_v2") is not True
+        ):
             raise ProductDailyError(
                 "consumer_binding_invalid", "bound v2 capability declaration required"
             )
@@ -209,7 +205,9 @@ def resolve_p12_test_root(root: Path, override: str | None = None) -> Path:
     return candidate
 
 
-def resolve_p12_consumer_root(root: Path, binding: dict[str, Any], override: str | None = None) -> Path:
+def resolve_p12_consumer_root(
+    root: Path, binding: dict[str, Any], override: str | None = None
+) -> Path:
     """Resolve and byte-verify the consumer checkout named by a bound pin.
 
     The release path only trusts the versioned binding's per-file SHA-256 map;
@@ -253,7 +251,7 @@ def resolve_p12_consumer_root(root: Path, binding: dict[str, Any], override: str
 
 def resolve_pinned_v2_loader(
     root: Path, override: str | None = None
-) -> "Callable[[dict[str, Any]], Any]":
+) -> Callable[[dict[str, Any]], Any]:
     """Resolve the real pinned p12.decision-set.v2 loader from the bound binding.
 
     This is the only authority a v2 release may use: the versioned binding file
@@ -269,7 +267,6 @@ def resolve_pinned_v2_loader(
 
     import os
     import sys
-    from collections.abc import Callable as _Callable
 
     binding = consumer_identity_v2(root)
     if binding.get("pin_state") != "bound":
@@ -283,7 +280,6 @@ def resolve_pinned_v2_loader(
         binding,
         override if override is not None else os.environ.get("QUANTHUS_P12_CONSUMER_ROOT"),
     )
-    pinned_src = str(consumer_root / "src")
     # The host tree already owns the "quanthus" top-level package, so a bare
     # sys.path bump cannot reach quanthus.p12_daily - the existing package's
     # __path__ decides which subdirectories the import machinery sees.  Mount
@@ -300,7 +296,6 @@ def resolve_pinned_v2_loader(
             "consumer_unavailable", "quanthus top-level package has no __path__"
         )
     mounted = str(consumer_root / "src" / "quanthus")
-    consumer_prefix = str(consumer_root.resolve()) + "/"
 
     _CONSUMER_SUBTREES = (
         "quanthus.p12_daily",
@@ -310,9 +305,7 @@ def resolve_pinned_v2_loader(
 
     def _evict_stale() -> None:
         for name in list(sys.modules):
-            if not any(
-                name == t or name.startswith(t + ".") for t in _CONSUMER_SUBTREES
-            ):
+            if not any(name == t or name.startswith(t + ".") for t in _CONSUMER_SUBTREES):
                 continue
             # These subpackages exist only inside the pinned consumer tree;
             # the host never ships them, so evicting clears consumer state.
@@ -360,19 +353,13 @@ def resolve_pinned_v2_loader(
             # module alone.  The same single pinned call's validated object
             # feeds it, so the account identity can never diverge from what was
             # actually validated.
-            if (
-                isinstance(loaded, tuple)
-                and len(loaded) == 2
-                and isinstance(loaded[1], str)
-            ):
+            if isinstance(loaded, tuple) and len(loaded) == 2 and isinstance(loaded[1], str):
                 validated, wire_digest = loaded
                 import dataclasses as _dc
 
                 import quanthus.shared.fact_contracts as pinned_fc
 
-                content = json.loads(
-                    json.dumps(_dc.asdict(validated), default=str, sort_keys=True)
-                )
+                content = json.loads(json.dumps(_dc.asdict(validated), default=str, sort_keys=True))
                 return validated, wire_digest, pinned_fc.digest(content)
             return loaded
         finally:

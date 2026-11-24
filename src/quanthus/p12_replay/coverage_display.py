@@ -76,6 +76,40 @@ def _disposition_label(value: Any) -> str:
     return v or "—"
 
 
+_CLOCK_MARKERS = (
+    "knowledge_after_t_close",
+    "after_t_close",
+    "t_close",
+)
+
+
+def _clock_blocked_reason(gate_receipt: Mapping[str, Any] | None) -> str | None:
+    """The security's scan verdict needs T-close knowledge: a CLOCK block.
+
+    Returns the gate's own reason line when the event/feature/listing gate
+    failed on a clock dependency (e.g. ``scan verdict at T:
+    knowledge_after_t_close``); None when it was scanned normally - a
+    ``no qualified event window`` failure is a real evaluated-no-signal,
+    never a clock block.
+    """
+    if not isinstance(gate_receipt, Mapping):
+        return None
+    gates = gate_receipt.get("gates") or {}
+    for gate in ("events", "features", "listing"):
+        g = gates.get(gate)
+        if not isinstance(g, Mapping):
+            continue
+        reason = str(g.get("reason") or "")
+        if any(m in reason.lower() for m in _CLOCK_MARKERS):
+            return reason
+        # a failed status whose reason names a clock dependency
+        if str(g.get("status") or "").lower() == "failed" and (
+            "after" in reason.lower() and "close" in reason.lower()
+        ):
+            return reason
+    return None
+
+
 def _scan_reason_for(
     code: str,
     *,
@@ -118,6 +152,62 @@ def _scan_reason_for(
                 if r:
                     return r
     return None
+
+
+
+def _day_block_of(
+    receipt: Mapping[str, Any],
+    evaluation_receipt: Mapping[str, Any],
+    seam: Mapping[str, Any],
+    source_closure: Mapping[str, Any],
+) -> Mapping[str, Any] | None:
+    """The whole-day block from whichever carrier actually declares one.
+
+    A p11 receipt may keep it on ``day_block``; a blocked day that never
+    produced a qualified package instead marks ``seam.day_blocked`` /
+    ``source_closure.day_blocked`` + ``disposition`` (e.g. input_not_ready)
+    and explains itself on ``diagnostics`` / ``day_block_reason``.  Reads
+    them in that order so a real INPUT_BLOCKED day shows its own reason,
+    never a silent 0/0 (协调: 整日输入不足 without a top day_block).
+    """
+    block = receipt.get("day_block") or evaluation_receipt.get("day_block")
+    if isinstance(block, Mapping) and (block.get("reason") or block.get("detail")):
+        return block
+    flagged = (
+        seam.get("day_blocked")
+        or source_closure.get("day_blocked")
+        or str(receipt.get("disposition") or "").lower()
+        in ("input_not_ready", "blocked", "day_blocked")
+        or str(source_closure.get("account_disposition") or "").lower()
+        in ("input_not_ready", "blocked", "day_blocked")
+    )
+    if not flagged:
+        return block if isinstance(block, Mapping) else None
+    reason = (
+        source_closure.get("day_block_reason")
+        or (block.get("reason") if isinstance(block, Mapping) else None)
+        or receipt.get("disposition")
+        or source_closure.get("account_disposition")
+    )
+    detail = None
+    diags = receipt.get("diagnostics") or source_closure.get("diagnostics") or ()
+    if isinstance(diags, (list, tuple)):
+        for d in diags:
+            if isinstance(d, Mapping) and str(d.get("scope") or "") == "whole_day":
+                detail = d.get("reason") or d.get("detail")
+                break
+        else:
+            for d in diags:
+                if isinstance(d, Mapping) and (d.get("reason") or d.get("detail")):
+                    detail = d.get("reason") or d.get("detail")
+                    break
+    out = dict(block) if isinstance(block, Mapping) else {}
+    if reason and not out.get("reason"):
+        out["reason"] = reason
+    if detail and not out.get("detail"):
+        out["detail"] = detail
+    out.setdefault("scope", "whole_day")
+    return out or None
 
 
 def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
@@ -232,15 +322,39 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
         eligible = bool(delivery.get("entry_eligible", True)) and code not in coverage_excl
         decision = decisions.get(code)
         held_row = held.get(code)
-        is_evaluated = code in evaluated
-        if not eligible or (code in coverage_excl and not is_evaluated):
+        gate_receipt = gate_receipts.get(code)
+        # A scan verdict that needs T-close knowledge is a CLOCK block, not
+        # a qualified evaluated-no-signal: it keeps its own clock reason and
+        # never counts into N (协调: knowledge_after_t_close).
+        clock_reason = _clock_blocked_reason(gate_receipt)
+        # An excluded/not_qualified security is never "evaluated": the run
+        # addressed it (it sits in evaluated_universe) but its own receipt
+        # marks it excluded or not qualified, so it keeps its real status
+        # out of N - only a genuinely scanned-and-not-signal security
+        # counts (协调: 已评估且未命中信号照常计 N; 时钟阻断/排除不计).
+        # "excluded" marks a removed security (not_listed etc); "not_qualified"
+        # still counts - a no-qualified-event scan IS an evaluated no-signal.
+        hr_status = str(
+            (gate_receipt or {}).get("status") or ""
+        ).lower()
+        qualified = hr_status != "excluded"
+        is_evaluated = (
+            code in evaluated
+            and clock_reason is None
+            and qualified
+        )
+        if clock_reason is not None:
+            state = "blocked"
+        elif not eligible or (code in coverage_excl and not is_evaluated):
             state = "pending"
         elif is_evaluated:
             state = "evaluated"
         else:
             state = "pending"
         verdict = None
-        if decision is not None:
+        if clock_reason is not None:
+            verdict = "时钟阻断"
+        elif decision is not None:
             verdict = _disposition_label(decision.get("disposition"))
         elif held_row is not None:
             action = str(held_row.get("action") or "")
@@ -256,10 +370,12 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
             code,
             decision=decision,
             held_row=held_row,
-            gate_receipt=gate_receipts.get(code),
+            gate_receipt=gate_receipt,
             coverage_excl=coverage_excl.get(code),
         )
-        if scan is None and state == "pending":
+        if clock_reason is not None:
+            scan = clock_reason
+        elif scan is None and state == "pending":
             scan = "公司行为/分红送股数据未核清" if not eligible else "输入未交付至评估"
         rows.append(
             {
@@ -310,7 +426,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
         # the number of per-security receipts.  Show the actual state -
         # blocked when the day carried a block, else coverage-pending -
         # while the per-security rows stay readable as evidence.
-        day_block = receipt.get("day_block") or evaluation_receipt.get("day_block")
+        day_block = _day_block_of(receipt, evaluation_receipt, seam, source_closure)
         block_reason = None
         if isinstance(day_block, Mapping):
             block_reason = day_block.get("reason") or day_block.get("detail")
@@ -346,7 +462,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
     # calendar_coverage_incomplete): the per-security pool is real, but the
     # day's own block reason must stay on the note, never drop to a bare
     # N/M line (协调 R6 item 3).
-    day_block = receipt.get("day_block") or evaluation_receipt.get("day_block")
+    day_block = _day_block_of(receipt, evaluation_receipt, seam, source_closure)
     block_reason = None
     if isinstance(day_block, Mapping):
         # The actual reason the day blocked: P11's natural-language detail

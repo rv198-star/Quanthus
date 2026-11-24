@@ -1126,3 +1126,67 @@ class TestCoveragePrecheckRound2:
         assert block["day_block"]["reason"] == "calendar_coverage_incomplete"
         assert "calendar_coverage_incomplete" in block["note_text"] or "整日阻断" in block["note_text"]
         assert "2" in block["note_text"]
+
+    def test_real_b451_clock_blocked_pool_counts(self):
+        # 协调真回执对照: CN02 owner-e1-three-b451 day.json shape -
+        # delivered dict, seam.day_blocked, disposition=input_not_ready,
+        # NO top-level day_block; 三券 gates.events.reason=
+        # "scan verdict at T: knowledge_after_t_close" (时钟阻断),
+        # 5558 券按动作覆盖隔离 / excluded.  N must count only a
+        # genuinely scanned-and-no-signal security, never the clock
+        # blocks; M is the full delivered pool.
+        from quanthus.p12_replay.coverage_display import coverage_block
+        d = {
+            "schema_version": "p11.paper-replay-day.v1",
+            "market_date": "2026-10-08",
+            "disposition": "input_not_ready",
+            "delivered": {c: {"entry_eligible": True} for c in
+                          ("600000", "000002", "002040", "300362", "600111")},
+            "seam": {"day_blocked": True,
+                     "evaluated_universe": ["600000", "000002", "002040",
+                                            "300362", "600111"],
+                     "decisions": [], "excluded": []},
+            "diagnostics": [
+                {"reason": "history_gate_unsatisfied: every market input "
+                           "failed its history qualification",
+                 "scope": "whole_day", "stage": "shared_prerequisite"},
+            ],
+            "source_closure": {
+                "day_blocked": True,
+                "evaluated_universe": ["600000", "000002", "002040",
+                                       "300362", "600111"],
+                "history_receipts": [
+                    {"security_code": "600000", "status": "not_qualified",
+                     "gates": {"events": {"status": "failed",
+                        "reason": "scan verdict at T: knowledge_after_t_close"}}},
+                    {"security_code": "000002", "status": "not_qualified",
+                     "gates": {"events": {"status": "failed",
+                        "reason": "scan verdict at T: knowledge_after_t_close"}}},
+                    {"security_code": "002040", "status": "not_qualified",
+                     "gates": {"events": {"status": "failed",
+                        "reason": "scan verdict at T: knowledge_after_t_close"}}},
+                    {"security_code": "600111", "status": "not_qualified",
+                     "gates": {"events": {"status": "failed",
+                        "reason": "no qualified event window in the 22-session scan"}}},
+                    {"security_code": "300362", "status": "excluded",
+                     "reason": "not_listed_on_signal_date"},
+                ],
+            },
+        }
+        block = coverage_block(d)
+        # M = full delivered pool; N counts only the real scanned-no-signal
+        # (600111).  三券时钟阻断 out of N, excluded out of N.
+        assert block["pool_count"] == 5
+        assert block["evaluated_count"] == 1
+        by_code = {r["security_code"]: r for r in block["securities"]}
+        assert by_code["600000"]["state"] == "blocked"
+        assert "knowledge_after_t_close" in by_code["600000"]["scan_reason"]
+        assert by_code["000002"]["state"] == "blocked"
+        assert by_code["002040"]["state"] == "blocked"
+        assert by_code["600111"]["state"] == "evaluated"
+        assert by_code["300362"]["state"] == "pending"
+        # whole-day input shortage surfaced from disposition/diagnostics
+        # even without a top-level day_block.
+        assert block["day_block"] is not None
+        assert "history_gate_unsatisfied" in block["note_text"] or \
+               "整日阻断" in block["note_text"]

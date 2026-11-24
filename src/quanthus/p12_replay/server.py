@@ -98,6 +98,7 @@ footer{max-width:1120px;margin:0 auto 40px;padding:0 20px;color:var(--muted);fon
 .cov-eval{background:#e9f3ec;color:var(--ok)}
 .cov-pend{background:#f3ede0;color:var(--warn)}
 .cov-na{background:#eef1f4;color:var(--muted)}
+.cov-block{background:#f6e8e8;color:#b03a3a}
 .covrow .v{color:var(--info);font-weight:600}
 .covrow .r{color:var(--muted);flex:1;min-width:160px}
 tabs{display:flex;gap:0;margin-bottom:0}
@@ -170,7 +171,7 @@ function renderCoverage(){
  const rows=c.securities||[];
  if(rows.length){h+='<div style="margin-top:4px">';
   for(const r of rows){
-   const st=r.state||'';const tag=st==='evaluated'?'<span class="covtag cov-eval">已评估</span>':(st==='pending'?'<span class="covtag cov-pend">待核</span>':'<span class="covtag cov-na">'+esc(st||'—')+'</span>');
+   const st=r.state||'';const tag=st==='evaluated'?'<span class="covtag cov-eval">已评估</span>':(st==='blocked'?'<span class="covtag cov-block">时钟阻断</span>':(st==='pending'?'<span class="covtag cov-pend">待核</span>':'<span class="covtag cov-na">'+esc(st||'—')+'</span>'));
    h+='<div class=covrow><span class=c>'+esc(r.security_code)+'</span>'+tag+(r.verdict?'<span class=v>'+esc(r.verdict)+'</span>':'')+(r.scan_reason?'<span class=r>'+esc(r.scan_reason)+'</span>':'')+'</div>';
   }
   h+='</div>'

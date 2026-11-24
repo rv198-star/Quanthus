@@ -1031,6 +1031,84 @@ class RuleDayOutput:
     stage_metrics: tuple[dict[str, Any], ...]
 
 
+def _enriched_history_receipts(
+    history_receipts: Sequence[Mapping[str, Any]] | None,
+    *,
+    features_by_security: Mapping[str, SecurityFeatureFacts],
+    seam: SeamResult,
+) -> list[dict[str, Any]]:
+    """Bind the ORIGINAL algorithm verdicts onto the per-security history receipts.
+
+    The gate floors are not recomputed: each gate's satisfied|failed|unavailable
+    comes from the real panel row (feature_ready/entry_eligible/listing_sessions)
+    and the real scan (a scanned event vs none), so a short history is a named
+    failure rather than a qualified empty.  Excluded securities keep their
+    exclusion record.
+    """
+    if not history_receipts:
+        return []
+    decision_codes = {d.security_code for d in seam.decisions}
+    excluded_reason = {
+        e.get("security_code"): e.get("reason") or e.get("member_or_field") for e in seam.excluded
+    }
+    out: list[dict[str, Any]] = []
+    for raw_receipt in history_receipts:
+        receipt = dict(raw_receipt)
+        code = receipt.get("security_code")
+        if receipt.get("status") == "excluded":
+            out.append(receipt)
+            continue
+        facts = features_by_security.get(code)
+        gates = dict(receipt.get("gates") or {})
+
+        def _v(ok: bool | None, reason: str) -> dict[str, Any]:
+            return {
+                "status": "unavailable" if ok is None else ("satisfied" if ok else "failed"),
+                "reason": reason,
+            }
+
+        event_scanned = code in decision_codes and any(
+            d.event_id is not None for d in seam.decisions if d.security_code == code
+        )
+        gates["events"] = {
+            **gates.get("events", {}),
+            **_v(
+                event_scanned if facts is not None else None,
+                "event scan produced a transition"
+                if event_scanned
+                else "no qualified event in the 22-session window",
+            ),
+        }
+        gates["features"] = {
+            **gates.get("features", {}),
+            **_v(
+                None if facts is None else bool(facts.feature_ready),
+                "panel feature_ready qualified on the signal row"
+                if (facts is not None and facts.feature_ready)
+                else (excluded_reason.get(code) or ("panel feature_ready=False / facts missing")),
+            ),
+        }
+        listing_ok = (
+            None if facts is None else facts.listing_sessions >= 120  # GATE_LISTING; original floor
+        )
+        gates["listing"] = {
+            **gates.get("listing", {}),
+            **_v(
+                listing_ok,
+                f"listing_sessions={None if facts is None else facts.listing_sessions}"
+                " vs required 120",
+            ),
+        }
+        receipt["gates"] = gates
+        receipt["status"] = (
+            "qualified"
+            if all(g.get("status") == "satisfied" for g in gates.values())
+            else "not_qualified"
+        )
+        out.append(receipt)
+    return out
+
+
 def run_daily_advice(
     *,
     runner: FormalStrategyRunner,
@@ -1057,6 +1135,7 @@ def run_daily_advice(
     account_disposition: str | None = None,
     shared_prereq_ok: bool = True,
     shared_prereq_reason: str | None = None,
+    history_receipts: Sequence[Mapping[str, Any]] | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Run domain evaluation and issue its receipt in one job, before package assembly.
@@ -1210,6 +1289,8 @@ def run_daily_advice(
             }
             for d in seam.decisions
         ],
+        # H1 history-gate receipts: per-security 22/61/120 observations + the
+        # bounded listing-floor proof kind, bound into the job's digested closure.
         "held_decisions": [
             {
                 "security_code": d.security_code,
@@ -1230,6 +1311,46 @@ def run_daily_advice(
             for d in seam.held_decisions
         ],
     }
+    enriched_history = _enriched_history_receipts(
+        history_receipts,
+        features_by_security=features_by_security,
+        seam=seam,
+    )
+    source_closure["history_receipts"] = enriched_history
+    source_closure["history_receipts_digest"] = sha256_digest(enriched_history)
+
+    # H1-R2 P1-1: a history gate is a publish gate, not a label.  A receipt
+    # marked not_qualified means the original algorithm did NOT qualify that
+    # security - the day is only publishable when at least one market input was
+    # qualified, or a real held/exit evaluation produced an independent output.
+    #
+    # account_member_market_unavailable is not a market verdict: the market
+    # parse failed but the held review ran on its own facts, so that security
+    # contributes no market evidence either way.
+    market_receipts = [
+        item
+        for item in enriched_history
+        if item.get("status") != "account_member_market_unavailable"
+    ]
+    any_market_qualified = any(item.get("status") == "qualified" for item in market_receipts)
+    all_market_failed = bool(market_receipts) and not any_market_qualified
+    # Any held_decisions entry is an independent held evaluation - even a
+    # hold_alert, which is itself a valid held output (missing facts fail closed
+    # to hold_alert, never a manufactured entry).  A blocked whole-day or a
+    # missing-held case simply has an empty tuple.
+    held_evaluated = bool(seam.held_decisions)
+    if all_market_failed and not candidates and not held_evaluated and not seam.day_blocked:
+        seam = dataclasses.replace(
+            seam,
+            day_blocked=True,
+            day_block_reason=(
+                "history_gate_unsatisfied: every market input failed its "
+                "history qualification and no independent held evaluation "
+                "produced an output; this is a blocked day, never a qualified "
+                "no-advice package"
+            ),
+        )
+
     closure_digest = sha256_digest(source_closure)
     receipt = None
     if not seam.day_blocked and len(candidates) == len(seam.entries):

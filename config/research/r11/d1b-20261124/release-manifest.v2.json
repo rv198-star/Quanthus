@@ -22,7 +22,8 @@
     "code_tree": "b263eff272f6e5b8929af5420c459a365b94bcb3",
     "publish_path": "src/quanthus/product_daily/recommendation/publish.py",
     "contracts_path": "src/quanthus/product_daily/recommendation/contracts.py",
-    "runtime_identity": "src/quanthus/product_daily/recommendation/runtime_identity.py"
+    "runtime_identity": "src/quanthus/product_daily/recommendation/runtime_identity.py",
+    "release_loader": "src/quanthus/product_daily/recommendation/release_contract.py"
   },
   "input_closure": {
     "pointer": "cn02:/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5/CURRENT_DAILY_CORE_BASE24.json",
@@ -92,5 +93,19 @@
     "consumer_capability": "versioned p12-consumer-binding.v1 object: consumer_schema=p12.decision-set.v2 + real source_commit/tree/file-hash pin + capabilities.supports_held_reduction_v2 + single-call field-preserving validated object",
     "missing_consumer_disposition": "refused or display_only",
     "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set(raw,*,expected_schema=p12.decision-set.v2)); caller bools/dicts, unpinned bindings and old field-dropping loaders are all refused before write; real pin pending -> refused/display_only"
+  },
+  "release_bindings": {
+    "machine_policy": {
+      "path": "config/research/r11/d1b-20261124/machine-policy.v2.json",
+      "sha256": "sha256:b974af06e219235e00e81b81137e1b7d2e137d0e11b44b3caaac0eb032351033"
+    },
+    "action_receipts": {
+      "path": "config/research/r11/d1b-20261124/action-receipts.v1.json",
+      "sha256": "sha256:5e015303ce55a60684d911a05ed05a07f76e06001a827382ab80a6855fa237c8"
+    },
+    "consumer": {
+      "path": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json",
+      "sha256": "sha256:09aaf05f4468471b2bf5df6765c342f8ab18ade4ec32190a42af0de8974caa0d"
+    }
   }
 }

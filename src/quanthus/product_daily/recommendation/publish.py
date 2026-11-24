@@ -338,7 +338,7 @@ def publish_package(
     elapsed_ms: int = 0,
     p12_loader: Callable[..., Any] | None = None,
     consumer_binding: dict[str, Any] | None = None,
-    wire_version: str = V1_DS_SCHEMA,
+    wire_version: str | None = None,
 ) -> PublishReceipt:
     """Write one package file append-only and return a receipt with all digest surfaces.
 
@@ -350,16 +350,12 @@ def publish_package(
     for each released date; without it p12_package_digests is None and the caller
     must not treat the file as bound on the consumer side.
 
-    wire_version selects the decision-set schema layer (p12.decision-set.v1 default,
-    or p12.decision-set.v2 for the held-reduction surface).  A release carrying an
-    executable reduce or serialized on the v2 surface can only be written when the
-    versioned P12 v2 consumer pin resolves to real bytes; while that pin is pending
-    every such release refuses before any file exists - no caller flag, dict,
-    attribute or namespace opens it.
+    The registered release selects the wire using the package policy identity.
+    wire_version, if supplied by a compatibility caller, only asserts that choice;
+    it never selects or downgrades a release.  Historical G1 fixture publication
+    has a distinct registered policy and still emits the frozen v1 bytes.
 
-    consumer_binding is accepted for signature compatibility but is never a
-    release authority: the only consumer identity is the versioned on-disk
-    binding resolved inside _consumer_pin_unresolved.
+    consumer_binding is retained for signature compatibility and grants no authority.
     """
 
     del consumer_binding  # never a release authority; see docstring
@@ -381,6 +377,17 @@ def publish_package(
             "a package containing any blocked decision is a diagnostic artifact, "
             "never a published advice day",
         )
+
+    from quanthus.policy import find_project_root
+    from quanthus.product_daily.recommendation.release_contract import select_package_release
+
+    release = select_package_release(package, find_project_root())
+    if wire_version is not None and wire_version != release.wire_version:
+        raise ProductDailyError(
+            "version_inconsistent",
+            "caller wire differs from the configured release; wire_version is an assertion only",
+        )
+    wire_version = release.wire_version
 
     # Wire version: the v1 byte surface is the frozen historical default and carries
     # no exit fields and no decision_set_schema header; an executable reduce may

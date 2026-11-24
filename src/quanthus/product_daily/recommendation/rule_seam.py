@@ -615,7 +615,6 @@ class RuleSeamAdapter:
 
 
 def _digest(label: str) -> str:
-    import hashlib
 
     return "sha256:" + hashlib.sha256(label.encode("utf-8")).hexdigest()
 
@@ -1778,6 +1777,12 @@ def load_release_manifest(path: Any) -> dict[str, Any]:
                 "invalid_three_piece",
                 "industry_mapping without a sha256 must declare binding_state pending/blocked",
             )
+    if raw["schema_version"] == "quanthus.p11-d1b.release-manifest.v2":
+        from quanthus.product_daily.recommendation.release_contract import (
+            validate_manifest_structure,
+        )
+
+        validate_manifest_structure(raw)
     return raw
 
 
@@ -1787,198 +1792,14 @@ def verify_release_manifest_closure(
     project_root: Any,
     pending_is_failure: bool = True,
 ) -> None:
-    """Verify the manifest's declared code/input identities against real bytes.
+    """Verify registered files, mandatory bindings and index/worktree closure."""
+    from quanthus.product_daily.recommendation.release_contract import verify_manifest
 
-    Structural parsing (load_release_manifest) only proves the file is well-formed;
-    release-ready qualification additionally requires the declared code commit/tree
-    to exist and the FULL semantic tracked closure under it (every tracked file
-    under src/quanthus/, config/ and tests/) to be byte-identical with the
-    checked-out tree - additions, deletions and modifications all count.  The
-    only tolerated diffs are the self-referential release manifests and the
-    named governance/planning ledger+view paths, which are metadata, not release
-    bytes.  An untracked file under a semantic root is a closure defect, not an
-    oversight.  Named input bindings (feature registry, strategy card,
-    expert/evaluation specs) must hash-match their governing files; a pending
-    industry binding is reported as pending and can never satisfy a READY check,
-    while a non-null industry sha whose path is absent fails outright.  This is
-    the three-piece release gate, not a claim of source qualification or adoption.
-
-    pending_is_failure=False reports the same byte drift/forgery failures while
-    treating an explicit pending binding as the qualified-pending state it is
-    (check_three_piece_consistency uses it: the composed set is PENDING rather
-    than READY, but code drift or a forged hash still fails).  pending_is_failure
-    may only soften the pending industry/source binding - never the byte diff.
-
-    Returns None on success; raises ProductDailyError otherwise.
-    """
-
-    import subprocess
-
-    root = Path(project_root)
-    failures: list[str] = []
-
-    code_entry = release_manifest.get("code_entry") or {}
-    code_commit = code_entry.get("code_commit")
-    code_tree = code_entry.get("code_tree")
-
-    # Every named code role must resolve; an omitted entry silently removes that
-    # artifact from verification, so the required role set is closed.
-    required_code_fields = {
-        "seam",
-        "producer",
-        "expert_runner",
-        "event_scan",
-        "entry_seam",
-        "trend_producer",
-        "context_builder",
-        "publish_path",
-        "contracts_path",
-        "runtime_identity",
-    }
-    missing_fields = sorted(required_code_fields - set(code_entry))
-    if missing_fields:
-        failures.append(f"code_entry missing required roles: {missing_fields}")
-
-    actual_tree = None
-    declared_commit = code_commit if isinstance(code_commit, str) else ""
-    if declared_commit:
-        try:
-            actual_tree = subprocess.check_output(
-                ["git", "rev-parse", f"{declared_commit}^{{tree}}"],
-                cwd=root,
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip()
-        except (OSError, subprocess.CalledProcessError):
-            actual_tree = None
-    if actual_tree is None or actual_tree != code_tree:
-        failures.append(
-            f"code_entry {code_commit}/{code_tree} does not resolve to the declared tree"
-        )
-    else:
-        # Full tracked semantic closure: every tracked file under the release's
-        # semantic roots must be byte-identical between the declared commit and
-        # the on-disk tree.  Allowed diffs: the self-referential release
-        # manifests and the governance/planning ledger+view metadata (not
-        # release bytes).
-        allowed_diff_prefixes = ("config/planning/", "docs/")
-        allowed_diff_exact = {
-            "config/research/r11/d1b-20261124/release-manifest.v1.json",
-            "config/research/r11/d1b-20261124/release-manifest.v2.json",
-        }
-        semantic_prefixes = (
-            "src/quanthus/",
-            "config/",
-            "tests/",
-        )
-        try:
-            # git diff <commit> -- <roots> reports every tracked/index path that
-            # differs from the declared commit: modifications, staged additions
-            # and deletions all appear, so a file added after the declaration or
-            # removed from the declared set is a drift, never silently omitted.
-            diff_out = subprocess.check_output(
-                ["git", "-C", str(root), "diff", "--name-only", declared_commit, "--"]
-                + list(semantic_prefixes),
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).splitlines()
-        except (OSError, subprocess.CalledProcessError):
-            diff_out = None
-        try:
-            # Untracked-but-not-ignored files under a semantic root are a real
-            # closure defect: a new release-relevant path that never entered the
-            # declared tree must not ride along unverified.
-            untracked = subprocess.check_output(
-                ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard", "--"]
-                + list(semantic_prefixes),
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).splitlines()
-        except (OSError, subprocess.CalledProcessError):
-            untracked = []
-        if diff_out is None:
-            failures.append("semantic closure diff could not be evaluated")
-        else:
-            drifted = sorted(
-                rel
-                for rel in set(diff_out) | set(untracked)
-                if isinstance(rel, str)
-                and rel not in allowed_diff_exact
-                and not rel.startswith(allowed_diff_prefixes)
-            )
-            if drifted:
-                failures.append(
-                    f"semantic closure drifted vs {code_commit}: {drifted[:12]}"
-                    + (" ..." if len(drifted) > 12 else "")
-                )
-
-    def _sha_or_none(rel: str) -> str | None:
-        try:
-            return hashlib.sha256((root / rel).read_bytes()).hexdigest()
-        except OSError:
-            return None
-
-    def _require_file_sha(label: str, rel: Any, declared: Any) -> None:
-        if not isinstance(rel, str) or not isinstance(declared, str):
-            return
-        expected = declared[len("sha256:") :] if declared.startswith("sha256:") else declared
-        actual = _sha_or_none(rel)
-        if actual != expected:
-            failures.append(
-                f"{label} {rel} sha256 mismatch (declared {declared})"
-                + (" - path absent" if actual is None else "")
-            )
-
-    closure = release_manifest.get("input_closure") or {}
-    registry = closure.get("feature_registry") or {}
-    _require_file_sha("feature_registry", registry.get("path"), registry.get("sha256"))
-    strategy = release_manifest.get("strategy") or {}
-    _require_file_sha("strategy card", strategy.get("card_path"), strategy.get("card_sha256"))
-
-    # Expert-binding named hashes each pin a real governing file.
-    expert = release_manifest.get("expert_binding") or {}
-    named_expert_files = {
-        "trend_expert_config_sha256": (
-            "config/expert-evaluations/experts/trend-stability.v1.json"
-        ),
-        "trend_eval_spec_sha256": (
-            "config/expert-evaluations/specs/trend-stability-p4-first-passage.evaluation.v1.json"
-        ),
-        "position_eval_spec_sha256": (
-            "config/expert-evaluations/specs/position-risk-formal-policy.evaluation.v1.json"
-        ),
-        "card_sha256": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
-    }
-    for key, rel in named_expert_files.items():
-        declared = expert.get(key)
-        if isinstance(declared, str) and declared.startswith("sha256:"):
-            _require_file_sha(f"expert_binding {key}", rel, declared)
-
-    industry = closure.get("industry_mapping") or {}
-    industry_sha = industry.get("sha256")
-    industry_path = industry.get("path")
-    if industry.get("binding_state") in {"pending", "blocked"} or industry_sha is None:
-        if pending_is_failure:
-            failures.append(
-                "industry_mapping binding is pending/blocked - not a READY input; a "
-                "release requiring it stays qualified-pending until P10 binds a sha256"
-            )
-    elif isinstance(industry_sha, str) and industry_sha.startswith("sha256:"):
-        if isinstance(industry_path, str) and not (root / industry_path).exists():
-            failures.append(
-                f"industry_mapping declares {industry_sha} but {industry_path} is "
-                "absent - a non-null hash must bind real bytes"
-            )
-        elif isinstance(industry_path, str):
-            actual = _sha_or_none(industry_path)
-            if actual != industry_sha[len("sha256:") :]:
-                failures.append(f"industry_mapping {industry_path} sha256 mismatch")
-
-    if failures:
-        raise ProductDailyError(
-            "manifest_closure_unverified",
-            "; ".join(failures),
-        )
+    verify_manifest(
+        release_manifest,
+        project_root=Path(project_root),
+        pending_is_failure=pending_is_failure,
+    )
 
 
 def check_three_piece_consistency(
@@ -1988,53 +1809,17 @@ def check_three_piece_consistency(
     release_manifest: dict[str, Any],
     project_root: Any = None,
 ) -> None:
-    """Cross-file identity/version check; any inconsistency fails the release.
-
-    The composed set only means something if the manifest's declared code/input
-    bytes are the real closure under review, so the same
-    verify_release_manifest_closure gate runs here - a forged code commit or a
-    tampered companion file is refused at composition time, not later.
-    """
-
+    """Strictly reload and bind every supplied object to the same registered files."""
     from quanthus.policy import find_project_root
+    from quanthus.product_daily.recommendation.release_contract import verify_manifest
 
-    root = project_root if project_root is not None else find_project_root()
-    for entry in action_receipts:
-        if (
-            entry.get("adoption_state") == "adopted"
-            and release_manifest.get("daily_adopted") is False
-        ):
-            raise ProductDailyError(
-                "inconsistent_three_piece",
-                f"action {entry.get('action')} adopted while release-manifest daily_adopted=false",
-            )
-    caps = {cap.get("field"): cap for cap in machine_policy.get("position_caps", ())}
-    if (
-        "single_security_fraction" in caps
-        and caps["single_security_fraction"].get("denominator") == "account_equity"
-    ):
-        raise ProductDailyError(
-            "inconsistent_three_piece",
-            "single_security_fraction must not use account_equity as denominator",
-        )
-    if machine_policy.get("schema_version") == "quanthus.p11-d1b.machine-policy.v2":
-        wire = machine_policy.get("held_reduction_wire") or {}
-        # The manifest must carry the same held-reduction wire version the policy
-        # serializes, so a consumer can pin one contract version end to end.
-        manifest_wire = release_manifest.get("held_reduction_wire")
-        if not isinstance(manifest_wire, dict) or manifest_wire.get("wire_version") != (
-            wire.get("wire_version")
-        ):
-            raise ProductDailyError(
-                "inconsistent_three_piece",
-                "release-manifest must declare the same held_reduction_wire version as "
-                "the v2 machine policy",
-            )
-    # The composed set inherits the manifest's byte closure: drift or forgery is
-    # an inconsistency, while an explicit pending binding is PENDING (consistent
-    # but not READY), reported by the caller as qualified-pending.
-    verify_release_manifest_closure(
+    verified = verify_manifest(
         release_manifest,
-        project_root=root,
+        project_root=Path(project_root) if project_root is not None else find_project_root(),
         pending_is_failure=False,
     )
+    if machine_policy != verified.policy or action_receipts != verified.receipts:
+        raise ProductDailyError(
+            "inconsistent_three_piece",
+            "machine_policy/action_receipts objects differ from the registered verified files",
+        )

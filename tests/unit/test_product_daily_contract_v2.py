@@ -782,14 +782,15 @@ def test_validate_consumer_object_rejects_dropped_exit_kind(monkeypatch):
         _validate_consumer_object(raw, drifted, wire_version="p12.decision-set.v2")
 
 
-def test_full_exit_package_publishes_without_v2_consumer(tmp_path):
+def test_configured_full_exit_also_requires_v2_consumer(tmp_path):
     package = _publishable_package(_held("exit", None))
-    receipt = publish_package(
-        package,
-        directory=tmp_path,
-        published_at=package.decision_sets[0].published_at,
-    )
-    assert receipt.file_sha256.startswith("sha256:")
+    with pytest.raises(ProductDailyError, match="pin"):
+        publish_package(
+            package,
+            directory=tmp_path,
+            published_at=package.decision_sets[0].published_at,
+        )
+    assert not list(tmp_path.glob("*.json"))
 
 
 # --- B. v2 wire emission: exit fields live only on the v2 decision payload ---------------

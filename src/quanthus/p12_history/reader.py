@@ -259,6 +259,13 @@ def read_history(
             if base_knowledge > decision_cutoff:
                 late_visible_members.append(_member_key(m))
             _reg(m, base_knowledge, visible_at=base_knowledge)
+    # P1 factor-PIT exception ledger (audit 749-05): registered in the
+    # envelope source_members with its own pinned publication + sha + the
+    # original source clock so member_consumption's relevant_for_T entry
+    # resolves to a real envelope member (P11 load_replay_request requires
+    # the consumed member to be supplied).
+    p1_member = smap.p1_exception_member()
+    _reg(p1_member, base_knowledge, visible_at=base_knowledge)
     for day in smap.daily_open_days():
         if day > market_date.isoformat():
             continue

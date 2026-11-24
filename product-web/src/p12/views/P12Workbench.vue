@@ -403,9 +403,9 @@
               data-testid="p12-plan-confirm"
             >
               <div class="p12-plan-confirm-body">
-                <strong>系统建议买入 {{ confirmablePlan.security_code }}</strong>
+                <strong>{{ confirmablePlan.side === 'sell' ? '系统建议卖出' : '系统建议买入' }} {{ confirmablePlan.security_code }}</strong>
                 <p class="p12-num">
-                  {{ confirmablePlan.delta_qty }} 股 · 限价上限 ¥{{ confirmablePlan.price_cap }}
+                  {{ confirmablePlan.side === 'sell' ? Math.abs(confirmablePlan.delta_qty) : confirmablePlan.delta_qty }} 股 · 限价{{ confirmablePlan.side === 'sell' ? '下限' : '上限' }} ¥{{ confirmablePlan.price_cap }}
                   · 窗口 {{ time(confirmablePlan.eligible_at) }}–{{ time(confirmablePlan.expires_at).slice(11) }}
                 </p>
                 <small>确认即按服务端该计划的数量与限价提交模拟委托，无需手工填单。</small>
@@ -612,7 +612,7 @@
               </template>
             </template>
 
-            <template v-else-if="selected.stage === 'exit_plan' && !isUnheldExit(selected) && !isReduceExit(selected) && !isUnverifiedExit(selected)">
+            <template v-else-if="selected.stage === 'exit_plan' && !isUnheldExit(selected) && !isDisplayOnlyReduce(selected) && !isUnverifiedExit(selected)">
               <dl class="p12-plan p12-num" data-testid="p12-sell-plan">
                 <div><dt>当前持有</dt><dd>{{ qty(sellTask ? sellTask.held : 0) }}</dd></div>
                 <div><dt>卖出数量</dt><dd>{{ sellTask ? qty(sellTask.total) : '—' }}</dd></div>
@@ -660,11 +660,11 @@
               <p v-if="isUnheldExit(selected)" data-testid="p12-unheld-exit-note">
                 本账户此前未买入 {{ selectedDisplayName }}（当前持仓 0 股），本轮退出计划对你的账户不产生卖出任务或待办费用。
               </p>
-              <p v-else-if="selected.stage === 'exit_plan' && isReduceExit(selected)" data-testid="p12-reduce-note">减仓建议（执行将在批次 B 接入）：建议减少对 {{ selectedDisplayName }} 的持仓，本批不生成卖出任务，持仓继续持有。</p>
+              <p v-else-if="selected.stage === 'exit_plan' && isDisplayOnlyReduce(selected)" data-testid="p12-reduce-note">减仓建议：建议减少对 {{ selectedDisplayName }} 的持仓，本轮无可执行卖出数量，持仓继续持有。</p>
               <!-- Issue #722 r7-1: an unverifiable exit now reads as a HELD row -->
               <!-- (stage holding, HOLD + MISSING_INPUT + INPUT_UNAVAILABLE); the -->
               <!-- note still names it so the holding is never read as a sell. -->
-              <p v-else-if="isUnverifiedExit(selected)" data-testid="p12-unverified-note">退出类型无法核实，暂不确认；持仓继续持有。</p>
+              <p v-else-if="selected.stage === 'exit_plan' && isUnverifiedExit(selected)" data-testid="p12-unverified-note">退出类型无法核实，暂不确认；持仓继续持有。</p>
               <p v-else-if="selected.stage === 'exit_plan' && selected.status_code === 'ENDED'" data-testid="p12-ended-note">{{ actionSentence }}</p>
               <p v-else-if="selected.stage === 'exit_plan'" data-testid="p12-sell-note">{{ actionSentence }}</p>
               <p v-if="selected.stage === 'exit_plan'" class="p12-precheck-warn" data-testid="p12-sell-unverified-note">无法核验停牌或跌停，委托可能无法成交；卖出确认照常放行。</p>
@@ -1158,9 +1158,16 @@ export default {
       const sel = this.selected
       if (!sel || sel.selfDirected || this.isRehearsal) return null
       const plan = sel.plan
-      if (!plan || plan.side !== 'buy' || this.isSelectedPlanExpired) return null
-      if (!(plan.delta_qty > 0)) return null
-      const actionable = (sel.action_code === 'BUY' && sel.status_code === 'READY') ||
+      if (!plan || this.isSelectedPlanExpired) return null
+      const isSell = plan.side === 'sell'
+      // A buy plan carries a positive delta; an executable sell plan carries
+      // a negative delta (the quantity to leave).  Both confirm through the
+      // same plan:{plan_id} order id.
+      const executable = isSell ? plan.delta_qty < 0 : plan.delta_qty > 0
+      if (!executable) return null
+      const actionable =
+        (sel.action_code === 'BUY' && sel.status_code === 'READY') ||
+        (isSell && sel.action_code === 'SELL' && sel.status_code === 'READY') ||
         (sel.applicability && sel.applicability.status === 'ACTIONABLE')
       if (!actionable) return null
       return { ...plan, security_code: sel.security_code }
@@ -1774,6 +1781,13 @@ export default {
     isReduceExit (item) {
       return Boolean(item && item.stage === 'exit_plan' && item.exit_kind === 'reduce')
     },
+    // Issue #723 E8 r2-4: a reduce exit_plan whose plan sized to zero stays
+    // a display-only 减仓建议 note; one with an executable sell plan goes
+    // through the sell task / confirm path.  An unverified exit is handled
+    // separately by isUnverifiedExit.
+    isDisplayOnlyReduce (item) {
+      return this.isReduceExit(item) && !(item.plan && item.plan.delta_qty < 0)
+    },
     isUnverifiedExit (item) {
       // Issue #722 r6-3 + r7-1: an exit whose reduce/full type cannot be
       // verified reads as a HELD row (backend rewrites the stage to holding
@@ -2012,9 +2026,11 @@ export default {
         const nowIso = this.marketSession?.server_time || this.workbench?.clock || new Date().toISOString()
         const result = await submitSimOrder(this.accountId, {
           order_id: `plan:${plan.plan_id}`,
-          side: 'buy',
+          side: plan.side === 'sell' ? 'sell' : 'buy',
           security_code: targetCode,
-          quantity: plan.delta_qty,
+          // The server re-derives authoritative quantity/window server-side;
+          // send the positive order quantity for a sell (delta_qty is signed).
+          quantity: plan.side === 'sell' ? Math.abs(plan.delta_qty) : plan.delta_qty,
           limit_price: plan.price_cap,
           occurred_at: nowIso
         })

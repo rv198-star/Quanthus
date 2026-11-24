@@ -42,6 +42,18 @@ STORE_NAME = "p12-paper.sqlite"
 USER_REPORTED_SOURCE = "user_reported"
 SIM_MATCHED_SOURCE = "sim_matched"
 
+# SQLite column order shared by the sim_orders table, the rebuild migration
+# and the row tuple; session_date is last so older rows stay readable.
+SIM_ORDER_COLUMNS = (
+    "account_id", "order_id", "side", "security_code", "security_name",
+    "quantity", "limit_price", "filled_qty", "status", "rule_version",
+    "accepted_at", "last_quote_time", "avg_price", "reject_reason",
+    "source", "receipt_id", "fill_source_seq", "updated_at", "session_date",
+)
+
+# Continuous-auction open in Asia/Shanghai, matching the exchange session.
+SESSION_OPEN_ISO = "09:30:00+08:00"
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc).astimezone()
@@ -65,6 +77,11 @@ class PaperOrder:
     reject_reason: str | None
     source: str               # sim_matched | user_reported
     receipt_id: str | None
+    # Issue #723 E8 r2-5: a plan-confirm order is bound to the confirming
+    # package authoritative next_session - it may rest unfilled past the
+    # generic close and releases only inside that session open, never
+    # earlier on a disagreeing quote calendar.  None stays a same-day order.
+    session_date: str | None = None
 
     @property
     def remaining_qty(self) -> int:
@@ -91,6 +108,7 @@ class PaperOrder:
             "reject_text": REJECT.get(self.reject_reason or "", None),
             "source": self.source,
             "receipt_id": self.receipt_id,
+            "session_date": self.session_date,
         }
 
 
@@ -141,22 +159,27 @@ class PaperOrderStore:
         scoped to its own account.
         """
         cols = {row[1] for row in c.execute("PRAGMA table_info(sim_orders)")}
-        if "account_id" in cols:
-            # Already has account_id; check whether the PK is composite.
-            pk = [r[1] for r in c.execute("PRAGMA table_info(sim_orders)") if r[5]]
-            if pk == ["account_id", "order_id"]:
-                return
-            # Rebuild: old PK on order_id alone -> composite PK.
-            c.execute("ALTER TABLE sim_orders RENAME TO sim_orders_old")
-            self._create(c)
-            c.execute(
-                "INSERT OR IGNORE INTO sim_orders SELECT * FROM sim_orders_old"
-            )
-            c.execute("DROP TABLE sim_orders_old")
+        pk = [r[1] for r in c.execute("PRAGMA table_info(sim_orders)") if r[5]]
+        if "account_id" in cols and pk == ["account_id", "order_id"] and "session_date" in cols:
             return
-        c.execute("ALTER TABLE sim_orders ADD COLUMN account_id TEXT NOT NULL DEFAULT 'SYN-P12-A'")
-        # column added; next call rebuilds to composite pk
-        self._migrate(c)
+        # Any older shape rebuilds once into the current columns.  Rows
+        # without account_id could only have been written by the single
+        # bound account, so they get the synthetic discriminator; rows
+        # without session_date stay unbound (a same-day order).
+        c.execute("ALTER TABLE sim_orders RENAME TO sim_orders_old")
+        self._create(c)
+        old_cols = {row[1] for row in c.execute("PRAGMA table_info(sim_orders_old)")}
+        if "account_id" not in old_cols:
+            c.execute(
+                "ALTER TABLE sim_orders_old ADD COLUMN account_id TEXT NOT NULL DEFAULT 'SYN-P12-A'"
+            )
+            old_cols = {row[1] for row in c.execute("PRAGMA table_info(sim_orders_old)")}
+        shared = [col for col in SIM_ORDER_COLUMNS if col in old_cols]
+        c.execute(
+            "INSERT OR IGNORE INTO sim_orders (" + ",".join(SIM_ORDER_COLUMNS) + ")"
+            + " SELECT " + ",".join(shared) + ",NULL FROM sim_orders_old"
+        )
+        c.execute("DROP TABLE sim_orders_old")
 
     def _migrate_legacy(self) -> None:
         # kept for clarity; migration runs inside _init via _migrate
@@ -202,6 +225,7 @@ class PaperOrderStore:
               receipt_id TEXT,
               fill_source_seq TEXT,
               updated_at TEXT NOT NULL,
+              session_date TEXT,
               PRIMARY KEY (account_id, order_id)
             )
             """
@@ -220,20 +244,20 @@ class PaperOrderStore:
         vals[16] = fill_source_seq
         with self._connect() as c:
             c.execute(
-                "INSERT INTO sim_orders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO sim_orders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 tuple(vals),
             )
 
     def update(self, order: PaperOrder, *, fill_source_seq: str | None = None) -> None:
         with self._connect() as c:
             c.execute(
-                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=? WHERE order_id=? AND account_id=?",
+                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=?, session_date=? WHERE order_id=? AND account_id=?",
                 (
                     order.filled_qty, order.status,
                     None if order.last_quote_time is None else order.last_quote_time.isoformat(),
                     None if order.avg_price is None else format(order.avg_price, "f"),
                     order.reject_reason, order.receipt_id, fill_source_seq,
-                    _utcnow().isoformat(), order.order_id, order.account_id,
+                    _utcnow().isoformat(), order.session_date, order.order_id, order.account_id,
                 ),
             )
 
@@ -252,13 +276,13 @@ class PaperOrderStore:
         """
         with self._connect() as c:
             cur = c.execute(
-                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=? WHERE order_id=? AND account_id=? AND status=?",
+                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=?, session_date=? WHERE order_id=? AND account_id=? AND status=?",
                 (
                     order.filled_qty, order.status,
                     None if order.last_quote_time is None else order.last_quote_time.isoformat(),
                     None if order.avg_price is None else format(order.avg_price, "f"),
                     order.reject_reason, order.receipt_id, fill_source_seq,
-                    _utcnow().isoformat(), order.order_id, order.account_id,
+                    _utcnow().isoformat(), order.session_date, order.order_id, order.account_id,
                     expected_status,
                 ),
             )
@@ -306,6 +330,7 @@ class PaperOrderStore:
             last_quote_time=(None if r["last_quote_time"] is None else datetime.fromisoformat(r["last_quote_time"])),
             avg_price=(None if r["avg_price"] is None else Decimal(r["avg_price"])),
             reject_reason=r["reject_reason"], source=r["source"], receipt_id=r["receipt_id"],
+            session_date=r["session_date"],
         )
 
     @staticmethod
@@ -318,6 +343,7 @@ class PaperOrderStore:
             None if o.last_quote_time is None else o.last_quote_time.isoformat(),
             None if o.avg_price is None else format(o.avg_price, "f"),
             o.reject_reason, o.source, o.receipt_id, None, _utcnow().isoformat(),
+            o.session_date,
         )
 
 
@@ -454,10 +480,22 @@ class PaperAccount:
         # closed its window, or disagrees with the submitted side/security is
         # refused before any cash is committed.
         plan = None
+        bound_session_date = None
         if command.order_id.startswith("plan:"):
             plan_id = command.order_id.split(":", 1)[1]
             resolver = getattr(self._app, "paper_current_plan", None)
-            plan = resolver(plan_id) if callable(resolver) else None
+            # E8 r2-3: a sell confirm re-sizes on the confirm-time mark -
+            # the live quote last price this order will actually fill
+            # against - never the stale package mark.  The resolver falls
+            # back to the package mark when no live mark is available.
+            live_mark = None
+            live_quote = self._quotes.quote(command.security_code)
+            if live_quote is not None and live_quote.last_price is not None:
+                live_mark = live_quote.last_price
+            try:
+                plan = resolver(plan_id, live_mark) if callable(resolver) else None
+            except TypeError:
+                plan = resolver(plan_id) if callable(resolver) else None
             if plan is None:
                 return self._reject(command, "PLAN_NOT_FOUND", None)
             if plan.side != command.side or plan.security_code != command.security_code:
@@ -469,6 +507,16 @@ class PaperAccount:
                 security_code=command.security_code,
                 quantity=plan.delta_qty,
                 limit_price=plan.price_cap,
+            )
+            # Issue #723 E8 r2-5: the confirming package next_session is the
+            # order session binding.  A post-publish confirm may register while
+            # the generic session is closed and waits for the bound session
+            # open instead of being refused outright.
+            get_decisions = getattr(self._app, "_current_decisions", None)
+            decisions = get_decisions() if callable(get_decisions) else None
+            next_session = getattr(decisions, "next_session", None)
+            bound_session_date = (
+                next_session.isoformat() if next_session is not None else None
             )
             # Issue #719 R12 / #723 (r2): typed unavailable gates for the
             # pre-open facts this plan's conditions declare apply ONLY to
@@ -517,8 +565,15 @@ class PaperAccount:
 
         # Supported-session admission: a resting limit order is only accepted
         # inside continuous auction.  Orders submitted after close are refused
-        # with MARKET_CLOSED rather than parked into the next session.
-        if session["market_state"] != "trading":
+        # with MARKET_CLOSED rather than parked into the next session -
+        # EXCEPT a plan-confirm order bound to the package next_session:
+        # publication lands after the T close, so that confirm registers as
+        # a pending intent and releases only inside the bound session open,
+        # never at the post-close instant and never on a disagreeing quote
+        # calendar (issue #723 E8 r2-5).  A suspended or quoteless security
+        # still refuses up front - parking it would park a never-fillable
+        # order.
+        if session["market_state"] != "trading" and bound_session_date is None:
             return self._reject(command, "MARKET_CLOSED", quote)
         if quote.status == "halt":
             return self._reject(command, "SECURITY_SUSPENDED", quote)
@@ -535,6 +590,7 @@ class PaperAccount:
             accepted_at=self._now(), last_quote_time=quote.quote_time,
             avg_price=None, reject_reason=None,
             source=SIM_MATCHED_SOURCE, receipt_id=None,
+            session_date=bound_session_date,
         )
         # Register the accepted order in the shared ledger first so a later
         # simulated fill posts against a real order row and the records view
@@ -640,6 +696,17 @@ class PaperAccount:
             return None
         if session["market_state"] != "trading":
             return None
+        # Issue #723 E8 r2-5: a plan-bound order releases only inside the
+        # confirming package own next_session - the quote clock session,
+        # not the order accept date, gates the first fill, and a quote
+        # stamped before that bound session open never releases it even
+        # while the generic session reads trading.
+        if order.session_date is not None:
+            if order.session_date != session["trading_date"]:
+                return None
+            qt = quote.quote_time.astimezone(SHANGHAI) if quote.quote_time is not None else None
+            if qt is not None and qt.isoformat() < order.session_date + "T" + SESSION_OPEN_ISO:
+                return None
         if quote.status != "live" or quote.last_price is None or quote.quote_time is None:
             return None
         # Only quotes at or after the order's accept may fill it.
@@ -778,11 +845,22 @@ class PaperAccount:
         day_done = session["market_state"] in ("call_auction_close", "closed", "holiday")
         n = 0
         for order in self._store.open_for(self._account_id):
-            accepted_day = order.accepted_at.astimezone(SHANGHAI).date()
-            # Cross-day orders always expire; same-day orders expire once the
-            # continuous session has finished (lunch break keeps them resting).
-            if accepted_day >= trading_day and not day_done:
-                continue
+            # Issue #723 E8 r2-5/6: a plan-bound order rides the confirming
+            # package next_session, not the generic accept-day close.  It
+            # outlives a closed accept day, releases inside the bound session
+            # open, and only terminates once that session continuous auction
+            # has finished - the terminal observation then releases the held
+            # quantity for the next-day continuation.
+            if order.session_date is not None:
+                bound = datetime.fromisoformat(order.session_date).date()
+                if not (trading_day >= bound and day_done):
+                    continue
+            else:
+                accepted_day = order.accepted_at.astimezone(SHANGHAI).date()
+                # Cross-day orders always expire; same-day orders expire once
+                # the continuous session has finished (lunch keeps them resting).
+                if accepted_day >= trading_day and not day_done:
+                    continue
             object.__setattr__(order, "status", "expired")
             if not self._store.update_if_status(order, expected_status="open"):
                 continue
@@ -833,7 +911,16 @@ class PaperAccount:
         if session["market_state"] in ("trading", "lunch_break", "call_auction_close"):
             return 0
         n = 0
+        bound_day = datetime.fromisoformat(session["trading_date"]).date()
         for order in self._store.open_for(self._account_id):
+            # A plan-bound order ends only when its bound session ends - it
+            # is not closed by the generic accept-day close (E8 r2-5).
+            bound = (
+                datetime.fromisoformat(order.session_date).date()
+                if order.session_date else None
+            )
+            if bound is not None and bound_day < bound:
+                continue
             object.__setattr__(order, "status", "expired")
             if not self._store.update_if_status(order, expected_status="open"):
                 continue

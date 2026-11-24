@@ -125,7 +125,10 @@ def size_exit(
             REDUCE_BUDGET_UNKNOWN,
         )
 
-    max_remaining_value = (target_position_fraction * locked_cycle_budget).quantize(Decimal("0.01"))
+    # E8 r2-3: the keep target uses the raw precision product - never a
+    # cent-rounded value - so a sub-lot residue is not rounded up into a
+    # spurious whole lot before the lot floor is applied.
+    max_remaining_value = target_position_fraction * locked_cycle_budget
     keep_qty = _lot_floor(max_remaining_value / mark_price, lot_size)
     if keep_qty <= 0 and target_position_fraction > 0:
         return ExitSizing(

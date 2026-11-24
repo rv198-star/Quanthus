@@ -6,8 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
-SCHEMA_VERSION = 'p12.desktop.v1'
-SCHEMA_DIGEST = 'sha256:c97f849cbe61fc820e8dadd357eae9cda9a98ff9263b813e33778a262466b271'
+SCHEMA_VERSION = 'p12.desktop.v2'
+SCHEMA_DIGEST = 'sha256:197de920fdf654cf23dd8696e4d918e8094143ac75780fa834bda9bb6e7835c4'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -891,7 +891,7 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                                                    'type': 'array'},
                                   'risk_check_ref': {'$ref': '#/components/schemas/Digest'},
                                   'security_code': {'minLength': 1, 'type': 'string'},
-                                  'side': {'enum': ['buy'], 'type': 'string'},
+                                  'side': {'enum': ['buy', 'sell'], 'type': 'string'},
                                   'target_qty': {'minimum': 0, 'type': 'integer'},
                                   'window_ref': {'minLength': 1, 'type': 'string'}},
                    'required': ['cash_bound',
@@ -1178,7 +1178,7 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                                      'version': {'minLength': 1, 'type': 'string'}},
                       'required': ['ref_id', 'version', 'digest'],
                       'type': 'object'},
- 'SchemaVersion': {'const': 'p12.desktop.v1', 'type': 'string'},
+ 'SchemaVersion': {'const': 'p12.desktop.v2', 'type': 'string'},
  'Scope': {'additionalProperties': False,
            'properties': {'account_id': {'minLength': 1, 'type': 'string'},
                           'mode': {'$ref': '#/components/schemas/Mode'}},

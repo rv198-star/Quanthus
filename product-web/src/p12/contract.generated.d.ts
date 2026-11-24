@@ -349,7 +349,7 @@ export interface PublishedPlan {
   reason_codes: Array<ReasonCode>
   risk_check_ref: Digest
   security_code: string
-  side: "buy"
+  side: "buy" | "sell"
   target_qty: number
   window_ref: string
 }
@@ -451,7 +451,7 @@ export interface RunReceiptRunner {
   version: string
 }
 
-export type SchemaVersion = "p12.desktop.v1"
+export type SchemaVersion = "p12.desktop.v2"
 
 export interface Scope {
   account_id: string

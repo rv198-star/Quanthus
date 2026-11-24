@@ -166,6 +166,31 @@ def _sellable_for(security_code, projection, history, reserved, trading_day):
     return max(0, held - today - int(reserved.get(security_code, 0)))
 
 
+def _carried_exit_orders(history) -> dict[str, list]:
+    """plan:* sell orders that ended terminal with unfilled quantity.
+
+    The exit intent they confirmed survives their own bound-session close:
+    a sell order that ended with quantity still held leaves a residual,
+    and this registry is what the next package reads to re-offer that
+    same intent under a re-sized plan.  An open order still reserves its
+    quantity, so only terminal rows carry.
+    """
+    carried: dict[str, list] = {}
+    for order in getattr(history, "orders", ()) or ():
+        if not str(order.order_id).startswith("plan:") or order.side != "sell":
+            continue
+        residual = int(order.accepted_total_qty) - int(order.known_fill_qty)
+        if order.status != "terminal" or residual <= 0:
+            continue
+        carried.setdefault(order.security_code, []).append(order)
+    return carried
+
+
+def _carried_plan_id(decisions, security_code: str) -> str:
+    """Deterministic successor plan id for a carried exit intent."""
+    return f"plan-carry-{security_code}-{decisions.market_date.isoformat()}"
+
+
 def _active_bucket_and_budget(app, history):
     # security -> (bucket_id, locked_cycle_budget) for RESERVED/HELD cycles.
     # The reduce fraction denominator is that cycle locked_cycle_budget.
@@ -658,6 +683,23 @@ class P12DesktopApplication:
         )
 
     # ---- package publication ----------------------------------------------------------
+    def _exit_types_unverified(self, decisions: MarketDecisionSet) -> bool:
+        # True when no bound receipt proves this package's exit types.
+        # Issue #722 r4-1 / #723 E8 r2-1: the package-store reader binds a
+        # published package to the run that produced it.  When that binding
+        # is absent the reduce/full types cannot be verified - the workbench
+        # shows HOLD/MISSING_INPUT and NO sell plan is generated, so package,
+        # workbench and confirm all agree the exit stays held.  A fixture
+        # without published_run_for has no receipt concept and stays verifiable.
+        published_run = getattr(self._decisions, "published_run_for", None)
+        if not callable(published_run):
+            return False
+        run_doc = published_run(decisions.market_date)
+        return run_doc is None and any(
+            item.stage is OpportunityStage.EXIT_PLAN
+            for item in decisions.decisions
+        )
+
     def _publish(self, decisions: MarketDecisionSet, history: FactHistory) -> PublishedPackage:
         """Size each entry intent against the package's account revision (the baseline)."""
 
@@ -760,10 +802,21 @@ class P12DesktopApplication:
         sell_reserved = _sell_reserved_by_security(history)
         bucket_by_sec, locked_by_sec = _active_bucket_and_budget(self, history)
         trading_day = self._now().date()
+        # E8 r2-1: an exit whose reduce/full type cannot be verified is
+        # held, never sold - the package emits no sell plan for it, matching
+        # the workbench HOLD/MISSING_INPUT and the confirm-path refusal.
+        exit_unverified = self._exit_types_unverified(decisions)
+        # E8 r2-6: an unfilled plan sell order ended terminal at the bound
+        # session close with its quantity still held.  The next package emits
+        # a carry plan for that same intent (even when the package itself
+        # adds no new exit signal), re-sized on the live holding and the
+        # in-flight quantity.  A position that already went flat keeps no
+        # residual intent, so it emits none.
+        carried = _carried_exit_orders(history)
         for item in decisions.decisions:
             if item.stage is not OpportunityStage.EXIT_PLAN:
                 continue
-            if item.exit_kind is None:
+            if item.exit_kind is None or exit_unverified:
                 continue
             # A sell sizes against the LIVE position, not the package's
             # baseline account revision: the quantity that may leave is the
@@ -805,14 +858,83 @@ class P12DesktopApplication:
                     eligible_at=decisions.published_at,
                     expires_at=_session_close(decisions.next_session),
                     window_ref=f"close-to-next-open:{decisions.next_session.isoformat()}",
-                    invalidations=(),
+                    invalidations=(() if sizing.reason_code is None else (sizing.reason_code,)),
+                    # E8 r2-4: an internal sizing reason is projected through
+                    # the registered HOLD_AND_ALERT code on the wire, never a
+                    # new closed-enum value; the specific Chinese hint rides in
+                    # the plan's invalidations/explanation text instead.
                     reason_codes=(
-                        () if sizing.reason_code is None else (sizing.reason_code,)
+                        () if sizing.reason_code is None else ("HOLD_AND_ALERT",)
                     ),
-                    primary_constraint=sizing.reason_code,
+                    primary_constraint=None if sizing.reason_code is None else "HOLD_AND_ALERT",
                     risk_check_ref=digest({
                         "plan_id": plan_id_for(decisions, item),
                         "exit_kind": item.exit_kind,
+                        "target": str(target),
+                        "locked": str(locked),
+                        "mark": str(mark),
+                    }),
+                    depends_on_preopen=(),
+                )
+            )
+        # Carried exit intents: securities whose plan sell order ended
+        # terminal-unfilled and that this package did NOT just re-decide
+        # (a fresh exit_plan for the same security already emits the
+        # re-sized plan above; emitting both would double-count the
+        # intent).
+        fresh_exit_secs = {
+            item.security_code
+            for item in decisions.decisions
+            if item.stage is OpportunityStage.EXIT_PLAN and item.exit_kind is not None
+        }
+        for security_code, prior_orders in carried.items():
+            if security_code in fresh_exit_secs or exit_unverified:
+                continue
+            current = self._facts.projection(self._context).quantity(security_code)
+            if current <= 0:
+                continue
+            mark = marks_map.get(security_code)
+            bucket_id = bucket_by_sec.get(security_code)
+            locked = locked_by_sec.get(security_code) if bucket_id else None
+            sizing = size_exit(
+                security_code=security_code,
+                exit_kind="full",
+                target_position_fraction=None,
+                held_qty=current,
+                sellable_qty=_sellable_for(
+                    security_code,
+                    self._facts.projection(self._context),
+                    history, sell_reserved, trading_day,
+                ),
+                mark_price=mark,
+                locked_cycle_budget=locked,
+                bucket_id=bucket_id,
+                lot_size=self._policy.risk.lot_size,
+            )
+            target = current - sizing.sell_qty
+            plans.append(
+                PublishedPlan(
+                    plan_id=_carried_plan_id(decisions, security_code),
+                    opportunity_id=f"OPP-CARRY-{security_code}",
+                    security_code=security_code,
+                    side="sell",
+                    current_qty=current,
+                    target_qty=target,
+                    delta_qty=target - current,
+                    price_cap=mark if mark is not None else Decimal("0.00"),
+                    cash_bound=None,
+                    estimated_fee=None,
+                    eligible_at=decisions.published_at,
+                    expires_at=_session_close(decisions.next_session),
+                    window_ref=f"close-to-next-open:{decisions.next_session.isoformat()}",
+                    invalidations=(() if sizing.reason_code is None else (sizing.reason_code,)),
+                    reason_codes=(
+                        () if sizing.reason_code is None else ("HOLD_AND_ALERT",)
+                    ),
+                    primary_constraint=None if sizing.reason_code is None else "HOLD_AND_ALERT",
+                    risk_check_ref=digest({
+                        "plan_id": _carried_plan_id(decisions, security_code),
+                        "carry_of": [o.order_id for o in prior_orders],
                         "target": str(target),
                         "locked": str(locked),
                         "mark": str(mark),
@@ -2591,7 +2713,34 @@ class P12DesktopApplication:
     def paper_history(self):
         return self._facts.history(self._context)
 
-    def paper_current_plan(self, plan_id: str):
+    def _confirm_mark(self, security_code: str, marks_map: dict):
+        """Confirm-time effective mark: the bound live-mark supply, then
+        the bound quote service live last price, else the package mark.
+
+        Issue #723 E8 r2-3: sizing at confirm must not reuse the stale
+        package-time mark when a live mark exists - the reduce keep target
+        is fixed by the mark that will actually price the fill.
+        """
+        if self._live_marks is not None:
+            try:
+                live = self._live_marks([security_code]) or {}
+            except Exception:  # noqa: BLE001 - fall back to quote/package
+                live = {}
+            mark = _optional_decimal(live.get(security_code))
+            if mark is not None and mark > 0:
+                return mark
+        quote_svc = getattr(self, "_quote_service", None) or getattr(self, "_quotes", None)
+        if quote_svc is not None:
+            try:
+                quote = quote_svc.quote(security_code)
+            except Exception:  # noqa: BLE001
+                quote = None
+            mark = _optional_decimal(getattr(quote, "last_price", None))
+            if mark is not None and mark > 0:
+                return mark
+        return marks_map.get(security_code)
+
+    def paper_current_plan(self, plan_id: str, live_mark=None):
         """The account's currently effective published plan for ``plan_id``.
 
         Read at order-acceptance time so a confirm-the-suggestion order is
@@ -2614,19 +2763,74 @@ class P12DesktopApplication:
         package = self._publish(decisions, snapshot.history)
         plan = next((p for p in package.plans if p.plan_id == plan_id), None)
         if plan is None:
+            # E8 r2-6: a carried exit intent resolves under the current
+            # package as a sell for the still-held quantity, so its own
+            # confirm id keeps working after the successor package lands.
+            # The original id plan-OPP-EXIT-<code>-<pkg-date> maps to the
+            # carry plan id for that same security.
+            stem = (
+                plan_id.removeprefix("plan-OPP-EXIT-")
+                if plan_id.startswith("plan-OPP-EXIT-") else None
+            )
+            if stem is None:
+                return None
+            security = stem.rsplit("-", 3)[0] if "-" in stem else stem
+            carried_plan_id = _carried_plan_id(decisions, security)
+            plan = next((p for p in package.plans if p.plan_id == carried_plan_id), None)
+            if plan is None:
+                return None
+        # E8 r2-1: an unverified exit never confirms a sell order.
+        if plan.side == "sell" and self._exit_types_unverified(decisions):
             return None
         if now < plan.eligible_at or now > plan.expires_at:
             return None
         current = snapshot.projection.quantity(plan.security_code)
         if plan.side == "sell":
-            # E8: a sell plan confirms down to its target quantity.  The
-            # remaining sellable is current - target; the order path needs a
-            # positive order quantity, and T+1 / reserved bounds are
-            # re-checked before the simulated order is accepted.
-            remaining = current - plan.target_qty
-            if remaining <= 0:
+            # E8 r2-2/3: confirm re-sizes against the live account, not the
+            # package-time quantity.  Live marks + the bucket's current
+            # locked_cycle_budget fix the keep target at raw precision; the
+            # still-sellable quantity nets out T+1 holds and the in-flight
+            # sell orders already covering it, so a second confirm can only
+            # sell the uncovered difference - never double-sell into a flat.
+            marks_map = dict(_marks(decisions))
+            # The caller (paper order path) may pass the live quote mark it
+            # will fill against; that confirm-time mark fixes the keep
+            # target before any package/mark fallback.
+            injected = _optional_decimal(live_mark)
+            confirm_mark = (
+                injected if injected is not None and injected > 0
+                else self._confirm_mark(plan.security_code, marks_map)
+            )
+            if confirm_mark is not None:
+                marks_map[plan.security_code] = confirm_mark
+            bucket_by_sec, locked_by_sec = _active_bucket_and_budget(self, snapshot.history)
+            bucket_id = bucket_by_sec.get(plan.security_code)
+            # Recover the reduce fraction from the decision that produced
+            # this plan; full exits keep their flat target.
+            decision = next(
+                (d for d in decisions.decisions if d.opportunity_id == plan.opportunity_id),
+                None,
+            )
+            exit_kind = getattr(decision, "exit_kind", None) or "full"
+            fraction = getattr(decision, "target_position_fraction", None)
+            sellable = _sellable_for(
+                plan.security_code, snapshot.projection, snapshot.history,
+                _sell_reserved_by_security(snapshot.history), now.date(),
+            )
+            sizing = size_exit(
+                security_code=plan.security_code,
+                exit_kind=exit_kind,
+                target_position_fraction=fraction,
+                held_qty=current,
+                sellable_qty=sellable,
+                mark_price=marks_map.get(plan.security_code),
+                locked_cycle_budget=locked_by_sec.get(plan.security_code) if bucket_id else None,
+                bucket_id=bucket_id,
+                lot_size=self._policy.risk.lot_size,
+            )
+            if sizing.sell_qty <= 0:
                 return None
-            return dataclasses.replace(plan, delta_qty=remaining)
+            return dataclasses.replace(plan, delta_qty=sizing.sell_qty)
         if plan.delta_qty <= 0:
             return None
         # Re-evaluate the still-open delta against the *current* position:

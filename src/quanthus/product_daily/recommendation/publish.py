@@ -236,6 +236,7 @@ def _validate_consumer_object(
     *,
     wire_version: str,
     wire_digest: str | None = None,
+    account_digest: str | None = None,
 ) -> str:
     """Single validated-object coordinate check + account binding digest.
 
@@ -245,13 +246,15 @@ def _validate_consumer_object(
     semantics.
 
     The returned binding digest is the same surface the P12 account
-    ConfigurationBinding records: digest(_package_content(validated)), computed
-    through the validated object's own package (the pinned consumer tree's
-    fact_contracts) so a tree without the bound P12 package fails closed.  The
-    loader's wire_digest is accepted as an argument only to prove the caller saw
-    the declared (object, digest) tuple shape; it is the raw-byte identity, not
-    the account binding identity, and is recorded on the receipt under
-    p12_wire_digests by the caller.
+    ConfigurationBinding records: digest(_package_content(validated)).  On the
+    pinned v2 surface it is carried in as account_digest - computed inside the
+    pinned mount window from the SAME validated object through the pinned
+    tree's own fact_contracts, since once the window restores the host has no
+    quanthus.shared.fact_contracts of its own to recompute it.  On the v1
+    surface the digest is recomputed here through the validated object's own
+    package so a tree without the bound P12 package fails closed.  The loader's
+    wire_digest is the raw-byte identity, not the account binding identity, and
+    is recorded on the receipt under p12_wire_digests by the caller.
 
     This function never opens the release gate by itself - _consumer_pin_unresolved
     is the gate.
@@ -329,11 +332,18 @@ def _validate_consumer_object(
                         f"pinned consumer dropped or altered the reduce target "
                         f"on {opportunity_id} (Decimal comparison)",
                     )
-    # Both the v1 historical surface and the pinned p12.decision-set.v2 surface
-    # record the same binding identity: the account-side digest of the validated
-    # object's full content, computed through the object's own package.  The v2
-    # loader's wire_digest covers the raw bytes instead and is kept on a separate
-    # receipt field; it is never returned here.
+    if wire_version == V2_DS_SCHEMA and account_digest is not None:
+        # Carried from inside the pinned mount window: the pinned tree's own
+        # fact_contracts digest of _package_content(validated), over the same
+        # validated object this call just coordinate-checked.  The host cannot
+        # recompute it - quanthus.shared.fact_contracts only exists inside the
+        # bound P12 package - so it travels out of the window with the object.
+        return account_digest
+
+    # The v1 historical surface records the same binding identity, recomputed
+    # here through the validated object's own package so a tree without the
+    # bound P12 package fails closed.  The v2 wire_digest covers the raw bytes
+    # and is never returned as the binding identity.
     import importlib
 
     top_package = type(validated).__module__.split(".", 1)[0]
@@ -489,27 +499,34 @@ def publish_package(
                     ) from exc
                 raise
             if wire_version == V2_DS_SCHEMA:
-                # The pinned contract returns (MarketDecisionSet, wire_digest); the
-                # validated object feeds coordinate checks and the account binding
-                # digest; the wire digest covers the raw bytes and is recorded on
-                # its own receipt surface.  An object without the tuple shape is
-                # not the pinned reader and is refused.
+                # The pinned seam returns (MarketDecisionSet, wire_digest,
+                # account_digest): the validated object feeds coordinate checks,
+                # the account digest is the binding identity recorded on the
+                # receipt, and the wire digest covers the raw bytes on its own
+                # receipt surface.  An object without the triple shape is not
+                # the pinned reader and is refused.
                 if (
                     not isinstance(loaded, tuple)
-                    or len(loaded) != 2
+                    or len(loaded) != 3
                     or not isinstance(loaded[1], str)
                     or not loaded[1].startswith("sha256:")
+                    or not isinstance(loaded[2], str)
+                    or not loaded[2].startswith("sha256:")
                 ):
                     raise ProductDailyError(
                         "unpublishable_package",
                         "the pinned v2 consumer did not return the declared "
-                        "(MarketDecisionSet, wire_digest) pair",
+                        "(MarketDecisionSet, wire_digest, account_digest) triple",
                     )
-                validated, wire_digest = loaded
+                validated, wire_digest, account_digest = loaded
             else:
-                validated, wire_digest = loaded, None
+                validated, wire_digest, account_digest = loaded, None, None
             p12_digests[raw["market_date"]] = _validate_consumer_object(
-                raw, validated, wire_version=wire_version, wire_digest=wire_digest
+                raw,
+                validated,
+                wire_version=wire_version,
+                wire_digest=wire_digest,
+                account_digest=account_digest,
             )
             if wire_digest is not None:
                 p12_wires[raw["market_date"]] = wire_digest

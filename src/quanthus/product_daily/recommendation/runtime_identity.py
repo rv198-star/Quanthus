@@ -263,7 +263,8 @@ def resolve_pinned_v2_loader(
     never a caller dict, a module attribute, or an importable name outside the
     pinned closure.  It accepts one raw decision_set dict (expected_schema and
     the declared account mode are already bound) and returns the real
-    (MarketDecisionSet, wire_digest) tuple produced by the single pinned call.
+    (MarketDecisionSet, wire_digest, account_digest) triple produced by the
+    single pinned call.
     """
 
     import os
@@ -345,17 +346,42 @@ def resolve_pinned_v2_loader(
                     "consumer_release_mismatch",
                     f"pinned loader resolved outside the bound checkout: {module_file}",
                 )
-            return pinned_loader.load_decision_set(
+            loaded = pinned_loader.load_decision_set(
                 raw,
                 expected_schema=PINNED_V2_SCHEMA,
             )
+            # The account binding digest is what the P12 ConfigurationBinding
+            # records for the package: digest(_package_content(validated)) - the
+            # same shape product_daily.application.desktop.service computes.
+            # It must be produced inside this mount window, while the pinned
+            # tree's own fact_contracts is importable; once the restore below
+            # evicts the pinned modules the host has no quanthus.shared of its
+            # own and the digest could never be recomputed from the object's
+            # module alone.  The same single pinned call's validated object
+            # feeds it, so the account identity can never diverge from what was
+            # actually validated.
+            if (
+                isinstance(loaded, tuple)
+                and len(loaded) == 2
+                and isinstance(loaded[1], str)
+            ):
+                validated, wire_digest = loaded
+                import dataclasses as _dc
+
+                import quanthus.shared.fact_contracts as pinned_fc
+
+                content = json.loads(
+                    json.dumps(_dc.asdict(validated), default=str, sort_keys=True)
+                )
+                return validated, wire_digest, pinned_fc.digest(content)
+            return loaded
         finally:
             pkg_path.remove(mounted)
             _evict_stale()
             sys.modules.update(prior_modules)
 
     def _loader(raw: dict[str, Any]) -> Any:
-        """One real pinned call; returns the (validated object, wire_digest) tuple."""
+        """One real pinned call; returns the (validated, wire_digest, account_digest) triple."""
 
         return _load_and_call(raw)
 

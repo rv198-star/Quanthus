@@ -112,11 +112,14 @@ def test_resolve_pinned_loader_verifies_every_file_byte(pinned_checkout, monkeyp
     loader = resolve_pinned_v2_loader(ROOT)
     package = _reduce_package()
     raw = _v2_wire(package)
-    validated, wire_digest = loader(raw)
+    validated, wire_digest, account_digest = loader(raw)
     assert validated.mode == "simulation"
     assert wire_digest.startswith("sha256:")
-    # The wire digest covers the raw bytes - a tampered payload digests
-    # differently.  Recompute it through the pinned tree's own fact_contracts.
+    assert account_digest.startswith("sha256:")
+    # The wire digest covers the raw bytes, the account digest covers the
+    # validated object's package content - both recomputed here through the
+    # pinned tree's own fact_contracts.
+    import dataclasses as _dc
     import sys as _sys
 
     import quanthus as _q
@@ -126,6 +129,11 @@ def test_resolve_pinned_loader_verifies_every_file_byte(pinned_checkout, monkeyp
         import quanthus.shared.fact_contracts as fc
 
         assert wire_digest == fc.digest(raw)
+        account_content = json.loads(
+            json.dumps(_dc.asdict(validated), default=str, sort_keys=True)
+        )
+        assert account_digest == fc.digest(account_content)
+        assert account_digest != wire_digest
     finally:
         _q.__path__.remove(str(pinned_checkout / "src" / "quanthus"))
         for _m in list(_sys.modules):
@@ -161,7 +169,7 @@ def test_pinned_loader_binds_mode_from_binding_not_wire(pinned_checkout, monkeyp
     loader = resolve_pinned_v2_loader(ROOT)
     package = _reduce_package()
     raw = _v2_wire(package)
-    validated, _ = loader(raw)
+    validated, _, _ = loader(raw)
     assert validated.mode == "simulation"
     assert validated.synthetic is False
     # The produced wire never carries a mode field - the pinned binding's mode
@@ -341,12 +349,17 @@ def test_published_fixture_account_and_wire_digests_match_p12_oracle(
     }
     for name, (expected_wire, expected_account) in expected.items():
         raw = json.loads((fixture_dir / name).read_text())
-        # One pinned call per set; the returned (object, wire) pair is reused
-        # for every surface so no second invocation can diverge.
-        validated, wire_digest = loader(raw)
+        # One pinned call per set; the returned (object, wire, account) triple
+        # is reused for every surface so no second invocation can diverge.
+        validated, wire_digest, account_digest = loader(raw)
         assert wire_digest == expected_wire, name
+        assert account_digest == expected_account, name
         matched = _validate_consumer_object(
-            raw, validated, wire_version="p12.decision-set.v2", wire_digest=wire_digest
+            raw,
+            validated,
+            wire_version="p12.decision-set.v2",
+            wire_digest=wire_digest,
+            account_digest=account_digest,
         )
         # The matcher returns the account binding identity from the SAME
         # validated object - equal to the P12 oracle, and distinct from the

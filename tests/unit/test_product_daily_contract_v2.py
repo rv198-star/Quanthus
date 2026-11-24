@@ -741,7 +741,11 @@ def test_validate_consumer_object_field_preserving(monkeypatch):
     raw = _v2_wire(package)
     validated = _v2_double_loader()(raw, expected_schema="p12.decision-set.v2")
     assert _validate_consumer_object(
-        raw, validated, wire_version="p12.decision-set.v2", wire_digest="sha256:" + "cd" * 32
+        raw,
+        validated,
+        wire_version="p12.decision-set.v2",
+        wire_digest="sha256:" + "cd" * 32,
+        account_digest="sha256:" + "ab" * 32,
     ) == ("sha256:" + "ab" * 32)
 
 
@@ -755,12 +759,15 @@ def test_validate_consumer_object_never_returns_wire_digest(monkeypatch):
     package = _reduce_package()
     raw = _v2_wire(package)
     validated = _v2_double_loader()(raw, expected_schema="p12.decision-set.v2")
-    wire = "sha256:" + "cd" * 32
     matched = _validate_consumer_object(
-        raw, validated, wire_version="p12.decision-set.v2", wire_digest=wire
+        raw,
+        validated,
+        wire_version="p12.decision-set.v2",
+        wire_digest="sha256:" + "cd" * 32,
+        account_digest="sha256:" + "ab" * 32,
     )
     assert matched == "sha256:" + "ab" * 32
-    assert matched != wire
+    assert matched != "sha256:" + "cd" * 32
 
 
 def test_validate_consumer_object_rejects_altered_target(monkeypatch):

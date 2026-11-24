@@ -29,12 +29,13 @@ entry never fabricates members or falls back to a synthetic package.
 from __future__ import annotations
 
 import json
+import hashlib
 from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from quanthus.event_library.contracts import sha256_digest
+from quanthus.event_library.contracts import canonical_json_bytes, sha256_digest
 from quanthus.p12_daily.e1_replay import E1ReplayContext, E1ReplayRunner
 from quanthus.p12_history.reader import read_history
 from quanthus.p12_history.source_pins import SourceMap
@@ -52,6 +53,7 @@ def build_e1_entry(
     open_sessions: tuple[str, ...] | list[str] = (),
     runner_ref_id: str = "p11.e1-replay-day",
     runner_version: str = "1.0.0",
+    evidence_dir: str | Path | None = None,
 ) -> tuple[E1ReplayRunner, Callable[[date, datetime], dict]]:
     """Assemble the E1 runner + the per-T #749 history_reader.
 
@@ -88,6 +90,20 @@ def build_e1_entry(
     # context supplier binds THIS run's same-T evidence, never the
     # last-read context a following request may already have replaced.
     state: dict[str, Any] = {"contexts": {}, "result": None}
+    ev_dir = Path(evidence_dir) if evidence_dir is not None else None
+
+    def _write_artifact(name: str, payload: Any) -> tuple[str, str]:
+        """Persist THIS run's input artefact as a standalone recomputable
+        file and return (uri, sha256).  The bytes are the canonical JSON so
+        sha256(file) == the declared digest - the auditor recomputes the
+        binding from the file alone, never from a frozen sibling's digest."""
+        data = canonical_json_bytes(payload)
+        if ev_dir is None:
+            return "mem://" + name, hashlib.sha256(data).hexdigest()
+        ev_dir.mkdir(parents=True, exist_ok=True)
+        path = ev_dir / name
+        path.write_bytes(data)
+        return str(path), hashlib.sha256(data).hexdigest()
 
     def history_reader(day: date, decision_cutoff: datetime) -> dict:
         day_holdings = holdings(day) if callable(holdings) else holdings
@@ -192,19 +208,53 @@ def build_e1_entry(
         # of this run's envelope - never the frozen v6 file digest and never
         # the scenario's static snapshot digest.
         envelope_digest = sha256_digest(result.raw_history)
-        # Rebuild p12_evidence from THIS run's coverage: member_consumption,
-        # source_clocks and the envelope digest this run actually produced.
-        # The scenario's static provenance (action_use, the sealed v6
-        # artefact uri/sha, the read/coverage receipts) carries over
-        # verbatim; only the run-bound clocks and the produced-envelope
-        # binding are re-bound to this read.
+        # Persist THIS run's actual input artefacts as standalone
+        # recomputable files (canonical JSON, so sha256(file) equals the
+        # declared digest), then bind p12_evidence's artefact refs to
+        # those new files - never to the frozen sealed-envelope uri.
+        # The sealed v6 artefact/read/coverage refs move under a
+        # sealed_source provenance block so the original source bytes
+        # stay auditable separately from this run's produced input.
+        env_uri, env_sha = _write_artifact(
+            "e1-envelope-" + day.isoformat() + ".json", result.raw_history
+        )
+        cov_uri, cov_sha = _write_artifact(
+            "e1-coverage-" + day.isoformat() + ".json", result.coverage
+        )
+        read_receipt_payload = {
+            "schema_version": "p12.e1-read-receipt.v1",
+            "market_date": day.isoformat(),
+            "run_read_at": run_read_at,
+            "member_consumption": mc,
+            "envelope_uri": env_uri,
+            "envelope_sha256": env_sha,
+        }
+        read_uri, read_sha = _write_artifact(
+            "e1-read-receipt-" + day.isoformat() + ".json", read_receipt_payload
+        )
         base_evidence = scenario.get("p12_evidence") or {}
         p12_evidence = dict(base_evidence)
         p12_evidence["member_consumption"] = mc
-        p12_evidence["envelope"] = {
-            **(base_evidence.get("envelope") or {}),
-            "sha256": envelope_digest.removeprefix("sha256:"),
+        # The artefact refs bind THIS run's produced input bytes; the sealed
+        # source artefact/read/coverage refs are preserved verbatim under
+        # sealed_source as provenance, listed separately from the live refs.
+        p12_evidence["sealed_source"] = {
+            "envelope": base_evidence.get("envelope"),
+            "read_receipt": base_evidence.get("read_receipt"),
+            "coverage_receipt": base_evidence.get("coverage_receipt"),
+            "note": (
+                "Frozen #749 source artefacts this read consumed. The live "
+                "envelope/read_receipt/coverage_receipt above point to this "
+                "run's recomputable canonical-JSON artefacts, not to the "
+                "sealed source files."
+            ),
         }
+        p12_evidence["envelope"] = {
+            "uri": env_uri,
+            "sha256": env_sha,
+        }
+        p12_evidence["read_receipt"] = {"uri": read_uri, "sha256": read_sha}
+        p12_evidence["coverage_receipt"] = {"uri": cov_uri, "sha256": cov_sha}
         p12_evidence["read_at"] = run_read_at
         p12_evidence["source_clocks"] = {
             **(base_evidence.get("source_clocks") or {}),
@@ -254,6 +304,7 @@ def load_e1_scenario(
     path: str | Path,
     *,
     repo_root: str | Path,
+    evidence_dir: str | Path | None = None,
 ) -> tuple[E1ReplayRunner, Callable[[date, datetime], dict]]:
     """Load a frozen E1 scenario JSON and assemble runner + history_reader.
 
@@ -335,6 +386,7 @@ def load_e1_scenario(
         holdings=doc.get("holdings") or (),
         pending=doc.get("pending") or (),
         open_sessions=tuple(doc.get("open_sessions") or ()),
+        evidence_dir=evidence_dir,
     )
 
 __all__ = ["build_e1_entry", "load_e1_scenario"]

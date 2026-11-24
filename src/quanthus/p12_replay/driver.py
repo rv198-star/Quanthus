@@ -527,6 +527,7 @@ def main(argv=None) -> int:
             e1_runner, e1_history_reader = load_e1_scenario(
                 args.e1_scenario,
                 repo_root=Path(__file__).resolve().parents[3],
+                evidence_dir=args.state_dir / "e1-evidence",
             )
             # Frozen October decision cutoff: the scenario may pin
             # decision_cutoff_time; the phase-1 default is 21:30+08 (the

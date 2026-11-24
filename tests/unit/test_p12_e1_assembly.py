@@ -117,7 +117,7 @@ def _fake_read_history(market_date, decision_cutoff, *, holdings, pending, sourc
     return _Result()
 
 
-def _build(monkeypatch, holdings=(), pending=()):
+def _build(monkeypatch, holdings=(), pending=(), evidence_dir=None):
     monkeypatch.setattr(e1_assembly, "read_history", _fake_read_history)
     monkeypatch.setattr(
         _e1_rt, "load_e1_rule_assets", lambda root: {"assets": "fake"}
@@ -130,6 +130,7 @@ def _build(monkeypatch, holdings=(), pending=()):
         holdings=holdings,
         pending=pending,
         open_sessions=("2026-10-09",),
+        evidence_dir=evidence_dir,
     )
 
 
@@ -156,13 +157,19 @@ def test_build_e1_entry_returns_runner_and_per_t_context(monkeypatch):
     assert ctx.exclusions == EXCLUSIONS
     assert ctx.action_coverage == ACTION_COVERAGE
     # p12_evidence is rebuilt from THIS run's coverage: the produced
-    # envelope digest, run clocks and the scenario's static provenance.
+    # envelope digest, run clocks and this run's standalone artefact refs.
+    # The sealed source artefact/read/coverage refs are preserved
+    # verbatim under sealed_source as provenance.
     from quanthus.event_library.contracts import sha256_digest
 
     ev = ctx.p12_evidence
     env_digest = sha256_digest(ENVELOPE).removeprefix("sha256:")
     assert ev["envelope"]["sha256"] == env_digest
-    assert ev["envelope"]["uri"] == "mem://env"  # static provenance kept
+    assert ev["envelope"]["uri"].startswith("mem://e1-envelope-")
+    # the sealed v6 refs moved to sealed_source; live refs are this run's
+    assert ev["sealed_source"]["envelope"]["uri"] == "mem://env"
+    assert ev["read_receipt"]["uri"].startswith("mem://e1-read-receipt-")
+    assert ev["coverage_receipt"]["uri"].startswith("mem://e1-coverage-")
     assert ev["member_consumption"] is COVERAGE["member_consumption"]
     assert ev["read_at"] == "2026-10-08T13:30:00Z"
     assert ev["source_clocks"]["run_read_at"] == "2026-10-08T13:30:00Z"
@@ -471,3 +478,41 @@ def test_load_e1_scenario_source_map_override(tmp_path, monkeypatch):
     asm.load_e1_scenario(doc, repo_root=tmp_path)
     assert seen["kw"]["base_package_root"] == _P("/srv/root")
     assert seen["kw"]["base_members_path"] == _P("/tmp/base.json")
+
+
+def test_evidence_dir_writes_recomputable_artefacts(tmp_path, monkeypatch):
+    """With evidence_dir the run's envelope/coverage/read-receipt land as
+    standalone canonical-JSON files whose sha256 equals the declared
+    digest - the auditor recomputes the binding from the file bytes."""
+    import hashlib
+    import json as _json
+
+    from quanthus.event_library.contracts import sha256_digest
+
+    ev_dir = tmp_path / "e1-evidence"
+    runner, reader = _build(monkeypatch, evidence_dir=ev_dir)
+    reader(T, CUTOFF)
+    ctx = runner._context_supplier(T)
+    ev = ctx.p12_evidence
+    # the produced envelope file exists and its bytes hash to the digest
+    env_file = ev_dir / ("e1-envelope-" + T.isoformat() + ".json")
+    assert env_file.is_file()
+    env_bytes = env_file.read_bytes()
+    assert hashlib.sha256(env_bytes).hexdigest() == ev["envelope"]["sha256"]
+    assert ev["envelope"]["uri"] == str(env_file)
+    assert _json.loads(env_bytes) == ENVELOPE
+    assert ev["envelope"]["sha256"] == sha256_digest(ENVELOPE).removeprefix(
+        "sha256:"
+    )
+    # coverage + read-receipt also land as recomputable files
+    for key, prefix in (
+        ("coverage_receipt", "e1-coverage-"),
+        ("read_receipt", "e1-read-receipt-"),
+    ):
+        uri = ev[key]["uri"]
+        assert Path(uri).is_file(), key
+        assert Path(uri).name.startswith(prefix)
+        assert (
+            hashlib.sha256(Path(uri).read_bytes()).hexdigest()
+            == ev[key]["sha256"]
+        )

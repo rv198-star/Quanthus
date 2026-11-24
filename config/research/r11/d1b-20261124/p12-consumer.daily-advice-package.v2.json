@@ -1,19 +1,30 @@
 {
   "schema_version": "quanthus.p11.p12-consumer-binding.v1",
   "binding_id": "p11-p12-daily-advice-package-v2",
-  "binding_version": "2.0.0-pending",
-  "use_grade": "CANDIDATE_PIN_PENDING",
+  "binding_version": "2.0.0-a676de97",
+  "use_grade": "PINNED_REAL_CONSUMER",
+  "purpose": "historical_replay",
+  "mode": "simulation",
   "consumer_schema": "p12.decision-set.v2",
   "loader_entry": "quanthus.p12_daily.decision_loader.load_decision_set",
-  "loader_contract": "load_decision_set(raw, *, expected_schema)",
-  "source_commit": null,
-  "source_tree": null,
-  "source_files_sha256": null,
-  "pin_state": "pending",
+  "loader_contract": "load_decision_set(raw, *, expected_schema=\"p12.decision-set.v2\") -> (MarketDecisionSet, wire_digest); the resolved P11 seam additionally returns account_digest = digest(_package_content(validated)) computed inside the pinned mount window from the same validated object; mode optional at the frozen signature, simulation bound at the package-source read",
+  "source_commit": "a676de9782c85b30a2e7d4a18d4ee5abc88a3906",
+  "source_tree": "6878fc758945264254bfc8a40017bb6d3a2d67fe",
+  "source_files_sha256": {
+    "src/quanthus/p12_daily/decision_loader.py": "ca916af4a245b005e7640fdd570db149243b92a97fb8f693f58223e459746b9c",
+    "src/quanthus/capabilities/decision_access/__init__.py": "f487db68ef500bbb6264a4c08207a60bdca9bdacae30d993eea170f0589d2d6d",
+    "src/quanthus/shared/fact_contracts.py": "54ba64674c76e3392bb6d649ab52db35d96f9eae8caa1e19f5c4635e6ee6f07e",
+    "src/quanthus/shared/values.py": "6059bfd2f55102fe5b5a8a3effbab852c736a4f6618f44435fb02aa21c5ef8d9",
+    "src/quanthus/shared/__init__.py": "c22cda22c0fe906de76189a95e1b9a97348159ea42e23e432b9c0db2d9cae2e8",
+    "src/quanthus/capabilities/__init__.py": "698c9ebdf2ca5eab3ff1c27929fddf1916082cd6bcd94aa646f9c2750293e66b",
+    "src/quanthus/p12_daily/__init__.py": "c21a6914d6bd6b88811b9f0facd6042173b421544b85adee5ca40667a98d3b5b",
+    "schemas/p12/v2/decision-set.v2.json": "9cfe6b198bfda466eda36e56dd900a933949b4348e3febb647b6118fe89185a3"
+  },
+  "pin_state": "bound",
   "production_adoption": "NOT_REGISTERED",
   "capabilities": {
     "supports_held_reduction_v2": true,
-    "note": "capability declared by the planned P12 v2 contract (#723 comment7118368788); the binding is a candidate only - no real source_commit/tree/file hashes exist yet, so publish-time verification fails closed until the actual pin arrives"
+    "note": "The frozen signature selects the loader mode from the wire or falls back to simulation. P12 checks the account mode when it reads the published package. This binding covers historical_replay."
   },
-  "note": "The real pinned P12 v2 consumer is not delivered. This file records the declared interface (schema + loader entry + expected_schema contract). source_commit/source_tree/source_files_sha256 stay null (never a fake identity); the publish gate refuses any executable reduce release until they are bound to real bytes."
+  "note": "Bound real pin. source_commit/tree identify the fixed consumer revision; source_files_sha256 covers the loader, its decision_access/fact_contracts/values closure and the generated v2 schema, each verified byte-for-byte before the module is imported. Two digest surfaces stay distinct: p12_package_digests is the account binding identity digest(_package_content(validated)) - what the real P12 ConfigurationBinding records; p12_wire_digests is the loader's own digest over the raw wire bytes. Neither is the file sha256, and the wire digest never substitutes for the account binding digest."
 }

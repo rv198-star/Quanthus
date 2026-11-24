@@ -73,16 +73,29 @@ def test_current_package_uses_configured_v2_and_cannot_downgrade(tmp_path, wire)
         called.append(raw)
         raise AssertionError("pending pin must precede any caller loader")
 
-    with pytest.raises(ProductDailyError, match="pin|configured release"):
-        publish_package(
+    # The registered v2 release resolves its own pinned loader: a forged caller
+    # loader is never invoked, and a caller wire_version cannot downgrade the
+    # configured release (v1 assertion mismatches the v2 release).
+    if wire == V1_DS_SCHEMA:
+        with pytest.raises(ProductDailyError, match="version_inconsistent"):
+            publish_package(
+                package,
+                directory=tmp_path / "published",
+                published_at=package.decision_sets[0].published_at,
+                wire_version=wire,
+                p12_loader=forged_loader,
+            )
+        assert not (tmp_path / "published").exists()
+    else:
+        receipt = publish_package(
             package,
             directory=tmp_path / "published",
             published_at=package.decision_sets[0].published_at,
             wire_version=wire,
             p12_loader=forged_loader,
         )
+        assert receipt.p12_package_digests is not None
     assert called == []
-    assert not (tmp_path / "published").exists()
 
 
 def test_registered_legacy_fixture_keeps_exact_v1_bytes(tmp_path):

@@ -37,7 +37,7 @@
     "candidate_evidence": "expert/risk digests must equal batch+policy+rule+opportunity bound digests; unknown reason code or mismatch -> input_blocked",
     "intake_clock": "intake_received_at and intake_verified_at must be <= decision_cutoff",
     "p12_precheck": "cutoff on market_date; published_at >= cutoff; next_session > market_date; unique ids and live security codes; entry window on next_session; no duplicate market_date in one package",
-    "digest_surfaces": "file_sha256 = on-disk bytes; decision_set_digests = canonical JSON; p12_package_digests = P12-validated object binding digest",
+    "digest_surfaces": "file_sha256 = on-disk bytes; decision_set_digests = canonical JSON; p12_package_digests = P12 account ConfigurationBinding digest digest(_package_content(validated)); p12_wire_digests = loader raw-wire-byte digest",
     "explanation_contract": "Decision enforces registered reason, registered EXPLANATION_CODES code, valid use and non-empty component_ref on all stages; producer blocks invalid explanations before build; ProductDailyError during build becomes fail-closed",
     "entry_window": "eligible/expires converted to Asia/Shanghai then inside 09:30-15:00 on next_session; expires_at>eligible_at; checked in EntryPlan, AdvicePolicy and DecisionSet",
     "publish_blocked": "any input_blocked decision refuses write; p12_loader digests all decision_sets before write so a loader failure leaves no file; PublishReceipt carries p12_package_digests when loader supplied",

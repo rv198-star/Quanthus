@@ -15501,6 +15501,38 @@
           "body_sha256": "290c40460d2942eba2695ff5cfba59be7331b6ce523e57ec1886899135af1111"
         }
       ]
+    },
+    {
+      "id": "CP-700-20261124T032045594414Z",
+      "recorded_at": "2026-11-24T03:20:45.594414+00:00",
+      "actor": "P11 root / Sol",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "rejected",
+      "summary": "C4 fixed6c contract audit CHANGES_REQUIRED;52payload verified. Preserve v1/formal-target/coordinate fixes, replace caller-driven publication gate in R3;fixed M2root4f independent review runs separately.",
+      "evidence": [
+        {
+          "id": "c4-6c-root-disposition",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/CONTRACT-6C-ROOT-DISPOSITION.json",
+          "sha256": "db214cfe603ed7c8d1af4996724c17e637821870d83b1ab8ce909343f41d19ee",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed6c engineering rejection and next repair scope; source qualification, P12 consumer adoption and research/use gates unchanged."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Synthetic interface engineering review only. No module head or scientific/use state changes; source UNBOUND and P12 consumer NOT_GRANTED retained. Root M2fixed4f and R3contract require their fixed independent reviews before integrated CN02 full.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T03:19:18Z",
+          "body_sha256": "28a71a592a2b75f01840345171daac35a465409c4a20a17a005b05dfb178bc05"
+        }
+      ]
     }
   ],
   "history_imports": [

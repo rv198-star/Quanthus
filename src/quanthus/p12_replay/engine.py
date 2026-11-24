@@ -1330,14 +1330,24 @@ class ReplayEngine:
             pool_only_block,
         )
 
-        receipt = self._day_replay_receipt() or self._run_receipt()
+        run = self._run_receipt()
+        receipt = self._day_replay_receipt() or run
         block = coverage_block(receipt) if receipt else None
+        # The page footer names the rule that produced THIS day's receipt:
+        # the bound P12 run's runner ref (synthetic now, the adopted P11
+        # runner later) - never the static "合成规则驱动" line.
+        runner = (run or {}).get("runner") or (receipt or {}).get("runner")
         if block is not None:
+            if runner:
+                block["runner"] = runner
             return block
         # Pool size is honest even with no coverage carrier: the number of
         # securities whose bars the replay actually delivered for this day.
         pool = sorted((self.bars_by_day.get(self.current_day) or {}).keys())
-        return pool_only_block(len(pool), delivered_codes=pool)
+        block = pool_only_block(len(pool), delivered_codes=pool)
+        if runner:
+            block["runner"] = runner
+        return block
 
     def _day_replay_receipt(self) -> dict | None:
         """The same-day ``p11.paper-replay-day.v1`` receipt bound to THIS run.

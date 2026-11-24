@@ -151,7 +151,7 @@ tabs{display:flex;gap:0;margin-bottom:0}
  <div class=card><h2>包 / 回执</h2><div id=pkg style="font:11px/1.6 ui-monospace,monospace;word-break:break-all">—</div></div>
 </aside>
 </main>
-<footer>独立回放实例 · 与 8791/8790 完全隔离 · 合成规则驱动 · 成交按真实日线开盘价判定 · 回放证据在引擎日志与记录页可核</footer>
+<footer>独立回放实例 · 与 8791/8790 完全隔离 · <span id=rulesrc>合成规则驱动</span> · 成交按真实日线开盘价判定 · 回放证据在引擎日志与记录页可核</footer>
 <script>
 let S=null;
 async function api(p,b){const t=sessionStorage.getItem('replay-token');const m=b===undefined?'GET':'POST';const r=await fetch(p,{method:m,headers:{'Content-Type':'application/json','Authorization':'Bearer '+(t||'')},body:b===undefined?undefined:JSON.stringify(b)});if(r.status===401){sessionStorage.removeItem('replay-token');location.reload();return{}}if(!r.ok){let e={status:'http_'+r.status};try{e=await r.json()}catch(_){e.error='HTTP '+r.status}return e}return r.json()}
@@ -166,7 +166,7 @@ function sideClass(label){if(label==='买入建议')return'buy';if(label==='卖�
 function renderCoverage(){
  const el=document.getElementById('coverage');const c=(S&&S.coverage)||null;
  if(!c){el.innerHTML='';return}
- let h='<p class=covnote><b>'+esc(c.note_text||'')+'</b>'+(c.note&&c.note!==c.note_text?('<br>'+esc(c.note)):'')+'</p>';
+ let h='<p class=covnote><b>'+esc(c.note_text||'')+'</b></p>';
  const rows=c.securities||[];
  if(rows.length){h+='<div style="margin-top:4px">';
   for(const r of rows){
@@ -176,6 +176,9 @@ function renderCoverage(){
   h+='</div>'
  }
  el.innerHTML=h
+ const rn=c.runner||{};
+ const src=(rn.ref_id?(rn.ref_id+(rn.version?('@'+rn.version):'')):'')||'合成规则驱动';
+ const rse=document.getElementById('rulesrc');if(rse)rse.textContent='规则来源 '+src
 }
 async function refresh(){
  S=await api('/api/state');const r=S.replay||{};

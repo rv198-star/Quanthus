@@ -269,7 +269,10 @@ def test_publish_fails_before_write_when_loader_refuses(pinned_checkout, tmp_pat
     package = _publishable_reduce_package()
     ds = package.decision_sets[0]
     # Remove exit_kind so the pinned v2 loader must refuse before any file lands.
-    tampered_decision = dataclasses.replace(ds.decisions[0], exit_kind=None)
+    # object.__setattr__ bypasses the frozen dataclass guard so the mutation
+    # reaches the real loader rather than dying at P11's own contract check.
+    tampered_decision = dataclasses.replace(ds.decisions[0], exit_kind="full")
+    object.__setattr__(tampered_decision, "exit_kind", None)
     tampered_ds = dataclasses.replace(ds, decisions=(tampered_decision,))
     tampered_package = dataclasses.replace(package, decision_sets=(tampered_ds,))
     with pytest.raises(Exception):
@@ -290,8 +293,14 @@ def test_publish_refuses_tampered_wire(pinned_checkout, tmp_path, monkeypatch):
 
     package = _publishable_reduce_package()
     ds = package.decision_sets[0]
-    drifted = dataclasses.replace(ds, market_date=__import__("datetime").date(2026, 11, 26))
-    tampered_package = dataclasses.replace(package, decision_sets=(drifted,))
+    # Shift the reduce target by one tick: still a valid P11 object, but the
+    # pinned loader + coordinate check must catch the byte-level drift before
+    # any file is staged.
+    tampered_decision = dataclasses.replace(
+        ds.decisions[0], target_position_fraction=Decimal("0.51")
+    )
+    tampered_ds = dataclasses.replace(ds, decisions=(tampered_decision,))
+    tampered_package = dataclasses.replace(package, decision_sets=(tampered_ds,))
     with pytest.raises(Exception):
         publish_package(
             tampered_package,

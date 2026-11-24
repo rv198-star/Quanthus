@@ -164,7 +164,7 @@ def test_build_e1_entry_returns_runner_and_per_t_context(monkeypatch):
     assert m0["digest"] == "a" * 64
     # available_at is the member's own declared usable instant (the
     # envelope source_members visible_at), never the read verify_at.
-    assert m0["available_at"] == "2026-10-08T15:00:00Z"
+    assert m0["available_at"] == "2026-10-08T15:00:00+00:00"
     assert "verified_at" not in m0
     assert ctx.member_evidence[1]["available_at"] is None
     assert m0["required"] is True

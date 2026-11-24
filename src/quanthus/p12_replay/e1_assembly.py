@@ -112,13 +112,25 @@ def build_e1_entry(
             for m in (result.raw_history.get("source_members") or [])
             if isinstance(m, dict)
         }
+        # The pre-db240043 P11 _isodatetime (datetime.fromisoformat) rejects
+        # the trailing 'Z' the v6 source_members carry; the request-level
+        # projection converts it to the equivalent '+00:00' offset so the
+        # replay diagnostic proceeds.  The source envelope and evidence keep
+        # their original bytes - only this projected field is rewritten.
+        def _iso_offset(value):
+            if isinstance(value, str) and value.endswith("Z"):
+                return value[:-1] + "+00:00"
+            return value
+
         member_evidence = tuple(
             {
                 "member_id": m.get("member_id"),
                 "package_key": m.get("package_key"),
                 "version": m.get("version"),
                 "digest": m.get("sha256"),
-                "available_at": visible_by_member.get(m.get("member_id")),
+                "available_at": _iso_offset(
+                    visible_by_member.get(m.get("member_id"))
+                ),
                 "required": bool(m.get("relevant_for_T")),
             }
             for m in members
@@ -129,15 +141,38 @@ def build_e1_entry(
             for m in members
             if isinstance(m, dict) and m.get("relevant_for_T")
         )
+        account = dict(scenario["account"])
+        facts_template = dict(scenario["facts_template"])
+        # The same Z->+00:00 projection applies to the account as_of /
+        # as_of_overrides and facts_template intake clocks the pre-db240043
+        # P11 loader reads with a bare fromisoformat.
+        for key in ("as_of",):
+            if isinstance(account.get(key), str) and account[key].endswith("Z"):
+                account[key] = account[key][:-1] + "+00:00"
+        ov = account.get("as_of_overrides")
+        if isinstance(ov, dict):
+            account["as_of_overrides"] = {
+                k: (v[:-1] + "+00:00" if isinstance(v, str) and v.endswith("Z") else v)
+                for k, v in ov.items()
+            }
+        for key in (
+            "intake_received_at",
+            "intake_first_read_at",
+            "intake_verified_at",
+        ):
+            v = facts_template.get(key)
+            if isinstance(v, str) and v.endswith("Z"):
+                facts_template[key] = v[:-1] + "+00:00"
+
         state["contexts"][day.isoformat()] = E1ReplayContext(
             scenario_id=scenario["scenario_id"],
             market_dates=(day.isoformat(),),
             open_sessions=tuple(open_sessions),
             package_id=scenario["package_id"],
             manifest_sha256=scenario["manifest_sha256"],
-            account=scenario["account"],
+            account=account,
             policy=scenario["policy"],
-            facts_template=scenario["facts_template"],
+            facts_template=facts_template,
             snapshot_id=scenario["snapshot_id"],
             snapshot_manifest_digest=scenario["snapshot_manifest_digest"],
             exclusions=tuple(exclusions),

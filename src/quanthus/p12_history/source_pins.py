@@ -88,16 +88,49 @@ class SourceMap:
         base_members_path: Path = H1_BASE_MEMBERS,
         daily_members_path: Path = H1_DAILY_MEMBERS,
         base_package_root: Path = BASE_PACKAGE_ROOT,
+        calendar_members_path: Path | None = None,
     ) -> None:
         self.base_package_root = Path(base_package_root)
         self._base_doc = json.loads(Path(base_members_path).read_text())
         self._daily_doc = json.loads(Path(daily_members_path).read_text())
         self._base_tables = self._base_doc.get("tables") or {}
         self._daily_entries = self._daily_doc.get("entries") or {}
+        # Optional P10 full-history calendar map (history-calendar-*).
+        # When present it OVERRIDES the Base table's calendar members so
+        # the reader can prove listing age back to 1990 (the H1 map only
+        # pins the 2026 partition).  Format: {"base":[{path,sha256,...}],
+        # "daily":[{path,sha256,...}]} with absolute member paths.
+        self._calendar_members = None
+        if calendar_members_path is not None:
+            doc = json.loads(Path(calendar_members_path).read_text())
+            self._calendar_members = (
+                doc.get("base") or [],
+                doc.get("daily") or doc.get("november") or [],
+            )
 
     # ---- Base -----------------------------------------------------------
     def base_members(self, table: str) -> list[ResolvedMember]:
         """All pinned members of one Base table (every partition file)."""
+        if table == "dwd_trading_calendar" and self._calendar_members:
+            base, daily = self._calendar_members
+            out = []
+            for e in base + daily:
+                out.append(
+                    ResolvedMember(
+                        member_id=str(e["path"]).split("/published/DWD/")[-1]
+                        if "/published/DWD/" in str(e["path"])
+                        else str(e["path"]),
+                        package_id=BASE_PACKAGE_ID,
+                        version=BASE_VERSION,
+                        abs_path=Path(e["path"]),
+                        sha256="sha256:" + str(e["sha256"]).replace("sha256:", ""),
+                        size_bytes=int(e.get("size_bytes") or 0),
+                        readability="READABLE",
+                        package_kind="base",
+                        market_date=e.get("target"),
+                    )
+                )
+            return out
         entry = self._base_tables.get(table) or {}
         out = []
         for tup in entry.get("members") or []:

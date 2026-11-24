@@ -41,3 +41,12 @@ Milestone 使用 GitHub 仓库原生的里程碑功能。Issue 类型说明工�
 - 新正式版本绑定已合入源码 SHA、发布提交和资产摘要；同内容重试验证已有结果，内容变化使用新版本。WFF 的公开产物仓由发布流程写入，开发规则应用在源码维护仓。
 - 新任务直接执行本约定；在途任务下一次接手时补最低必要信息；已关闭历史保持原记录。遗留 PR/分支/worktree 用有限清单逐项决定继续、已集成、被替代、保留证据或删除。
 - Issue 类型与状态仅维护一个来源。受同步器管理的字段经其声明入口更新；兼容标签从同一来源生成。Quanthus 的稳定 ID、P10 所有权、TPlan/蓝图和分项验收继续按项目规则执行。
+
+## RSI 巡检工单（source:rsi）
+
+本仓接受 RSI 巡检以 GitHub Issue 形式提交的发现（原生类型选 `Bug` 或 `Task`，标签带 `source:rsi` 与 `triage:pending`，正文末尾附 `<!-- rsi:fingerprint=<sha256> scope=<scope> -->`）。RSI 只有提单权；分诊、排期、硬化与关单由本项目自行决定。
+
+- **何时查看**：每次任务启动、或准备合入/发布前，按当前任务涉及的模块或操作 `scope` 执行 `gh issue list --label source:rsi --state open`；只处理与当前 `scope` 匹配的条目，无关条目留给对应负责人。
+- **采纳并硬化**：将发现硬化进本次代码、测试或预检脚本（纯语境经验则更新对应模块文档），在提交或 PR 正文写 `Closes #<编号>`，由 GitHub 以 `state_reason=completed` 关闭。
+- **拒绝或暂缓**：若判断不适用、误报或当前不做，在 Issue 写明简短理由后执行 `gh issue close <编号> --reason "not planned"`（`state_reason=not_planned`）。该指纹即从待办中移除；源码未发生新变更前 RSI 不再重提。
+- **指纹保留**：保留 Issue 正文末尾的 `rsi:fingerprint` 注释，供去重与硬化后复发核对使用。

@@ -119,15 +119,52 @@ def test_scoped_weekly_or_held_minutes_never_claim_full_completion():
 
 @pytest.mark.parametrize("recovery", [False, True])
 def test_daily_invokes_full_existing_cycle_not_source_only(tmp_path, monkeypatch, recovery):
+    config = tmp_path / "daily.json"
+    config.write_text("{}")
+
     def fake_run(command, **kwargs):
         assert command[2] == "quanthus.pipelines.securities_warehouse.daily_base24_cycle"
         assert ("--recovery" in command) == recovery
         assert "--native-only" not in command
+        assert "--no-trade-regrade" not in command
         kwargs["stdout"].write(json.dumps({"result": {"status": "QUALIFIED_1D_NATIVE5M"}}).encode())
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(jobs.subprocess, "run", fake_run)
-    assert jobs.daily(tmp_path / "config", DAY, recovery)["status"] == "QUALIFIED_1D_NATIVE5M"
+    assert jobs.daily(config, DAY, recovery)["status"] == "QUALIFIED_1D_NATIVE5M"
+
+
+@pytest.mark.parametrize(
+    "flag,recovery,error",
+    [
+        (True, False, "P10_NO_TRADE_REGRADE_REQUIRES_RECOVERY"),
+        ("true", True, "P10_NO_TRADE_REGRADE_FLAG_INVALID"),
+        (True, True, None),
+        (False, True, None),
+    ],
+)
+def test_container_daily_regrade_opt_in_never_silently_becomes_ordinary_daily(
+    tmp_path, monkeypatch, flag, recovery, error
+):
+    config = tmp_path / "daily.json"
+    config.write_text(json.dumps({"no_trade_regrade_continuation": flag}))
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        kwargs["stdout"].write(b'{"result":{"status":"QUALIFIED_1D_NATIVE5M"}}')
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(jobs.subprocess, "run", fake_run)
+    if error:
+        with pytest.raises(ValueError, match=error):
+            jobs.daily(config, DAY, recovery)
+        assert not calls
+    else:
+        assert jobs.daily(config, DAY, recovery)["status"] == "QUALIFIED_1D_NATIVE5M"
+        assert len(calls) == 1
+        assert "--recovery" in calls[0]
+        assert ("--no-trade-regrade" in calls[0]) is flag
 
 
 def private_mail(tmp_path):

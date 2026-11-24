@@ -118,16 +118,20 @@ def _canonical_fraction(value: Any, field: str) -> Decimal:
     ``format(d, "f")`` + fractional-trailing-zero strip, so a round trip is
     byte-identical and ``Decimal.normalize`` (which rounds to context
     precision) is never used.
+
+    The string is fullmatched BEFORE any ``Decimal`` is constructed, exactly
+    as the frozen R4 order requires: leading zero, trailing zero, whitespace,
+    exponent, symbol and non-string inputs are all refused on the regex; only
+    a match reaches ``Decimal(value)`` verbatim (no normalize/quantize).
     """
 
-    parsed = _wire_decimal(value, field)
     if not isinstance(value, str) or _TARGET_FRACTION_WIRE.fullmatch(value) is None:
         raise FactError(
             "INVALID_PACKAGE",
             f"decision_set {field} must be the canonical 0.<digits> "
             "fraction ending in a non-zero digit",
         )
-    return parsed
+    return Decimal(value)
 
 
 def _chart(raw: Any) -> ChartEvidence | None:

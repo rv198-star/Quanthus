@@ -220,3 +220,28 @@ class SourceMap:
                 member.abs_path.stat().st_size if member.abs_path.exists() else None
             ),
         }
+
+    def resolve(self, member_id: str) -> ResolvedMember | None:
+        """Resolve one member_id back to its pinned ResolvedMember.
+
+        Base members use the package-relative `payload/...` id; daily-core
+        members were registered under the absolute path that was actually
+        opened, so both forms are matched.  Returns None for an id the
+        frozen maps do not cover (a named gap, never a guess).
+        """
+        for table in self._base_tables:
+            for m in self.base_members(table):
+                if m.member_id == member_id:
+                    return m
+        if self._calendar_members:
+            for m in self.base_members("dwd_trading_calendar"):
+                if m.member_id == member_id:
+                    return m
+        for day in self.daily_open_days():
+            pkg = self.daily_core(day)
+            if pkg is None:
+                continue
+            for m in pkg.members:
+                if m.member_id == member_id or str(m.abs_path) == member_id:
+                    return m
+        return None

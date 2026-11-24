@@ -38,7 +38,9 @@ def read_actions(source_map: SourceMap, market_date: date):
             recs = _rows(
                 member.abs_path,
                 ["corporate_action_id", "security_id", "action_type", "action_status",
-                 "record_date", "ex_date", "payment_date", "announced_at", "knowledge_from"],
+                 "record_date", "ex_date", "payment_date", "announced_at",
+                 "record_source", "source_record_id", "source_revision",
+                 "knowledge_from", "knowledge_to"],
             )
         except Exception as exc:  # noqa: BLE001
             action_reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
@@ -48,6 +50,7 @@ def read_actions(source_map: SourceMap, market_date: date):
             if not sid:
                 continue
             actions.setdefault(str(rec.get("corporate_action_id") or ""), {
+                "corporate_action_id": str(rec.get("corporate_action_id") or ""),
                 "security_id": sid,
                 "action_type": str(rec.get("action_type") or ""),
                 "action_status": str(rec.get("action_status") or ""),
@@ -56,6 +59,10 @@ def read_actions(source_map: SourceMap, market_date: date):
                 "payment_date": _date(rec.get("payment_date")),
                 "announced_at": parse_ts(rec.get("announced_at")),
                 "knowledge_from": parse_ts(rec.get("knowledge_from")),
+                "knowledge_to": parse_ts(rec.get("knowledge_to")),
+                "record_source": str(rec.get("record_source") or ""),
+                "source_record_id": str(rec.get("source_record_id") or ""),
+                "source_revision": str(rec.get("source_revision") or ""),
                 "terms": {},
             })
         action_reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
@@ -64,7 +71,9 @@ def read_actions(source_map: SourceMap, market_date: date):
             recs = _rows(
                 member.abs_path,
                 ["corporate_action_id", "term_type", "amount_per_share",
-                 "ratio_numerator", "ratio_denominator", "currency"],
+                 "ratio_numerator", "ratio_denominator", "currency",
+                 "record_source", "source_record_id", "source_revision",
+                 "knowledge_from", "knowledge_to"],
             )
         except Exception as exc:  # noqa: BLE001
             term_reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
@@ -77,6 +86,11 @@ def read_actions(source_map: SourceMap, market_date: date):
                     "ratio_numerator": rec.get("ratio_numerator"),
                     "ratio_denominator": rec.get("ratio_denominator"),
                     "currency": rec.get("currency"),
+                    "record_source": str(rec.get("record_source") or ""),
+                    "source_record_id": str(rec.get("source_record_id") or ""),
+                    "source_revision": str(rec.get("source_revision") or ""),
+                    "knowledge_from": parse_ts(rec.get("knowledge_from")),
+                    "knowledge_to": parse_ts(rec.get("knowledge_to")),
                 }
         term_reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
     return actions, {"action_reads": action_reads, "term_reads": term_reads}

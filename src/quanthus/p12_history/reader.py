@@ -85,12 +85,13 @@ def read_history(
                 visible_at if visible_at is not None else knowledge_at,
                 date_from, date_to,
             )
-    # P11 裁定: a member whose own business clock is later than the
-    # declared decision_cutoff is registered with its real knowledge_at
-    # but its visible_at is bounded by the cutoff - the member is
-    # visible for the replay only up to the frozen point.  The
-    # truncated members are named on the coverage receipt so P11 can
-    # decide which uses are affected ("按真实可用性处理受影响动作").
+    # P11 裁定 (OCTOBER-REPLAY-TIME-v1): the original member clock is
+    # carried verbatim - visible_at equals the member's own knowledge_at
+    # and is NOT bounded by the decision_cutoff.  The logical replay
+    # cutoff is declared separately on the envelope; consumers consume
+    # through the versioned October-replay entry which reads the real
+    # clock.  Members whose source clock post-dates the cutoff are still
+    # named on the receipt (bounded_members, kept for comparison).
     base_knowledge = datetime.fromisoformat(BASE_BUSINESS_THROUGH + "T16:00:00+00:00")
     bounded_members = []
     for table in (
@@ -103,10 +104,9 @@ def read_history(
         "dwd_tradability_state", "dwd_security_bar",
     ):
         for m in smap.base_members(table):
-            vis = min(base_knowledge, decision_cutoff)
             if base_knowledge > decision_cutoff:
                 bounded_members.append(m.member_id)
-            _reg(m, base_knowledge, visible_at=vis)
+            _reg(m, base_knowledge, visible_at=base_knowledge)
     for day in smap.daily_open_days():
         if day > market_date.isoformat():
             continue
@@ -115,10 +115,9 @@ def read_history(
             continue
         day_dt = datetime.fromisoformat(day + "T16:00:00+00:00")
         for m in pkg.members:
-            vis = min(day_dt, decision_cutoff)
             if day_dt > decision_cutoff:
                 bounded_members.append(m.member_id)
-            _reg(m, day_dt, date_from=day, date_to=day, visible_at=vis)
+            _reg(m, day_dt, date_from=day, date_to=day, visible_at=day_dt)
     source_member_entries = list(member_entries.values())
 
     # ---- per-security entries ----
@@ -145,6 +144,64 @@ def read_history(
         securities=securities,
     )
 
+    # Actual consumption closure (P11 裁定): only members actually opened
+    # this run count for formal use.  Each reads[] entry already carries
+    # sha_match from verify_member; here we re-resolve the member_id to
+    # pin its package_kind (base / daily-core), absolute path and read
+    # clock so the receipt is independently recomputable.  Members named
+    # in the envelope but never opened are NOT counted as consumed.
+    consumed = {}
+
+    def _collect(section, key):
+        seg = section.get(key) if isinstance(section, dict) else section
+        for rec in seg or []:
+            mid = rec.get("member_id")
+            if not mid or rec.get("status") != "READ":
+                continue
+            if mid in consumed:
+                consumed[mid]["uses"].append(key)
+                continue
+            resolver = getattr(smap, "resolve", None)
+            resolved = resolver(mid) if callable(resolver) else None
+            consumed[mid] = {
+                "member_id": mid,
+                "package_id": (resolved.package_id if resolved else rec.get("package_id")),
+                "package_kind": (resolved.package_kind if resolved else "unresolved"),
+                "version": (resolved.version if resolved else None),
+                "abs_path": (str(resolved.abs_path) if resolved else rec.get("path")),
+                "sha256": rec.get("sha256"),
+                "sha_match": bool(rec.get("sha_match")),
+                "rows": rec.get("rows"),
+                "status": rec.get("status"),
+                "verify_at": read_at,
+                "uses": [key],
+            }
+
+    _collect(cal_cov, "reads")
+    _collect(list_cov, "reads")
+    _collect(uni_cov, "reads")
+    _collect(bar_cov, "reads")
+    _collect(act_cov, "action_reads")
+    _collect(act_cov, "term_reads")
+    _collect(exc_cov, "reads")
+    _collect(lim_cov, "reads")
+
+    member_consumption = {
+        "consumed_member_count": len(consumed),
+        "base_member_count": sum(1 for v in consumed.values() if v["package_kind"] == "base"),
+        "daily_member_count": sum(
+            1 for v in consumed.values() if v["package_kind"] == "daily-core"
+        ),
+        "sha_all_match": all(v["sha_match"] for v in consumed.values()),
+        "members": sorted(consumed.values(), key=lambda v: v["member_id"]),
+        "registered_member_count": len(source_member_entries),
+        "note": (
+            "Members actually opened and sha-verified this run. Registered "
+            "envelope source_members may exceed consumed members; formal use "
+            "counts only the consumed set."
+        ),
+    }
+
     coverage = {
         "read_at": read_at,
         "visible_at_label": REPLAY_AS_OBSERVED,
@@ -160,6 +217,7 @@ def read_history(
         "bar_sessions": BAR_SESSIONS,
         "listing_proof_sessions": LISTING_PROOF_SESSIONS,
         "bounded_members": bounded_members,
+        "member_consumption": member_consumption,
         "note": (
             "Corporate-action/exception completeness for the covered window is "
             "UNKNOWN (0 securities proven; 2026-11 deltas SOURCE_NOT_REFRESHED). "

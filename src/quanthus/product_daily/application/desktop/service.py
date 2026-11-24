@@ -1081,6 +1081,7 @@ class P12DesktopApplication:
         blockers: tuple[str, ...],
         now: datetime,
         reduce_exit_ids: frozenset[str] = frozenset(),
+        exit_types_unverified: bool = False,
     ) -> OpportunityView:
         plan = next((p for p in package.plans if p.opportunity_id == item.opportunity_id), None)
         applicability = (
@@ -1169,8 +1170,20 @@ class P12DesktopApplication:
             # task in batch A - the position stays held and the page shows
             # the reduction suggestion; only action "exit" produces the
             # sell task.
-            is_reduce = item.opportunity_id in reduce_exit_ids
-            action, status = ("HOLD", "READY") if is_reduce else ("SELL", "READY")
+            if exit_types_unverified:
+                # Issue #722 r4-1: no receipt binds this package's digest
+                # and run identity - the reduce/full type cannot be
+                # verified.  The plan stays visible but is not confirmable:
+                # HOLD + MISSING_INPUT ("退出类型无法核实") rather than a
+                # guessed full sell.
+                action, status = "HOLD", "MISSING_INPUT"
+                reasons.append("EXIT_TYPE_UNVERIFIED")
+                primary = "EXIT_TYPE_UNVERIFIED"
+            else:
+                is_reduce = item.opportunity_id in reduce_exit_ids
+                action, status = (
+                    ("HOLD", "READY") if is_reduce else ("SELL", "READY")
+                )
             # Once the position is flat the exit is complete: it no longer
             # prompts a sell.  An exit plan is sized for the whole held
             # quantity, so quantity 0 after its report marks it done — but only
@@ -1216,7 +1229,7 @@ class P12DesktopApplication:
             MaybeDecimal.unknown("NO_POSITION"),
         )
         exit_kind = None
-        if stage is OpportunityStage.EXIT_PLAN:
+        if stage is OpportunityStage.EXIT_PLAN and not exit_types_unverified:
             exit_kind = (
                 "reduce" if item.opportunity_id in reduce_exit_ids else "full"
             )
@@ -1303,6 +1316,21 @@ class P12DesktopApplication:
             if callable(published_run)
             else None
         )
+        # Issue #722 r4-1: when no receipt binds THIS package's digest and
+        # run identity, the exit plans' reduce/full types cannot be
+        # verified - the workbench shows "退出类型无法核实" and the plan is
+        # not confirmable, never a guessed full sell.  This only applies to
+        # sources that implement published_run_for (the package-store
+        # reader); a replay fixture without the method has no receipt
+        # concept and its exit plans are already self-describing.
+        exit_types_unverified = (
+            callable(published_run)
+            and run_doc is None
+            and any(
+                item.stage is OpportunityStage.EXIT_PLAN
+                for item in decisions.decisions
+            )
+        )
         reduce_exit_ids = frozenset(
             str(sig.get("opportunity_id"))
             for sig in (run_doc or {}).get("held_signals") or ()
@@ -1311,7 +1339,7 @@ class P12DesktopApplication:
         items = [
             self._opportunity(
                 item, decisions, package, projection, history, account,
-                blockers, now, reduce_exit_ids,
+                blockers, now, reduce_exit_ids, exit_types_unverified,
             )
             for item in (decisions.decisions if visible else ())
             # The no-qualified-candidate no-op marks a published "nothing to

@@ -29,10 +29,20 @@ PENDING_VERSION = "v1"
 EXCHANGE_TZ = timezone(timedelta(hours=8))
 
 # The configured daily publish time-of-day (audit R15): the next workbench
-# check is the next authoritative session at this time, the same moment the
-# nightly timer fires.  A pending placeholder publishes then too, so the
-# publication clock and the displayed next_check_at stay consistent.
+# check is the next authoritative session at this time.  A pending
+# placeholder publishes at that configured point, so the publication clock
+# and the displayed next_check_at stay consistent.
 DEFAULT_PUBLISH_TIME = time(22, 30, tzinfo=EXCHANGE_TZ)
+
+# Issue #722 r4-2: the overdue deadline is the day's FIRST configured post-
+# cutoff publish slot, never a publish_time + fixed minutes guess.  These
+# mirror the deployed post-cutoff timers (22:35/22:45/23:00 on CN02); a
+# deployment that moves its timers must move this list with them.
+DEFAULT_PUBLISH_SLOTS = (
+    time(22, 35, tzinfo=EXCHANGE_TZ),
+    time(22, 45, tzinfo=EXCHANGE_TZ),
+    time(23, 0, tzinfo=EXCHANGE_TZ),
+)
 
 
 def calendar_next_session_provider(job_root: Path, calendar_root: Path | None = None):
@@ -80,7 +90,7 @@ class PublishedPackageSource:
         account_ids: frozenset[str] | None = None,
         next_session_provider=None,
         publish_time: time = DEFAULT_PUBLISH_TIME,
-        publish_slot: timedelta = timedelta(minutes=30),
+        publish_slots: tuple[time, ...] = DEFAULT_PUBLISH_SLOTS,
     ) -> None:
         self._store = DailyPackageStore(Path(state_dir))
         self._clock = clock
@@ -93,7 +103,7 @@ class PublishedPackageSource:
         # is blocked rather than fabricating a date.
         self._next_session_provider = next_session_provider
         self._publish_time = publish_time
-        self._publish_slot = publish_slot
+        self._publish_slots = tuple(publish_slots)
 
     # ---- helpers --------------------------------------------------------------
     def _scope_ok(self, scope: AccountScope) -> None:
@@ -172,31 +182,49 @@ class PublishedPackageSource:
         return self._publish_time
 
     def publish_deadline(self, market_date: date) -> datetime:
-        """The publish deadline for a market date (issue #722 r3-3).
+        """The publish deadline for a market date (issue #722 r4-2).
 
-        The configured publish point (decision cutoff time-of-day) plus the
-        publish slot that the post-cutoff timers fill (22:35/22:45/23:00).  A
-        package absent after this moment is overdue - judged from the
-        deadline, never from next_check_at.
+        The day's FIRST configured publish slot on that market date - the
+        earliest moment the post-cutoff timers should have produced a
+        package or a successful receipt.  A package absent after this
+        moment is overdue - judged from the first slot, never from
+        next_check_at and never from a publish-time-plus-fixed-minutes
+        guess.
         """
-        return datetime.combine(market_date, self._publish_time) + self._publish_slot
+        if not self._publish_slots:
+            return None
+        return datetime.combine(market_date, min(self._publish_slots))
+
+    def publish_slots(self) -> tuple[time, ...]:
+        """The day's configured publish slots (the post-cutoff timers)."""
+        return self._publish_slots
 
     def published_run_for(self, market_date: date) -> dict | None:
-        """The run receipt that produced this date's package.
+        """The run receipt that produced THIS market_date's published package.
 
         A later INPUT_BLOCKED or precheck receipt on the same market_date never
         rewrites the published package's actions (issue #722 r3-1): the
         workbench binds the held_signals of the run whose status is PUBLISHED
-        or ALREADY_PUBLISHED, not the newest receipt.
+        or ALREADY_PUBLISHED, not the newest receipt.  Issue #722 r4-1: the
+        receipt must name BOTH the published package's file digest AND the
+        run identity bound to this exact publication - a different run's
+        successful receipt over a different package must not be mistaken for
+        the run that produced the package the workbench is reading.  No
+        matching receipt means the package's exit types cannot be verified;
+        callers must not guess the produce run.
         """
-        runs = getattr(self._store, "latest_run_for_date", None)
-        if not callable(runs):
+        stored = self._store.package_for(market_date)
+        if stored is None:
             return None
-        for candidate in self._store.runs():
+        for candidate in reversed(self._store.runs()):
             if (
                 str(candidate.get("market_date")) == market_date.isoformat()
                 and str(candidate.get("status"))
                 in ("PUBLISHED", "ALREADY_PUBLISHED")
+                and str((candidate.get("package") or {}).get("file_sha256") or "")
+                == stored.file_sha256
+                and str((candidate.get("package") or {}).get("package_id") or "")
+                == stored.package_id
             ):
                 return candidate
         return None

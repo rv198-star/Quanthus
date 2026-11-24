@@ -134,6 +134,34 @@ def build_local_kernel(
         source_kwargs = {}
         if publish_time is not None:
             source_kwargs["publish_time"] = publish_time
+        # Issue #722 r4-2: the overdue deadline is the FIRST configured
+        # publish slot, bound here to the same post-cutoff timers the
+        # systemd unit fires.  QUANTHUS_P12_PUBLISH_SLOTS accepts a
+        # comma-separated "22:35,22:45,23:00"; a missing env keeps the
+        # source's default (the CN02 22:35/22:45/23:00 slots).
+        raw_slots = os.environ.get("QUANTHUS_P12_PUBLISH_SLOTS")
+        if raw_slots:
+            from quanthus.p12_daily.package_source import EXCHANGE_TZ as _EX_TZ
+            default_tz = (
+                publish_time.tzinfo
+                if publish_time is not None and publish_time.tzinfo is not None
+                else _EX_TZ
+            )
+            slots = []
+            for token in raw_slots.split(","):
+                token = token.strip()
+                if not token:
+                    continue
+                try:
+                    parsed = _time.fromisoformat(token)
+                except ValueError:
+                    continue
+                slots.append(
+                    parsed if parsed.tzinfo is not None
+                    else parsed.replace(tzinfo=default_tz)
+                )
+            if slots:
+                source_kwargs["publish_slots"] = tuple(slots)
         paper_decisions = PublishedPackageSource(
             state_dir,
             system_clock,

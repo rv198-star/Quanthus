@@ -102,12 +102,30 @@ def make_forward_calendar(
         "timezone": "Asia/Shanghai",
         "coverage": {"start": "2026-11-01", "end": coverage_end},
         "venues": {
-            "SSE": {"status": "AVAILABLE", "next_session": dict(next_map),
-                    "next_session_unavailable": {
-                        k: "NEXT_SESSION_OUTSIDE_COVERAGE"
-                        for k, v in next_map.items() if v is None}},
-            "SZSE": {"status": "AVAILABLE", "next_session": dict(next_map),
-                     "next_session_unavailable": {}},
+            "SSE": {
+                "status": "AVAILABLE",
+                "next_session": dict(next_map),
+                "next_session_unavailable": {
+                    k: "NEXT_SESSION_OUTSIDE_COVERAGE"
+                    for k, v in next_map.items() if v is None
+                },
+                # Issue #722 r4-3: the strict-successor check cross-checks
+                # the mapped answer against the venue's real session list;
+                # the fixture derives it from the mapping so a queried date
+                # resolves to the strict next session (a skipped date, a
+                # regression or an absent answer is caught downstream).
+                "sessions": sorted(
+                    {d for d in next_map} | {v for v in next_map.values() if v}
+                ),
+            },
+            "SZSE": {
+                "status": "AVAILABLE",
+                "next_session": dict(next_map),
+                "next_session_unavailable": {},
+                "sessions": sorted(
+                    {d for d in next_map} | {v for v in next_map.values() if v}
+                ),
+            },
             "BSE": {"status": bse_status, "reason": bse_reason,
                     "next_session": None, "sessions": None},
         },
@@ -1935,10 +1953,14 @@ def test_reserved_bucket_pending_skips_settled_holding_security(env):
         projection=N(positions=(position,)),
         history=N(orders=()),
     )
+    # Issue #722 r4-4: a binding whose bucket phases cannot be read blocks
+    # the day; this fixture supplies a readable RESERVED state so the
+    # settled-holding case still skips the double-listing.
+    bucket = N(bucket_id="b1", phase="reserved")
     service = N(
         snapshot=lambda _c: snapshot,
         funding_binding=lambda _c: {"bucket_securities": {"b1": "600000"}},
-        funding_state=lambda _c: None,
+        funding_state=lambda _c: (N(buckets=(bucket,)), 1),
     )
     with patch(
         "quanthus.platform.adapters.product_daily_facts_sqlite."
@@ -2023,19 +2045,324 @@ def test_reduce_projection_binds_the_published_run(tmp_path):
     assert (store.latest_run() or {})["status"] == "INPUT_BLOCKED"
 
 def test_overdue_judged_from_publish_deadline_not_next_check(tmp_path):
-    """Issue #722 r3-3: overdue is the deadline (configured publish time +
-    slot) passing with no package and no successful receipt - never
-    next_check_at, which only names the NEXT scheduled publish point."""
+    """Issue #722 r4-2: overdue starts at the day's FIRST configured publish
+    slot (the earliest post-cutoff timer), never a publish-time-plus-fixed-
+    minutes guess - and never next_check_at, which only names the NEXT
+    scheduled publish point."""
     from quanthus.p12_daily.package_source import PublishedPackageSource
 
     state = tmp_path / "state"
-    now = datetime(2026, 11, 23, 23, 1, tzinfo=TZ)
+    now = datetime(2026, 11, 23, 22, 36, tzinfo=TZ)
     source = PublishedPackageSource(state, lambda: now)
-    # deadline = market_date 22:30 + 30min slot = 23:00; at 23:01 it passed.
+    # The deadline is the first configured slot (22:35); at 22:36 a package
+    # or successful receipt is already overdue - not deferred to 23:00.
     deadline = source.publish_deadline(date(2026, 11, 23))
-    assert deadline == datetime(2026, 11, 23, 23, 0, tzinfo=TZ)
+    assert deadline == datetime(2026, 11, 23, 22, 35, tzinfo=TZ)
     assert now > deadline
     # A late-publish at 22:35 yesterday must not shift the configured
     # 22:30 time-of-day used for the next session's check point.
     assert source.publish_time().hour == 22
     assert source.publish_time().minute == 30
+
+
+def _publish_reduce_package(state, prod):
+    """Publish one package whose exit_plan carries a reduce held_signal;
+    returns (receipt, store)."""
+    holding = HeldPositionFact(security_code="600000", quantity=500)
+    runner = SyntheticRuleRunner(candidates=(
+        one_candidate(holding_signal={
+            "action": "reduce", "target_position_fraction": "0.50",
+        }),
+    ))
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=now,
+        decision_cutoff=CUTOFF, holdings=(holding,),
+    )
+    return receipt, DailyPackageStore(state)
+
+
+def test_reduce_projection_requires_the_package_run_identity(tmp_path):
+    """Issue #722 r4-1: a successful receipt naming a DIFFERENT package
+    digest or a different run identity does not bind the published
+    package's exit types - the workbench then shows the exit type as
+    unverifiable, never a guessed full sell."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    receipt, store = _publish_reduce_package(state, prod)
+    assert receipt["status"] == "PUBLISHED"
+    trusted = store.package_for(MARKET_DATE)
+    now = datetime(2026, 11, 23, 9, 31, tzinfo=TZ)
+    source = PublishedPackageSource(state, lambda: now)
+    # A forgery: same market_date, PUBLISHED-equivalent status, but a
+    # different package digest and a different run id.
+    forgery = {
+        **receipt,
+        "run_id": "20261120T223400000000+0800",
+        "status": "ALREADY_PUBLISHED",
+        "package": {**receipt["package"], "file_sha256": "f" * 64},
+        "held_signals": [],
+    }
+    store.write_run(forgery)
+    # The bound receipt is still the real publish run - the forgery is not
+    # selected and the projection keeps the reduce signal.
+    bound = source.published_run_for(MARKET_DATE)
+    assert bound is not None
+    assert bound["run_id"] == receipt["run_id"]
+    # Removing the bound receipt leaves no verifiable produce run.
+    for path in store.runs_dir.glob("*.json"):
+        path.unlink()
+    store.write_run(forgery)
+    source2 = PublishedPackageSource(state, lambda: now)
+    assert source2.published_run_for(MARKET_DATE) is None
+    assert trusted is not None
+
+
+def test_exit_type_unverified_blocks_confirmation(tmp_path):
+    """Issue #722 r4-1: with no receipt binding the published package's
+    digest and run identity, the exit plan reads HOLD + MISSING_INPUT +
+    EXIT_TYPE_UNVERIFIED ("退出类型无法核实") and is not confirmable."""
+    from quanthus.platform.adapters.p12_synthetic_fixture import (
+        load_synthetic_fixture,
+    )
+    from quanthus.platform.p12.paper_fixture import build_paper_application
+    from quanthus.product_daily.application.models import (
+        SyntheticRuntimeAuthorization,
+    )
+
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    receipt, store = _publish_reduce_package(state, prod)
+    assert receipt["status"] == "PUBLISHED"
+    # Drop every run receipt: no produce run is verifiable.
+    for path in store.runs_dir.glob("*.json"):
+        path.unlink()
+    now = datetime(2026, 11, 23, 9, 31, tzinfo=TZ)
+    source = PublishedPackageSource(state, lambda: now, mode="synthetic")
+    app = build_paper_application(
+        state_dir=state,
+        policy=load_synthetic_fixture(
+            Path("config/p12/synthetic-desktop.v1.json")
+        ).policy,
+        now=lambda: now,
+        authorization=SyntheticRuntimeAuthorization(
+            "audit", frozenset({"SYN-PAPER-A"})
+        ),
+        decision_source=source,
+    )
+    workbench = app.workbench(app.scope)
+    exits = [
+        item for item in workbench.opportunities
+        if item.stage == "exit_plan"
+    ]
+    assert exits
+    for item in exits:
+        assert item.action_code == "HOLD"
+        assert item.status_code == "MISSING_INPUT"
+        assert item.exit_kind is None
+        assert "EXIT_TYPE_UNVERIFIED" in item.reason_codes
+
+
+def test_ledger_dangling_symlink_is_a_read_failure(env):
+    """Issue #722 r4-4: a ledger path that is a dangling symlink is a read
+    failure (ACCOUNT_FACTS_UNAVAILABLE), never FRESH_NO_BASELINE."""
+    from quanthus.p12_daily.daily_job import (
+        AccountFactsUnavailable,
+        _account_facts,
+    )
+
+    prod, state, _ = env
+    state_dir = Path(state)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    link = state_dir / "p12-paper-facts.sqlite"
+    link.symlink_to(state_dir / "missing-target")
+    with pytest.raises(AccountFactsUnavailable):
+        _account_facts(state_dir, "SYN-PAPER-A")
+
+
+def test_funding_binding_without_phase_state_blocks(env):
+    """Issue #722 r4-4: a funding binding whose bucket phases cannot be
+    read blocks the day; only an explicit RESERVED phase produces a
+    reserved_bucket pending."""
+    from types import SimpleNamespace as N
+    from unittest.mock import patch
+
+    from quanthus.p12_daily.daily_job import (
+        AccountFactsUnavailable,
+        _account_facts,
+    )
+
+    prod, state, _ = env
+    state_dir = Path(state)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "p12-paper-facts.sqlite").write_bytes(b"x")
+    snapshot = N(projection=N(positions=()), history=N(orders=()))
+    service = N(
+        snapshot=lambda _c: snapshot,
+        funding_binding=lambda _c: {
+            "bucket_securities": {"held": "000001", "reserved": "600000"}
+        },
+        funding_state=lambda _c: None,
+    )
+    with patch(
+        "quanthus.platform.adapters.product_daily_facts_sqlite."
+        "build_synthetic_fact_service",
+        return_value=service,
+    ), pytest.raises(AccountFactsUnavailable):
+        _account_facts(state_dir, "SYN-PAPER-A")
+    # Readable phases: only the RESERVED bucket names a pending security.
+    service.funding_state = lambda _c: (
+        N(buckets=[
+            N(bucket_id="held", phase="held"),
+            N(bucket_id="reserved", phase="reserved"),
+        ]),
+        1,
+    )
+    with patch(
+        "quanthus.platform.adapters.product_daily_facts_sqlite."
+        "build_synthetic_fact_service",
+        return_value=service,
+    ):
+        _holdings, pending, state_, _dg = _account_facts(
+            state_dir, "SYN-PAPER-A"
+        )
+    assert state_ == "OK"
+    assert [(p.security_code, p.kind) for p in pending] == [
+        ("600000", "reserved_bucket")
+    ]
+
+
+def test_forward_calendar_missing_sessions_blocks(tmp_path):
+    """Issue #722 r4-3: a descriptor whose venue session list is absent,
+    empty or unparseable is a calendar block, never an open calendar."""
+    from quanthus.p12_daily.forward_calendar import load_forward_calendar
+
+    for mutate in (
+        lambda venue: venue.pop("sessions", None),
+        lambda venue: venue.__setitem__("sessions", None),
+        lambda venue: venue.__setitem__("sessions", []),
+        lambda venue: venue.__setitem__("sessions", ["2026-11-20", "BAD"]),
+    ):
+        root = make_forward_calendar(
+            tmp_path / "cal", next_map={"2026-11-20": "2026-11-24"}
+        )
+        ptr_path = root / "CURRENT_FORWARD_CALENDAR.json"
+        pointer = json.loads(ptr_path.read_text())
+        desc_path = root / pointer["descriptor"]
+        descriptor = json.loads(desc_path.read_text())
+        for venue in ("SSE", "SZSE"):
+            mutate(descriptor["venues"][venue])
+        desc_path.write_text(json.dumps(descriptor, sort_keys=True))
+        pointer["descriptor_sha256"] = hashlib.sha256(
+            desc_path.read_bytes()
+        ).hexdigest()
+        ptr_path.write_text(json.dumps(pointer))
+        cal, block, _ = load_forward_calendar(root, decision_cutoff=CUTOFF)
+        assert cal is None and block is not None, mutate
+
+
+def test_forward_calendar_missing_or_bad_coverage_blocks(tmp_path):
+    """Issue #722 r4-3: missing, partial, unparseable or reversed coverage
+    bounds are a calendar block."""
+    from quanthus.p12_daily.forward_calendar import load_forward_calendar
+
+    for coverage in (
+        {},
+        {"start": "2026-11-01"},
+        {"end": "2026-12-31"},
+        {"start": "BAD", "end": "2026-12-31"},
+        {"start": "2026-12-31", "end": "2026-11-01"},
+    ):
+        root = make_forward_calendar(
+            tmp_path / "cal", next_map={"2026-11-20": "2026-11-24"}
+        )
+        ptr_path = root / "CURRENT_FORWARD_CALENDAR.json"
+        pointer = json.loads(ptr_path.read_text())
+        desc_path = root / pointer["descriptor"]
+        descriptor = json.loads(desc_path.read_text())
+        descriptor["coverage"] = coverage
+        desc_path.write_text(json.dumps(descriptor, sort_keys=True))
+        pointer["descriptor_sha256"] = hashlib.sha256(
+            desc_path.read_bytes()
+        ).hexdigest()
+        ptr_path.write_text(json.dumps(pointer))
+        cal, block, _ = load_forward_calendar(root, decision_cutoff=CUTOFF)
+        assert cal is None and block is not None, coverage
+
+
+def test_base_manifest_pin_supplies_missing_location(tmp_path):
+    """Issue #722 r4-5 / P10 #747: when the core manifest's base member
+    carries no file location, the pinned read-only manifest path supplies
+    it - but only while its recomputed sha matches the declared digest."""
+    import hashlib as _hl
+
+    from quanthus.p12_daily.daily_core_input import qualify_daily_input
+
+    prod = tmp_path / "job"
+    prod.mkdir()
+    meta = make_product(prod, MARKET_DATE.isoformat())
+    core = meta["core"]
+    # Rebind the manifest so its base member has NO path (the P10 #747
+    # shape) but declares the real sha of a pinned external base file.
+    pinned_dir = tmp_path / "pinned-base"
+    pinned_dir.mkdir()
+    pinned_file = pinned_dir / "manifest.json"
+    pinned_file.write_text(json.dumps({"kind": "base", "sealed": True}))
+    pinned_sha = "sha256:" + _hl.sha256(pinned_file.read_bytes()).hexdigest()
+    manifest = json.loads((core / "manifest.json").read_text())
+    manifest["base"] = {
+        "manifest_sha256": pinned_sha,
+        "package_id": "standard-base-2.5.1-8cd966be87fc",
+    }
+    (core / "manifest.json").write_text(json.dumps(manifest, sort_keys=True))
+    core_sha = _sha((core / "manifest.json").read_bytes())
+    ptr_path = prod / "CURRENT_DAILY_CORE_BASE24.json"
+    pointer = json.loads(ptr_path.read_text())
+    pointer["entry"]["base_manifest_sha256"] = pinned_sha
+    pointer["entry"]["core_manifest_sha256"] = core_sha
+    index = json.loads((prod / "DATES.json").read_text())
+    index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
+    (prod / "DATES.json").write_text(json.dumps(index, sort_keys=True))
+    pointer["index_sha256"] = _sha((prod / "DATES.json").read_bytes())
+    ptr_path.write_text(json.dumps(pointer))
+
+    pin = {
+        "package_id": "standard-base-2.5.1-8cd966be87fc",
+        "manifest_sha256": pinned_sha,
+        "manifest_path": str(pinned_file),
+    }
+    qualified = qualify_daily_input(
+        prod / "CURRENT_DAILY_CORE_BASE24.json",
+        expected_market_date=MARKET_DATE,
+        checked_at=datetime(2026, 11, 20, 22, 30, tzinfo=TZ),
+        base_manifest_pin=pin,
+    )
+    assert qualified.base_manifest_sha256 == pinned_sha
+
+    # A declared sha that differs from the pinned identity still blocks.
+    manifest["base"] = {
+        "manifest_sha256": "sha256:" + "9" * 64,
+        "package_id": "standard-base-2.5.1-8cd966be87fc",
+    }
+    (core / "manifest.json").write_text(json.dumps(manifest, sort_keys=True))
+    core_sha2 = _sha((core / "manifest.json").read_bytes())
+    pointer["entry"]["core_manifest_sha256"] = core_sha2
+    pointer["entry"]["base_manifest_sha256"] = "sha256:" + "9" * 64
+    index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha2
+    (prod / "DATES.json").write_text(json.dumps(index, sort_keys=True))
+    pointer["index_sha256"] = _sha((prod / "DATES.json").read_bytes())
+    ptr_path.write_text(json.dumps(pointer))
+    blocked = qualify_daily_input(
+        prod / "CURRENT_DAILY_CORE_BASE24.json",
+        expected_market_date=MARKET_DATE,
+        checked_at=datetime(2026, 11, 20, 22, 30, tzinfo=TZ),
+        base_manifest_pin=pin,
+    )
+    from quanthus.p12_daily.daily_core_input import InputBlock
+    assert isinstance(blocked, InputBlock)

@@ -1,0 +1,9 @@
+{
+ "schema_version": "quanthus.p12.daily-input.v1",
+ "purpose": "P12 daily input pins (P10 #747): the parent Base manifest the CN02 base24 cycle does not locate for itself.  The pinned path is only consulted when the core manifest's base member carries no usable file location; the recomputed sha must equal the declared manifest_sha256 and the package_id must match, else the day stays blocked.",
+ "base_manifest": {
+  "package_id": "standard-base-2.5.1-8cd966be87fc",
+  "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+  "manifest_path": "/srv/quanthus-base22-data/build/base25-20261031/work/paired-base251-adce892e-a1/published/DWD/manifest.json"
+ }
+}

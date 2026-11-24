@@ -164,7 +164,11 @@ def next_session(
         )
     # Strict successor: the answer must be after today, and when the venue
     # declares its session list the answer must BE the next session in it -
-    # a regressed date or a skipped session never stands.
+    # a regressed date or a skipped session never stands.  The loader
+    # (issue #722 r4-3) already refused a venue whose sessions list is
+    # missing or unparseable, so each list here is guaranteed usable - a
+    # session list that still cannot name a strict successor blocks the
+    # day rather than being skipped.
     if nxt <= today:
         return None, CalendarBlock(
             detail=(
@@ -177,11 +181,23 @@ def next_session(
         venue = (cal.descriptor.get("venues") or {}).get(venue_name) or {}
         sessions = venue.get("sessions")
         if not isinstance(sessions, list) or not sessions:
-            continue
+            return None, CalendarBlock(
+                detail=(
+                    venue_name + " sessions list is absent at query time; "
+                    "the strict-successor check cannot run"
+                ),
+                missing_member="forward_calendar",
+            )
         try:
             ordered = sorted(date.fromisoformat(str(s)) for s in sessions)
         except ValueError:
-            continue
+            return None, CalendarBlock(
+                detail=(
+                    venue_name + " sessions list holds a non-date entry at "
+                    "query time; the strict-successor check cannot run"
+                ),
+                missing_member="forward_calendar",
+            )
         followers = [s for s in ordered if s > today]
         if not followers or followers[0] != nxt:
             return None, CalendarBlock(
@@ -352,15 +368,65 @@ def load_forward_calendar(
             missing_member="forward_calendar",
         ), receipt
 
-    coverage = descriptor.get("coverage") or {}
+    # Issue #722 r4-3: a descriptor without a parseable coverage window is
+    # unusable - "I don't know what I cover" is a calendar block, never an
+    # open window.  Missing start/end or unparseable dates all block.
+    coverage = descriptor.get("coverage")
     cov_start = cov_end = None
-    try:
-        if coverage.get("start"):
-            cov_start = date.fromisoformat(str(coverage["start"]))
-        if coverage.get("end"):
-            cov_end = date.fromisoformat(str(coverage["end"]))
-    except ValueError:
-        cov_start = cov_end = None
+    coverage_issue = None
+    if not isinstance(coverage, dict):
+        coverage_issue = "descriptor carries no coverage object"
+    else:
+        try:
+            if coverage.get("start"):
+                cov_start = date.fromisoformat(str(coverage["start"]))
+            if coverage.get("end"):
+                cov_end = date.fromisoformat(str(coverage["end"]))
+        except ValueError:
+            coverage_issue = "coverage start/end is not an ISO date"
+        else:
+            if cov_start is None or cov_end is None:
+                coverage_issue = (
+                    "coverage start/end missing; the calendar's scope is "
+                    "unknown"
+                )
+            elif cov_end < cov_start:
+                coverage_issue = "coverage end precedes coverage start"
+    if coverage_issue is not None:
+        return None, CalendarBlock(
+            detail="forward calendar " + coverage_issue,
+            missing_member="forward_calendar",
+        ), receipt
+
+    # Issue #722 r4-3: each governing venue must declare a parseable session
+    # list - the strict-successor check (next_session) depends on it.  A
+    # venue with no list, an empty list, or unparseable dates cannot prove
+    # its mapped answer is the real next session, so the calendar blocks
+    # rather than trusting the mapping alone.
+    session_issue = None
+    for venue_name in ("SSE", "SZSE"):
+        venue = venues.get(venue_name) or {}
+        sessions = venue.get("sessions")
+        if not isinstance(sessions, list) or not sessions:
+            session_issue = (
+                venue_name + " declares no sessions list; the next_session "
+                "map cannot be cross-checked"
+            )
+            break
+        try:
+            for item in sessions:
+                date.fromisoformat(str(item))
+        except ValueError:
+            session_issue = (
+                venue_name + " sessions list holds a non-date entry; the "
+                "next_session map cannot be cross-checked"
+            )
+            break
+    if session_issue is not None:
+        return None, CalendarBlock(
+            detail="forward calendar " + session_issue,
+            missing_member="forward_calendar",
+        ), receipt
 
     bse = venues.get("BSE") or {}
     cal = ForwardCalendar(

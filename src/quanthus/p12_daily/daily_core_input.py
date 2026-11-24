@@ -43,6 +43,49 @@ DEFAULT_POINTER_PATH = Path(
     "CURRENT_DAILY_CORE_BASE24.json"
 )
 
+# P10 #747: the CN02 base24 cycle's core manifest names the parent Base
+# manifest by digest only - it carries no file location P12 can recompute
+# the declared sha from.  The consumer pins the parent Base's read-only
+# manifest identity (package_id + manifest_sha256 + a read-only path) in
+# this versioned config; the pin is only a fallback locator used when the
+# manifest itself cannot name the file, and its bytes are re-hashed on
+# every run - a pin whose content does not match still blocks the day.
+DEFAULT_INPUT_CONFIG = (
+    Path(__file__).resolve().parents[3] / "config/p12/daily-input.v1.json"
+)
+
+# Sentinel: qualify_daily_input reads the pinned parent-Base locator from
+# the versioned config unless the caller passes an explicit dict or None.
+_PIN_FROM_CONFIG = object()
+
+
+def _load_base_manifest_pin(config_path: Path | None) -> dict | None:
+    '''The pinned parent-Base manifest locator from the versioned config.
+
+    Returns {package_id, manifest_sha256, manifest_path} or None.  A config
+    that is absent, unreadable or missing a field reads as no pin - the
+    caller then keeps the manifest's own location requirement.'''
+    path = Path(config_path) if config_path is not None else DEFAULT_INPUT_CONFIG
+    if not path.is_file():
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    node = raw.get("base_manifest") if isinstance(raw, dict) else None
+    if not isinstance(node, dict):
+        return None
+    package_id = node.get("package_id")
+    sha = node.get("manifest_sha256")
+    location = node.get("manifest_path")
+    if not all(isinstance(v, str) and v for v in (package_id, sha, location)):
+        return None
+    return {
+        "package_id": package_id,
+        "manifest_sha256": sha,
+        "manifest_path": location,
+    }
+
 
 @dataclass(frozen=True)
 class InputBlock:
@@ -139,10 +182,19 @@ def qualify_daily_input(
     *,
     expected_market_date: date | None = None,
     checked_at: datetime | None = None,
+    base_manifest_pin=_PIN_FROM_CONFIG,
 ) -> DailyCoreSnapshot | InputBlock:
     '''Verify the base24 daily pointer and its bound members; block on any drift.'''
 
     now = checked_at or datetime.now(EXCHANGE_TZ)
+
+    # Resolve the pinned parent-Base locator: the default reads the
+    # versioned config; callers may pass a dict (tests) or None to disable.
+    pin = (
+        _load_base_manifest_pin(None)
+        if base_manifest_pin is _PIN_FROM_CONFIG
+        else base_manifest_pin
+    )
 
     def block(reason: str, detail: str, missing: tuple[str, ...] = ()) -> InputBlock:
         return InputBlock(
@@ -310,12 +362,37 @@ def qualify_daily_input(
                 "manifest member " + repr(rel) + " sha256 differs from the declared digest",
                 ("core/" + rel,),
             )
-    # Re-hash the parent Base manifest.  Audit R4 (r2): the manifest MUST
-    # name the base manifest's file so its declared sha can be recomputed on
-    # the bytes - a description-only base reference that cannot be located
-    # blocks the run rather than skipping verification.
+    # Re-hash the parent Base manifest.  Audit R4 (r2): the declared sha is
+    # recomputed on real bytes - a description-only base reference cannot
+    # skip verification.  Issue #722 r4-5 / P10 #747: when the core manifest
+    # does not name the base manifest's file, the pinned read-only locator
+    # supplies the path - but only while the manifest's declared
+    # manifest_sha256 equals the pinned sha and any declared package_id
+    # agrees with the pinned identity.  The pinned bytes are re-hashed on
+    # every run; a digest mismatch, a package_id mismatch or an unreadable
+    # pinned file still blocks the day.
     base_member = manifest.get("base") or {}
     base_ref = base_member.get("path") or base_member.get("manifest")
+    declared_base_sha = str(base_member.get("manifest_sha256") or "")
+    using_pin = False
+    if (
+        not (isinstance(base_ref, str) and base_ref)
+        and pin is not None
+        and declared_base_sha == str(pin.get("manifest_sha256") or "")
+    ):
+        member_pkg = str(base_member.get("package_id") or "")
+        pinned_pkg = str(pin.get("package_id") or "")
+        if member_pkg and member_pkg != pinned_pkg:
+            return block(
+                INPUT_UNAVAILABLE,
+                "core manifest base package_id "
+                + repr(member_pkg)
+                + " differs from the pinned parent base "
+                + repr(pinned_pkg),
+                ("base_manifest",),
+            )
+        base_ref = str(pin.get("manifest_path") or "")
+        using_pin = True
     if not isinstance(base_ref, str) or not base_ref:
         return block(
             INPUT_UNAVAILABLE,
@@ -324,18 +401,21 @@ def qualify_daily_input(
             ("base_manifest",),
         )
     base_path = Path(base_ref)
-    if not base_path.is_absolute():
+    if not using_pin and not base_path.is_absolute():
         base_path = (core_root / base_ref).resolve()
     if not base_path.is_file():
         return block(
             INPUT_UNAVAILABLE,
-            "parent base manifest missing: " + str(base_path),
+            "parent base manifest missing: " + str(base_path)
+            + (" (pinned read-only path)" if using_pin else ""),
             ("base_manifest",),
         )
-    if _sha256_file(base_path) != str(base_member.get("manifest_sha256") or ""):
+    base_sha_actual = _sha256_file(base_path)
+    if base_sha_actual != declared_base_sha:
         return block(
             INPUT_UNAVAILABLE,
-            "parent base manifest sha256 differs from the declared digest",
+            "parent base manifest sha256 differs from the declared digest"
+            + (" (pinned path)" if using_pin else ""),
             ("base_manifest",),
         )
 

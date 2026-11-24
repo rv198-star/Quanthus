@@ -320,7 +320,10 @@ def _account_facts(
         # Issue #722 r3-7: a path that exists but is not a regular file (a
         # directory, a socket) is a READ FAILURE, never a fresh account -
         # only a genuinely absent file can be FRESH_NO_BASELINE.
-        if store_path.exists():
+        # Issue #722 r4-4: a dangling symlink has a path entry (exists() is
+        # False because the target is gone, but is_symlink() is True) - it
+        # is likewise a read failure, never a fresh account.
+        if store_path.exists() or store_path.is_symlink():
             raise AccountFactsUnavailable(
                 f"ledger path exists but is not a regular file: {store_path}"
             )
@@ -424,15 +427,22 @@ def _account_facts(
         raise AccountFactsUnavailable(
             f"funding binding read failed: {type(exc).__name__}: {exc}"
         ) from exc
-    reserved_bucket_ids: frozenset | None = None
-    if funding_row is not None:
+    if binding:
+        # Issue #722 r4-4: a binding whose bucket phases cannot be read is a
+        # fact-read failure, never "every bound security is reserved".
+        # reserved_bucket names a security still being acquired only while
+        # its own bucket's phase is explicitly RESERVED.
+        if funding_row is None:
+            raise AccountFactsUnavailable(
+                "funding binding exists but the bucket phases could not be "
+                "read; reserved_bucket cannot be verified"
+            )
         state, _rev = funding_row
         reserved_bucket_ids = frozenset(
             item.bucket_id
             for item in state.buckets
             if getattr(item.phase, "value", item.phase) == "reserved"
         )
-    if binding:
         # Issue #722 r3-7: the reserved-bucket pending only names a security
         # still being acquired.  A security already materialized as a settled
         # holding is served by the holding path, never double-listed as a
@@ -441,10 +451,7 @@ def _account_facts(
         securities = dict(binding.get("bucket_securities") or {})
         for _bucket_id, sec in securities.items():
             if sec:
-                if (
-                    reserved_bucket_ids is not None
-                    and _bucket_id not in reserved_bucket_ids
-                ):
+                if _bucket_id not in reserved_bucket_ids:
                     # A bucket whose current phase is not RESERVED (settled,
                     # closed, or a binding on an unbound partition) does not
                     # hold the security out - it never enters the pending

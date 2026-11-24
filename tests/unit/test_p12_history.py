@@ -8,6 +8,7 @@ unproven coverage, and never fabricates bars / listing age / a member.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -29,14 +30,23 @@ def _write(path: Path, table: pa.Table) -> None:
 
 
 def _member(root: Path, rel: str, package_id: str = "test-base", kind: str = "base",
-            market_date: str | None = None) -> ResolvedMember:
+            market_date: str | None = None, declared_sha256: str | None = None) -> ResolvedMember:
     p = root / rel
+    # Real sha256 of the member bytes (the audit rejected the earlier
+    # placeholder "a"*64 which made every member SHA_MISMATCH and left an
+    # empty universe).  A caller may pass declared_sha256 to stage a
+    # deliberate-wrong-digest contrast; otherwise hash the real file.
+    if declared_sha256 is None:
+        declared_sha256 = (
+            "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+            if p.exists() else "sha256:" + "0" * 64
+        )
     return ResolvedMember(
         member_id=rel,
         package_id=package_id,
         version="2.5.1",
         abs_path=p,
-        sha256="sha256:" + "a" * 64,
+        sha256=declared_sha256,
         size_bytes=p.stat().st_size if p.exists() else 0,
         readability="READABLE",
         package_kind=kind,
@@ -69,12 +79,24 @@ class StubSourceMap(SourceMap):
     def daily_core(self, market_date):
         return None  # members resolved via daily_member
 
+    def resolve(self, member_id):
+        for members in self._members_by_table.values():
+            for m in members:
+                if m.member_id == member_id or str(m.abs_path) == member_id:
+                    return m
+        for members in self._daily.values():
+            for m in members:
+                if m.member_id == member_id or str(m.abs_path) == member_id:
+                    return m
+        return None
+
 
 def _calendar_table(days, venue="SSE"):
     return pa.table({
         "venue_id": [venue] * len(days),
         "trade_date": days,
         "is_open": [True] * len(days),
+        "open_at": [datetime(d.year, d.month, d.day, 1, 30, tzinfo=UTC) for d in days],
         "close_at": [datetime(d.year, d.month, d.day, 15, 0, tzinfo=UTC) for d in days],
         "observation_start": [datetime(d.year, d.month, d.day, 9, 30, tzinfo=UTC) for d in days],
         "knowledge_from": [datetime(d.year, d.month, d.day, 16, 0, tzinfo=UTC) for d in days],
@@ -118,6 +140,10 @@ def _bar_table(days, listing="listing-600000"):
         "close": [10.5 + i for i in range(n)],
         "volume": [1000.0] * n,
         "turnover": [10500.0] * n,
+        "source_revision": ["rev-1"] * n,
+        "record_source": ["primary"] * n,
+        "knowledge_from": [datetime(d.year, d.month, d.day, 8, 0, tzinfo=UTC) for d in days],
+        "knowledge_to": pa.array([None] * n, type=pa.timestamp("us", tz="UTC")),
     })
 
 
@@ -155,12 +181,13 @@ def _build_map(tmp_path: Path, n_sessions=130, with_bars=True, with_listing=True
         _write(p, tbl)
         members[table] = [_member(tmp_path, f"{table}.parquet")]
     if with_bars:
-        p = tmp_path / "bars-2026-11.parquet"
-        _write(p, _bar_table(cal_days))
+        # Write the member bytes FIRST so _member hashes the real file
+        # (the prior order declared sha256 on a not-yet-written path ->
+        # placeholder digest -> SHA_MISMATCH -> empty bars).
+        _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet", _bar_table(cal_days))
         members["dwd_security_bar"] = [
             _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")
         ]
-        _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet", _bar_table(cal_days))
     for t in ("dwd_corporate_action", "dwd_corporate_action_term", "dwd_quality_exception",
               "dwd_observation_gap", "dwd_price_limit_regime", "dwd_tradability_state"):
         members.setdefault(t, [])
@@ -189,6 +216,47 @@ def test_envelope_shape_and_membership(tmp_path):
     # three clocks separated
     assert res.coverage["visible_at_label"] == "ENGINEERING_REPLAY_AS_OBSERVED"
     assert res.read_at == "2026-11-24T23:00:00Z"
+
+
+def test_open_at_is_native_not_observation_start(tmp_path):
+    # 协调/原件: 09-30 open_at=null (exchange gave no native open) vs
+    # observation_start=09-29T16:00Z; 10-08 open_at=01:30Z vs
+    # observation_start=10-07T16:00Z.  envelope.open_at must carry the
+    # NATIVE open_at column - never the observation_start instant.
+    from quanthus.p12_history import calendar_listing as cal_mod
+    from quanthus.p12_history.envelope import build_envelope
+    from quanthus.p12_history.calendar_listing import CalendarRow
+
+    # Direct row-level check: CalendarRow keeps open_at distinct.
+    rows = [
+        CalendarRow(venue_id="SSE", session_date=date(2026, 9, 30),
+                    is_open=True, open_at=None, close_at=None,
+                    observation_start=datetime(2026, 9, 29, 16, 0, tzinfo=UTC),
+                    knowledge_from=datetime(2026, 10, 8, 0, 0, tzinfo=UTC),
+                    source_member_id="part-000039"),
+        CalendarRow(venue_id="SSE", session_date=date(2026, 10, 8),
+                    is_open=True,
+                    open_at=datetime(2026, 10, 8, 1, 30, tzinfo=UTC),
+                    close_at=datetime(2026, 10, 8, 7, 0, tzinfo=UTC),
+                    observation_start=datetime(2026, 10, 7, 16, 0, tzinfo=UTC),
+                    knowledge_from=datetime(2026, 10, 8, 0, 0, tzinfo=UTC),
+                    source_member_id="part-000040"),
+    ]
+    env = build_envelope(
+        market_date=date(2026, 10, 8),
+        decision_cutoff=datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_member_entries=[], calendar_rows=rows,
+        listing_rows=[], securities=[],
+    )
+    cal = {r["session_date"]: r for r in env["calendar_rows"]}
+    # 09-30: open_at stays null (not back-filled from observation_start)
+    assert cal["2026-09-30"]["open_at"] is None
+    assert cal["2026-09-30"]["observation_start"] == "2026-09-29T16:00:00Z"
+    # 10-08: open_at is the real 01:30Z open, not the 10-07 observation_start
+    assert cal["2026-10-08"]["open_at"] == "2026-10-08T01:30:00Z"
+    assert cal["2026-10-08"]["observation_start"] == "2026-10-07T16:00:00Z"
+    # close_at and knowledge_from preserved natively too
+    assert cal["2026-10-08"]["close_at"] == "2026-10-08T07:00:00Z"
 
 
 def test_missing_listing_leaves_membership_unproven(tmp_path):
@@ -295,3 +363,433 @@ class TestActionAuthorityHandoff:
         assert any("batch-02-spdb-r2/RESULT.json" in x for x in members_read)
         assert any("WINDOW-USE.json" in x for x in members_read)
         assert out["action_coverage"]["action_coverage"] == "REBUILT"
+
+
+def test_shared_calendar_missing_yields_day_block_not_crash(tmp_path):
+    # A shared hard dependency (venue calendar) whose bytes are unreadable
+    # must emit a named whole-day block receipt, not FileNotFoundError and
+    # not a silent READ.
+    smap = _build_map(tmp_path, n_sessions=130)
+    (tmp_path / "cal.parquet").unlink()
+    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap)
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block["reason_code"] == "SHARED_CALENDAR_UNAVAILABLE"
+    assert block["affected_scope"] == "whole_day"
+    assert "cal.parquet" in block["failed_members"]
+
+
+def test_shared_calendar_bad_sha_yields_day_block(tmp_path):
+    # A shared calendar member whose declared sha is wrong is a hard
+    # fault -> named whole-day block, never silently READ with 0 rows.
+    smap = _build_map(tmp_path, n_sessions=130)
+    bad = _member(tmp_path, "cal.parquet", declared_sha256="sha256:" + "b" * 64)
+    smap._members_by_table["dwd_trading_calendar"] = [bad]
+    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_CALENDAR_UNAVAILABLE"
+
+
+def test_bars_carry_member_and_source_provenance(tmp_path):
+    smap = _build_map(tmp_path, n_sessions=130)
+    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap)
+    bar = res.raw_history["securities"][0]["bars"][0]
+    assert bar["member_id"] == (
+        "payload/dwd_security_bar/interval_size=1d/"
+        "observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    )
+    assert bar["package_id"] == "test-base"
+    assert bar["source_record_id"].startswith("src/code=600000/")
+
+
+def test_account_roles_separated_on_universe(tmp_path):
+    smap = _build_map(tmp_path, n_sessions=130)
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=smap,
+        holdings=[{"security_id": "security-600000", "quantity": 100},
+                  {"security_id": "outside-held", "quantity": None}],
+        pending=[{"security_id": "outside-pending", "pending_kind": "sell",
+                  "pending_quantity": 20}],
+    )
+    uni = res.coverage["universe"]
+    assert "security-600000" in uni["held_in_pool"]
+    assert "outside-held" in uni["held_unknown_quantity"]
+    assert "outside-pending" in uni["pending_only"]
+    assert uni["pending_typed"][0]["pending_kind"] == "sell"
+
+
+def test_future_listing_and_industry_not_admitted(tmp_path):
+    """749-03: a future-effective listing/industry never replaces the current."""
+    smap = _build_map(tmp_path)
+    # Add a future listing + a future industry row for the same security.
+    fut_listing = tmp_path / "listing.parquet"
+    base_tbl = _listing_table()
+    extra = pa.table({
+        "security_id": ["security-600000"],
+        "listing_id": ["listing-600000-future"],
+        "venue_id": ["SSE"],
+        "effective_from": [datetime(2026, 11, 27, tzinfo=UTC)],
+        "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [datetime(2026, 11, 25, tzinfo=UTC)],
+    })
+    import pyarrow.parquet as pq
+    combined = pa.concat_tables([base_tbl, extra])
+    pq.write_table(combined, fut_listing)
+    # Rebuild map so the listing member re-hashes the new bytes.
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    ind = tmp_path / "dwd_company_industry_membership.parquet"
+    ind_tbl = pa.concat_tables([
+        pa.table({
+            "company_id": ["company-1"], "industry_node_id": ["ind-bank"],
+            "membership_type": ["primary"],
+            "effective_from": [datetime(2026,1,1,tzinfo=UTC)],
+            "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+            "knowledge_from": [datetime(2026,1,1,tzinfo=UTC)]}),
+        pa.table({
+            "company_id": ["company-1"], "industry_node_id": ["ind-future"],
+            "membership_type": ["primary"],
+            "effective_from": [datetime(2026,11,27,tzinfo=UTC)],
+            "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+            "knowledge_from": [datetime(2026,11,25,tzinfo=UTC)]}),
+    ])
+    pq.write_table(ind_tbl, ind)
+    members["dwd_company_industry_membership"] = [_member(tmp_path, "dwd_company_industry_membership.parquet")]
+    smap2 = StubSourceMap(members, {})
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=smap2,
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    secs = [x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000"]
+    assert len(secs) == 1
+    assert secs[0]["identity"]["listing_id"] == "listing-600000"
+    assert secs[0]["identity"]["industry_id"] == "ind-bank"
+
+
+def test_retired_at_open_boundary_not_candidate(tmp_path):
+    """749-03: a listing retired at the open boundary (effective_to <= T) drops."""
+    smap = _build_map(tmp_path)
+    lp = tmp_path / "listing.parquet"
+    retired = pa.table({
+        "security_id": ["security-600000"],
+        "listing_id": ["listing-600000"],
+        "venue_id": ["SSE"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+        "effective_to": [datetime(2026, 11, 20, tzinfo=UTC)],  # ended before T
+        "knowledge_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+    })
+    pq.write_table(retired, lp)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert all(x["identity"]["security_id"] != "security-600000" for x in res.raw_history["securities"])
+
+
+def test_duplicate_security_id_collapses(tmp_path):
+    """749-03: two in-force listings with the same effective_from are ambiguous - block the security, name it."""
+    smap = _build_map(tmp_path)
+    lp = tmp_path / "listing.parquet"
+    dup = pa.concat_tables([_listing_table(), pa.table({
+        "security_id": ["security-600000"],
+        "listing_id": ["listing-600000-b"],  # second listing, same window
+        "venue_id": ["SSE"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+        "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+    })])
+    pq.write_table(dup, lp)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    ids = [x["identity"]["security_id"] for x in res.raw_history["securities"]]
+    # Two listing rows in-force at the same instant on different listing_id
+    # is a genuine ambiguity: the security is blocked from new candidates
+    # and named, never silently resolved by physical source order.
+    assert ids.count("security-600000") == 0
+    assert "security-600000" in res.coverage["universe"]["ambiguous_security_ids"]
+
+
+def test_overlapping_listing_resolves_to_latest(tmp_path):
+    """749-03: overlapping intervals on distinct listing_id are ambiguous - block, never auto-pick later."""
+    smap = _build_map(tmp_path)
+    lp = tmp_path / "listing.parquet"
+    dup = pa.concat_tables([_listing_table(), pa.table({
+        "security_id": ["security-600000"],
+        "listing_id": ["listing-600000-new"],  # newer listing, later effective_from
+        "venue_id": ["SSE"],
+        "effective_from": [datetime(2026, 6, 1, tzinfo=UTC)],
+        "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+    })])
+    # Retire the old listing before the new one's start so both read validly but only new is latest-in-force.
+    old = _listing_table().to_pandas()
+    pq.write_table(dup, lp)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    secs = [x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000"]
+    # Two distinct listing_ids both cover the open with different
+    # effective_from: no named version proves one is live -> ambiguous,
+    # blocked from new candidates regardless of source order.
+    assert len(secs) == 0
+    assert "security-600000" in res.coverage["universe"]["ambiguous_security_ids"]
+
+
+def test_late_bar_revision_preserved(tmp_path):
+    """749-02: a late correction row for the same session is kept in bar_revisions."""
+    smap = _build_map(tmp_path)
+    # Re-write the bar member with an extra late-correction row for the last day.
+    bar_path = tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    days = _sessions(330)
+    base = _bar_table(days)
+    last = days[-1]
+    extra = pa.table({
+        "source_record_id": [f"src/code=600000/{last}-rev2"],
+        "observation_end": [datetime(last.year, last.month, last.day, 16, 0, tzinfo=UTC)],
+        "listing_id": ["listing-600000"],
+        "calendar_session_id": [f"cal-{last}"],
+        "interval_size": ["1d"], "price_basis": ["UNADJUSTED"], "currency": ["CNY"],
+        "open": [25.0], "high": [26.0], "low": [24.0], "close": [25.5],
+        "volume": [2000.0], "turnover": [51000.0],
+        "source_revision": ["rev-2"],
+        "record_source": ["late-correction"],
+        "knowledge_from": [datetime(2026, 11, 24, 17, 0, tzinfo=UTC)],
+        "knowledge_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+    })
+    pq.write_table(pa.concat_tables([base, extra]), bar_path)
+    members = smap._members_by_table
+    members["dwd_security_bar"] = [_member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    sec = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000")
+    last_bar = sec["bars"][-1]
+    assert last_bar["close_price"] == "25.5"
+    revs = sec.get("bar_revisions", {}).get(last_bar["session_date"], [])
+    assert len(revs) == 2
+    # The revision chain keeps the withdrawn earlier row verbatim.
+    assert {r["source_revision"] for r in revs} == {"rev-1", "rev-2"}
+
+
+def _listing_table_custom(rows):
+    return pa.table({
+        "security_id": [r[0] for r in rows],
+        "listing_id": [r[1] for r in rows],
+        "venue_id": [r[2] for r in rows],
+        "effective_from": [r[3] for r in rows],
+        "effective_to": pa.array([r[4] for r in rows], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [r[5] for r in rows],
+    })
+
+
+def test_same_day_half_open_at_native_open(tmp_path):
+    """749-03: half-open tested at the venue's real open instant, not the date."""
+    smap = _build_map(tmp_path)
+    T = datetime(2026, 11, 24, 1, 30, tzinfo=UTC)  # native open 09:30 +08
+    lp = tmp_path / "listing.parquet"
+    tbl = _listing_table_custom([
+        # opens AFTER the venue open -> not yet listed
+        ("security-600000", "listing-600000", "SSE",
+         datetime(2026, 11, 24, 2, 0, tzinfo=UTC), None, datetime(2026, 1, 1, tzinfo=UTC)),
+    ])
+    pq.write_table(tbl, lp)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert all(x["identity"]["security_id"] != "security-600000" for x in res.raw_history["securities"])
+
+    # ends AFTER the venue open -> still in force at the open
+    tbl2 = _listing_table_custom([
+        ("security-600000", "listing-600000", "SSE",
+         datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 11, 24, 2, 0, tzinfo=UTC), datetime(2026, 1, 1, tzinfo=UTC)),
+    ])
+    pq.write_table(tbl2, lp)
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    res2 = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert any(x["identity"]["security_id"] == "security-600000" for x in res2.raw_history["securities"])
+
+
+def test_formal_selects_pre_cutoff_revision(tmp_path):
+    """749-02: formal cutoff picks the last revision KNOWN before the cutoff."""
+    smap = _build_map(tmp_path)
+    bar_path = tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    days = _sessions(330)
+    base = _bar_table(days)
+    last = days[-1]
+    # late correction AFTER the 14:30Z cutoff (17:00Z) must not be selected.
+    extra = pa.table({
+        "source_record_id": ["src/late"], "observation_end": [datetime(last.year,last.month,last.day,16,0,tzinfo=UTC)],
+        "listing_id": ["listing-600000"], "calendar_session_id": [f"cal-{last}"],
+        "interval_size": ["1d"], "price_basis": ["UNADJUSTED"], "currency": ["CNY"],
+        "open": [25.0], "high": [26.0], "low": [24.0], "close": [25.5],
+        "volume": [2.0], "turnover": [3.0],
+        "source_revision": ["late"], "record_source": ["c"],
+        "knowledge_from": [datetime(2026,11,24,17,0,tzinfo=UTC)],
+        "knowledge_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+    })
+    pq.write_table(pa.concat_tables([base, extra]), bar_path)
+    members = smap._members_by_table
+    members["dwd_security_bar"] = [_member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")]
+    res = reader_mod.read_history(
+        # Formal 14:30Z cutoff (Shanghai 22:30) - the 17:00Z late row post-dates it.
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    sec = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000")
+    # The late 17:00Z correction (close 25.5, knowledge 17:00Z > cutoff)
+    # is not selected; the earlier known revision wins.
+    assert sec["bars"][-1]["close_price"] != "25.5"
+    assert sec["bars"][-1]["late_for_cutoff"] is False
+    # The rejected late row is still recorded in the revision chain.
+    rev = sec["bar_revisions"][sec["bars"][-1]["session_date"]]
+    assert any(r["knowledge_from"] and "17:00" in str(r["knowledge_from"]) for r in rev)
+
+
+def test_out_of_pool_holding_on_wire(tmp_path):
+    """749-04: an out-of-pool held security emits a securities[] entry with account facts."""
+    smap = _build_map(tmp_path)
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=smap,
+        holdings=[{"security_id": "security-600000", "quantity": 100},
+                  {"security_id": "outside-held", "quantity": 50}],
+        pending=[{"security_id": "outside-pend", "pending_kind": "sell", "pending_quantity": 5}],
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    sids = {x["identity"]["security_id"] for x in res.raw_history["securities"]}
+    assert "outside-held" in sids and "outside-pend" in sids
+    held = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "outside-held")
+    assert held["account"]["held_quantity"] == 50
+    assert held["account"]["account_role"] == "held"
+    in_pool = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000")
+    assert in_pool["account"]["held_quantity"] == 100
+
+
+def test_exclusion_prefixed_code(tmp_path):
+    """749-09: an exchange-prefixed code 'sz.300308' is matched on its bare code."""
+    smap = _build_map(tmp_path)
+    excl = tmp_path / "excl.json"
+    excl.write_text(json.dumps({"securities": ["600000"], "excluded_dates": ["2026-11-24"]}))
+    import hashlib as hl
+    sha = "sha256:" + hl.sha256(excl.read_bytes()).hexdigest()
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=smap,
+        replay_exclusion={"path": excl, "sha256": sha},
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    sids = {x["identity"]["security_id"] for x in res.raw_history["securities"]}
+    assert "security-600000" not in sids
+    assert res.coverage["replay_exclusion"]["excluded_count"] == 1
+
+
+def test_late_archive_listing_kept_for_replay(tmp_path):
+    """749-03 first-segment: in-force listing with archive knowledge post-dating T is KEPT + late_visible for as-observed."""
+    smap = _build_map(tmp_path)
+    lp = tmp_path / "listing.parquet"
+    tbl = _listing_table_custom([
+        ("security-600000", "listing-600000", "SSE",
+         datetime(2026, 9, 28, tzinfo=UTC), None,
+         datetime(2026, 11, 25, 8, 0, tzinfo=UTC)),  # archive after cutoff
+    ])
+    pq.write_table(tbl, lp)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    # October replay purpose keeps it + flags late_visible.
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    sec = next((x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000"), None)
+    assert sec is not None
+    assert sec["identity"]["late_visible"] is True
+    # A formal production read drops it on real availability.
+    res2 = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=StubSourceMap(members, {}), purpose="production_daily",
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert all(x["identity"]["security_id"] != "security-600000" for x in res2.raw_history["securities"])
+
+
+def test_exception_window_intersection(tmp_path):
+    """749-05: an exception lands only when its key date is inside the security's bar window."""
+    smap = _build_map(tmp_path)
+    import json as _j
+    # In-window exception (a bar session date) + out-of-window exception.
+    in_win = "2026-11-24"
+    out_win = "2026-07-20"  # outside the 61-session window
+    exc_tbl = pa.table({
+        "affected_table": ["dwd_security_bar", "dwd_security_bar"],
+        "affected_business_key_json": [
+            _j.dumps({"listing_id": "listing-600000", "session_date": in_win}),
+            _j.dumps({"listing_id": "listing-600000", "session_date": out_win}),
+        ],
+        "affected_effective_at": [datetime(2026,11,20,tzinfo=UTC), datetime(2026,7,20,tzinfo=UTC)],
+        "authority": ["P1"] * 2,
+        "disposition": ["fail_closed"] * 2,
+        "resolution_state": ["open"] * 2,
+        "knowledge_from": [datetime(2026,11,1,tzinfo=UTC)] * 2,
+    })
+    ep = tmp_path / "dwd_quality_exception.parquet"
+    _write(ep, exc_tbl)
+    members = smap._members_by_table
+    members["dwd_quality_exception"] = [_member(tmp_path, "dwd_quality_exception.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    sec = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000")
+    dates = [_j.loads(e["affected_business_key_json"]).get("session_date") for e in sec["exceptions"]]
+    assert in_win in dates and out_win not in dates
+
+
+def test_exclusion_unpinned_blocks_before_read(tmp_path):
+    """749-09: no pinned sha256 -> INPUT_BLOCKED and zero members opened."""
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=smap,
+        replay_exclusion={"path": tmp_path / "excl.json", "sha256": None},
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "REPLAY_EXCLUSION_UNPINNED"
+    assert calls == []  # no member opened before the gate
+
+
+def test_exclusion_bad_sha_blocks_before_read(tmp_path):
+    """749-09: wrong pinned sha256 -> INPUT_BLOCKED and zero members opened."""
+    smap = _build_map(tmp_path)
+    excl = tmp_path / "excl.json"
+    excl.write_text(json.dumps({"securities": ["600000"], "excluded_dates": ["2026-11-24"]}))
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=smap,
+        replay_exclusion={"path": excl, "sha256": "sha256:" + "f" * 64},
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "REPLAY_EXCLUSION_SHA_MISMATCH"
+    assert calls == []
+
+
+def test_all_bars_bad_blocks_day(tmp_path):
+    """749-05: every declared bar member failing -> whole-day block, not READ."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    members["dwd_security_bar"] = [
+        _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet",
+                declared_sha256="sha256:" + "a" * 64)
+    ]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_PRICE_UNAVAILABLE"

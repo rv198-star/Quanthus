@@ -36,7 +36,7 @@ def read_actions(source_map: SourceMap, market_date: date):
     for member in source_map.base_members("dwd_corporate_action"):
         verify = source_map.verify_member(member)
         if not verify.get("matches"):
-            action_reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
+            action_reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
             continue
         try:
             recs = _rows(
@@ -47,7 +47,7 @@ def read_actions(source_map: SourceMap, market_date: date):
                  "knowledge_from", "knowledge_to"],
             )
         except Exception as exc:  # noqa: BLE001
-            action_reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+            action_reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
             continue
         for rec in recs:
             sid = str(rec.get("security_id") or "")
@@ -69,11 +69,11 @@ def read_actions(source_map: SourceMap, market_date: date):
                 "source_revision": str(rec.get("source_revision") or ""),
                 "terms": {},
             })
-        action_reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+        action_reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     for member in source_map.base_members("dwd_corporate_action_term"):
         verify = source_map.verify_member(member)
         if not verify.get("matches"):
-            term_reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
+            term_reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
             continue
         try:
             recs = _rows(
@@ -84,7 +84,7 @@ def read_actions(source_map: SourceMap, market_date: date):
                  "knowledge_from", "knowledge_to"],
             )
         except Exception as exc:  # noqa: BLE001
-            term_reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+            term_reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
             continue
         for rec in recs:
             aid = str(rec.get("corporate_action_id") or "")
@@ -100,7 +100,7 @@ def read_actions(source_map: SourceMap, market_date: date):
                     "knowledge_from": iso(parse_ts(rec.get("knowledge_from"))),
                     "knowledge_to": iso(parse_ts(rec.get("knowledge_to"))),
                 }
-        term_reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+        term_reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     return actions, {"action_reads": action_reads, "term_reads": term_reads}
 
 
@@ -110,7 +110,7 @@ def read_exceptions(source_map: SourceMap, market_date: date):
     for member in source_map.base_members("dwd_quality_exception"):
         verify = source_map.verify_member(member)
         if not verify.get("matches"):
-            reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
             continue
         try:
             recs = _rows(
@@ -119,14 +119,14 @@ def read_exceptions(source_map: SourceMap, market_date: date):
                  "authority", "disposition", "resolution_state", "knowledge_from"],
             )
         except Exception as exc:  # noqa: BLE001
-            reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
             continue
         qe.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     for member in source_map.base_members("dwd_observation_gap"):
         verify = source_map.verify_member(member)
         if not verify.get("matches"):
-            reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
             continue
         try:
             recs = _rows(
@@ -135,11 +135,40 @@ def read_exceptions(source_map: SourceMap, market_date: date):
                  "gap_reason", "is_expected", "knowledge_from"],
             )
         except Exception as exc:  # noqa: BLE001
-            reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
             continue
         gaps.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     return {"quality_exceptions": qe, "observation_gaps": gaps}, {"reads": reads}
+
+
+def read_p1_exceptions(source_map: SourceMap, market_date: date):
+    """P1 factor-PIT visibility exceptions, verbatim with original keys.
+
+    The 4,173-row ODS ledger (ref_adjustment_factor_pit_exceptions) is the
+    fail-closed P1 exception table - separate from dwd_quality_exception.
+    Each row carries the original stock_code / exchange / effective_date /
+    source_revision / knowledge_cutoff; the reader projects it per
+    security + dependency window and never fabricates a factor block.
+    """
+    member = source_map.p1_exception_member()
+    verify = source_map.verify_member(member)
+    reads = []
+    if not verify.get("matches"):
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH", "declared_sha256": member.sha256, "actual_sha256": verify.get("actual_sha256"), "sha_match": False, "verified_at": verify.get("verified_at")})
+        return {"p1_exceptions": []}, {"reads": reads, "p1_unverified": True}
+    try:
+        recs = _rows(
+            member.abs_path,
+            ["stock_code", "exchange", "effective_date", "exception_type",
+             "reason_code", "event_type", "visibility_origin",
+             "knowledge_cutoff", "source_revision", "recorded_at", "policy"],
+        )
+    except Exception as exc:  # noqa: BLE001
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
+        return {"p1_exceptions": []}, {"reads": reads, "p1_unverified": True}
+    reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+    return {"p1_exceptions": recs}, {"reads": reads}
 
 
 def read_limits(source_map: SourceMap, market_date: date):
@@ -148,7 +177,7 @@ def read_limits(source_map: SourceMap, market_date: date):
     for member in source_map.base_members("dwd_price_limit_regime"):
         verify = source_map.verify_member(member)
         if not verify.get("matches"):
-            reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
             continue
         try:
             recs = _rows(
@@ -158,14 +187,14 @@ def read_limits(source_map: SourceMap, market_date: date):
                  "effective_from", "effective_to"],
             )
         except Exception as exc:  # noqa: BLE001
-            reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
             continue
         regimes.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     for member in source_map.base_members("dwd_tradability_state"):
         verify = source_map.verify_member(member)
         if not verify.get("matches"):
-            reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False, "verified_at": verify.get("verified_at")})
             continue
         try:
             recs = _rows(
@@ -175,8 +204,8 @@ def read_limits(source_map: SourceMap, market_date: date):
                  "observation_start", "knowledge_from"],
             )
         except Exception as exc:  # noqa: BLE001
-            reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
+            reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
             continue
         tradability.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+        reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     return {"price_limit_regimes": regimes, "tradability_state": tradability}, {"reads": reads}

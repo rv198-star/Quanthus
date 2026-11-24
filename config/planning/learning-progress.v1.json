@@ -16549,6 +16549,99 @@
           "claim_ceiling": "Work accepted by the registered implementers. Fixed integration acceptance and E5 remain outstanding."
         }
       ]
+    },
+    {
+      "id": "CP-700-20261124T201050923941Z",
+      "recorded_at": "2026-11-24T20:10:50.923941Z",
+      "actor": "P11-root-october-joint-intake",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "P12正式采用v2读取器。十月集成树b56a在CN02通过真实消费者与单券隔离检查；已核10-08实读，继续完成动作原件、数值上下文和账户装配。",
+      "updates": [],
+      "no_change_reason": "本轮确认发布接口和工程接线。8792真实单日运行及E5按动作签发仍待最终代码与场景凭据。",
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T20:08:19Z",
+          "body_sha256": "326665d729b693a53ab412658c6caf7092ca53e6887e88c55a92aa86c8c54db8"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "B56-NODE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/intake-a676-6e5f/CN02-JOINT.json",
+          "sha256": "0314e8b872881ebc8e81dfe80c3afc8f0f2d65a035e3ac46073aed94b8bea7f3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact b56 engineering integration on CN02; signed release checks, real consumer, strict v3 diagnostic; full deferred to final release."
+        },
+        {
+          "id": "A676-CONTRACT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/intake-a676-6e5f/cn02-loader.json",
+          "sha256": "f8d2fd4b808ea1588e7485aaddcd641e74f4343b162ddcbd73825c691a78bbbd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "P12 adopted this reading contract; real CN02 consumer precision and wire/account digests."
+        },
+        {
+          "id": "OCT08-V3",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/intake-a676-6e5f/CN02-V3-SUMMARY.json",
+          "sha256": "aad293fd3ebdd56c76a81e6be7f7b7e2222ba35251ca1a928cd266001543d1c2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Root reproduced the two actual #749 artefact SHA values and read scope, without granting use."
+        },
+        {
+          "id": "OCT08-CLOCK42",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/intake-a676-6e5f/CALENDAR-42-CROSS.json",
+          "sha256": "827641fc7f0efc5655ad7346b22db64174d33dc79e71dd472a557fd1bbde1c57",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "42 sessions missing native close in the actual 61-session window."
+        },
+        {
+          "id": "OCT08-R9",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/intake-a676-6e5f/R9-BOUND-BATCHES.json",
+          "sha256": "ab989bbf52b2f06cd0fadfb5f774e3f11697ea36e56eb60176937bdb16e4f15e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Controlled positive for original cash and explicit mismatches at the original published byte and Shenzhen input boundaries; successor dispatched."
+        },
+        {
+          "id": "OCT08-C7",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/intake-a676-6e5f/AUDIT-C7-RECOVERY.json",
+          "sha256": "e55d1a661139af3f1e641f75b283bb8d9c857c51ad666a5eb0f5c9f609d09d78",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "C6 terminal before final verdict; fresh C7 assigned to fixed R8."
+        },
+        {
+          "id": "OCT08-SCOPE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/intake-a676-6e5f/RESULT.json",
+          "sha256": "55cf3042f63018f61a6982d657607e44d882f8f3eb7f674f74396760a590f6bb",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Engineering intake through b56 and separate E5 scope."
+        }
+      ]
     }
   ],
   "history_imports": [

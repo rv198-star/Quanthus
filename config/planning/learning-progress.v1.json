@@ -16411,6 +16411,601 @@
           "body_sha256": "36c32b174f94ac55e9260ccaacdcaf0936cb0d97813efd4d00758ed1bb407520"
         }
       ]
+    },
+    {
+      "id": "CP-700-20261124T030000000000Z",
+      "recorded_at": "2026-11-24T03:00:00+08:00",
+      "actor": "Codex SWE-2 (exec-B) on Owner 2026-11-24 dispatch P11-D1B-20261124-01",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "恢复新 main 缺失的 #700 work_items 映射并为固定规则三件套批（P11-D1B-20261124-01）登记准备；未触碰共享采用/里程碑，未授予 daily_adopted，未重跑历史研究。",
+      "evidence": [
+        {
+          "id": "blueprint-mapping-commit",
+          "kind": "authority",
+          "location": "git",
+          "revision": "9aef4fc10c978302fdd2e1ebc37925b87c0c5d3c",
+          "path": "config/planning/learning-blueprint.v1.json",
+          "sha256": "3d6a3dc0624b1195123bae73cbe02d24dc84f9779557e7c04e69dad63af43a78",
+          "claim_ceiling": "仅登记 P11-R11-USE-002/#700 单条 work_items 映射；不签工程或用途通过。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "纯登记恢复：新 main 缺 #700 映射导致 context 失败；本 checkpoint 只把单条 work_items 映射与真实 issue 观察入账，updates=[]，不评估/不提升任何模块 facet，不改既有 module 状态，不授予采用。",
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T19:06:23Z",
+          "body_sha256": "dd5ece10537bbe99063041b9d220462bed22200aeb2b9d8541133a69fa4b33ff"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-20261123T195549468103Z",
+      "recorded_at": "2026-11-23T19:55:49.468103+00:00",
+      "actor": "P11 SWE2 exec session B",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "P11-D1B engineering candidate 4b5cb68f returned CHANGES_REQUIRED by independent audit (DeepSeek #725): synthetic trend/feature evidence, seam disconnected from G1 producer, forged-component digest accepted, held path config-only, machine-policy denominator wrong, A05-A07 reassigned, release-manifest incomplete. Reworked on the same branch to deee4a94a42ec4c0423afdc3ef364bfeb5b5266a (tree 1580efd04c46749ee286b824011fa480dd6c13e5): real evaluate_trend_stability + build_formal_expert_context, real FormalStrategyDecision carried in SeamDecision, seam_to_candidates locks component to ExpertBundle, evaluate_held with hold+alert on missing facts, unit_notional_bucket_budget denominator, A05-A07 original identities restored, release-manifest full closure, strict three-piece loaders, prospective_clock_json via P6Base24CandidatePolicy/P6ProspectiveSplitPolicy (PC-1..PC-8), fail-first tests added. 49/49 targeted PASS; ruff/format/compile/strict-mypy clean; blueprint+exploration checks PASS. No daily_adopted, no P12 binding, no real account/market rows, no U06/U07/U08 unlock.",
+      "evidence": [
+        {
+          "id": "EV-D1B-4B5-AUDIT",
+          "kind": "assessment",
+          "claim_ceiling": "independent audit verdict on the 4b5cb68f engineering candidate only; no use adoption",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/RESULT.json",
+          "sha256": "a50ba0e5c7742061196bff1f879d88fd131e36e83afb05a9d07539d6155c2883",
+          "verification": "recorded_not_reopened_by_ci"
+        },
+        {
+          "id": "EV-D1B-4B5-CHANGES",
+          "kind": "assessment",
+          "claim_ceiling": "CHANGES_REQUIRED list driving the narrow rework; no use adoption",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/CHANGES_REQUIRED.md",
+          "sha256": "f79ce79f55ae8a61afe0b4668eee33d775577c104d776e301466898c739b9306",
+          "verification": "recorded_not_reopened_by_ci"
+        },
+        {
+          "id": "EV-D1B-NEXT-ACC",
+          "kind": "assessment",
+          "claim_ceiling": "prospective-clock acceptance matrix for the next fixed candidate only",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/NEXT-FIXED-ACCEPTANCE.md",
+          "sha256": "70036bed0481a5a7c4d06b3cc6a696c1fa79150fb7c21d96f9eac6425ccfe61f",
+          "verification": "recorded_not_reopened_by_ci"
+        },
+        {
+          "id": "EV-D1B-FIX2-EVIDENCE",
+          "kind": "assessment",
+          "claim_ceiling": "reworked candidate deee4a94 evidence map; no daily_adopted/P12 binding granted",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/execution/M1-FIX2-EVIDENCE.md",
+          "sha256": "6fa66a5b8f0f22056232fc677bba309953a6db869347639adb3a7c4ec95a3eb4",
+          "verification": "recorded_not_reopened_by_ci"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "This checkpoint only returns the 4b5cb68f engineering candidate to reworked status and records the new fixed candidate deee4a94.  It does not promote module use, sign daily_adopted, or grant P12 binding; earlier accepted results are unchanged.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T19:46:32Z",
+          "body_sha256": "c14db207b753c72fff16a44027dec2faa5afe0e5e22f155a4e5c20def9ea2f64"
+        }
+      ],
+      "reviewed_modules": []
+    },
+    {
+      "id": "CP-700-20261123T211952907443Z",
+      "recorded_at": "2026-11-23T21:19:52.907443+00:00",
+      "actor": "P11-root-core-repair",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "de2c1447 independent rejection preserved; same-job actual expert/held core repair fixed at1133cb8a for independent audit. Mac89 focused and strict8 clean; CN02 GitHub fetch timed out, exact node checks NOT_RUN.",
+      "evidence": [
+        {
+          "id": "P11-CORE-1133-SUBMISSION",
+          "kind": "assessment",
+          "sha256": "fae499f6c0a7ff60a821a1f71f1a7be1f558630d58d828ce9cb182c586fe8680",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author development evidence and fixed source only; independent review pending.",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/core-p0-repair/SUBMISSION-1133cb8a.json"
+        },
+        {
+          "id": "P11-CORE-CN02-SOURCE-BLOCK",
+          "kind": "assessment",
+          "sha256": "e7e0eaef0fa9f5fd45f5b03fcf1d93e14e54dbb9c8664a68516278cf8a637475",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Nexus workspace success and one GitHub fetch timeout; no exact focused/full check executed.",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/core-p0-repair/CN02-SOURCE-CHECK-1133cb8a.json"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Unreviewed synthetic core repair only. Retain accepted older facets, parked historical U06/U07 and daily_adopted=false; M2 raw adapter, source qualification, action adoption and CN02 full acceptance remain. No module maturity or consumer admission is promoted.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T21:19:11Z",
+          "body_sha256": "cfcb175f6da00d0af13af1327ef5787854f69124cdaa63851f58b57fed55d964"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-700-20261123T221421385098Z",
+      "recorded_at": "2026-11-23T22:14:21.385098+00:00",
+      "actor": "P11-root-projection-repair",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "1bee independent CHANGES_REQUIRED preserved. Source525912b2 repairs exact feature projection/isolation, held audit, version/window/source/consumer closure and shared-block diagnostics;110 development focused checks pass, independent review pending.",
+      "evidence": [
+        {
+          "id": "P11-1BEE-INDEPENDENT-REJECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/1bee0686/RESULT.json",
+          "sha256": "4b0640364c426b10ad7c81c5d98d53647bc9a897622a7bd5cf536b76d45692b5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent1bee fixed engineering rejection; old verdict preserved."
+        },
+        {
+          "id": "P11-5259-SOURCE-SUBMISSION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/repair-1bee/SUBMISSION-SOURCE-525912b2.json",
+          "sha256": "4e60eb7475cbb2da08686cea79cef32efd73589fd5623b62d5fc512d80025c39",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author source525912b2 identity and development checks only; independent and node review pending."
+        },
+        {
+          "id": "P11-PREOPEN-FACT-CONTRACT-CANDIDATE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/MACHINE-POLICY-FACT-DEPENDENCIES.candidate.v1.json",
+          "sha256": "f7b7ece369925f5a049d2c5d2eb7ff788dc05c85decb7ec0aed5f63f975bdac2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Seven-condition contract candidate under Owner paper facts principle; runtime schema/source qualification not implemented."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Synthetic prepared-input repair under #700 only. No module maturity or daily/account admission is promoted. M2 raw integration, P10 facts/publisher, machine-policy grade implementation, action adoption and formal CN02 acceptance remain.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:13:04Z",
+          "body_sha256": "2baef3b07ed7915497029f300ca3e4f362de93a099a919173d05096aa55dbdf5"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-700-20261123T225801511867Z",
+      "recorded_at": "2026-11-23T22:58:01.511867+00:00",
+      "actor": "P11-root-C2-price-floor-repair",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "C2 fixed9646 CHANGES_REQUIRED retained; original8 items closed, one entry floor isolation residual. Sourcefb767b83 moves existing0.01 check to entry projection,113focused pass; independent re-review and CN02 pending.",
+      "evidence": [
+        {
+          "id": "P11-9646-C2-REJECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/9646cea1-c2/RESULT.json",
+          "sha256": "a52ef341e17298d376957392a5714c2d3a6b105cff4ed70c0eb408f7989bb4ef",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent9646 scope:8prior items closed and C2-P1-1 open; historical verdict retained."
+        },
+        {
+          "id": "P11-FB767B83-SOURCE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/repair-c2-price-floor/SUBMISSION-SOURCE.json",
+          "sha256": "b25e8a26784cbab1d07d769e80f2d7b1d1f8756fcd362dfd42e48859257847ab",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author source/test identity with113focused only; independent review and CN02 pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "No module/adoption promotion. Narrow deterministic entry admission repair; preserve held exits, M2 ownership, original strategy thresholds and source/use/node gates.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:13:04Z",
+          "body_sha256": "2baef3b07ed7915497029f300ca3e4f362de93a099a919173d05096aa55dbdf5"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-700-20261123T234642409903Z",
+      "recorded_at": "2026-11-23T23:46:42.409903+00:00",
+      "actor": "P11-root-node-compatibility-repair",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "6359local independent pass retained;1892Nodefull failed9527/25/8/35.24environment failures proven onbase;9introducedR7file-binding errors fixed by sealed-runner restoration andP11typing adapter. Sourcea725 targeted177Node/124local pass; independentreview and integratedfull pending.",
+      "evidence": [
+        {
+          "id": "P11-6359-INDEPENDENT-PASS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/6359bf9c-c2/RESULT.json",
+          "sha256": "42ccbbd85ac0369932ece06fba3981777a0e895bf890131ab7fc870985e95a89",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "LocalM1 synthetic pass; originalverdict scope retained."
+        },
+        {
+          "id": "P11-1892-NODE-FULL-FAILED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/cn02-6359-followup/FULL-1892-RESULT.json",
+          "sha256": "8e8812c7c3f442b8644604ac19af628efdd3211ad71e96a814505bf762894266",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual full9527passed25failed8errors35skipped,exit2; not a pass."
+        },
+        {
+          "id": "P11-A725-COMPAT-SOURCE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/runner-compat-1892/SUBMISSION-SOURCE-A725.json",
+          "sha256": "093007444ad610f8912ee4887eb2e91059987e7f6cbf1e171e66ec9176ff1d88",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Narrow originalbyte restoration andP11boundary adapter; newfixed review candidate, globalfullpending."
+        },
+        {
+          "id": "P11-A725-NODE-TARGETED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/runner-compat-1892/CN02-A725-VERIFIED.json",
+          "sha256": "3e89d29761c92375ed1a5d15ca53341c3e2a31ebf38f84d4e61d675e5ecafad9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Verified-head177Node tests/strict9pass only."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "No module/use promotion. Preserve all failed revisions and frozenR7 request, scientific/PIT/adoption gates. Latest global full result remains failed; next whole-suite belongs to final integratedM2 closure.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-23T22:13:04Z",
+          "body_sha256": "2baef3b07ed7915497029f300ca3e4f362de93a099a919173d05096aa55dbdf5"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-700-20261124T021403417812Z",
+      "recorded_at": "2026-11-24T02:14:03.417812+00:00",
+      "actor": "P11 root / Sol",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "Fixed synthetic M2 account/input-boundary repair on ad48; preserve valid neighbor and held alerts, separate pending membership, bind quantity and readable unavailable provenance; 171 focused passed. Independent review and integrated CN02 full follow.",
+      "evidence": [
+        {
+          "id": "root-m2-input-repair-source",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/root-m2-input-repair/SOURCE-RESULT.json",
+          "sha256": "0a12cfa0fa3999a49c2f8ef382503a50532eed2424dcf8e87a6e69e2d293736e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact synthetic source and focused/static evidence; no source qualification, consumer adoption or runtime activation."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Repair delivery only. No scientific evidence/adoption state or module progress head promoted; U06/U07, daily adoption and consumer gates unchanged.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T01:20:16Z",
+          "body_sha256": "290c40460d2942eba2695ff5cfba59be7331b6ce523e57ec1886899135af1111"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-20261124T032045594414Z",
+      "recorded_at": "2026-11-24T03:20:45.594414+00:00",
+      "actor": "P11 root / Sol",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "rejected",
+      "summary": "C4 fixed6c contract audit CHANGES_REQUIRED;52payload verified. Preserve v1/formal-target/coordinate fixes, replace caller-driven publication gate in R3;fixed M2root4f independent review runs separately.",
+      "evidence": [
+        {
+          "id": "c4-6c-root-disposition",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/CONTRACT-6C-ROOT-DISPOSITION.json",
+          "sha256": "db214cfe603ed7c8d1af4996724c17e637821870d83b1ab8ce909343f41d19ee",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed6c engineering rejection and next repair scope; source qualification, P12 consumer adoption and research/use gates unchanged."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Synthetic interface engineering review only. No module head or scientific/use state changes; source UNBOUND and P12 consumer NOT_GRANTED retained. Root M2fixed4f and R3contract require their fixed independent reviews before integrated CN02 full.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T03:19:18Z",
+          "body_sha256": "28a71a592a2b75f01840345171daac35a465409c4a20a17a005b05dfb178bc05"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-20261124T043327030833Z",
+      "recorded_at": "2026-11-24T04:33:27.030833+00:00",
+      "actor": "P11 root / Sol",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "Retain C4 fixed4f two-P1 rejection and root fixed2a0 closure rejection. M2 R2 source43adc14f corrects atomic calendar/fill-evidence boundary and typed pending provenance;185 focused passed, independent review follows. ContractR4 separate.",
+      "evidence": [
+        {
+          "id": "root-m2-r2-source",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/root-m2-input-repair-r2/SOURCE-RESULT.json",
+          "sha256": "0a3f501a347a486bf201828a2fcf57d2034fe2e04e5325112ca7fa0ec255772d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Synthetic fixed input-boundary source and focused/static evidence only; no research, source qualification or P12 adoption."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Engineering repair checkpoint; scientific/use/consumer state heads remain. Preserve4f/6c/2a0 rejection and all earlier costs; independent fixed review and integratedCN02 full remain required.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T03:19:18Z",
+          "body_sha256": "28a71a592a2b75f01840345171daac35a465409c4a20a17a005b05dfb178bc05"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-20261124T051941680110Z",
+      "recorded_at": "2026-11-24T05:19:41.680110+00:00",
+      "actor": "P11 root / Sol",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "Retain62 C4CHANGES_REQUIRED residual; pending-pairR3 source23a60afc closes unpaired/conflicting legacy metadata before membership,194focused and C4probe pass. Calendar/hint/typed fixes retained; fixed independent delta review next.",
+      "evidence": [
+        {
+          "id": "root-pending-pair-r3",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/root-m2-pending-pair-r3/SOURCE-RESULT.json",
+          "sha256": "cef5532c608b2dd31eb3d6f18aa0c0f967e2158971da38963275146522445e92",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed synthetic pending pairing validation and localregressions; no source/use/consumeradoption"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Engineering validation-order correction only; sourceUNBOUND/P12NOT_GRANTED and allscientific/useheads unchanged. Finalindependentreview andintegratedCN02fullpending.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T04:50:51Z",
+          "body_sha256": "bfff4ed462e0d34507acbef8a1779e8d6c6380ba413a4ff70dce174589d3d8df"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-20261124T062404261818Z",
+      "recorded_at": "2026-11-24T06:24:04.261818+00:00",
+      "actor": "P11-root-registered-release-repair",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "M2d651 independent local PASS and exactCN02 targeted194 accepted. Contract1f4 C5fourP1 rejected; rootR5 consolidates registry wire/strict files/objects/index closure,175focused andoriginal19bypassmatrix closed; independentreview pending.",
+      "evidence": [
+        {
+          "id": "M2-D651-LOCAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/M2-D651-ENGINEERING-LOCAL-ACCEPTANCE.json",
+          "sha256": "c4fa1140d053b20e1a9fed15b4c432e46ba026cfafeac7c7453c6a55562780b4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "M2 scoped engineering accepted local and verified CN02194targeted; jointfull pending."
+        },
+        {
+          "id": "M2-D651-CN02",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/cn02-d651/RESULT.json",
+          "sha256": "cf49aa570be81dce04005415130a2215ebf5ce668eb919fc26ef3ed0fedcf5a1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exactd651 CN02targeted194 and scopedstatic actualreceipt."
+        },
+        {
+          "id": "CONTRACT-R4-C5",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/audit/contract-r4-1f4e6218-c5/RESULT.json",
+          "sha256": "c7d7d60a0cb54faff69cac83e29d1eb88b654cd6441bab4f742e282db3413ade",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed1f4 CHANGES_REQUIRED fourP1; historical verdict preserved."
+        },
+        {
+          "id": "CONTRACT-R5-SELF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/root-contract-r5/RESULT.json",
+          "sha256": "d015caa0bcf5387a75f349670085eaec1f1e048beb3dd01ca42b9d1d90675f28",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "175focused/C5matrix fixed0violations; independentreview pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Scoped engineering checkpoint only; shared-source qualification, adoption, realv2pin/E8 and jointCN02full remain open. All previous failures/parked U06/U07/sentiment preserved.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T05:29:34Z",
+          "body_sha256": "d2197cd46c179b1a021a728399ceee87cdab7a6d9b03ad44ccf2966b4e9a2a40"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-700-D1-BLOCKED-20261124T105300001905Z",
+      "recorded_at": "2026-11-24T10:53:00.002137+00:00",
+      "actor": "P11-root-forward-day1-intake",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "2026-11-24预绑定首日自然core元信息到件；P11于18:42:31收件/首读、18:50:33完成核验，固定manifest及15成员元信息一致。用途INPUT_OR_CLOCK_BLOCKED，缺发布/成员时钟/行业复权/当日修订链；量能UNKNOWN。",
+      "evidence": [
+        {
+          "id": "D1-P10-FIXED-BLOCKED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-forward-day1-20261124/first-check-v1/RESULT.json",
+          "sha256": "efd0daa576bed9b5bd2830950a00a86935e31dc75fe55cdbd570b779f432c656",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "P10固定core元信息与原用途缺项，非合格消费交付。"
+        },
+        {
+          "id": "D1-P11-PURPOSE-RECEIPT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/forward-day1-20261124-intake/RECEIPT.json",
+          "sha256": "a438943416afd94cf142551861302656d4630f2e3ae9063333e74b4f85d12976",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "P11元信息核验回执；首日用途保持受阻，未读市场行。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "首日资格受阻回执，不改模块/采用状态；同ID实证齐备且22:30前核验后才重判，历史701保持挂起，M2/合同工程继续。",
+      "issue_observations": [],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-700-JOINT-20261124T134625325781Z",
+      "recorded_at": "2026-11-24T13:46:25.325781+00:00",
+      "actor": "P11-root-joint-integration",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "C6fixedR5独审47payload已核并采纳工程范围；与M2d651合并，共享seam的AST改动不相交且原函数精确并集，账本记录无丢失。联合268focused及静态通过，已固定待CN02全检。",
+      "evidence": [
+        {
+          "id": "C6-R5-ACCEPTED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/CONTRACT-R5-C6-ROOT-ACCEPTANCE.json",
+          "sha256": "6daa18d523d1acd35600b07b3562ba21dfffbdb8649fda9fb0c832610cf66e50",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R5fixedcontract engineering accepted;realpin/source/use pending."
+        },
+        {
+          "id": "JOINT-PARENT-MERGE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/joint-integration-20261124/MERGE-PROOF.json",
+          "sha256": "1cff19ab20cbbc0b45dbb784bfe021047e1176789ad437118a6b241bfbab20ac",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "ASTexactdisjointunion and intactcheckpointunion."
+        },
+        {
+          "id": "JOINT-268-LOCAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/joint-integration-20261124/SELF-CHECK.json",
+          "sha256": "30854f8f176dc93617ead340be1a2324ceaa45d0f7f95e990363c92a0389d16c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Joint268focused and scopedstatic;CN02fullpending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "分支整合工程；真实source/industry/v2pin/E8与P12采用待各自合同，不提升模块/研究/交易状态。",
+      "issue_observations": [],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

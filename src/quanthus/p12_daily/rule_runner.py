@@ -108,7 +108,12 @@ class PendingSecurity:
 
     security_code: str
     kind: str
-    quantity: int
+    # None when the in-flight quantity cannot be fixed (issue #723
+    # comment-7122395119): an unbounded reserved bucket or an order whose
+    # remaining size is not separately materialized.  The runner never
+    # substitutes 0 and never merges several pendings of one security into
+    # a single quantity - each pending line is passed through verbatim.
+    quantity: int | None
 
 
 @dataclass(frozen=True)

@@ -389,11 +389,13 @@ def _account_facts(
         unreported = int(getattr(order, "unreported_fill_qty", 0) or 0)
         needs_recon = bool(getattr(order, "needs_reconciliation", False))
         if unreported > 0 or needs_recon:
+            # The unconfirmed fill's quantity is its own unreported count,
+            # never merged with the same order's open remainder.
             pending.append(
                 PendingSecurity(
                     security_code=order.security_code,
                     kind="unconfirmed_fill",
-                    quantity=max(unreported, remaining),
+                    quantity=unreported if unreported > 0 else None,
                 )
             )
     # RESERVED funding buckets: the bucket_securities binding names which
@@ -406,11 +408,13 @@ def _account_facts(
         securities = dict(binding.get("bucket_securities") or {})
         for _bucket_id, sec in securities.items():
             if sec:
+                # A RESERVED bucket holds out the security but does not fix a
+                # share count: quantity stays None, never a fabricated 0.
                 pending.append(
                     PendingSecurity(
                         security_code=str(sec),
                         kind="reserved_bucket",
-                        quantity=0,
+                        quantity=None,
                     )
                 )
     snapshot_digest = digest({

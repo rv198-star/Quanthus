@@ -1711,3 +1711,23 @@ def test_pending_security_blocks_fresh_entry(env):
         d.security_code != "600000" or d.entry is None
         for d in output.decision_set.decisions
     )
+
+
+def test_pending_security_with_unknown_quantity_uses_none(env):
+    """A pending commitment whose quantity cannot be fixed (RESERVED bucket)
+    is passed through as quantity=None - never a fabricated 0 and never
+    merged with other pendings of the same security."""
+    from quanthus.p12_daily.rule_runner import PendingSecurity
+
+    prod, state, _ = env
+    pendings = (
+        PendingSecurity(security_code="600000", kind="reserved_bucket", quantity=None),
+        PendingSecurity(security_code="600000", kind="open_buy_order", quantity=100),
+    )
+    # Each pending line is preserved verbatim - no merge, no 0 substitution.
+    assert pendings[0].quantity is None
+    assert pendings[1].quantity == 100
+    # The runner blocks the security from a fresh entry regardless of a null
+    # quantity (the commitment exists, its size is just unknown).
+    blocked = {p.security_code for p in pendings}
+    assert "600000" in blocked

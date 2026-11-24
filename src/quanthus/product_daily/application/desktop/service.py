@@ -13,7 +13,7 @@ import dataclasses
 import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
-from datetime import datetime, time
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 from quanthus.capabilities.accounting import AccountProjection, Position, value_account
@@ -65,6 +65,7 @@ from quanthus.product_daily.application.desktop.views import (
     SubmitOrderEvent,
     WorkbenchView,
 )
+from quanthus.product_daily.application.exit_planner import size_exit
 from quanthus.product_daily.application.history import ConfigurationBinding, FactHistory
 from quanthus.product_daily.application.models import Baseline
 from quanthus.product_daily.application.service import SyntheticFactService
@@ -89,6 +90,7 @@ FACT_SOURCE_ID = "desktop-user-confirmation"
 OUTSIDE_PLAN_WINDOW = "OUTSIDE_PLAN_WINDOW"
 RECONCILIATION_PENDING = "RECONCILIATION_PENDING"
 CASH_ONLY = "CASH"
+EXCHANGE_TZ_E8 = timezone(timedelta(hours=8))
 CONFIGURATION_BINDING_MISMATCH = "CONFIGURATION_BINDING_MISMATCH"
 _GROUP_ORDER = {
     "reconcile": 0,
@@ -128,6 +130,70 @@ def _marks(decisions: MarketDecisionSet) -> dict[str, Decimal]:
         if item.chart is not None and item.chart.bars:
             marks[item.security_code] = item.chart.bars[-1].close
     return marks
+
+
+def _session_close(day) -> datetime:
+    # Exchange 15:00 close on a trading date, Asia/Shanghai-aware.
+    return datetime.combine(day, time(15, 0), tzinfo=EXCHANGE_TZ_E8)
+
+
+def _sell_reserved_by_security(history):
+    # Open sell-order quantity already reserved per security: any in-flight
+    # (non-terminal) sell order holds its remaining quantity so a new plan
+    # can never oversell the same shares.
+    reserved = {}
+    for order in getattr(history, "orders", ()) or ():
+        if order.side != "sell" or order.status == "terminal":
+            continue
+        remaining = max(0, int(order.hold_qty or 0))
+        reserved[order.security_code] = reserved.get(order.security_code, 0) + remaining
+    return reserved
+
+
+def _sellable_for(security_code, projection, history, reserved, trading_day):
+    # T+1-sellable shares: held minus today buys minus open sell reserves.
+    held = int(projection.quantity(security_code))
+    today = 0
+    for report in getattr(history, "reports", ()) or ():
+        if report.security_code != security_code or report.side != "buy":
+            continue
+        try:
+            day = datetime.fromisoformat(str(report.occurred_at)).date()
+        except Exception:
+            continue
+        if day >= trading_day:
+            today += int(report.quantity)
+    return max(0, held - today - int(reserved.get(security_code, 0)))
+
+
+def _active_bucket_and_budget(app, history):
+    # security -> (bucket_id, locked_cycle_budget) for RESERVED/HELD cycles.
+    # The reduce fraction denominator is that cycle locked_cycle_budget.
+    bucket_by_sec = {}
+    locked_by_sec = {}
+    try:
+        state = app._facts.funding_state(app._context)
+    except FactError:
+        return bucket_by_sec, locked_by_sec
+    if state is None:
+        return bucket_by_sec, locked_by_sec
+    funding, _ = state
+    try:
+        binding = app._facts.funding_binding(app._context) or {}
+    except FactError:
+        binding = {}
+    bucket_secs = dict(binding.get("bucket_securities") or {})
+    for item in funding.buckets:
+        phase = str(getattr(item.phase, "value", item.phase)).lower()
+        if phase not in ("reserved", "held"):
+            continue
+        sec = bucket_secs.get(item.bucket_id)
+        if not sec:
+            continue
+        locked = getattr(item, "locked_cycle_budget", None)
+        bucket_by_sec[sec] = item.bucket_id
+        locked_by_sec[sec] = locked
+    return bucket_by_sec, locked_by_sec
 
 
 def _valuation_ref(decisions: MarketDecisionSet) -> str:
@@ -684,6 +750,76 @@ class P12DesktopApplication:
                     ),
                 )
             )
+        # E8 (issue #723): exit_plan decisions produce sell plans.  A full
+        # exit sells the T+1-sellable quantity; a reduce sells only down to
+        # the fraction the decision declared, sized against the holding
+        # locked_cycle_budget by size_exit.  A decision with no executable
+        # quantity still publishes a display-only row; the confirm gate
+        # reads the same live sizing and refuses when nothing is sellable.
+        marks_map = _marks(decisions)
+        sell_reserved = _sell_reserved_by_security(history)
+        bucket_by_sec, locked_by_sec = _active_bucket_and_budget(self, history)
+        trading_day = self._now().date()
+        for item in decisions.decisions:
+            if item.stage is not OpportunityStage.EXIT_PLAN:
+                continue
+            if item.exit_kind is None:
+                continue
+            # A sell sizes against the LIVE position, not the package's
+            # baseline account revision: the quantity that may leave is the
+            # holding the account actually carries now.
+            current = self._facts.projection(self._context).quantity(item.security_code)
+            if current <= 0:
+                continue
+            mark = marks_map.get(item.security_code)
+            bucket_id = bucket_by_sec.get(item.security_code)
+            locked = locked_by_sec.get(item.security_code) if bucket_id else None
+            sizing = size_exit(
+                security_code=item.security_code,
+                exit_kind=item.exit_kind,
+                target_position_fraction=item.target_position_fraction,
+                held_qty=current,
+                sellable_qty=_sellable_for(
+                    item.security_code,
+                    self._facts.projection(self._context),
+                    history, sell_reserved, trading_day,
+                ),
+                mark_price=mark,
+                locked_cycle_budget=locked,
+                bucket_id=bucket_id,
+                lot_size=self._policy.risk.lot_size,
+            )
+            target = current - sizing.sell_qty
+            plans.append(
+                PublishedPlan(
+                    plan_id=plan_id_for(decisions, item),
+                    opportunity_id=item.opportunity_id,
+                    security_code=item.security_code,
+                    side="sell",
+                    current_qty=current,
+                    target_qty=target,
+                    delta_qty=target - current,
+                    price_cap=mark if mark is not None else Decimal("0.00"),
+                    cash_bound=None,
+                    estimated_fee=None,
+                    eligible_at=decisions.published_at,
+                    expires_at=_session_close(decisions.next_session),
+                    window_ref=f"close-to-next-open:{decisions.next_session.isoformat()}",
+                    invalidations=(),
+                    reason_codes=(
+                        () if sizing.reason_code is None else (sizing.reason_code,)
+                    ),
+                    primary_constraint=sizing.reason_code,
+                    risk_check_ref=digest({
+                        "plan_id": plan_id_for(decisions, item),
+                        "exit_kind": item.exit_kind,
+                        "target": str(target),
+                        "locked": str(locked),
+                        "mark": str(mark),
+                    }),
+                    depends_on_preopen=(),
+                )
+            )
         body = {
             "schema_version": PACKAGE_SCHEMA_VERSION,
             "mode": decisions.mode,
@@ -1203,10 +1339,35 @@ class P12DesktopApplication:
                     "退出类型无法核实，暂不确认；持仓继续持有。"
                 )
             else:
-                is_reduce = item.opportunity_id in reduce_exit_ids
-                action, status = (
-                    ("HOLD", "READY") if is_reduce else ("SELL", "READY")
+                is_reduce = (
+                    item.exit_kind == "reduce"
+                    or item.opportunity_id in reduce_exit_ids
                 )
+                # E8 (#723 comment-7117737408): a v2 exit_plan carries its own
+                # exit_kind, and _publish sized a sell plan for it.  An
+                # executable plan (delta_qty < 0) is a confirmable SELL or
+                # REDUCE task; a plan that sized to zero stays a display row
+                # with the sizing reason (below target / residue-zero / budget
+                # unknown / T+1 lock), never an implicit order.  A legacy v1
+                # exit_plan without exit_kind keeps the batch-A behaviour:
+                # reduce shows 减仓建议 and a full exit still offers
+                # the whole-quantity sell from the plan-less display path.
+                executable = plan is not None and plan.delta_qty < 0
+                if is_reduce:
+                    action, status = (
+                        ("SELL", "READY")
+                        if executable
+                        else ("HOLD", "READY")
+                    )
+                else:
+                    action, status = (
+                        ("SELL", "READY")
+                        if (executable or item.exit_kind is None)
+                        else ("HOLD", "READY")
+                    )
+                if plan is not None and plan.primary_constraint:
+                    reasons.append(plan.primary_constraint)
+                    primary = plan.primary_constraint
             # Once the position is flat the exit is complete: it no longer
             # prompts a sell.  An exit plan is sized for the whole held
             # quantity, so quantity 0 after its report marks it done — but only
@@ -1253,8 +1414,12 @@ class P12DesktopApplication:
         )
         exit_kind = None
         if stage is OpportunityStage.EXIT_PLAN and not exit_types_unverified:
+            # v2 decisions self-describe their exit kind; v1 falls back to the
+            # published run's held_signals for the same distinction.
             exit_kind = (
-                "reduce" if item.opportunity_id in reduce_exit_ids else "full"
+                item.exit_kind
+                if item.exit_kind is not None
+                else ("reduce" if item.opportunity_id in reduce_exit_ids else "full")
             )
         return OpportunityView(
             opportunity_id=item.opportunity_id,
@@ -2448,16 +2613,27 @@ class P12DesktopApplication:
         snapshot = self._facts.snapshot(self._context)
         package = self._publish(decisions, snapshot.history)
         plan = next((p for p in package.plans if p.plan_id == plan_id), None)
-        if plan is None or plan.delta_qty <= 0:
+        if plan is None:
             return None
         if now < plan.eligible_at or now > plan.expires_at:
+            return None
+        current = snapshot.projection.quantity(plan.security_code)
+        if plan.side == "sell":
+            # E8: a sell plan confirms down to its target quantity.  The
+            # remaining sellable is current - target; the order path needs a
+            # positive order quantity, and T+1 / reserved bounds are
+            # re-checked before the simulated order is accepted.
+            remaining = current - plan.target_qty
+            if remaining <= 0:
+                return None
+            return dataclasses.replace(plan, delta_qty=remaining)
+        if plan.delta_qty <= 0:
             return None
         # Re-evaluate the still-open delta against the *current* position:
         # after a fill the account already holds the security, so the
         # remaining executable quantity is target - current, which may now be
         # zero.  The order path then refuses instead of reopening a spent
         # suggestion above the live trial headroom.
-        current = snapshot.projection.quantity(plan.security_code)
         remaining = plan.target_qty - current
         if remaining <= 0:
             return None

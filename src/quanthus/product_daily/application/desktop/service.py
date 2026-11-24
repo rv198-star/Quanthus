@@ -2573,6 +2573,11 @@ class P12DesktopApplication:
             sellable_for=_sellable,
             account_mode=scope.mode,
             pool_dir=pool_dir,
+            account_id=scope.account_id,
+            policy_ref=(
+                f"{getattr(self._policy.composition_ref, 'ref_id', '')}@"
+                f"{getattr(self._policy.composition_ref, 'version', '')}"
+            ),
         )
         # E6-06: persist the check receipt beside the named pool so the
         # verification, its per-fact verdicts and the re-derived quantities
@@ -2582,7 +2587,7 @@ class P12DesktopApplication:
                 from quanthus.product_daily.application.preopen import (
                     write_check_receipt,
                 )
-                write_check_receipt(pool_dir, receipt)
+                write_check_receipt(pool_dir, receipt, account_id=scope.account_id)
             except OSError:
                 # persistence is best-effort; the returned receipt still
                 # carries the full check for the caller to record.

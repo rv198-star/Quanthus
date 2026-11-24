@@ -505,3 +505,57 @@ def test_preopen_pending_buy_does_not_fill_when_suspended(tmp_path):
     # the halt surfaces at match time, not as a confirmed fill
     assert out.status == "rejected"
     assert out.reason_code == "SECURITY_SUSPENDED"
+
+def test_retracted_plan_never_fills_on_poll(tmp_path):
+    """E6 r3: a plan-bound buy that rested pending on an UNKNOWN fact stays
+    blocked once its published suggestion is retracted - the live resolver
+    returns no plan and the matcher refuses to trade, never skipping the
+    pre-fill check and filling anyway."""
+    plan = _PlanStub(depends=("SUSPENSION",))
+    box = [datetime(2026, 11, 19, 14, 0, 0, tzinfo=SHANGHAI)]
+    now = _clock(box)
+    store = PaperOrderStore(tmp_path / "paper.sqlite", clock=now)
+    app = _PreopenAppStub(plan, {}, mode="simulation")
+    a = PaperAccount(
+        app=app, store=store,
+        quotes=_quotes(now, [_quote("10.60", box[0])]), now=now,
+    )
+    out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 100, Decimal("10.80")))
+    assert out.status == "open"  # admitted as pending intent
+    # Retract the suggestion: the resolver now finds no effective plan.
+    app._plan = None
+    app.paper_current_plan = lambda pid: None
+    # A marketable quote would fill a live order - a retracted one stays put.
+    a._quotes = _quotes(now, [_quote("10.50", box[0])])
+    box[0] = box[0].replace(minute=31)
+    res = a.poll()
+    assert res["filled"] == []
+    stored = store.get("plan:p-dep", app.scope.account_id)
+    assert stored.status == "open" and stored.filled_qty == 0
+
+
+def test_buy_confirm_shrinks_to_affordable_lot(tmp_path):
+    """E6-04: a plan confirm whose cash cannot fund the full head shrinks to
+    the still-affordable whole-lot quantity instead of refusing or
+    re-committing the published quantity."""
+    plan = _PlanStub()
+    plan.delta_qty = 400
+    plan.price_cap = Decimal("12.40")
+    plan.estimated_fee = Decimal("5.00")
+    plan.target_qty = 400
+    box = [datetime(2026, 11, 19, 14, 0, 0, tzinfo=SHANGHAI)]
+    now = _clock(box)
+    store = PaperOrderStore(tmp_path / "paper.sqlite", clock=now)
+    app = _PreopenAppStub(plan, {}, mode="simulation")
+    a = PaperAccount(
+        app=app, store=store,
+        quotes=_quotes(now, [_quote("12.15", box[0], prev="11.50")]), now=now,
+    )
+    # cash 10000, one resting buy holding 6025 -> spendable 3975; minus fee 5
+    # -> 3970 / 12.40 = 320 -> 300 whole-lot shares.
+    a._cash = lambda: Decimal("10000.00")
+    a._open_buy_hold = lambda: Decimal("6025.00")
+    out = a.submit(OrderCommand("plan:p-dep", "buy", "600000", 400, Decimal("12.40")))
+    assert out.status in ("open", "filled")
+    stored = store.get("plan:p-dep", app.scope.account_id)
+    assert stored.quantity == 300

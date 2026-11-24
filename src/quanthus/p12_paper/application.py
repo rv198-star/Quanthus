@@ -540,7 +540,28 @@ class PaperAccount:
                 Decimal("0.01")
             )
             if self._available_cash() < need:
-                return self._reject(command, "INSUFFICIENT_CASH", quote)
+                # E6-04: a plan confirm shrinks to the still-affordable
+                # whole-lot quantity instead of refusing outright.  The
+                # pre-open check sizes the same spendable cash after the
+                # fee provision, so the confirm never silently rewrites the
+                # quantity back to the published head.
+                if plan is not None and command.side == "buy":
+                    spendable = self._available_cash()
+                    headroom = spendable - plan_fee
+                    if headroom > 0 and command.limit_price > 0:
+                        affordable = int(headroom // command.limit_price)
+                        shrunk = (affordable // LOT) * LOT
+                        if shrunk > 0 and shrunk < command.quantity:
+                            command = OrderCommand(
+                                order_id=command.order_id, side=command.side,
+                                security_code=command.security_code,
+                                quantity=shrunk, limit_price=command.limit_price,
+                            )
+                            need = (command.limit_price * command.quantity + plan_fee).quantize(
+                                Decimal("0.01")
+                            )
+                if self._available_cash() < need:
+                    return self._reject(command, "INSUFFICIENT_CASH", quote)
             # Fixed-bucket capacity: with no bucket able to take this security
             # the order is refused before it opens, never filled into a gap
             # the funding page cannot reconcile.
@@ -736,6 +757,12 @@ class PaperAccount:
         if order.side == "buy" and order.order_id.startswith("plan:"):
             resolver = getattr(self._app, "paper_current_plan", None)
             live_plan = resolver(order.order_id.split(":", 1)[1]) if callable(resolver) else None
+            # E6 r3: a plan-bound buy stays blocked once its published
+            # suggestion is gone - a retracted package, an expired window or
+            # a plan that no longer resolves is a blocked fill, never a
+            # reason to skip the pre-fill check and trade anyway.
+            if live_plan is None:
+                return None
             provider = getattr(self._app, "preopen_fact_for", None)
             for fact in getattr(live_plan, "depends_on_preopen", ()) or ():
                 ok = provider(order.security_code, fact) if callable(provider) else None
@@ -789,6 +816,10 @@ class PaperAccount:
         object.__setattr__(order, "avg_price", fill_price)
         object.__setattr__(order, "last_quote_time", quote.quote_time)
         object.__setattr__(order, "receipt_id", result.receipt_id)
+        # E6-05: capture the stored unverified alert before clearing it -
+        # the sell/reduction fill reports it so a poll-driven outcome is
+        # never silent on a fact that stayed unverified at fill time.
+        fill_alert = order.pending_reason if order.side == "sell" else None
         # The fill passed the pre-fill fact re-check, so the intent is no
         # longer pending on an unverified fact; clear the stored alert.
         object.__setattr__(order, "pending_reason", None)
@@ -801,7 +832,7 @@ class PaperAccount:
             return self._resolve_after_conflict(order, quote)
         self._observe_terminal(order, filled=order.quantity, cancelled=0)
         return SubmitOutcome(
-            order.order_id, "filled", None, None, order.filled_qty,
+            order.order_id, "filled", fill_alert, None, order.filled_qty,
             fill_price, order.rule_version, quote.quote_time, result.receipt_id,
         )
 

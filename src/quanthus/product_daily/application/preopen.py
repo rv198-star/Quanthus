@@ -229,6 +229,13 @@ def load_stock_pool_snapshot(state_dir: Path, trading_date) -> dict:
         body = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise PoolError("POOL_CORRUPT", f"unreadable pre-open pool: {exc}") from exc
+    # A syntactically valid JSON value that is not an object (``[]``, a
+    # scalar, ``null``) is still a corrupt named pool - refuse it with the
+    # same typed defect instead of crashing on the dict access below.
+    if not isinstance(body, dict):
+        raise PoolError(
+            "POOL_CORRUPT", "pre-open pool is not a JSON object"
+        )
     sig = body.pop("sha256", None)
     if sig is None:
         raise PoolError("POOL_CORRUPT", "pre-open pool has no embedded sha256")
@@ -350,34 +357,40 @@ def resolve_auction(quote, code, now) -> FactVerdict:
             f"quote surface is {quote_status}; no usable auction print",
             getattr(quote, "source", "tencent") or "tencent", now,
         )
-    # Point-in-time: a print must already be observed AND received by the
-    # check instant; a later tick is never back-read into an earlier check.
+    # Point-in-time AND window qualification: a genuine auction print must
+    # carry BOTH a source observation time and a source receipt time, each
+    # on the same trading day and each at or before the check instant, and
+    # the observation must land inside the 09:15-09:25 auction window.  An
+    # ordinary ``open`` tick without source times, a print observed before
+    # the window, or one stamped outside the window never qualifies - the
+    # fact stays ``unavailable`` and never borrows the check instant as a
+    # stand-in receipt.
     quote_time = getattr(quote, "quote_time", None)
     received_at = getattr(quote, "received_at", None)
-    if quote_time is not None:
-        qt = quote_time.astimezone(EXCHANGE_TZ)
-        if qt > now:
-            return _unavailable(
-                code, FACT_AUCTION, "auction print observed after the check instant",
-                getattr(quote, "source", "tencent") or "tencent", now,
-            )
-        if qt.date() != now.date():
-            return _unavailable(
-                code, FACT_AUCTION, "auction print belongs to a different session",
-                getattr(quote, "source", "tencent") or "tencent", now,
-            )
-    if received_at is not None:
-        ra = received_at.astimezone(EXCHANGE_TZ)
-        if ra > now:
-            return _unavailable(
-                code, FACT_AUCTION, "auction print received after the check instant",
-                getattr(quote, "source", "tencent") or "tencent", now,
-            )
-        if ra.date() != now.date():
-            return _unavailable(
-                code, FACT_AUCTION, "auction print received on a different session",
-                getattr(quote, "source", "tencent") or "tencent", now,
-            )
+    if quote_time is None or received_at is None:
+        return _unavailable(
+            code, FACT_AUCTION,
+            "auction print lacks a source observation/receipt time",
+            getattr(quote, "source", "tencent") or "tencent", now,
+        )
+    qt = quote_time.astimezone(EXCHANGE_TZ)
+    ra = received_at.astimezone(EXCHANGE_TZ)
+    if qt.date() != now.date() or ra.date() != now.date():
+        return _unavailable(
+            code, FACT_AUCTION, "auction print belongs to a different session",
+            getattr(quote, "source", "tencent") or "tencent", now,
+        )
+    if qt > now or ra > now:
+        return _unavailable(
+            code, FACT_AUCTION, "auction print observed/received after the check instant",
+            getattr(quote, "source", "tencent") or "tencent", now,
+        )
+    if not (AUCTION_OPEN <= qt.time() <= AUCTION_CLOSE):
+        return _unavailable(
+            code, FACT_AUCTION,
+            "auction print observed outside the 09:15-09:25 window",
+            getattr(quote, "source", "tencent") or "tencent", now,
+        )
     return FactVerdict(
         security_code=code,
         fact=FACT_AUCTION,
@@ -385,16 +398,30 @@ def resolve_auction(quote, code, now) -> FactVerdict:
         reason=None,
         source=getattr(quote, "source", "tencent") or "tencent",
         observed_at=_iso(quote_time),
-        received_at=_iso(received_at) or now.isoformat(),
+        received_at=_iso(received_at),
     )
 
 
+def _canonical_fact(fact) -> str:
+    """Bare fact category for a declared dependency name.
+
+    A package projects ``requires:PREOPEN_AUCTION`` onto the plan as the
+    scoped name ``PREOPEN_AUCTION``; the resolver keys on the bare category
+    ``AUCTION``.  Strip the PREOPEN_ scope prefix so a scoped declaration
+    resolves to the same category instead of an unknown fact (and never
+    yields a doubled PREOPEN_PREOPEN_* reason downstream).
+    """
+    name = str(fact or "")
+    return name[len("PREOPEN_"):] if name.startswith("PREOPEN_") else name
+
+
 def resolve_fact(quote, code, fact, now) -> FactVerdict:
-    if fact == FACT_SUSPENSION:
+    category = _canonical_fact(fact)
+    if category == FACT_SUSPENSION:
         return resolve_suspension(quote, code, now)
-    if fact == FACT_LIMIT_PRICE:
+    if category == FACT_LIMIT_PRICE:
         return resolve_limit_price(quote, code, now)
-    if fact == FACT_AUCTION:
+    if category == FACT_AUCTION:
         return resolve_auction(quote, code, now)
     return _unavailable(code, fact, f"unknown pre-open fact {fact!r}", "none", now)
 
@@ -412,6 +439,8 @@ def run_check(
     sellable_for=None,
     account_mode: str = "real",
     pool_dir=None,
+    account_id: str | None = None,
+    policy_ref: str | None = None,
 ) -> dict:
     """Run the 09:00-09:25 verification over the day's package and account.
 
@@ -585,6 +614,9 @@ def run_check(
     receipt = {
         "schema_version": CHECK_SCHEMA,
         "check": "preopen",
+        "account_id": account_id,
+        "account_mode": account_mode,
+        "policy_ref": policy_ref,
         "trading_date": now.date().isoformat(),
         "checked_at": now.isoformat(),
         "in_window": in_window,
@@ -623,17 +655,40 @@ def attach_check_to_receipt(receipt: dict | None, check: dict) -> dict:
     return base
 
 
-def write_check_receipt(state_dir: Path, check: dict) -> Path:
+def write_check_receipt(state_dir: Path, check: dict, *, account_id=None) -> Path:
     """Persist a pre-open check receipt beside the named pool.
 
     E6-06: the verify pass is durable evidence - the package, account
     revision, policy mode, pool SHA, per-plan facts/alerts/recheck quantity
     and refusal reasons are recoverable across a restart, keyed by trading
-    day and check SHA so a later audit reads the identical record."""
+    day and check SHA so a later audit reads the identical record.  The day
+    file ``<date>.json`` holds every account's receipt under its own key in
+    ``accounts``, so a second account's same-day check merges in without
+    overwriting the first's record."""
     path = (
         Path(state_dir)
         / "preopen-check"
         / (str(check["trading_date"]) + ".json")
     )
-    _write_atomic(path, json.dumps(check, ensure_ascii=False, sort_keys=True, indent=2))
+    account = account_id or check.get("account_id") or "account"
+    prior_accounts: dict = {}
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            existing = None
+        if isinstance(existing, dict):
+            if isinstance(existing.get("accounts"), dict):
+                prior_accounts = dict(existing["accounts"])
+            elif existing.get("account_id"):
+                # Fold a single-account receipt from an earlier write into
+                # the shared accounts map so it is preserved, never lost.
+                prior_accounts[str(existing["account_id"])] = existing
+    prior_accounts[str(account)] = check
+    # The day file keeps the just-written receipt at the top level (so a
+    # single-account read still finds its own sha/fields) AND embeds every
+    # account's receipt under ``accounts`` - a second account's check
+    # merges in without overwriting or hiding the first's record.
+    merged = {**check, "accounts": prior_accounts}
+    _write_atomic(path, json.dumps(merged, ensure_ascii=False, sort_keys=True, indent=2))
     return path

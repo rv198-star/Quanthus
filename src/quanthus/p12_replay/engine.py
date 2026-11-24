@@ -1357,11 +1357,23 @@ class ReplayEngine:
         if not isinstance(run, dict):
             return None
         ref = run.get("p11_replay_day_receipt_ref")
-        # The run may carry the bound receipt inline (embedded doc) or as a
-        # reference to an independently-written file.
-        if isinstance(ref, dict) and ref.get("schema_version") == "p11.paper-replay-day.v1":
-            doc = ref
-        elif isinstance(ref, dict) and ref.get("path"):
+        if not isinstance(ref, dict):
+            return None
+
+        # A ref object that names a file is a FILE REFERENCE first - the real
+        # DailyPackageStore._day_receipt_ref payload carries schema_version +
+        # run_id + path + sha256 + market_date + scenario_id (no delivered or
+        # day_block of its own), so treating schema_version as "inline
+        # receipt" returned the bare ref and starved the display.  Resolve
+        # the path, recompute its sha, then read the original p11 doc.
+        doc = None
+        run_id_now = run.get("run_id")
+        declared_run = ref.get("run_id")
+        # The bound receipt must belong to THIS run; a ref that names a
+        # different run (or none) is refused - never read as this day's.
+        if declared_run and run_id_now and str(declared_run) != str(run_id_now):
+            return None
+        if ref.get("path"):
             rel = str(ref["path"])
             path = (self.state_dir / rel).resolve()
             # The reference must stay inside the replay state dir - never
@@ -1372,17 +1384,23 @@ class ReplayEngine:
                 return None
             if not path.is_file():
                 return None
+            expected_sha = ref.get("sha256") or ref.get("file_sha256")
+            # sha256 must be present and in sha256:<hex> form - a missing
+            # or bare-hex digest cannot bind the original bytes.
+            if not expected_sha or not str(expected_sha).startswith("sha256:"):
+                return None
+            actual = "sha256:" + _hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+            if str(expected_sha) != actual:
+                return None
             try:
                 doc = _json.loads(path.read_text())
             except (OSError, _json.JSONDecodeError):
                 return None
-            expected_sha = ref.get("sha256") or ref.get("file_sha256")
-            if expected_sha:
-                actual = "sha256:" + _hashlib.sha256(
-                    path.read_bytes()
-                ).hexdigest()
-                if str(expected_sha) != actual:
-                    return None
+        elif ref.get("delivered") is not None or ref.get("seam") is not None:
+            # A ref carrying the real coverage fields IS the inline receipt.
+            doc = ref
         else:
             return None
         if not isinstance(doc, dict):
@@ -1400,20 +1418,16 @@ class ReplayEngine:
             run.get("scenario_id")
             or (run.get("source_closure") or {}).get("scenario_id")
         )
-        if isinstance(ref, dict):
-            declared = ref.get("scenario_id")
-            if declared and run_scenario and str(declared) != str(run_scenario):
-                return None
-            declared_run = ref.get("run_id")
-            if declared_run and run.get("run_id") and str(declared_run) != str(
-                run.get("run_id")
-            ):
-                return None
-            doc_scenario = doc.get("scenario_id")
-            if doc_scenario and run_scenario and str(doc_scenario) != str(
-                run_scenario
-            ):
-                return None
+        declared_scenario = ref.get("scenario_id")
+        if declared_scenario and run_scenario and str(declared_scenario) != str(
+            run_scenario
+        ):
+            return None
+        doc_scenario = doc.get("scenario_id")
+        if doc_scenario and run_scenario and str(doc_scenario) != str(
+            run_scenario
+        ):
+            return None
         return doc
 
     def _run_receipt(self) -> dict | None:

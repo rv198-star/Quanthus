@@ -910,3 +910,110 @@ class TestCoveragePrecheckRound2:
                 return r
         eng._store = _Store2()
         assert eng._day_replay_receipt() is None
+
+    def _engine(self, tmp_path, state):
+        from datetime import date
+        from quanthus.p12_replay.engine import ReplayEngine
+        from quanthus.p12_replay.replay_product import ReplayInputSpec
+        from quanthus.p12_daily.rule_runner import SyntheticRuleRunner
+
+        sessions = [date(2026, 10, 8), date(2026, 10, 9)]
+        spec = ReplayInputSpec(history={}, corporate_actions={}, volume={},
+                               knowledge_cutoff=None, completed_at=None)
+        return ReplayEngine(
+            state_dir=state, sessions=sessions, bars_by_day={},
+            runner=SyntheticRuleRunner(candidates=()), spec=spec,
+            base_manifest_path=tmp_path / "m.json",
+            base_manifest_sha256="sha256:" + "0" * 64,
+            app_builder=lambda **kw: None)
+
+    def test_real_writer_ref_shape_reads_original(self, tmp_path):
+        # The REAL DailyPackageStore._day_receipt_ref payload carries
+        # schema_version + run_id + path + sha256 + market_date +
+        # scenario_id and nothing else - the old code read schema_version
+        # as "inline receipt" and returned the bare ref (no delivered).
+        import json, hashlib
+        state = tmp_path / "st"
+        eng = self._engine(tmp_path, state)
+        day = "2026-10-08"
+        original = self._receipt()
+        # Real layout: <state>/runs/replay-day-receipts/<run_id>.json
+        real_path = state / "runs" / "replay-day-receipts" / "run-9.json"
+        real_path.parent.mkdir(parents=True, exist_ok=True)
+        real_path.write_text(json.dumps(original))
+        real_sha = "sha256:" + hashlib.sha256(
+            real_path.read_bytes()).hexdigest()
+
+        class _Store:
+            def latest_run_for_date(self, d):
+                return {
+                    "run_id": "run-9", "market_date": day,
+                    "scenario_id": "scn-1",
+                    "p11_replay_day_receipt_ref": {
+                        # exact writer shape
+                        "schema_version": "p11.paper-replay-day.v1",
+                        "run_id": "run-9",
+                        "path": "runs/replay-day-receipts/run-9.json",
+                        "sha256": real_sha,
+                        "market_date": day,
+                        "scenario_id": "scn-1",
+                    }}
+        eng._store = _Store()
+        doc = eng._day_replay_receipt()
+        # The ORIGINAL receipt comes back - its coverage is readable.
+        assert doc is not None
+        assert doc["delivered"]["600000"]["entry_eligible"] is True
+        assert doc["market_date"] == day
+
+        # Bare-hex sha256 (no sha256: prefix) -> refused.
+        class _StoreNoShaPfx(_Store):
+            def latest_run_for_date(self, d):
+                r = super().latest_run_for_date(d)
+                r["p11_replay_day_receipt_ref"] = dict(
+                    r["p11_replay_day_receipt_ref"],
+                    sha256=real_sha.removeprefix("sha256:"))
+                return r
+        eng._store = _StoreNoShaPfx()
+        assert eng._day_replay_receipt() is None
+
+        # Missing sha256 entirely -> refused.
+        class _StoreNoSha(_Store):
+            def latest_run_for_date(self, d):
+                r = super().latest_run_for_date(d)
+                ref = dict(r["p11_replay_day_receipt_ref"])
+                ref.pop("sha256")
+                r["p11_replay_day_receipt_ref"] = ref
+                return r
+        eng._store = _StoreNoSha()
+        assert eng._day_replay_receipt() is None
+
+    def test_real_writer_ref_foreign_scenario_refused(self, tmp_path):
+        # The bound file exists and hashes fine, but the ORIGINAL doc's
+        # scenario differs from this run's - refused, not served.
+        import json, hashlib
+        state = tmp_path / "st"
+        eng = self._engine(tmp_path, state)
+        day = "2026-10-08"
+        original = self._receipt()
+        original["scenario_id"] = "scn-FOREIGN"
+        real_path = state / "runs" / "replay-day-receipts" / "run-9.json"
+        real_path.parent.mkdir(parents=True, exist_ok=True)
+        real_path.write_text(json.dumps(original))
+        real_sha = "sha256:" + hashlib.sha256(
+            real_path.read_bytes()).hexdigest()
+
+        class _Store:
+            def latest_run_for_date(self, d):
+                return {
+                    "run_id": "run-9", "market_date": day,
+                    "scenario_id": "scn-1",
+                    "p11_replay_day_receipt_ref": {
+                        "schema_version": "p11.paper-replay-day.v1",
+                        "run_id": "run-9",
+                        "path": "runs/replay-day-receipts/run-9.json",
+                        "sha256": real_sha,
+                        "market_date": day,
+                        "scenario_id": "scn-FOREIGN",
+                    }}
+        eng._store = _Store()
+        assert eng._day_replay_receipt() is None

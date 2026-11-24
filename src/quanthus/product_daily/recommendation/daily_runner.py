@@ -62,6 +62,42 @@ from quanthus.product_daily.recommendation.rule_seam import (
     run_daily_advice,
 )
 
+# Private replay-context token.  The single-T "october_replay_as_observed" date
+# context is established only inside the versioned as-observed replay entry
+# (run_daily_advice_from_history under as_observed, reached via the sealed replay
+# path) - never by a caller-supplied string, anchor or boolean.  The constructor is
+# gated behind an internal key that only the verified projection can supply, so the
+# public raw entry cannot be tricked into admitting a null-clock warm-up row.
+_OCTOBER_CONTEXT_KEY = object()
+
+
+@dataclass(frozen=True)
+class OctoberReplayContext:
+    """Verified single-T replay context admitted by the versioned replay entry.
+
+    Carries the named context id and the binding that produced it.  Instances are
+    created only inside history_input's as-observed replay projection; the public
+    run_daily_advice_from_raw accepts this type (and only this type), so a raw
+    caller passing the bare string is a contract breach, not an admission.
+    """
+
+    context_id: str
+
+    def __init__(self, context_id: str, *, _key: object) -> None:
+        if _key is not _OCTOBER_CONTEXT_KEY:
+            raise ProductDailyError(
+                "replay_context_not_constructible",
+                "OctoberReplayContext is created only by the versioned replay entry",
+            )
+        require_text(context_id, "context_id")
+        object.__setattr__(self, "context_id", context_id)
+
+
+def _new_october_context(context_id: str) -> OctoberReplayContext:
+    """Internal factory - the only path that can mint the private token."""
+
+    return OctoberReplayContext(context_id, _key=_OCTOBER_CONTEXT_KEY)
+
 
 @dataclass(frozen=True)
 class RawSecurityInput:
@@ -388,16 +424,16 @@ def run_daily_advice_from_raw(
     # observe instants, exclusions and the member catalogue).  Strict/daily
     # callers omit it and see no field.
     consumption_evidence: Mapping[str, Any] | None = None,
-    # Versioned single-T numeric context for the October replay.  Only the
-    # "october_replay_as_observed" context admits a date-context warm-up row:
-    # a bar strictly before T on a named open session whose close/cutoff
-    # entries are BOTH absent joins the numeric window with its own business
-    # date as the knowledge coordinate -- original nulls preserved, never a
-    # borrowed T clock or a fabricated 15:00/midnight.  Each admitted row is
-    # named inside the signed closure.  Any other value (or None) keeps the
-    # original per-bar instant requirement; a forward/H1/M2 caller cannot
-    # substitute this with an anchor or a bare boolean.
-    numeric_context: str | None = None,
+    # Versioned single-T numeric context for the October replay.  Only an
+    # OctoberReplayContext token - minted by the versioned as-observed replay
+    # entry, never a caller-supplied string/anchor/boolean - admits a
+    # date-context warm-up row: a bar strictly before T on a named open session
+    # whose close/cutoff entries are BOTH absent joins the numeric window with
+    # its own business date as the knowledge coordinate -- original nulls
+    # preserved, never a borrowed T clock or a fabricated 15:00/midnight.  Each
+    # admitted row is named inside the signed closure.  None keeps the original
+    # per-bar instant requirement on every caller.
+    numeric_context: OctoberReplayContext | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Build real panel facts + the scan series from raw inputs, then run the core.
@@ -425,12 +461,16 @@ def run_daily_advice_from_raw(
     signal_date = facts.market_date
     all_trading_dates: set[date] = set()
     date_context_rows: list[dict[str, Any]] = []
-    # The named numeric context is the ONLY thing that admits a date-context
-    # row.  It is established by the versioned as-observed replay entry, not by
-    # a caller-supplied anchor or flag; the string is asserted below so an
-    # unrecognized context fails loudly instead of silently widening.
-    if numeric_context not in (None, "october_replay_as_observed"):
+    # The typed replay token is the ONLY thing that admits a date-context row.
+    # A bare string/anchor/boolean can never satisfy the type check, so a strict
+    # /forward/H1/M2 caller cannot substitute a label for the versioned entry's
+    # projection; an unrecognized context id fails loudly.
+    if numeric_context is not None and (
+        type(numeric_context) is not OctoberReplayContext
+        or numeric_context.context_id != "october_replay_as_observed"
+    ):
         raise ProductDailyError("unknown_numeric_context", f"numeric_context {numeric_context!r}")
+    _date_context_ok = numeric_context is not None
     # Account and raw closures are bound even when a particular market input fails.
     raw_closures = [raw_security_input_closure(item) for item in raw]
 
@@ -463,12 +503,7 @@ def run_daily_advice_from_raw(
                 if day > signal_date:
                     continue
                 close_at, cutoff = close_map.get(day), cutoff_map.get(day)
-                if (
-                    close_at is None
-                    and cutoff is None
-                    and day < signal_date
-                    and numeric_context == "october_replay_as_observed"
-                ):
+                if close_at is None and cutoff is None and day < signal_date and _date_context_ok:
                     # Date-context warm-up row: original nulls preserved.  The
                     # scan treats its session_date as the knowledge coordinate
                     # (strictly earlier than T under the declared sequence); T
@@ -543,7 +578,7 @@ def run_daily_advice_from_raw(
         consumption_evidence = {
             **(dict(consumption_evidence) if consumption_evidence else {}),
             "date_context_rows": tuple(date_context_rows),
-            "numeric_context": numeric_context,
+            "numeric_context": numeric_context.context_id,
         }
 
     return run_daily_advice(

@@ -885,11 +885,14 @@ def _gap_clocked_raw(code: str, gap_days: int = 42) -> RawSecurityInput:
 
 
 def _run_context(runner, resources, raws, context=None, **kw):
+    from quanthus.product_daily.recommendation.daily_runner import _new_october_context
+
+    token = _new_october_context(context) if context is not None else None
     return _run(
         runner,
         resources,
         raws,
-        numeric_context=context,
+        numeric_context=token,
         consumption_evidence={"replay": "oct08-42"},
         **kw,
     )
@@ -905,12 +908,33 @@ def test_date_context_strict_entry_refused(runner, resources):
 
 
 def test_date_context_context_kwarg_gated(runner, resources):
-    """numeric_context is required; an unknown context string fails loudly."""
+    """numeric_context must be the private token; a bare string is a breach."""
 
     raw = _gap_clocked_raw("600000")
     with pytest.raises(ProductDailyError) as exc:
         _run(runner, resources, [raw], numeric_context="bogus_context")
     assert "unknown_numeric_context" in str(exc.value)
+
+
+def test_date_context_string_label_refused(runner, resources):
+    """The public raw entry refuses a caller-supplied context string - only the
+    versioned replay entry can mint the private token, so a forward/H1/M2 caller
+    cannot substitute a label for the verified projection."""
+
+    raw = _gap_clocked_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw], numeric_context="october_replay_as_observed")
+    assert "unknown_numeric_context" in str(exc.value)
+
+
+def test_date_context_token_not_constructible_publicly(runner, resources):
+    """OctoberReplayContext cannot be minted without the internal key - a raw
+    caller cannot fabricate the admission token even knowing its shape."""
+    from quanthus.product_daily.recommendation.daily_runner import OctoberReplayContext
+
+    with pytest.raises(ProductDailyError) as exc:
+        OctoberReplayContext("october_replay_as_observed", _key=object())
+    assert "replay_context_not_constructible" in str(exc.value)
 
 
 def test_date_context_warmup_rows_equivalent(runner, resources):

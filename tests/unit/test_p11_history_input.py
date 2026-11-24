@@ -707,6 +707,37 @@ def test_r2_qualified_no_signal_events_gate_records_verdict(runner, resources):
     assert receipt["status"] == "qualified"
 
 
+def test_r3_per_security_scan_verdict_named_not_flattened(runner, resources):
+    """The events gate surfaces the SAME scan's per-security T verdict, not a
+    flattened 'qualified no-signal' for every quiet day.  A T-1 halted security
+    and a genuinely-quiet security produce DIFFERENT reasons from one scan -
+    a named eligibility veto is never reported as a no-signal pass."""
+
+    # Quiet T: real not_triggered verdict -> "no-signal" reason.
+    env = _trend_envelope()
+    tbar = env["securities"][0]["bars"][-1]
+    close = tbar["close_price"]
+    tbar["high_price"] = close
+    tbar["low_price"] = close
+    tbar["amount"] = "100"
+    out_quiet = run_daily_advice_from_history(
+        env, runner=runner, resources=resources, **_run_kwargs()
+    )
+    quiet_reason = out_quiet.source_closure["history_receipts"][0]["gates"]["events"]["reason"]
+
+    # T-1 halted: real t_minus_1_not_tradable verdict -> named veto, not no-signal.
+    env2 = _trend_envelope()
+    env2["securities"][0]["bars"][-2]["is_tradable"] = False
+    out_halted = run_daily_advice_from_history(
+        env2, runner=runner, resources=resources, **_run_kwargs()
+    )
+    halted_reason = out_halted.source_closure["history_receipts"][0]["gates"]["events"]["reason"]
+
+    assert "no-signal" in quiet_reason
+    assert "t_minus_1_not_tradable" in halted_reason
+    assert "no-signal" not in halted_reason
+
+
 def test_r2_held_still_evaluates_when_market_fails(runner, resources):
     """A known-held security whose market parse failed still gets its held review
     (account_member_market_unavailable), and the day is not falsely blocked."""

@@ -303,6 +303,12 @@ class CandidateScanResult:
     candidates: tuple[ScannedCandidate, ...]
     counters: CandidateScanCounters
     industry_gaps: tuple[CandidateIndustryGap, ...] = ()
+    # Per-(security_id, signal_date) verdicts the SAME scan evaluated, in the order
+    # the engine produced them.  A value is a CandidateReason value (unusable window)
+    # or "triggered"; a security absent from the map reached no evaluated verdict.
+    # This is what the day receipt reads for the per-security T verdict - it is the
+    # real scan output, never re-derived from reason_counts.
+    signal_verdicts: tuple[tuple[str, str, str], ...] = ()
 
     def __post_init__(self) -> None:
         event_ids = [candidate.event_id for candidate in self.candidates]
@@ -410,6 +416,8 @@ class CandidateScanShard:
     decoded_rows: int
     row_decode_elapsed_seconds: float
     security_scan_elapsed_seconds: float
+    # Per-(security_id, signal_date, verdict) triples from the same scan.
+    signal_verdicts: tuple[tuple[str, str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if (
@@ -435,6 +443,12 @@ class CandidateScanShard:
             raise CandidateScanError("candidate scan shard counters must be non-negative")
         if self.row_decode_elapsed_seconds < 0 or self.security_scan_elapsed_seconds < 0:
             raise CandidateScanError("candidate scan shard elapsed time must be non-negative")
+        owned_keys = set(self.security_ids)
+        for security_id, _signal_date, verdict in self.signal_verdicts:
+            if security_id not in owned_keys:
+                raise CandidateScanError("candidate scan shard verdict not owned by shard")
+            if not isinstance(verdict, str) or not verdict:
+                raise CandidateScanError("candidate scan shard verdict must be non-empty")
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -463,6 +477,10 @@ class CandidateScanShard:
             "decoded_rows": self.decoded_rows,
             "row_decode_elapsed_seconds": self.row_decode_elapsed_seconds,
             "security_scan_elapsed_seconds": self.security_scan_elapsed_seconds,
+            "signal_verdicts": [
+                [security_id, signal_date, verdict]
+                for security_id, signal_date, verdict in self.signal_verdicts
+            ],
         }
 
     @classmethod
@@ -476,12 +494,14 @@ class CandidateScanShard:
             "decoded_rows",
             "row_decode_elapsed_seconds",
             "security_scan_elapsed_seconds",
+            "signal_verdicts",
         }
         if not isinstance(value, Mapping) or set(value) != expected:
             raise CandidateScanError("candidate scan shard payload fields differ")
         security_ids = value["security_ids"]
         raw_values = value["raw_candidates"]
         reason_counts = value["reason_counts"]
+        signal_verdicts = value["signal_verdicts"]
         if (
             not isinstance(security_ids, list)
             or any(not isinstance(item, str) for item in security_ids)
@@ -490,6 +510,13 @@ class CandidateScanShard:
             or any(
                 not isinstance(key, str) or not isinstance(count, int) or isinstance(count, bool)
                 for key, count in reason_counts.items()
+            )
+            or not isinstance(signal_verdicts, list)
+            or any(
+                not isinstance(item, list)
+                or len(item) != 3
+                or any(not isinstance(part, str) for part in item)
+                for item in signal_verdicts
             )
         ):
             raise CandidateScanError("candidate scan shard payload is invalid")
@@ -580,6 +607,9 @@ class CandidateScanShard:
             decoded_rows=int(value["decoded_rows"]),
             row_decode_elapsed_seconds=float(value["row_decode_elapsed_seconds"]),
             security_scan_elapsed_seconds=float(value["security_scan_elapsed_seconds"]),
+            signal_verdicts=tuple(
+                (str(item[0]), str(item[1]), str(item[2])) for item in signal_verdicts
+            ),
         )
 
 
@@ -920,7 +950,7 @@ def _scan_security_series(
     source_policy: EventScanSourcePolicy,
 ) -> tuple[list[_RawCandidate], Counter[str], int]:
     if not security_rows:
-        return [], Counter(), 0
+        return [], Counter(), 0, {}
     rows = tuple(security_rows)
     if tuple(sorted(rows, key=lambda item: item.session_date)) != rows:
         raise CandidateScanError("one security scan series must be sorted by session_date")
@@ -940,6 +970,11 @@ def _scan_security_series(
     reasons: Counter[str] = Counter()
     raw: list[_RawCandidate] = []
     evaluated = 0
+    # Per-(security, signal_date) verdicts from the SAME real scan: every row the
+    # engine actually evaluated to a real verdict (a named CandidateReason when the
+    # window was unusable, or "triggered" when the transition fired).  These are the
+    # values the receipt surfaces per security - never re-derived from counters.
+    verdicts: dict[tuple[str, date], str] = {}
     (
         row_reasons,
         ranges,
@@ -956,9 +991,13 @@ def _scan_security_series(
         trading_index = date_index.get(current.session_date)
         if trading_index is None or trading_index < history_sessions - 1:
             reasons[CandidateReason.OBSERVATION_GAP.value] += 1
+            verdicts[(security_id, current.session_date)] = CandidateReason.OBSERVATION_GAP.value
             continue
         if trading_index + 1 >= len(ordered_dates):
             reasons[CandidateReason.MISSING_T_PLUS_1_SESSION.value] += 1
+            verdicts[(security_id, current.session_date)] = (
+                CandidateReason.MISSING_T_PLUS_1_SESSION.value
+            )
             continue
         first_index = local_index - history_sessions + 1
         window = rows[first_index : local_index + 1]
@@ -978,6 +1017,7 @@ def _scan_security_series(
         )
         if reason is not None:
             reasons[reason.value] += 1
+            verdicts[(security_id, current.session_date)] = reason.value
             continue
         prior_range = ranges[local_index - 1]
         current_range = ranges[local_index]
@@ -1016,6 +1056,9 @@ def _scan_security_series(
             current_turnover_median,
         }:
             reasons[CandidateReason.ZERO_ACTIVITY_BASELINE.value] += 1
+            verdicts[(security_id, current.session_date)] = (
+                CandidateReason.ZERO_ACTIVITY_BASELINE.value
+            )
             continue
         prior_range_ratio = prior_range / prior_range_median
         prior_turnover_ratio = prior_turnover / prior_turnover_median
@@ -1028,6 +1071,7 @@ def _scan_security_series(
             and current_turnover_ratio >= thresholds["active_turnover_ratio_min"]
         ):
             reasons[CandidateReason.NOT_TRIGGERED.value] += 1
+            verdicts[(security_id, current.session_date)] = CandidateReason.NOT_TRIGGERED.value
             continue
         features = CandidateFeatureEvidence(
             feature_start=window[0].session_date,
@@ -1046,6 +1090,7 @@ def _scan_security_series(
             "candidate_rule_digest": card.semantic_digest,
             "snapshot_manifest_digest": snapshot_manifest_digest,
         }
+        verdicts[(security_id, current.session_date)] = "triggered"
         raw.append(
             _RawCandidate(
                 security_id=security_id,
@@ -1075,7 +1120,7 @@ def _scan_security_series(
                 ),
             )
         )
-    return raw, reasons, evaluated
+    return raw, reasons, evaluated, verdicts
 
 
 def _finalize_raw_candidates(
@@ -1092,6 +1137,9 @@ def _finalize_raw_candidates(
     prospective_clock_json: str | None = None,
     snapshot_replay_cutoff: datetime | None = None,
     replay_clock_factory: Callable[[date], str] | None = None,
+    # Per-(security_id, signal_date, verdict) triples carried from the shards that
+    # produced the raw scan.  Passed through to CandidateScanResult.signal_verdicts.
+    signal_verdicts: tuple[tuple[str, str, str], ...] = (),
 ) -> CandidateScanResult:
     from quanthus.backtest.snapshot_clock import SnapshotReplayClock
 
@@ -1236,6 +1284,7 @@ def _finalize_raw_candidates(
             )
         ),
         counters=counters,
+        signal_verdicts=signal_verdicts,
         industry_gaps=tuple(
             CandidateIndustryGap(
                 security_id=security_id,
@@ -1275,6 +1324,7 @@ def scan_candidate_series_shard(
     reasons: Counter[str] = Counter()
     raw: list[_RawCandidate] = []
     evaluated = 0
+    verdicts: dict[tuple[str, date], str] = {}
     last_series_end: dict[str, date] = {}
     scanned_security_ids: set[str] = set()
     series_count = 0
@@ -1302,7 +1352,7 @@ def scan_candidate_series_shard(
             )
         last_series_end[security_id] = rows[-1].session_date
         scan_started = time.perf_counter()
-        child_raw, child_reasons, child_evaluated = _scan_security_series(
+        child_raw, child_reasons, child_evaluated, child_verdicts = _scan_security_series(
             rows,
             ordered_dates=ordered_dates,
             date_index=date_index,
@@ -1316,6 +1366,7 @@ def scan_candidate_series_shard(
         raw.extend(child_raw)
         reasons.update(child_reasons)
         evaluated += child_evaluated
+        verdicts.update(child_verdicts)
         series_count += 1
         if progress is not None and series_count % 100 == 0:
             progress(
@@ -1354,6 +1405,10 @@ def scan_candidate_series_shard(
         decoded_rows=decoded_rows,
         row_decode_elapsed_seconds=decode_elapsed,
         security_scan_elapsed_seconds=scan_elapsed,
+        signal_verdicts=tuple(
+            (security_id, signal_date.isoformat(), verdict)
+            for (security_id, signal_date), verdict in sorted(verdicts.items())
+        ),
     )
 
 
@@ -1383,6 +1438,7 @@ def finalize_candidate_scan_shards(
     reasons: Counter[str] = Counter()
     evaluated = 0
     owned_security_ids: set[str] = set()
+    verdicts: dict[tuple[str, date], str] = {}
     for shard in shards:
         overlap = owned_security_ids.intersection(shard.security_ids)
         if overlap:
@@ -1393,6 +1449,8 @@ def finalize_candidate_scan_shards(
         raw.extend(shard.raw_candidates)
         reasons.update(shard.reason_counts)
         evaluated += shard.evaluated_rows
+        for security_id, signal_date_text, verdict in shard.signal_verdicts:
+            verdicts[(security_id, date.fromisoformat(signal_date_text))] = verdict
     return _finalize_raw_candidates(
         raw,
         reasons=reasons,
@@ -1406,6 +1464,10 @@ def finalize_candidate_scan_shards(
         prospective_clock_json=getattr(source_policy, "prospective_clock_json", None),
         snapshot_replay_cutoff=getattr(source_policy, "snapshot_replay_cutoff", None),
         replay_clock_factory=getattr(source_policy, "replay_clock_for_date", None),
+        signal_verdicts=tuple(
+            (security_id, signal_date.isoformat(), verdict)
+            for (security_id, signal_date), verdict in sorted(verdicts.items())
+        ),
     )
 
 

@@ -1267,7 +1267,10 @@ def run_daily_advice_from_history(
     # as-observed replay entry; a strict/forward/H1/M2 caller supplying it is
     # a contract breach, never a silent widening.  Under as_observed the
     # context is fixed (not a caller-chosen string), so no anchor or boolean
-    # substitute is accepted elsewhere.
+    # substitute is accepted elsewhere.  The public raw entry admits the
+    # private OctoberReplayContext token only - this entry mints it from the
+    # verified as_observed projection, so a bare string can never reach the
+    # admission gate.
     numeric_context = kwargs.pop("numeric_context", None)
     if numeric_context is not None and (
         not as_observed or numeric_context != "october_replay_as_observed"
@@ -1276,12 +1279,19 @@ def run_daily_advice_from_history(
             "invalid_raw_history",
             "numeric_context requires the versioned as-observed replay mode",
         )
+    replay_token = None
+    if numeric_context is not None:
+        from quanthus.product_daily.recommendation.daily_runner import (
+            _new_october_context,
+        )
+
+        replay_token = _new_october_context(numeric_context)
     output = run_daily_advice_from_raw(
         raw=inputs,
         history_receipts=bound_receipts,
         caller_input_exclusions=runner_exclusions,
         consumption_evidence=kwargs.pop("consumption_evidence", None),
-        numeric_context=numeric_context,
+        numeric_context=replay_token,
         **kwargs,
     )
     # The issued receipt's digest must match the closure actually carried on the

@@ -24,9 +24,11 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import inspect
 import json
 from collections.abc import Callable
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -105,10 +107,256 @@ def p12_package_digests(
     }
 
 
-def _package_file_bytes(package: DailyAdvicePackage) -> bytes:
+def _serialize_decision_sets(
+    package: DailyAdvicePackage, *, wire_version: str
+) -> list[dict[str, Any]]:
+    """Serialize decision_sets on the explicitly selected wire version.
+
+    v1 -> the frozen historical payload (no exit fields).  v2 -> the
+    p12.daily-advice-package.v2 payload (exit_kind/target_position_fraction
+    present).  Any other declared version is refused before bytes exist.
+    """
+    if wire_version == "p12.daily-advice-package.v1":
+        return [item.to_dict() for item in package.decision_sets]
+    if wire_version == "p12.daily-advice-package.v2":
+        return [item.to_wire_dict() for item in package.decision_sets]
+    raise ProductDailyError(
+        "unpublishable_package",
+        f"unregistered decision_set wire version: {wire_version}",
+    )
+
+
+def _package_file_dict(package: DailyAdvicePackage, *, wire_version: str) -> dict[str, Any]:
+    """Package file payload for one wire version.
+
+    Outer schema_version stays the P11 package envelope identity
+    (quanthus.r11.daily-advice.v1); the consumer-facing contract version travels on
+    each decision_set's own wire payload and on the explicit wire_version declared
+    alongside it (documented for P12 in HELD-REDUCTION-CONTRACT.candidate.v2.md).
+    """
+    out = package.to_dict()
+    out["decision_sets"] = _serialize_decision_sets(package, wire_version=wire_version)
+    return out
+
+
+def _package_file_bytes(package: DailyAdvicePackage, *, wire_version: str) -> bytes:
     return (
-        json.dumps(package.to_dict(), ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+        json.dumps(
+            _package_file_dict(package, wire_version=wire_version),
+            ensure_ascii=False,
+            indent=1,
+            sort_keys=True,
+        )
+        + "\n"
     ).encode("utf-8")
+
+
+def _require_verified_p12_consumer(
+    package: DailyAdvicePackage,
+    *,
+    wire_version: str,
+    p12_loader: Callable[..., Any],
+    consumer_binding: dict[str, Any] | None,
+) -> dict[str, tuple[Any, str]]:
+    """Resolve and verify the pinned consumer once; return validated objects + digests.
+
+    One verified pipeline for every published decision_set:
+
+    1. consumer_binding must be the versioned binding object (schema
+       quanthus.p11.p12-consumer-binding.v1) carrying non-empty source_commit /
+       source_tree / loader_entry / source_files_sha256 identities - a free-standing
+       caller dict is never a pinned consumer.
+    2. The binding's consumer_schema must equal the wire_version the release is
+       serialized on; a v1-pinned consumer can never validate a v2 wire.
+    3. For an executable reduce the binding must additionally declare
+       capabilities.supports_held_reduction_v2 == true.  The real pinned v2 pin is
+       not delivered yet, so that declaration cannot currently exist legitimately:
+       every executable reduce release stays fail-closed until the actual
+       quanthus.p12_daily.decision_loader pin arrives.
+    4. The loader is invoked exactly once per decision_set with the expected schema;
+       the returned validated object is checked on market_date, every opportunity's
+       security_code, stage and exit_kind, and each reduce's target with Decimal
+       semantics.  The P12 binding digest is computed from the SAME validated object
+       - a loader that drifts between a "gate call" and a "digest call" can no
+       longer exist because there is only one call.
+    """
+
+    binding = consumer_binding
+    has_reduce = any(
+        decision.stage == "exit_plan" and decision.exit_kind == "reduce"
+        for item in package.decision_sets
+        for decision in item.decisions
+    )
+    if has_reduce:
+        # The pinned consumer binding is required only to release an executable
+        # reduce.  A v1 non-reduce package published with a loader still goes through
+        # the same single-call validated-object pipeline for its digest, but it does
+        # not need a pinned v2 consumer identity because it carries no field the v1
+        # consumer could misread.
+        if not isinstance(binding, dict):
+            raise ProductDailyError(
+                "unpublishable_package",
+                "a pinned consumer binding is required to publish: supply the "
+                "versioned quanthus.p11.p12-consumer-binding object, not a caller flag",
+            )
+        if binding.get("schema_version") != "quanthus.p11.p12-consumer-binding.v1":
+            raise ProductDailyError(
+                "unpublishable_package",
+                "consumer_binding must be the versioned "
+                "quanthus.p11.p12-consumer-binding.v1 object",
+            )
+        for field in ("source_commit", "source_tree", "loader_entry", "source_files_sha256"):
+            value = binding.get(field)
+            if not value or (field == "source_files_sha256" and not isinstance(value, dict)):
+                raise ProductDailyError(
+                    "unpublishable_package",
+                    f"consumer_binding missing pinned identity field: {field}",
+                )
+        if binding.get("consumer_schema") != wire_version:
+            raise ProductDailyError(
+                "unpublishable_package",
+                f"consumer_binding consumer_schema {binding.get('consumer_schema')!r} does "
+                f"not match the release wire version {wire_version!r}; a consumer pinned "
+                "to another schema cannot validate this payload",
+            )
+        capability = binding.get("capabilities") or {}
+        if capability.get("supports_held_reduction_v2") is not True:
+            raise ProductDailyError(
+                "unpublishable_package",
+                "an executable reduce requires a pinned P12 v2 consumer declaring "
+                "capabilities.supports_held_reduction_v2; the only pinned consumer "
+                "today (9de1cdb9 synthetic) drops exit_kind/target_position_fraction "
+                "and would read a reduce as a full sell, so this release stays "
+                "refused until the real p12.daily-advice-package.v2 pin arrives",
+            )
+    if has_reduce:
+        # The verified-consumer restriction is what makes an executable reduce safe.
+        # A non-reduce v1 release uses the loader only as a digest oracle, so it does
+        # not need a pinned v2 consumer identity.
+        import importlib.util
+
+        loader_module = getattr(p12_loader, "__module__", "")
+        loader_name = getattr(p12_loader, "__name__", "")
+        is_planned_entry = (
+            loader_module == "quanthus.p12_daily.decision_loader"
+            and loader_name == "load_decision_set"
+            and importlib.util.find_spec("quanthus.p12_daily.decision_loader") is not None
+        )
+        test_only = getattr(p12_loader, "_p11_test_only_consumer", False) is True
+        if not is_planned_entry and not test_only:
+            raise ProductDailyError(
+                "unpublishable_package",
+                "the pinned consumer for an executable reduce must be the real pinned "
+                "quanthus.p12_daily.decision_loader.load_decision_set (not yet "
+                "delivered - #723 comment7118368788) or an explicitly marked TEST_ONLY "
+                "unit double; an unmarked caller callable is not a verified consumer",
+            )
+    if has_reduce:
+        try:
+            signature = inspect.signature(p12_loader)
+            accepts_schema = "expected_schema" in signature.parameters or any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in signature.parameters.values()
+            )
+        except (TypeError, ValueError):
+            accepts_schema = False
+        if not accepts_schema:
+            raise ProductDailyError(
+                "unpublishable_package",
+                "the pinned consumer loader must accept expected_schema so the wire "
+                "version is enforced by the consumer, not assumed by the producer",
+            )
+    verified: dict[str, tuple[Any, str]] = {}
+    sets = _serialize_decision_sets(package, wire_version=wire_version)
+    for raw in sets:
+        try:
+            if has_reduce:
+                validated = p12_loader(raw, expected_schema=wire_version)
+            else:
+                validated = p12_loader(raw)
+        except ProductDailyError:
+            raise
+        except Exception as exc:
+            if has_reduce:
+                raise ProductDailyError(
+                    "unpublishable_package",
+                    f"pinned consumer failed to validate decision_set {raw['market_date']}: {exc}",
+                ) from exc
+            raise
+        if has_reduce:
+            # The verified consumer must agree on every serialized coordinate, not
+            # merely on the fields this release happens to gate.
+            if getattr(validated, "market_date", None) is not None and (
+                validated.market_date.isoformat() != raw["market_date"]
+            ):
+                raise ProductDailyError(
+                    "unpublishable_package",
+                    f"validated object market_date drifted for {raw['market_date']}",
+                )
+            raw_by_id = {d["opportunity_id"]: d for d in raw["decisions"]}
+            seen_by_id = {
+                getattr(d, "opportunity_id", None): d for d in getattr(validated, "decisions", ())
+            }
+            if set(seen_by_id) != set(raw_by_id):
+                raise ProductDailyError(
+                    "unpublishable_package",
+                    f"validated object dropped or invented opportunities for {raw['market_date']}",
+                )
+            for opportunity_id, raw_decision in raw_by_id.items():
+                seen = seen_by_id[opportunity_id]
+                seen_stage = getattr(seen, "stage", None)
+                seen_stage = getattr(seen_stage, "value", seen_stage)
+                if (
+                    getattr(seen, "security_code", None) != raw_decision["security_code"]
+                    or seen_stage != raw_decision["stage"]
+                ):
+                    raise ProductDailyError(
+                        "unpublishable_package",
+                        f"validated object altered security/stage on {opportunity_id}",
+                    )
+                if raw_decision["stage"] == "exit_plan":
+                    expected_kind = raw_decision.get("exit_kind")
+                    if getattr(seen, "exit_kind", None) != expected_kind:
+                        raise ProductDailyError(
+                            "unpublishable_package",
+                            f"pinned consumer dropped or altered exit_kind on "
+                            f"{opportunity_id}; an executable exit plan may only be "
+                            "released through a field-preserving "
+                            "p12.daily-advice-package.v2 loader",
+                        )
+                    if expected_kind == "reduce":
+                        seen_target = getattr(seen, "target_position_fraction", None)
+                        expected_target = raw_decision.get("target_position_fraction")
+                        try:
+                            same_target = (
+                                seen_target is not None
+                                and expected_target is not None
+                                and (Decimal(str(seen_target)) == Decimal(str(expected_target)))
+                            )
+                        except Exception:
+                            same_target = False
+                        if not same_target:
+                            raise ProductDailyError(
+                                "unpublishable_package",
+                                f"pinned consumer dropped or altered the reduce target "
+                                f"on {opportunity_id} (Decimal comparison)",
+                            )
+        # Compute the binding digest from the SAME validated object that passed every
+        # check above; resolve the digest function through the validated object's own
+        # package so a tree without the bound P12 package fails closed.
+        import importlib
+
+        top_package = type(validated).__module__.split(".", 1)[0]
+        try:
+            p12_digest = importlib.import_module(top_package + ".shared.fact_contracts").digest
+        except ImportError as exc:
+            raise ProductDailyError(
+                "p12_binding_unavailable",
+                "the P12 fact_contracts digest is required for the account binding and "
+                "is only present in the bound P12 package; cannot compute it here",
+            ) from exc
+        content = json.loads(json.dumps(dataclasses.asdict(validated), default=str, sort_keys=True))
+        verified[raw["market_date"]] = (validated, p12_digest(content))
+    return verified
 
 
 def publish_package(
@@ -119,6 +367,7 @@ def publish_package(
     elapsed_ms: int = 0,
     p12_loader: Callable[[dict[str, Any]], Any] | None = None,
     consumer_binding: dict[str, Any] | None = None,
+    wire_version: str = "p12.daily-advice-package.v1",
 ) -> PublishReceipt:
     """Write one package file append-only and return a receipt with all digest surfaces.
 
@@ -150,30 +399,48 @@ def publish_package(
             "never a published advice day",
         )
 
-    # Held-reduction wire v2 gate: an executable reduce must only be released through a
-    # pinned consumer whose binding declares the capability AND whose actual loader
-    # preserves exit_kind/target_position_fraction on the validated object for the same
-    # opportunity/security.  A bare caller boolean can never grant that: a loader that
-    # silently drops the fields would read the same exit_plan as a full liquidation, so
-    # without a real field-preserving validated object the reduce stays refused /
-    # display-only.  consumer_binding is the versioned consumer_identity() mapping
-    # (source_commit + capabilities), not a free-standing flag.
+    # Wire version: the v1 byte surface is the frozen historical default and carries
+    # no exit fields; an executable reduce may only be serialized on the
+    # p12.daily-advice-package.v2 wire and only through the verified consumer
+    # pipeline.  Serializing a reduce onto the v1 wire would let the old consumer
+    # read it as an undifferentiated full sell, so that combination is refused up
+    # front.
     has_reduce = any(
         decision.stage == "exit_plan" and decision.exit_kind == "reduce"
         for item in package.decision_sets
         for decision in item.decisions
     )
-    if has_reduce:
-        _require_field_preserving_v2_consumer(package, p12_loader, consumer_binding)
+    if has_reduce and wire_version != "p12.daily-advice-package.v2":
+        raise ProductDailyError(
+            "unpublishable_package",
+            "an executable reduce may only be serialized on the "
+            "p12.daily-advice-package.v2 wire; on the v1 wire the pinned consumer "
+            "would drop exit_kind/target_position_fraction and read it as a full sell",
+        )
+    # An executable reduce can never be released without the verified consumer
+    # pipeline: no loader means no validated object, so it stays refused/display-only.
+    if has_reduce and p12_loader is None:
+        raise ProductDailyError(
+            "unpublishable_package",
+            "an executable reduce requires the verified pinned consumer pipeline; "
+            "no loader means no validated object, so the reduce stays refused",
+        )
 
-    # The P12 binding digest is computed and validated *before* any bytes land so a loader
-    # failure leaves the directory untouched.
+    # One verified consumer pipeline: resolve the pinned binding, call the loader
+    # exactly once per decision_set with expected_schema, match the validated object
+    # on every coordinate (date/opportunity/security/stage/kind/Decimal target), and
+    # compute the P12 binding digest from the SAME validated object - all before any
+    # bytes land, so every invalid/no-consumer/old-loader/identity-mismatch/
+    # drifting-loader path leaves zero artifacts.
     p12_digests: dict[str, str] | None = None
     if p12_loader is not None:
-        merged: dict[str, str] = {}
-        for item in package.decision_sets:
-            merged.update(p12_package_digests(item.to_dict(), p12_loader))
-        p12_digests = merged
+        verified = _require_verified_p12_consumer(
+            package,
+            wire_version=wire_version,
+            p12_loader=p12_loader,
+            consumer_binding=consumer_binding,
+        )
+        p12_digests = {market_date: digest for market_date, (_, digest) in verified.items()}
 
     target_dir = Path(directory)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -181,7 +448,7 @@ def publish_package(
     # The on-disk layout is one file per (package_id, version).  A second write of the same
     # package_id for the same market date but different content is exactly what P12's
     # append-only binding rejects, so refuse before any bytes land.
-    this_sets = [item.to_dict() for item in package.decision_sets]
+    this_sets = _serialize_decision_sets(package, wire_version=wire_version)
     this_dates = {item["market_date"] for item in this_sets}
     for existing in sorted(target_dir.glob(package.package_id + ".v*.json")):
         try:
@@ -207,7 +474,7 @@ def publish_package(
             "idempotency_conflict",
             str(path) + " already exists; a same-(id, version) rewrite is never allowed",
         )
-    payload = _package_file_bytes(package)
+    payload = _package_file_bytes(package, wire_version=wire_version)
     path.write_bytes(payload)
 
     decision_count = sum(len(item.decisions) for item in package.decision_sets)
@@ -229,78 +496,3 @@ def publish_package(
         published_at=published_at,
         elapsed_ms=elapsed_ms,
     )
-
-
-def _require_field_preserving_v2_consumer(
-    package: DailyAdvicePackage,
-    p12_loader: Callable[[dict[str, Any]], Any] | None,
-    consumer_binding: dict[str, Any] | None,
-) -> None:
-    """Fail closed unless a real pinned v2 consumer preserves the reduce fields.
-
-    Three conditions, all checked before any filesystem write:
-
-    1. consumer_binding must be the versioned consumer_identity() mapping and declare
-       capabilities.supports_held_reduction_v2 == true (a caller-supplied bool is not a
-       binding).
-    2. A real p12_loader must be supplied; the absence of a loader can never be a
-       validated consumer.
-    3. For every decision_set containing an exit_kind=reduce decision, the loader's
-       validated object must carry exit_kind == "reduce" and a target_position_fraction
-       equal to the serialized value on the same opportunity_id/security_code.  A loader
-       that drops or alters either field (the pinned v1 consumer does exactly this) fails
-       the gate.
-    """
-
-    capability = (consumer_binding or {}).get("capabilities") or {}
-    if capability.get("supports_held_reduction_v2") is not True:
-        raise ProductDailyError(
-            "unpublishable_package",
-            "an executable reduce requires a pinned P12 v2 consumer "
-            "(consumer_binding capabilities.supports_held_reduction_v2); the current "
-            "consumer would drop exit_kind/target_position_fraction and read it as a "
-            "full sell",
-        )
-    if p12_loader is None:
-        raise ProductDailyError(
-            "unpublishable_package",
-            "an executable reduce requires the actual pinned P12 v2 loader to validate "
-            "and preserve its fields; no loader means no validated consumer",
-        )
-    for item in package.decision_sets:
-        reduce_ids = {
-            decision.opportunity_id
-            for decision in item.decisions
-            if decision.stage == "exit_plan" and decision.exit_kind == "reduce"
-        }
-        if not reduce_ids:
-            continue
-        raw = item.to_dict()
-        try:
-            validated = p12_loader(raw)
-        except Exception as exc:
-            raise ProductDailyError(
-                "unpublishable_package",
-                f"pinned v2 consumer failed to validate the reduce decision_set: {exc}",
-            ) from exc
-        by_id = {decision.opportunity_id: decision for decision in validated.decisions}
-        expected = {
-            decision.opportunity_id: decision
-            for decision in item.decisions
-            if decision.opportunity_id in reduce_ids
-        }
-        for opportunity_id, decision in expected.items():
-            seen = by_id.get(opportunity_id)
-            if (
-                seen is None
-                or getattr(seen, "exit_kind", None) != "reduce"
-                or getattr(seen, "target_position_fraction", None) is None
-                or str(getattr(seen, "target_position_fraction", ""))
-                != str(decision.target_position_fraction)
-            ):
-                raise ProductDailyError(
-                    "unpublishable_package",
-                    f"pinned consumer dropped or altered the reduce fields on "
-                    f"{opportunity_id}; an executable reduce may only be released "
-                    "through a field-preserving p12.daily-advice-package.v2 loader",
-                )

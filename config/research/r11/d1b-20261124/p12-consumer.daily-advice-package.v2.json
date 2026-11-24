@@ -1,0 +1,19 @@
+{
+  "schema_version": "quanthus.p11.p12-consumer-binding.v1",
+  "binding_id": "p11-p12-daily-advice-package-v2",
+  "binding_version": "2.0.0-pending",
+  "use_grade": "CANDIDATE_PIN_PENDING",
+  "consumer_schema": "p12.daily-advice-package.v2",
+  "loader_entry": "quanthus.p12_daily.decision_loader.load_decision_set",
+  "loader_contract": "load_decision_set(raw, *, expected_schema)",
+  "source_commit": null,
+  "source_tree": null,
+  "source_files_sha256": null,
+  "pin_state": "pending",
+  "production_adoption": "NOT_REGISTERED",
+  "capabilities": {
+    "supports_held_reduction_v2": true,
+    "note": "capability declared by the planned P12 v2 contract (#723 comment7118368788); the binding is a candidate only - no real source_commit/tree/file hashes exist yet, so publish-time verification fails closed until the actual pin arrives"
+  },
+  "note": "The real pinned P12 v2 consumer is not delivered. This file records the declared interface (schema + loader entry + expected_schema contract). source_commit/source_tree/source_files_sha256 stay null (never a fake identity); the publish gate refuses any executable reduce release until they are bound to real bytes."
+}

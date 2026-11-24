@@ -62,8 +62,10 @@ BLOCKED_REASON_CODES = frozenset({STALE_MARKET_INPUT, INPUT_UNAVAILABLE})
 # decision must declare whether it is a full liquidation or a bounded reduction, and a
 # reduction must carry the expert's own target remaining-position fraction.  Older P12
 # loaders silently drop these fields and would read every exit_plan as a full sell, so a
-# package containing a reduce must only be handed to a pinned consumer that declares
-# supports_held_reduction_v2; until then the reduce stays display-only.
+# package containing a reduce is serialized ONLY on the p12.daily-advice-package.v2
+# wire (Decision.to_wire_dict / publish wire_version) and may only be handed to a
+# pinned consumer whose versioned binding resolves and validates that schema; until
+# then the reduce stays display-only/refused.
 EXIT_KIND_FULL = "full"
 EXIT_KIND_REDUCE = "reduce"
 EXIT_KINDS = frozenset({EXIT_KIND_FULL, EXIT_KIND_REDUCE})
@@ -376,6 +378,14 @@ class Decision:
                 )
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize on the frozen v1 wire.
+
+        to_dict is the historical p12.daily-advice-package.v1 payload (the shape the
+        pinned 9de1cdb9 consumer validates); it intentionally carries no
+        exit_kind/target_position_fraction keys.  The v2 wire fields are emitted only
+        by to_wire_dict(), which is reached solely through the versioned v2
+        serialization surface in publish.py - never through the v1 byte path.
+        """
         return {
             "opportunity_id": self.opportunity_id,
             "security_code": self.security_code,
@@ -386,13 +396,23 @@ class Decision:
             "explanations": list(self.explanations),
             "next_observation": self.next_observation,
             "entry": None if self.entry is None else self.entry.to_dict(),
-            "exit_kind": self.exit_kind,
-            "target_position_fraction": (
-                None
-                if self.target_position_fraction is None
-                else decimal_text(self.target_position_fraction)
-            ),
         }
+
+    def to_wire_dict(self) -> dict[str, Any]:
+        """Serialize on the p12.daily-advice-package.v2 wire.
+
+        The only difference from the v1 payload is the held-reduction fields, which the
+        v1 consumer silently drops - precisely why a package containing an executable
+        reduce must never be serialized or bound through the v1 surface.
+        """
+        out = self.to_dict()
+        out["exit_kind"] = self.exit_kind
+        out["target_position_fraction"] = (
+            None
+            if self.target_position_fraction is None
+            else decimal_text(self.target_position_fraction)
+        )
+        return out
 
 
 @dataclass(frozen=True)
@@ -505,6 +525,12 @@ class DecisionSet:
             "decisions": [item.to_dict() for item in self.decisions],
             "audit": self.audit.to_dict(),
         }
+
+    def to_wire_dict(self) -> dict[str, Any]:
+        """p12.daily-advice-package.v2 payload: v1 shape plus the reduce wire fields."""
+        out = self.to_dict()
+        out["decisions"] = [item.to_wire_dict() for item in self.decisions]
+        return out
 
 
 @dataclass(frozen=True)

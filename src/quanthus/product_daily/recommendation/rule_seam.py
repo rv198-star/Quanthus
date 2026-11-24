@@ -21,6 +21,7 @@ account limit.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -1451,9 +1452,60 @@ def load_machine_policy(path: Any) -> dict[str, Any]:
 # outside its scope and continue with an alert.
 MACHINE_BUY_ACTIONS = frozenset({"new_entry", "confirm_buy"})
 
+# Frozen v2 contract values (#723 comment7116501586): exactly these seven unique
+# condition identities, in this order; exactly these four position caps; the exact
+# evaluation phase, veto precedence and action-scope semantics below.  The strict
+# loader is an identity gate, not a substring check - a policy that drops, duplicates,
+# reorders, renames or rewords any of these is a different contract and fails closed.
+MACHINE_POLICY_V2_CONDITION_FIELDS: tuple[str, ...] = (
+    "price_limit_or_halt_unavailable",
+    "auction_snapshot_unavailable",
+    "single_security_fraction",
+    "per_industry_max",
+    "new_buckets_per_day",
+    "total_position",
+    "expert_veto",
+)
+MACHINE_POLICY_V2_CAP_FIELDS: tuple[str, ...] = (
+    "single_security_fraction",
+    "per_industry_max",
+    "new_buckets_per_day",
+    "total_position",
+)
+MACHINE_POLICY_V2_CAP_DENOMINATORS: dict[str, str] = {
+    "single_security_fraction": "unit_notional_bucket_budget",
+    "per_industry_max": "active_or_reserved_count",
+    "new_buckets_per_day": "buckets",
+    "total_position": "account_equity",
+}
+MACHINE_POLICY_V2_EVALUATION_PHASE = "T+1 preopen or user confirmation; not T package generation"
+MACHINE_POLICY_V2_VETO_PRECEDENCE: tuple[str, ...] = (
+    "force_liquidate_veto",
+    "reduce_only_veto",
+    "block_new",
+)
+MACHINE_POLICY_V2_ACTION_SCOPE: dict[str, str] = {
+    "new_entry": "new buy plan",
+    "confirm_buy": "buy confirmation only; sell and reduce confirmation excluded",
+}
+
+# Consumer-binding schema the verified release pipeline resolves against.  A pinned
+# consumer declares the one wire schema it validates; the binding's pinned source
+# identity (commit/tree/loader entry/file hashes) is what makes it more than a caller
+# flag.
+CONSUMER_BINDING_SCHEMA = "quanthus.p11.p12-consumer-binding.v1"
+
 
 def _validate_machine_policy_v2(raw: dict[str, Any]) -> None:
-    """Fail closed on a malformed v2 fact-dependency declaration."""
+    """Fail closed on any deviation from the frozen v2 fact-dependency contract.
+
+    Identity gate: exactly the seven registered condition identities (unique, in the
+    frozen order), exactly the four registered caps with their frozen denominators,
+    the exact evaluation-phase sentence, the exact veto precedence and the exact
+    action-scope wording.  Nothing is substring-matched; every frozen value is
+    compared verbatim so a reworded, reordered, dropped, duplicated or appended
+    declaration is a different contract and fails closed.
+    """
 
     if raw.get("adoption_state") != "proposed" or raw.get("daily_adopted") is not False:
         raise ProductDailyError(
@@ -1461,25 +1513,56 @@ def _validate_machine_policy_v2(raw: dict[str, Any]) -> None:
             "machine-policy v2 must stay proposed with daily_adopted=false",
         )
     scopes = raw.get("action_scope_definition")
-    if not isinstance(scopes, dict) or "confirm_buy" not in scopes:
+    if scopes != MACHINE_POLICY_V2_ACTION_SCOPE:
         raise ProductDailyError(
             "invalid_three_piece",
-            "machine-policy v2 must define the confirm_buy action scope",
+            "machine-policy v2 action_scope_definition must equal the frozen "
+            f"{MACHINE_POLICY_V2_ACTION_SCOPE}",
         )
     if raw.get("sell_reduce_on_missing_preopen_facts") != "continue_with_alert":
         raise ProductDailyError(
             "invalid_three_piece",
             "missing preopen facts must leave sell/reduce as continue_with_alert",
         )
-    phase = raw.get("evaluation_phase")
-    if not isinstance(phase, str) or "preopen" not in phase:
+    if raw.get("evaluation_phase") != MACHINE_POLICY_V2_EVALUATION_PHASE:
         raise ProductDailyError(
             "invalid_three_piece",
-            "machine-policy v2 must evaluate at the T+1 preopen/confirmation phase",
+            "machine-policy v2 evaluation_phase must be exactly "
+            f"{MACHINE_POLICY_V2_EVALUATION_PHASE!r}",
         )
+    if tuple(raw.get("veto_precedence") or ()) != MACHINE_POLICY_V2_VETO_PRECEDENCE:
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 veto_precedence must be exactly "
+            f"{list(MACHINE_POLICY_V2_VETO_PRECEDENCE)}",
+        )
+    caps = raw.get("position_caps") or []
+    cap_fields = [cap.get("field") for cap in caps if isinstance(cap, dict)]
+    if cap_fields != list(MACHINE_POLICY_V2_CAP_FIELDS):
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 must carry exactly the four registered caps "
+            f"{list(MACHINE_POLICY_V2_CAP_FIELDS)} in order; got {cap_fields}",
+        )
+    for cap in caps:
+        expected_denominator = MACHINE_POLICY_V2_CAP_DENOMINATORS[cap["field"]]
+        if cap.get("denominator") != expected_denominator:
+            raise ProductDailyError(
+                "invalid_three_piece",
+                f"machine-policy v2 cap {cap['field']} denominator must be "
+                f"{expected_denominator}, never {cap.get('denominator')}",
+            )
     conditions = raw.get("conditions")
     if not isinstance(conditions, list) or not conditions:
         raise ProductDailyError("invalid_three_piece", "machine-policy v2 conditions missing")
+    condition_fields = [cond.get("field") for cond in conditions if isinstance(cond, dict)]
+    if condition_fields != list(MACHINE_POLICY_V2_CONDITION_FIELDS):
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 must carry exactly the seven registered conditions "
+            f"{list(MACHINE_POLICY_V2_CONDITION_FIELDS)} in order; got "
+            f"{condition_fields}",
+        )
     for index, cond in enumerate(conditions):
         if not isinstance(cond, dict) or "field" not in cond:
             raise ProductDailyError(
@@ -1534,6 +1617,12 @@ def _validate_machine_policy_v2(raw: dict[str, Any]) -> None:
     if not isinstance(wire, dict):
         raise ProductDailyError(
             "invalid_three_piece", "machine-policy v2 held_reduction_wire missing"
+        )
+    if wire.get("wire_version") != "p12.daily-advice-package.v2":
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 held_reduction_wire.wire_version must be "
+            "p12.daily-advice-package.v2",
         )
     if wire.get("reduce_denominator") != "locked_cycle_budget":
         raise ProductDailyError(
@@ -1623,6 +1712,107 @@ def load_release_manifest(path: Any) -> dict[str, Any]:
                 "industry_mapping without a sha256 must declare binding_state pending/blocked",
             )
     return raw
+
+
+def verify_release_manifest_closure(release_manifest: dict[str, Any], *, project_root: Any) -> None:
+    """Verify the manifest's declared code/input identities against real bytes.
+
+    Structural parsing (load_release_manifest) only proves the file is well-formed;
+    release-ready qualification additionally requires the declared code commit/tree
+    to exist and its file bytes to match the checked-out closure, and every bound
+    input sha256 to match the governing file.  Pending bindings (for example the
+    industry mapping) are reported as pending - they can never satisfy a READY
+    check.  This is the three-piece release gate, not a claim of source
+    qualification or adoption.
+
+    Returns None on success; raises ProductDailyError otherwise.
+    """
+
+    import subprocess
+
+    root = Path(project_root)
+    failures: list[str] = []
+
+    code_entry = release_manifest.get("code_entry") or {}
+    code_commit = code_entry.get("code_commit")
+    code_tree = code_entry.get("code_tree")
+    try:
+        actual_tree = subprocess.check_output(
+            ["git", "rev-parse", f"{code_commit}^{{tree}}"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        actual_tree = None
+    if actual_tree is None or actual_tree != code_tree:
+        failures.append(
+            f"code_entry {code_commit}/{code_tree} does not resolve to the declared tree"
+        )
+    else:
+        # code_entry maps role -> repo-relative path (a "path:symbol" suffix pins the
+        # callable inside the file, not a separate artifact).
+        for field, rel in code_entry.items():
+            if field in {"code_commit", "code_tree"} or not isinstance(rel, str):
+                continue
+            file_rel = rel.split(":", 1)[0]
+            try:
+                committed = subprocess.check_output(
+                    ["git", "show", f"{code_commit}:{file_rel}"],
+                    cwd=root,
+                    stderr=subprocess.DEVNULL,
+                )
+            except (OSError, subprocess.CalledProcessError):
+                failures.append(f"{field} {file_rel} not in {code_commit}")
+                continue
+            try:
+                local = (root / file_rel).read_bytes()
+            except OSError:
+                failures.append(f"{field} {file_rel} unreadable in this closure")
+                continue
+            if local != committed:
+                failures.append(f"{field} {file_rel} differs from {code_commit}")
+
+    closure = release_manifest.get("input_closure") or {}
+    registry = closure.get("feature_registry") or {}
+    registry_path = registry.get("path")
+    registry_sha = registry.get("sha256")
+    if (
+        isinstance(registry_sha, str)
+        and registry_sha.startswith("sha256:")
+        and isinstance(registry_path, str)
+    ):
+        try:
+            actual = hashlib.sha256((root / registry_path).read_bytes()).hexdigest()
+        except OSError:
+            actual = None
+        if actual != registry_sha[len("sha256:") :]:
+            failures.append(
+                f"feature_registry {registry_path} sha256 mismatch (declared {registry_sha})"
+            )
+    strategy = release_manifest.get("strategy") or {}
+    card_path = strategy.get("card_path")
+    card_sha = strategy.get("card_sha256")
+    if isinstance(card_sha, str) and isinstance(card_path, str):
+        try:
+            actual = hashlib.sha256((root / card_path).read_bytes()).hexdigest()
+        except OSError:
+            actual = None
+        if actual != card_sha:
+            failures.append(f"strategy card {card_path} sha256 mismatch")
+
+    industry = closure.get("industry_mapping") or {}
+    if industry.get("binding_state") in {"pending", "blocked"} or industry.get("sha256") is None:
+        failures.append(
+            "industry_mapping binding is pending/blocked - not a READY input; a "
+            "release requiring it stays qualified-pending until P10 binds a sha256"
+        )
+
+    if failures:
+        raise ProductDailyError(
+            "manifest_closure_unverified",
+            "; ".join(failures),
+        )
 
 
 def check_three_piece_consistency(

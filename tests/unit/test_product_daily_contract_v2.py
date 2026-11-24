@@ -238,8 +238,8 @@ def test_exit_plan_requires_explicit_kind():
 
 def test_exit_plan_full_carries_no_target():
     d = _decision(exit_kind="full")
-    assert d.to_dict()["exit_kind"] == "full"
-    assert d.to_dict()["target_position_fraction"] is None
+    assert d.to_wire_dict()["exit_kind"] == "full"
+    assert d.to_wire_dict()["target_position_fraction"] is None
     with pytest.raises(ProductDailyError, match="full exit carries no target"):
         _decision(exit_kind="full", target_position_fraction=Decimal("0.5"))
 
@@ -249,7 +249,7 @@ def test_exit_plan_reduce_requires_valid_target():
         with pytest.raises(ProductDailyError):
             _decision(exit_kind="reduce", target_position_fraction=bad)
     d = _decision(exit_kind="reduce", target_position_fraction=Decimal("0.5"))
-    assert d.to_dict()["target_position_fraction"] == "0.5"
+    assert d.to_wire_dict()["target_position_fraction"] == "0.5"
 
 
 def test_exit_fields_rejected_outside_exit_plan():
@@ -262,7 +262,7 @@ def test_tampered_target_changes_wire_identity():
 
     a = _decision(exit_kind="reduce", target_position_fraction=Decimal("0.50"))
     b = _decision(exit_kind="reduce", target_position_fraction=Decimal("0.51"))
-    assert sha256_digest(a.to_dict()) != sha256_digest(b.to_dict())
+    assert sha256_digest(a.to_wire_dict()) != sha256_digest(b.to_wire_dict())
 
 
 # --- B. producer emits reduce/full correctly ------------------------------------------------------
@@ -316,7 +316,7 @@ def _produce_held(held: HeldSignal):
     )
 
 
-def _held(action: str, target: Decimal | None) -> HeldSignal:
+def _held(action: str, target: Decimal | None, *, formal=None) -> HeldSignal:
     return HeldSignal(
         opportunity_id="held-600000",
         security_code="600000",
@@ -337,14 +337,98 @@ def _held(action: str, target: Decimal | None) -> HeldSignal:
         next_observation="next",
         depends_on_member_ids=(),
         target_maximum_position=target,
+        formal_decision=formal,
     )
 
 
 def test_producer_reduce_carries_target_fraction():
     result = _produce_held(_held("reduce", Decimal("0.5")))
     d = result.package.decision_sets[0].decisions[0]
+    # No typed FormalStrategyDecision -> the caller-supplied target never becomes an
+    # executable reduce; the intent degrades to display-only hold+alert.
+    assert d.stage == "holding" and d.exit_kind is None
+    assert d.target_position_fraction is None
+
+
+def test_producer_reduce_requires_formal_decision_even_with_caller_target():
+    """CV2-963-P1-2: held.target_maximum_position is a caller claim; only the actual
+    FormalStrategyDecision.target_maximum_position may become an executable reduce."""
+
+    result = _produce_held(_held("reduce", Decimal("0.5")))
+    d = result.package.decision_sets[0].decisions[0]
+    assert d.stage == "holding"
+    assert any("never a full sale" in x.get("text", "") for x in d.explanations)
+
+
+def _formal_reduce_decision(target: Decimal):
+    """Minimal typed FormalStrategyDecision carrying a real reduce target.
+
+    A unit-mechanism double for the producer path: it proves the producer reads the
+    target from the typed object, not from the caller field.  It does not grant
+    strategy qualification - the formal gate stays with the real runner.
+    """
+
+    from datetime import datetime
+
+    from quanthus.aggregator import (
+        ConstraintRuleRef,
+        GovernanceResult,
+        GovernedAction,
+        MergedConstraints,
+        RequiredAction,
+        ScoreActionResult,
+    )
+    from quanthus.expert_strategy.runner import FormalStrategyDecision
+
+    cutoff = datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI)
+    rule = ConstraintRuleRef(expert_id="e", expert_version="1", rule="r")
+    merged = MergedConstraints(
+        minimum_position=Decimal("0"),
+        maximum_position=Decimal("1"),
+        stop_rules=(rule,),
+        hold_rules=(rule,),
+        source_output_digests=("sha256:" + "0" * 64,),
+    )
+    governance = GovernanceResult(
+        security_code="600000",
+        snapshot_id="snap-1",
+        knowledge_cutoff=cutoff,
+        required_action=RequiredAction.NONE,
+        terminating_veto_ids=(),
+        veto_outputs=(),
+        constraint_outputs=(),
+        merged_constraints=merged,
+    )
+    action = ScoreActionResult(
+        security_code="600000",
+        snapshot_id="snap-1",
+        knowledge_cutoff=cutoff,
+        position_state="held",
+        governance_digest=governance.digest,
+        action_policy_version="pol@1",
+        action_policy_digest="sha256:" + "0" * 64,
+        scoring_outputs=(),
+        aggregate_score=Decimal("0"),
+        proposed_action=GovernedAction.REDUCE,
+        final_action=GovernedAction.REDUCE,
+        reason_codes=(),
+    )
+    return FormalStrategyDecision(
+        event_id="held-600000",
+        intervention_id=None,
+        topology_digest="sha256:" + "0" * 64,
+        trend_state=None,
+        governance=governance,
+        action=action,
+        target_maximum_position=target,
+    )
+
+
+def test_producer_reduce_uses_formal_decision_target():
+    result = _produce_held(_held("reduce", None, formal=_formal_reduce_decision(Decimal("0.10"))))
+    d = result.package.decision_sets[0].decisions[0]
     assert d.stage == "exit_plan" and d.exit_kind == "reduce"
-    assert d.target_position_fraction == Decimal("0.5")
+    assert d.target_position_fraction == Decimal("0.10")
 
 
 def test_producer_full_exit_has_no_target():
@@ -372,17 +456,55 @@ def _publishable_package(held: HeldSignal):
     return result.package
 
 
-def _consumer_binding(*, supports: bool) -> dict:
+def _v1_consumer_binding() -> dict:
+    """The pinned v1 synthetic consumer binding (real versioned object).
+
+    consumer_schema is attached at load time: the pinned v1 consumer only validates
+    the p12.daily-advice-package.v1 wire."""
+
     from quanthus.product_daily.recommendation.runtime_identity import consumer_identity
 
     binding = consumer_identity(ROOT)
-    binding["capabilities"] = {"supports_held_reduction_v2": supports}
+    binding["consumer_schema"] = "p12.daily-advice-package.v1"
     return binding
 
 
+def _v2_candidate_binding() -> dict:
+    """The candidate v2 consumer binding object (pin pending).
+
+    Real versioned file, declared schema/capability per #723 comment7118368788; its
+    source_commit/tree/file hashes are null, so it can never satisfy the verified
+    pin check."""
+
+    from quanthus.product_daily.recommendation.runtime_identity import consumer_identity_v2
+
+    return consumer_identity_v2(ROOT)
+
+
+def _reduce_package() -> object:
+    """A package containing a REAL executable reduce (formal decision carried)."""
+    return _publishable_package(
+        _held("reduce", None, formal=_formal_reduce_decision(Decimal("0.5")))
+    )
+
+
 def test_reduce_package_refused_without_v2_consumer(tmp_path):
-    package = _publishable_package(_held("reduce", Decimal("0.5")))
-    with pytest.raises(ProductDailyError, match="supports_held_reduction_v2"):
+    package = _reduce_package()
+    with pytest.raises(ProductDailyError, match="verified pinned consumer"):
+        publish_package(
+            package,
+            directory=tmp_path,
+            published_at=package.decision_sets[0].published_at,
+            wire_version="p12.daily-advice-package.v2",
+        )
+    assert not list(tmp_path.glob("*.json"))
+
+
+def test_reduce_refused_on_v1_wire_even_with_binding(tmp_path):
+    """A reduce on the v1 wire is refused before any loader call: the v1 consumer
+    would silently read it as a full sell."""
+    package = _reduce_package()
+    with pytest.raises(ProductDailyError, match="p12.daily-advice-package.v2"):
         publish_package(
             package,
             directory=tmp_path,
@@ -391,47 +513,77 @@ def test_reduce_package_refused_without_v2_consumer(tmp_path):
     assert not list(tmp_path.glob("*.json"))
 
 
-def test_reduce_package_refused_when_capability_declared_but_no_loader(tmp_path):
-    """A caller declaring the capability without a real loader never publishes."""
-
-    package = _publishable_package(_held("reduce", Decimal("0.5")))
-    with pytest.raises(ProductDailyError, match="no validated consumer"):
-        publish_package(
-            package,
-            directory=tmp_path,
-            published_at=package.decision_sets[0].published_at,
-            consumer_binding=_consumer_binding(supports=True),
-        )
-    assert not list(tmp_path.glob("*.json"))
-
-
-def test_reduce_package_refused_when_old_loader_drops_fields(tmp_path):
-    """fakeTrue + the actual pinned old loader: the validated object carries no
-    exit_kind/target_position_fraction, so the release is refused with no file."""
-
-    package = _publishable_package(_held("reduce", Decimal("0.5")))
-    with pytest.raises(ProductDailyError, match="dropped or altered the reduce fields"):
+def test_reduce_refused_with_unpinned_v2_candidate_binding(tmp_path):
+    """The candidate v2 binding declares the capability, but its source pin is
+    pending/null - it can never satisfy the verified pin check."""
+    package = _reduce_package()
+    with pytest.raises(ProductDailyError, match="pinned identity"):
         publish_package(
             package,
             directory=tmp_path,
             published_at=package.decision_sets[0].published_at,
             p12_loader=_p12_loader(),
-            consumer_binding=_consumer_binding(supports=True),
+            consumer_binding=_v2_candidate_binding(),
+            wire_version="p12.daily-advice-package.v2",
         )
     assert not list(tmp_path.glob("*.json"))
 
 
-def _field_preserving_loader():
-    """Minimal double of the future p12.daily-advice-package.v2 validated object.
+def test_reduce_refused_with_wrong_schema_binding(tmp_path):
+    """A v1-pinned consumer binding cannot serve a v2 wire release."""
+    package = _reduce_package()
+    with pytest.raises(ProductDailyError, match="consumer_schema"):
+        publish_package(
+            package,
+            directory=tmp_path,
+            published_at=package.decision_sets[0].published_at,
+            p12_loader=_p12_loader(),
+            consumer_binding=_v1_consumer_binding(),
+            wire_version="p12.daily-advice-package.v2",
+        )
+    assert not list(tmp_path.glob("*.json"))
 
-    Stands in ONLY to prove the gate itself opens for a consumer that preserves the
-    fields; it is not a claimed integration with the real P12 loader, which is still
-    pending (#723 comment7118368788).
+
+def test_reduce_refused_with_arbitrary_capability_dict(tmp_path):
+    """A caller-supplied {capabilities: true} dict is not a versioned binding."""
+    package = _reduce_package()
+    with pytest.raises(ProductDailyError, match="consumer-binding"):
+        publish_package(
+            package,
+            directory=tmp_path,
+            published_at=package.decision_sets[0].published_at,
+            p12_loader=_p12_loader(),
+            consumer_binding={"capabilities": {"supports_held_reduction_v2": True}},
+            wire_version="p12.daily-advice-package.v2",
+        )
+    assert not list(tmp_path.glob("*.json"))
+
+
+def _v2_pinned_binding() -> dict:
+    """A fully-pinned v2 consumer binding for the gate mechanics.
+
+    TEST_ONLY: stands in for the real p12.daily-advice-package.v2 pin that is not yet
+    delivered.  It exercises the verified pipeline; it is not a claimed integration."""
+
+    binding = _v2_candidate_binding()
+    binding["source_commit"] = "9de1cdb999f692d6cc1cd5be13b53116600ab4bf"
+    binding["source_tree"] = "53417ed848db0b78acb928ea2f7d1bfafa44be95"
+    binding["source_files_sha256"] = {"placeholder": "0" * 64}
+    return binding
+
+
+def _v2_double_loader():
+    """TEST_ONLY field-preserving loader double for the v2 wire.
+
+    Marked _p11_test_only_consumer so it may exercise the pipeline mechanics; it is
+    never a real consumer qualification."
     """
 
     @dataclasses.dataclass(frozen=True)
     class _Decision:
         opportunity_id: str
+        security_code: str
+        stage: str
         exit_kind: str | None
         target_position_fraction: Decimal | None
 
@@ -440,11 +592,13 @@ def _field_preserving_loader():
         decisions: list
         market_date: date
 
-    def build(raw):
+    def build(raw, *, expected_schema=None):
         return _Set(
             decisions=[
                 _Decision(
                     opportunity_id=d["opportunity_id"],
+                    security_code=d["security_code"],
+                    stage=d["stage"],
                     exit_kind=d.get("exit_kind"),
                     target_position_fraction=(
                         None
@@ -457,22 +611,23 @@ def _field_preserving_loader():
             market_date=date.fromisoformat(raw["market_date"]),
         )
 
-    # The publish receipt resolves the P12 binding digest through the validated object's
-    # top package (quanthus.shared.fact_contracts); present the double under that module
-    # so the gate exercises the same resolution path as a real pinned consumer.
     _Set.__module__ = "quanthus.capabilities.decision_access"
     _Decision.__module__ = "quanthus.capabilities.decision_access"
+    build._p11_test_only_consumer = True  # type: ignore[attr-defined]
     return build
 
 
-def test_reduce_package_publishes_only_through_field_preserving_consumer(tmp_path):
-    package = _publishable_package(_held("reduce", Decimal("0.5")))
+def test_reduce_publishes_through_marked_test_double(tmp_path):
+    """The verified pipeline opens for a marked TEST_ONLY double that preserves every
+    coordinate - mechanics evidence only, not a real v2 integration."""
+    package = _reduce_package()
     receipt = publish_package(
         package,
         directory=tmp_path,
         published_at=package.decision_sets[0].published_at,
-        p12_loader=_field_preserving_loader(),
-        consumer_binding=_consumer_binding(supports=True),
+        p12_loader=_v2_double_loader(),
+        consumer_binding=_v2_pinned_binding(),
+        wire_version="p12.daily-advice-package.v2",
     )
     raw = json.loads(Path(receipt.path).read_text())
     decision = raw["decision_sets"][0]["decisions"][0]
@@ -480,23 +635,91 @@ def test_reduce_package_publishes_only_through_field_preserving_consumer(tmp_pat
     assert decision["target_position_fraction"] == "0.5"
 
 
-def test_reduce_refused_when_loader_alters_target(tmp_path):
-    package = _publishable_package(_held("reduce", Decimal("0.5")))
+def test_reduce_refused_when_loader_drifts_between_calls(tmp_path):
+    """CV2-963-P1-3: the digest is computed from the SAME validated object that passed
+    the gate.  A loader whose second call drops fields can no longer exist, because
+    there is only one call."""
+    package = _reduce_package()
+    calls = {"count": 0}
 
-    def bad_loader(raw):
-        out = _field_preserving_loader()(raw)
-        out.decisions[0] = dataclasses.replace(
-            out.decisions[0], target_position_fraction=Decimal("0.99")
-        )
+    def unstable_loader(raw, *, expected_schema=None):
+        calls["count"] += 1
+        out = _v2_double_loader()(raw, expected_schema=expected_schema)
+        if calls["count"] > 1:
+            out = dataclasses.replace(
+                out,
+                decisions=[
+                    dataclasses.replace(d, exit_kind=None, target_position_fraction=None)
+                    for d in out.decisions
+                ],
+            )
         return out
 
-    with pytest.raises(ProductDailyError, match="dropped or altered"):
+    unstable_loader._p11_test_only_consumer = True  # type: ignore[attr-defined]
+    # The single-call design means the second (drifting) call never happens; the
+    # release either passes on the single validated object or fails.
+    receipt = publish_package(
+        package,
+        directory=tmp_path,
+        published_at=package.decision_sets[0].published_at,
+        p12_loader=unstable_loader,
+        consumer_binding=_v2_pinned_binding(),
+        wire_version="p12.daily-advice-package.v2",
+    )
+    assert calls["count"] == 1, "the consumer must be validated exactly once"
+    raw = json.loads(Path(receipt.path).read_text())
+    assert raw["decision_sets"][0]["decisions"][0]["exit_kind"] == "reduce"
+
+
+def test_reduce_refused_when_loader_alters_target(tmp_path):
+    package = _reduce_package()
+
+    def bad_loader(raw, *, expected_schema=None):
+        out = _v2_double_loader()(raw, expected_schema=expected_schema)
+        return dataclasses.replace(
+            out,
+            decisions=[
+                dataclasses.replace(d, target_position_fraction=Decimal("0.99"))
+                for d in out.decisions
+            ],
+        )
+
+    bad_loader._p11_test_only_consumer = True  # type: ignore[attr-defined]
+    with pytest.raises(ProductDailyError, match="reduce target"):
         publish_package(
             package,
             directory=tmp_path,
             published_at=package.decision_sets[0].published_at,
             p12_loader=bad_loader,
-            consumer_binding=_consumer_binding(supports=True),
+            consumer_binding=_v2_pinned_binding(),
+            wire_version="p12.daily-advice-package.v2",
+        )
+    assert not list(tmp_path.glob("*.json"))
+
+
+def test_reduce_refused_when_loader_returns_wrong_security(tmp_path):
+    """CV2-963-P1-3: a validated object with a different security/stage is refused."""
+    package = _reduce_package()
+
+    def wrong_loader(raw, *, expected_schema=None):
+        out = _v2_double_loader()(raw, expected_schema=expected_schema)
+        return dataclasses.replace(
+            out,
+            decisions=[
+                dataclasses.replace(d, security_code="999999", stage="holding")
+                for d in out.decisions
+            ],
+        )
+
+    wrong_loader._p11_test_only_consumer = True  # type: ignore[attr-defined]
+    with pytest.raises(ProductDailyError, match="security/stage"):
+        publish_package(
+            package,
+            directory=tmp_path,
+            published_at=package.decision_sets[0].published_at,
+            p12_loader=wrong_loader,
+            consumer_binding=_v2_pinned_binding(),
+            wire_version="p12.daily-advice-package.v2",
         )
     assert not list(tmp_path.glob("*.json"))
 
@@ -511,6 +734,48 @@ def test_full_exit_package_publishes_without_v2_consumer(tmp_path):
     assert receipt.file_sha256.startswith("sha256:")
 
 
+# --- B. v2 wire emission: exit fields live only on the v2 decision payload ---------------
+
+
+def test_v1_decision_bytes_carry_no_exit_fields():
+    """The frozen v1 payload is byte-stable: no exit_kind/target keys on any stage."""
+    raw = _decision(stage=HOLDING).to_dict()
+    assert "exit_kind" not in raw and "target_position_fraction" not in raw
+    raw = _decision(stage=EXIT_PLAN, exit_kind="full").to_dict()
+    assert "exit_kind" not in raw and "target_position_fraction" not in raw
+    raw = _decision(
+        stage=EXIT_PLAN, exit_kind="reduce", target_position_fraction=Decimal("0.5")
+    ).to_dict()
+    assert "exit_kind" not in raw and "target_position_fraction" not in raw
+
+
+def test_v2_wire_dict_carries_exit_fields_only_on_v2_payload():
+    raw_v1 = _decision(
+        stage=EXIT_PLAN, exit_kind="reduce", target_position_fraction=Decimal("0.5")
+    ).to_dict()
+    raw_v2 = _decision(
+        stage=EXIT_PLAN, exit_kind="reduce", target_position_fraction=Decimal("0.5")
+    ).to_wire_dict()
+    assert "exit_kind" not in raw_v1
+    assert raw_v2["exit_kind"] == "reduce"
+    assert raw_v2["target_position_fraction"] == "0.5"
+
+
+def test_decision_set_v2_wire_dict_carries_fields():
+    ds = _produce_held(
+        _held("reduce", None, formal=_formal_reduce_decision(Decimal("0.5")))
+    ).package.decision_sets[0]
+    v1 = ds.to_dict()
+    v2 = ds.to_wire_dict()
+    assert "exit_kind" not in v1["decisions"][0]
+    assert v2["decisions"][0]["exit_kind"] == "reduce"
+    assert v2["decisions"][0]["target_position_fraction"] == "0.5"
+    # everything else is the same payload
+    assert {k: v for k, v in v1.items() if k != "decisions"} == {
+        k: v for k, v in v2.items() if k != "decisions"
+    }
+
+
 # --- B. named dependency: the pinned v1 P12 loader drops the v2 fields -------------------------
 
 
@@ -521,13 +786,14 @@ def test_old_p12_loader_drops_reduce_fields_named_dependency():
     not a passed integration."""
 
     validate = _p12_loader()
-    package = _publishable_package(_held("reduce", Decimal("0.5")))
+    package = _reduce_package()
     raw = package.decision_sets[0].to_dict()
-    assert raw["decisions"][0]["exit_kind"] == "reduce"
-    assert raw["decisions"][0]["target_position_fraction"] == "0.5"
+    # The v1 decision payload carries no exit fields at all now; the loader accepts the
+    # v1 shape and naturally sees nothing to drop.  The v2 wire is what carries them.
+    wire = package.decision_sets[0].to_wire_dict()
+    assert wire["decisions"][0]["exit_kind"] == "reduce"
+    assert wire["decisions"][0]["target_position_fraction"] == "0.5"
     validated = validate(raw)  # the v1 loader still accepts the set
-    # ...but the validated object carries neither field: a consumer that executed on it
-    # would treat the reduce as an undifferentiated full exit_plan.
     assert not hasattr(validated.decisions[0], "exit_kind")
     assert not hasattr(validated.decisions[0], "target_position_fraction")
 

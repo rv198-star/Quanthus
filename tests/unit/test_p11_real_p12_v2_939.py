@@ -288,26 +288,31 @@ def test_publish_fails_before_write_when_loader_refuses(pinned_checkout, tmp_pat
 
 
 def test_publish_refuses_tampered_wire(pinned_checkout, tmp_path, monkeypatch):
-    """A package whose decision bytes were altered after production fails the pin."""
+    """A v2 wire whose reduce target is not a plain decimal string is refused
+    by the pinned loader before any file is staged - zero residue."""
     monkeypatch.setenv("QUANTHUS_P12_CONSUMER_ROOT", str(pinned_checkout))
-    import dataclasses
-
     from quanthus.product_daily.recommendation.publish import publish_package
 
     package = _publishable_reduce_package()
     ds = package.decision_sets[0]
-    # Shift the reduce target by one tick: still a valid P11 object, but the
-    # pinned loader + coordinate check must catch the byte-level drift before
-    # any file is staged.
-    # A non-plain-decimal target string: legal at the P11 dataclass layer but
-    # refused by the b756 _wire_decimal guard before any file is staged.
-    tampered_decision = ds.decisions[0]
-    object.__setattr__(tampered_decision, "target_position_fraction", Decimal("0.5e-1"))
-    tampered_ds = dataclasses.replace(ds, decisions=(tampered_decision,))
-    tampered_package = dataclasses.replace(package, decision_sets=(tampered_ds,))
-    with pytest.raises(Exception):
+    # Patch the wire serialization so the raw decision_set the pinned loader
+    # reads carries a float target - legal to emit, illegal on the v2 wire.
+    real_serialize = __import__(
+        "quanthus.product_daily.recommendation.publish", fromlist=["_serialize_decision_sets"]
+    )._serialize_decision_sets
+
+    def _tampered(pkg, *, wire_version):
+        sets = real_serialize(pkg, wire_version=wire_version)
+        sets[0]["decisions"][0]["target_position_fraction"] = 0.5  # float
+        return sets
+
+    monkeypatch.setattr(
+        "quanthus.product_daily.recommendation.publish._serialize_decision_sets",
+        _tampered,
+    )
+    with pytest.raises(Exception, match="plain decimal string"):
         publish_package(
-            tampered_package,
+            package,
             directory=tmp_path,
             published_at=ds.published_at,
         )

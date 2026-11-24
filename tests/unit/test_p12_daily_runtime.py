@@ -522,27 +522,32 @@ def test_pending_source_when_no_package(tmp_path):
     assert source.latest_run() is None
 
 
-def test_history_gate_failure_blocks(tmp_path):
-    """A history floor the input cannot prove blocks the whole day (M2 S3)."""
+def test_manifest_history_member_not_consulted(tmp_path):
+    """P11-P12-HISTORY-INPUT-v1 (issue #718 E1): the manifest history member
+    no longer feeds any gate.  A manifest whose history floors would fail
+    under the retired M2 contract still publishes - the runner owns the
+    per-security gates now, sourced from the raw-history envelope."""
     prod = tmp_path / "job"
     prod.mkdir()
     state = tmp_path / "state"
     meta = make_product(prod, MARKET_DATE.isoformat())
-    # Weaken the feature-warmup gate below its 61-session floor.
     manifest_path = meta["core"] / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
+    # Degrade every history floor below its retired M2 threshold.
     manifest["history"]["feature_warmup_sessions"] = {"observed_sessions": 40}
+    manifest["history"]["event_window_sessions"] = {"observed_sessions": 5}
+    manifest["history"]["listing_sessions"] = {"observed_sessions": 90}
     manifest_path.write_text(json.dumps(manifest, sort_keys=True))
-    # re-hash manifest into the entry/index so the pointer still verifies
     core_sha = _sha(manifest_path.read_bytes())
-    entry_dir = prod / "DATES.json"
-    index = json.loads(entry_dir.read_text())
+    index_path = prod / "DATES.json"
+    index = json.loads(index_path.read_text())
     index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
-    entry_dir.write_text(json.dumps(index, sort_keys=True))
-    pointer = json.loads((prod / "CURRENT_DAILY_CORE_BASE24.json").read_text())
-    pointer["index_sha256"] = _sha(entry_dir.read_bytes())
+    index_path.write_text(json.dumps(index, sort_keys=True))
+    pointer_path = prod / "CURRENT_DAILY_CORE_BASE24.json"
+    pointer = json.loads(pointer_path.read_text())
+    pointer["index_sha256"] = _sha(index_path.read_bytes())
     pointer["entry"]["core_manifest_sha256"] = core_sha
-    (prod / "CURRENT_DAILY_CORE_BASE24.json").write_text(json.dumps(pointer))
+    pointer_path.write_text(json.dumps(pointer))
     runner = SyntheticRuleRunner(candidates=(one_candidate(),))
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
@@ -551,8 +556,12 @@ def test_history_gate_failure_blocks(tmp_path):
         decision_cutoff=CUTOFF,
         holdings=(),
     )
-    assert receipt["status"] == "INPUT_BLOCKED"
-    assert receipt["input_block"]["missing_members"] == ["history.feature_warmup_61"]
+    # The synthetic runner needs no raw history; the retired manifest floors
+    # must not block it, and no manifest-derived gate rides the receipt.
+    assert receipt["status"] == "PUBLISHED"
+    assert "history_gates" not in receipt
+    assert receipt["history_input"]["expected_schema"] == "p11.raw-history-input.v1"
+    assert receipt["history_input"]["present"] is False
 
 
 def _reshash_manifest(prod, market_date, mutate):
@@ -591,77 +600,30 @@ def _run_and_receipt(state, prod, candidates=None):
     )
 
 
-def test_history_feature_warmup_valid_bar_gap_blocks(tmp_path):
-    """R8: a 60-day warmup window missing one valid bar is explicit evidence.
-
-    The member reaches the 61-session count but carries an evidence gap reason
-    (one valid bar absent in the recent window); the gate fails closed and the
-    reason is preserved on the run receipt."""
+def test_history_envelope_marker_rides_the_receipt(tmp_path):
+    """The run receipt records the declared raw-history schema marker so the
+    audit can see whether the H1 envelope reached the runner - the job itself
+    never reads a manifest count or fabricates the gate."""
     prod = tmp_path / "job"
     prod.mkdir()
     state = tmp_path / "state"
-
-    def mutate(manifest):
-        manifest["history"]["feature_warmup_sessions"] = {
-            "observed_sessions": 80,
-            "unavailable_reason": (
-                "近 60 日特征窗口缺一条有效 bar，证据缺口未修复"
-            ),
-        }
-
-    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate)
-    receipt = _run_and_receipt(state, prod)
-    assert receipt["status"] == "INPUT_BLOCKED"
-    assert "history.feature_warmup_61" in receipt["input_block"]["missing_members"]
-    gate = next(
-        g
-        for g in receipt["history_gates"]
-        if g["gate_id"] == "history.feature_warmup_61"
+    make_product(prod, MARKET_DATE.isoformat())
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(),
+        raw_history={
+            "schema_version": "p11.raw-history-input.v1",
+            "securities": [],
+        },
     )
-    assert gate["observed_sessions"] == 80
-    assert "有效 bar" in (gate["unavailable_reason"] or "")
-
-
-def test_history_gates_are_independent(tmp_path):
-    """R8 (r2): the three history floors are independent - a corporate-action
-    anomaly belongs to the 61-day feature-warmup gate, NOT the 120-day
-    listing floor (which reads only listing facts + the trading calendar).
-    Each mutated member trips only its own gate; the other two still hold."""
-    prod = tmp_path / "job"
-    prod.mkdir()
-    state = tmp_path / "state"
-
-    # Case 1: a 61-day corporate-action anomaly trips ONLY feature_warmup_61;
-    # the listing floor (120) and event window (22) stay satisfied.
-    def mutate_warmup(manifest):
-        manifest["history"]["feature_warmup_sessions"] = {
-            "observed_sessions": 80,
-            "unavailable_reason": "近 61 日存在公司行为异常",
-        }
-        manifest["history"]["listing_sessions"] = {"observed_sessions": 200}
-
-    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate_warmup)
-    receipt = _run_and_receipt(state, prod)
-    assert receipt["status"] == "INPUT_BLOCKED"
-    gates = {g["gate_id"]: g for g in receipt["history_gates"]}
-    assert gates["history.feature_warmup_61"]["satisfied"] is False
-    assert gates["history.listing_floor_120"]["satisfied"] is True
-    assert gates["history.event_window_22"]["satisfied"] is True
-    assert "公司行为异常" in (gates["history.feature_warmup_61"]["unavailable_reason"] or "")
-
-    # Case 2: only the listing floor fails; warmup + event window hold.
-    def mutate_listing(manifest):
-        manifest["history"]["listing_sessions"] = {
-            "observed_sessions": 90,
-        }
-
-    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate_listing)
-    receipt = _run_and_receipt(tmp_path / "state2", prod)
-    assert receipt["status"] == "INPUT_BLOCKED"
-    gates = {g["gate_id"]: g for g in receipt["history_gates"]}
-    assert gates["history.listing_floor_120"]["satisfied"] is False
-    assert gates["history.feature_warmup_61"]["satisfied"] is True
-    assert gates["history.event_window_22"]["satisfied"] is True
+    assert receipt["history_input"]["declared_schema"] == (
+        "p11.raw-history-input.v1"
+    )
+    assert receipt["history_input"]["present"] is True
 
 
 def test_missing_forward_calendar_pointer_blocks(tmp_path):

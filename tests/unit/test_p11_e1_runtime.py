@@ -28,6 +28,51 @@ from tests.unit.test_p11_history_input import (
 ROOT = find_project_root()
 
 
+def test_package_clock_checks_original_receipt_against_bound_trading_day():
+    from types import SimpleNamespace
+
+    from quanthus.product_daily.recommendation.e1_runtime import _october_package_clock
+
+    cutoff = datetime.fromisoformat("2026-10-08T21:30:00+08:00")
+    read = datetime.fromisoformat("2026-11-24T22:31:16+00:00")
+    verified = datetime.fromisoformat("2026-11-24T22:31:17+00:00")
+    observed = datetime.fromisoformat("2026-11-24T22:40:53+00:00")
+    digest = "sha256:" + "a" * 64
+    member = SimpleNamespace(member_id="bar", digest=digest, available_at=verified)
+    request = SimpleNamespace(
+        facts_template={
+            "intake_received_at": read,
+            "intake_first_read_at": read,
+            "intake_verified_at": verified,
+        },
+        member_evidence=[member],
+        required_member_ids=["bar"],
+    )
+    row = dict(
+        member_id="bar",
+        sha_match=True,
+        sha256=digest,
+        verify_at=verified.isoformat(),
+        relevant_for_T=True,
+    )
+    evidence = {
+        "member_consumption": {"run_read_at": read.isoformat(), "members": [row]},
+        "source_clocks": {"logical_decision_cutoff": cutoff.isoformat()},
+        "envelope": {"sha256": digest},
+    }
+    args = (request, evidence, read, observed, cutoff, digest, {"consumer_rule_version": "1.0.0"})
+    proof = _october_package_clock(*args)
+    assert proof["logical_cutoff"] == cutoff.isoformat()
+    assert proof["intake_verified_at"] == verified.isoformat()
+    evidence["source_clocks"]["logical_decision_cutoff"] = "2026-10-09T21:30:00+08:00"
+    with pytest.raises(ProductDailyError, match="replay_package_clock_mismatch"):
+        _october_package_clock(*args)
+    evidence["source_clocks"]["logical_decision_cutoff"] = cutoff.isoformat()
+    row["verify_at"] = "2026-11-25T22:31:17+00:00"
+    with pytest.raises(ProductDailyError, match="replay_package_clock_mismatch"):
+        _october_package_clock(*args)
+
+
 @pytest.fixture(scope="module")
 def assets() -> E1RuleAssets:
     return load_e1_rule_assets(ROOT)

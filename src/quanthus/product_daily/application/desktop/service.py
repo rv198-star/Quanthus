@@ -1515,7 +1515,19 @@ class P12DesktopApplication:
     def funding_rules(self, scope: AccountScope) -> FundingRulesView:
         self._require(scope)
         self._maintain()
-        _, history, projection, _, funding, _ = self._state()
+        try:
+            _, history, projection, _, funding, _ = self._state()
+        except FactError as exc:
+            # Issue #721 R14 (r2): a host without an authoritative calendar
+            # serves a blocked placeholder (INPUT_UNAVAILABLE); the funding
+            # and rules read must still answer from the account facts - the
+            # money never depends on the daily advice calendar.  Re-raise
+            # anything that is not the pending-blocked placeholder.
+            if exc.reason_code != "INPUT_UNAVAILABLE" or not self._pending_blocked():
+                raise
+            snapshot = self._facts.snapshot(self._context)
+            history, projection = snapshot.history, snapshot.projection
+            funding = self._funding(history, projection.revision)
         return FundingRulesView(
             scope=scope,
             composition_ref=self._policy.composition_ref,

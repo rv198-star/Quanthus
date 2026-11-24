@@ -193,8 +193,11 @@ def read_history(
         sec_actions = [
             a for a in actions.values() if a["security_id"] == ident.security_id
         ]
-        close_map = dict(venue_close.get(ident.venue_id) or {})
-        cutoff_map = dict(venue_knowledge.get(ident.venue_id) or {})
+        bar_dates = {b.get("session_date") for b in sec_bars}
+        all_close = venue_close.get(ident.venue_id) or {}
+        all_cut = venue_knowledge.get(ident.venue_id) or {}
+        close_map = {d: v for d, v in all_close.items() if d in bar_dates}
+        cutoff_map = {d: v for d, v in all_cut.items() if d in bar_dates}
         sec_limits = limit_by_listing.get(ident.listing_id) or []
         securities.append(
             env_mod.security_entry(

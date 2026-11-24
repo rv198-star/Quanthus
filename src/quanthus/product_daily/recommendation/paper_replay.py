@@ -759,47 +759,26 @@ def build_replay_envelope(
         unresolvable_aside = any(
             a.get("disposition") in _UNRESOLVABLE_ACTION_DISPOSITIONS for a in action_aside
         )
-        if (
-            not held_member
-            and unresolvable_aside
-            and _unresolvable_action_affects_window(
+        # This gate owns new-entry action coverage only. Other evidence,
+        # including the separately sourced P1 factor ledger, passes to H1.
+        if not held_member and (
+            (unresolvable_aside and _unresolvable_action_affects_window(
                 action_aside, request.open_sessions, market_date
-            )
+            ))
+            or not _action_coverage_ok(request, filtered, code, market_date)
         ):
-            coverage_exclusions.append(
-                {
-                    "security_code": code,
-                    "reason": "replay_action_coverage_unknown",
-                    "member_or_field": "securities[].actions",
-                    "at": market_date.isoformat(),
-                    "scope": "per_security",
-                }
-            )
+            isolation: dict[str, Any] = {
+                "security_code": code,
+                "reason": "replay_action_coverage_unknown",
+                "member_or_field": "securities[].actions",
+                "at": market_date.isoformat(),
+                "scope": "per_security",
+            }
+            if sec_o.get("exceptions"):
+                isolation["source_exceptions"] = sec_o["exceptions"]
+            coverage_exclusions.append(isolation)
             filtered["bars"] = []
             filtered["actions"] = []
-            filtered["exceptions"] = []
-            filtered["limits"] = []
-            filtered["close_at_by_date"] = {}
-            filtered["knowledge_cutoff_by_date"] = {}
-        # The coverage gate consumes the PROJECTED feature actions (filtered),
-        # not the raw wire rows (sec_o) - same identity, projected shape.
-        if (
-            not held_member
-            and not any(e["security_code"] == code for e in coverage_exclusions)
-            and not _action_coverage_ok(request, filtered, code, market_date)
-        ):
-            coverage_exclusions.append(
-                {
-                    "security_code": code,
-                    "reason": "replay_action_coverage_unknown",
-                    "member_or_field": "securities[].actions",
-                    "at": market_date.isoformat(),
-                    "scope": "per_security",
-                }
-            )
-            filtered["bars"] = []
-            filtered["actions"] = []
-            filtered["exceptions"] = []
             filtered["limits"] = []
             filtered["close_at_by_date"] = {}
             filtered["knowledge_cutoff_by_date"] = {}

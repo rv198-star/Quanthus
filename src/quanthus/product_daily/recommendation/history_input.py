@@ -748,12 +748,35 @@ def _actions_from(sec: Mapping[str, Any], security_index: int) -> tuple[Corporat
     return tuple(out)
 
 
-def _exceptions_from(sec: Mapping[str, Any], security_index: int) -> tuple[ExceptionSpan, ...]:
+def _exceptions_from(
+    sec: Mapping[str, Any], security_index: int, *, october_replay: bool = False
+) -> tuple[ExceptionSpan, ...]:
     out: list[ExceptionSpan] = []
     for ei, e in enumerate(
         _seq(sec.get("exceptions", ()), f"securities[{security_index}].exceptions")
     ):
         eo = _obj(e, f"exceptions[{ei}]")
+        if october_replay and eo.get("ledger") == "P1_factor_pit_exception":
+            # This panel builds holder returns from raw prices and signed cash/share
+            # terms. Vendor factor versions remain unavailable for any dependent
+            # historical calculation before their own cutoff. Preserve the ledger
+            # row in the signed consumption evidence, outside corporate-action SQL.
+            ident = _obj(sec.get("identity"), "exception owner")
+            if (
+                eo.get("exception_type") != "factor_pit_visibility"
+                or eo.get("stock_code") != ident.get("listing_code")
+                or (ident.get("venue_id"), eo.get("exchange")) not in {
+                    ("SSE", "SH"), ("SZSE", "SZ")
+                }
+                or eo.get("source_revision") != "adj_factors_pit_exception_ledger_v1|bs_adj_v1"
+                or "blocked_from" in eo
+                or "blocked_through" in eo
+            ):
+                _fail("invalid_raw_history", "p1_factor_exception_identity_or_contract_mismatch")
+            _isodate(eo.get("effective_date"), "factor exception effective_date")
+            _isodate(eo.get("knowledge_cutoff"), "factor exception knowledge_cutoff")
+            _text(eo.get("reason_code"), "factor exception reason_code")
+            continue
         out.append(
             ExceptionSpan(
                 security_code=_text(eo.get("security_code"), "exceptions[].security_code"),
@@ -1173,7 +1196,7 @@ def raw_security_inputs_from_history(
         try:
             bars = _bars_from(sec_o, si)
             actions = _actions_from(sec_o, si)
-            exceptions = _exceptions_from(sec_o, si)
+            exceptions = _exceptions_from(sec_o, si, october_replay=as_observed)
             limits = _limits_from(sec_o, si)
             close_map = _date_map(sec_o.get("close_at_by_date", {}), "close_at_by_date")
             cutoff_map = _date_map(
@@ -1565,11 +1588,29 @@ def run_daily_advice_from_history(
     # observed_at on the wire (the replay envelope always carries it), so it
     # is dropped here rather than rejected as a context breach.
     as_observed_at = kwargs.pop("as_observed_at", None)
+    consumption = kwargs.pop("consumption_evidence", None)
+    if as_observed:
+        factor_restrictions = [
+            {"security_code": (sec.get("identity") or {}).get("listing_code"), "source_row": row}
+            for sec in history.securities
+            if isinstance(sec.get("identity"), Mapping) and isinstance(sec.get("exceptions"), list)
+            for row in sec["exceptions"]
+            if isinstance(row, Mapping) and row.get("ledger") == "P1_factor_pit_exception"
+        ]
+        if factor_restrictions:
+            consumption = {
+                **(consumption or {}),
+                "p1_factor_visibility": {
+                    "policy_version": "p1-c1-conditional-20260725-v1",
+                    "scope": "factor_dependent_paths",
+                    "restrictions": factor_restrictions,
+                },
+            }
     output = run_daily_advice_from_raw(
         raw=inputs,
         history_receipts=bound_receipts,
         caller_input_exclusions=runner_exclusions,
-        consumption_evidence=kwargs.pop("consumption_evidence", None),
+        consumption_evidence=consumption,
         numeric_context=replay_token,
         scan_trading_dates=scan_trading_dates,
         as_observed_at=as_observed_at if replay_token is not None else None,

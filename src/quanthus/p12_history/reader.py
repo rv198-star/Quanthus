@@ -250,7 +250,7 @@ def read_history(
                 "kept": rec.get("kept"),
                 "admitted": rec.get("admitted"),
                 "status": rec.get("status"),
-                "verify_at": read_at,
+                "verify_at": rec.get("verified_at") or read_at,
                 "uses": [key],
             }
 
@@ -290,6 +290,13 @@ def read_history(
         "registered_member_count": len(source_member_entries),
         "registered_not_read": not_read,
         "november_partitions_not_used": november_not_used,
+        "run_read_at": read_at,
+        "clock_role": (
+            "verify_at = the wall-clock instant this member's sha256 "
+            "finished re-hashing (its own verification clock); members "
+            "registered but never hash-checked carry verify_at=None. "
+            "run_read_at is the job-start clock, recorded separately."
+        ),
         "note": (
             "Members actually opened and sha-verified this run. Registered "
             "envelope source_members may exceed consumed members; formal use "

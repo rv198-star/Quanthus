@@ -56,3 +56,19 @@ def iso(dt: datetime | None) -> str | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+class VerificationClock:
+    """Per-member verification timestamp source (P11 intake item 1).
+
+    The job-level ``read_at`` names when the RUN started; ``verify_at``
+    names when THIS member's sha256 finished re-hashing.  Every call to
+    ``SourceMap.verify_member`` stamps the wall-clock instant the hash
+    completed - never the shared run-start clock.  A member that was
+    registered but never hash-checked carries ``verify_at=None`` on the
+    consumption closure, distinct from the run-start clock recorded
+    separately on the receipt."""
+
+    @staticmethod
+    def now() -> datetime:
+        return utcnow()

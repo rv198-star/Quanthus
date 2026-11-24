@@ -55,7 +55,7 @@ def _read_table(source_map, table, columns):
             reads.append({
                 "member_id": member.member_id, "status": "SHA_MISMATCH",
                 "declared_sha256": verify["declared_sha256"],
-                "actual_sha256": verify["actual_sha256"],
+                "actual_sha256": verify["actual_sha256"], "verified_at": verify.get("verified_at"),
             })
             continue
         try:
@@ -64,7 +64,7 @@ def _read_table(source_map, table, columns):
             reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
             continue
         rows.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     return rows, reads
 
 

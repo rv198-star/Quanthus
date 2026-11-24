@@ -127,7 +127,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
             reads.append({
                 "member_id": member.member_id, "status": "SHA_MISMATCH",
                 "declared_sha256": verify["declared_sha256"],
-                "actual_sha256": verify["actual_sha256"],
+                "actual_sha256": verify["actual_sha256"], "verified_at": verify.get("verified_at"),
             })
             continue
         try:
@@ -174,7 +174,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
             csid = str(rec.get("calendar_session_id") or "")
             if csid and session is not None and venue_id is not None:
                 session_ids[csid] = (venue_id, session)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     out = sorted(rows.values(), key=lambda r: (r.venue_id, r.session_date))
     return out, {
         "reads": reads,
@@ -194,7 +194,7 @@ def read_listing_rows(source_map: SourceMap, market_date: date):
             reads.append({
                 "member_id": member.member_id, "status": "SHA_MISMATCH",
                 "declared_sha256": verify["declared_sha256"],
-                "actual_sha256": verify["actual_sha256"],
+                "actual_sha256": verify["actual_sha256"], "verified_at": verify.get("verified_at"),
             })
             continue
         try:
@@ -228,6 +228,6 @@ def read_listing_rows(source_map: SourceMap, market_date: date):
                 )
             )
             n += 1
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     out = sorted(rows, key=lambda r: (r.security_id, r.effective_from))
     return out, {"reads": reads}

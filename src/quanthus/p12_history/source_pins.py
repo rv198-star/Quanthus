@@ -18,6 +18,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from quanthus.p12_history.clocks import VerificationClock, iso
+
 BASE_ROOT = Path(
     "/srv/quanthus-base22-data/build/base25-20261031/work/"
     "paired-base251-adce892e-a1/published/DWD"
@@ -208,7 +210,11 @@ class SourceMap:
 
     # ---- verification ---------------------------------------------------------
     def verify_member(self, member: ResolvedMember) -> dict:
-        """Re-hash a member's bytes and compare to its pinned sha."""
+        """Re-hash a member's bytes and compare to its pinned sha.
+
+        verified_at stamps the instant the hash FINISHED (the member's
+        own verification clock), never the run's shared read_at - the
+        two clocks stay distinguishable on the consumption closure."""
         actual = sha256_file(member.abs_path)
         return {
             "member_id": member.member_id,
@@ -216,6 +222,7 @@ class SourceMap:
             "declared_sha256": member.sha256,
             "actual_sha256": actual,
             "matches": actual == member.sha256,
+            "verified_at": iso(VerificationClock.now()),
             "size_bytes": (
                 member.abs_path.stat().st_size if member.abs_path.exists() else None
             ),

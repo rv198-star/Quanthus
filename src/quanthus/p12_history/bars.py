@@ -54,7 +54,7 @@ def _project_member(member, sessions_set, needed_listings, security_by_listing, 
             reads.append({
                 "member_id": member.member_id, "status": "SHA_MISMATCH",
                 "declared_sha256": verify["declared_sha256"],
-                "actual_sha256": verify["actual_sha256"],
+                "actual_sha256": verify["actual_sha256"], "verified_at": verify.get("verified_at"),
             })
             return
     try:
@@ -99,7 +99,7 @@ def _project_member(member, sessions_set, needed_listings, security_by_listing, 
             continue
         out.setdefault(listing_id, {})[session] = bar
         admitted += 1
-    reads.append({"member_id": member.member_id, "status": "READ", "rows": scanned, "admitted": admitted, "sha256": member.sha256, "sha_match": True})
+    reads.append({"member_id": member.member_id, "status": "READ", "rows": scanned, "admitted": admitted, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
 
 
 def read_bars(source_map: SourceMap, sessions, security_by_listing):

@@ -323,38 +323,36 @@ class E1ReplayRunner:
         source_closure = receipt.get("source_closure")
         day_block = receipt.get("day_block")
         # Same-run two-identity binding (coordinator 8792 ruling): P11's
-        # source_closure keeps its own snapshot_manifest_digest (the #749
-        # envelope it consumed) and batch_id verbatim; P12 binds the same
-        # run's daily-core manifest/package identity alongside it so the
-        # publish gate verifies BOTH identities belong to this run - the
-        # produced envelope digest AND the P12 core manifest this run read.
+        # source_closure is a producer-SIGNED object - its bytes are bound by
+        # the evaluation receipt's source_closure_digest, so P12 never
+        # rewrites it.  The same run's P12 daily-core manifest/package
+        # identity rides in a SEPARATE wrapper field ``p12_core`` so the
+        # publish gate verifies BOTH the untouched P11 closure (digest
+        # recompute) AND the P12 core manifest this run read.  P11's own
+        # replay envelope identity stays verbatim inside the closure AND is
+        # mirrored under ``replay_package_id`` / ``replay_manifest_sha256``
+        # for listing.
         if isinstance(source_closure, dict) and snapshot is not None:
-            source_closure = dict(source_closure)
-            # P11's replay/envelope package identity is preserved verbatim
-            # under replay-scoped names when it differs from the P12 core
-            # package this run read - the original fields are never lost,
-            # only re-scoped so the two identities stay listed separately.
-            if (
-                source_closure.get("package_id") is not None
-                and source_closure.get("package_id") != snapshot.package_id
-            ):
-                source_closure["replay_package_id"] = source_closure["package_id"]
-            if (
-                source_closure.get("manifest_sha256") is not None
-                and source_closure.get("manifest_sha256")
-                != snapshot.core_manifest_sha256
-            ):
-                source_closure["replay_manifest_sha256"] = source_closure[
-                    "manifest_sha256"
-                ]
-            # This run's P12 daily-core identity (the same scope the input
-            # stage verified) rides the canonical gate keys.
-            source_closure["core_manifest_sha256"] = snapshot.core_manifest_sha256
-            source_closure["package_id"] = snapshot.package_id
-            source_closure["index_sha256"] = snapshot.index_sha256
-            source_closure["base_manifest_sha256"] = snapshot.base_manifest_sha256
-            source_closure["content_digest"] = snapshot.content_digest
-            source_closure["row_counts"] = dict(snapshot.row_counts)
+            p11_closure = dict(source_closure)
+            p12_core = {
+                "package_id": snapshot.package_id,
+                "core_manifest_sha256": snapshot.core_manifest_sha256,
+                "index_sha256": snapshot.index_sha256,
+                "base_manifest_sha256": snapshot.base_manifest_sha256,
+                "content_digest": snapshot.content_digest,
+                "row_counts": dict(snapshot.row_counts),
+            }
+            # Mirror P11's replay/envelope identity under replay-scoped names
+            # so the two identities stay listed separately without
+            # disturbing the signed P11 bytes.
+            if p11_closure.get("package_id") is not None:
+                p12_core["replay_package_id"] = p11_closure["package_id"]
+            if p11_closure.get("manifest_sha256") is not None:
+                p12_core["replay_manifest_sha256"] = p11_closure["manifest_sha256"]
+            source_closure = {
+                "p11_closure": p11_closure,
+                "p12_core": p12_core,
+            }
         diagnostics = {
             "diagnostics": list(receipt.get("diagnostics") or ()),
             **({"day_block": day_block} if day_block else {}),

@@ -155,12 +155,22 @@ def _publish_gate_block(
     closure = output.source_closure
     if not isinstance(closure, dict) or not closure:
         return ("source_closure_missing", {"detail": "runner produced no source closure"})
-    if closure.get("core_manifest_sha256") != expected_manifest_sha256:
+    # Same-run P12 daily-core identity.  The P11 replay producer signs its
+    # OWN source_closure bytes (receipt.source_closure_digest); P12 carries
+    # that signed object verbatim under ``p11_closure`` and keeps this run's
+    # daily-core binding in a SEPARATE ``p12_core`` field so both identities
+    # stay listed and the signed bytes are never rewritten.  A synthetic
+    # runner still emits the flat closure shape, so the canonical key is
+    # read with a flat-key fallback.
+    p12_core = closure.get("p12_core")
+    if not isinstance(p12_core, dict):
+        p12_core = closure
+    if p12_core.get("core_manifest_sha256") != expected_manifest_sha256:
         return (
             "source_closure_manifest_mismatch",
             {
                 "expected": expected_manifest_sha256,
-                "actual": closure.get("core_manifest_sha256"),
+                "actual": p12_core.get("core_manifest_sha256"),
             },
         )
     # 2. trusted producer for this account mode.
@@ -203,6 +213,23 @@ def _publish_gate_block(
                     "actual": receipt.get("coverage_digest"),
                 },
             )
+        # The P11 producer's signed source_closure is carried verbatim under
+        # ``p11_closure``; recompute its digest and compare with the digest
+        # the producer itself issued on the receipt.  A rewritten, stale or
+        # mismatched closure refuses the day rather than passing silently.
+        declared = receipt.get("source_closure_digest")
+        p11_closure = closure.get("p11_closure")
+        if isinstance(declared, str) and isinstance(p11_closure, dict):
+            from quanthus.event_library.contracts import sha256_digest as _p11_sha
+            actual_digest = _p11_sha(p11_closure)
+            if actual_digest != declared:
+                return (
+                    "source_closure_digest_mismatch",
+                    {
+                        "expected": declared,
+                        "actual": actual_digest,
+                    },
+                )
     else:
         coverage_payload = {
             "producer_id": producer_id,
@@ -210,7 +237,7 @@ def _publish_gate_block(
             "run_id": receipt.get("run_id"),
             "evaluated_universe": sorted(receipt.get("evaluated_universe") or ()),
             "manifest_sha256": expected_manifest_sha256,
-            "package_id": closure.get("package_id"),
+            "package_id": p12_core.get("package_id"),
         }
         if receipt.get("coverage_digest") != digest(coverage_payload):
             return (

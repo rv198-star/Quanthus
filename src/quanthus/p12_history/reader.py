@@ -142,8 +142,8 @@ def read_history(
     venue_knowledge = {}
     for c in calendar_rows:
         if c.close_at is not None:
-            venue_close.setdefault(c.venue_id, {})[c.session_date] = iso(c.close_at)
-        venue_knowledge.setdefault(c.venue_id, {})[c.session_date] = iso(c.knowledge_from)
+            venue_close.setdefault(c.venue_id, {})[c.session_date.isoformat()] = iso(c.close_at)
+        venue_knowledge.setdefault(c.venue_id, {})[c.session_date.isoformat()] = iso(c.knowledge_from)
     session_ids = cal_cov.get("session_ids") or {}
     tradability_by_key = {}
     for t in limits.get("tradability_state") or []:

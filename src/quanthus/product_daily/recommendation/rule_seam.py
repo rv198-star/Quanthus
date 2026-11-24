@@ -1048,8 +1048,10 @@ def _enriched_history_receipts(
 
     The gate floors are not recomputed: each gate's satisfied|failed|unavailable
     comes from the real panel row (feature_ready/entry_eligible/listing_sessions)
-    and the real scan (a scanned event vs none), so a short history is a named
-    failure rather than a qualified empty.  Excluded securities keep their
+    and the real scan verdict (a sufficient 22-session window evaluated to a real
+    trigger-or-quiet verdict vs an unusable window), so a short history is a named
+    failure rather than a qualified empty - and a fully-scanned no-signal is a
+    qualified quiet day, not a blocked one.  Excluded securities keep their
     exclusion record.
     """
     if not history_receipts:
@@ -1074,16 +1076,37 @@ def _enriched_history_receipts(
                 "reason": reason,
             }
 
+        # The events gate is the real 22-session scan window VERDICT, not the
+        # trigger outcome.  A security that produced a valid T scan row (its
+        # facts exist - the raw closure and signal row both qualified) reached
+        # a real scan evaluation: it either fired a candidate transition or
+        # evaluated NOT_TRIGGERED.  Both are qualified verdicts; a genuine
+        # no-signal is a publishable quiet day, never a blocked one.  The
+        # window-sufficiency floor stays named in required/observed and the
+        # actual trigger outcome stays named in the reason, so history
+        # qualification and trigger result are never conflated.
         event_scanned = code in decision_codes and any(
             d.event_id is not None for d in seam.decisions if d.security_code == code
         )
+        events_observed = gates.get("events", {}).get("observed")
+        events_required = gates.get("events", {}).get("required")
+        window_sufficient = (
+            isinstance(events_observed, int)
+            and isinstance(events_required, int)
+            and events_observed >= events_required
+        )
+        scan_reached_verdict = facts is not None and window_sufficient
         gates["events"] = {
             **gates.get("events", {}),
             **_v(
-                event_scanned if facts is not None else None,
+                scan_reached_verdict if facts is not None else None,
                 "event scan produced a transition"
                 if event_scanned
-                else "no qualified event in the 22-session window",
+                else (
+                    "qualified no-signal: scan window reached a real verdict, no transition fired"
+                    if scan_reached_verdict
+                    else "no qualified event window in the 22-session scan"
+                ),
             ),
         }
         gates["features"] = {

@@ -688,6 +688,25 @@ def test_r2_qualified_no_signal_stays_publishable(runner, resources):
     assert output.seam.day_blocked is False
 
 
+def test_r2_qualified_no_signal_events_gate_records_verdict(runner, resources):
+    """61+ bars + >=120 membership, quiet T -> real scan verdict reached, no
+    transition: events gate reads 'satisfied', reason names the no-signal, the
+    day is publishable and NOT blocked (a quiet day, never history_gate_unsatisfied)."""
+    env = _trend_envelope()
+    tbar = env["securities"][0]["bars"][-1]
+    close = tbar["close_price"]
+    tbar["high_price"] = close
+    tbar["low_price"] = close
+    tbar["amount"] = "100"
+    output = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    assert output.result.publishable is True
+    assert output.seam.day_blocked is False
+    receipt = output.source_closure["history_receipts"][0]
+    assert receipt["gates"]["events"]["status"] == "satisfied"
+    assert "no-signal" in receipt["gates"]["events"]["reason"]
+    assert receipt["status"] == "qualified"
+
+
 def test_r2_held_still_evaluates_when_market_fails(runner, resources):
     """A known-held security whose market parse failed still gets its held review
     (account_member_market_unavailable), and the day is not falsely blocked."""

@@ -2748,3 +2748,130 @@ def test_unhandled_inner_exception_writes_failed_receipt(tmp_path):
     assert "input_read" in receipt["input_block"]["missing_members"]
     store = DailyPackageStore(state)
     assert len(store.runs()) == 1
+
+def _replay_day_receipt(run_id: str, market_date: str = MARKET_DATE.isoformat(),
+                        scenario_id: str = 'spdb-20261008-2130') -> dict:
+    return {
+        'schema_version': 'p11.paper-replay-day.v1',
+        'scenario_id': scenario_id,
+        'ledger_namespace': 'historical-replay:spdb-20261008',
+        'market_date': market_date,
+        'input_grade': 'ENGINEERING_REPLAY_AS_OBSERVED',
+        'replay_observed_at': '2026-11-24T20:09:46+00:00',
+        'logical_decision_at': market_date + 'T21:30:00+08:00',
+        'delivered': {'600000': {'bar_rows': 61, 'window_sessions': 61,
+                               'gap_sessions': 0, 'entry_eligible': True}},
+        'seam': {'evaluated_universe': ['600000'], 'decisions': [],
+                 'excluded': []},
+        'excluded_security_codes': [],
+        'coverage_exclusions': [],
+        'source_closure': {'held_decisions': [], 'history_receipts': []},
+        'publishable': False,
+        'disposition': 'blocked',
+        'day_block': {'reason': 'history_gate_unsatisfied'},
+    }
+
+
+class _DayReceiptRunner:
+    'Stub: delegate decision_set to SyntheticRuleRunner + attach day receipt.'
+
+    def __init__(self, inner, day_receipt):
+        self._inner = inner
+        self._day = day_receipt
+
+    @property
+    def runner_ref(self):
+        return self._inner.runner_ref
+
+    def run(self, request):
+        import dataclasses as _dc
+        out = self._inner.run(request)
+        return _dc.replace(out, p11_day_receipt=dict(self._day))
+
+
+def test_p11_day_receipt_bound_and_persisted_on_publish(env):
+    prod, state, _ = env
+    inner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    day = _replay_day_receipt(run_id='placeholder')
+    runner = _DayReceiptRunner(inner, day)
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id='SYN-PAPER-A', now=now, decision_cutoff=CUTOFF,
+        holdings=(),
+    )
+    assert receipt['status'] == 'PUBLISHED'
+    ref = receipt['p11_replay_day_receipt_ref']
+    assert ref['run_id'] == receipt['run_id']
+    assert ref['schema_version'] == 'p11.paper-replay-day.v1'
+    assert ref['scenario_id'] == 'spdb-20261008-2130'
+    assert ref['market_date'] == MARKET_DATE.isoformat()
+    store = DailyPackageStore(state)
+    path = state / ref['path']
+    assert path.is_file()
+    assert str(receipt['run_id']) in ref['path']
+    assert 'replay-day-receipts' in ref['path']
+    import hashlib as _h
+    assert ref['sha256'] == 'sha256:' + _h.sha256(path.read_bytes()).hexdigest()
+    loaded = store.read_day_receipt(ref)
+    assert loaded['scenario_id'] == 'spdb-20261008-2130'
+    latest = store.latest_run_for_date(MARKET_DATE)
+    assert latest['p11_replay_day_receipt_ref']['sha256'] == ref['sha256']
+
+
+def test_p11_day_receipt_bound_on_runner_blocked(env):
+    prod, state, _ = env
+
+    class _Blocked:
+        @property
+        def runner_ref(self):
+            return SyntheticRuleRunner(candidates=()).runner_ref
+
+        def run(self, request):
+            from quanthus.p12_daily.rule_runner import RunnerOutput
+            return RunnerOutput(
+                decision_set=None,
+                exclusions=(),
+                publishable=False,
+                disposition='blocked',
+                diagnostics={'diagnostics': [{'reason': 'history_gate'}]},
+                evaluation_receipt={'run_id': request.run_id},
+                source_closure={'core_manifest_sha256': 'x'},
+                p11_day_receipt=_replay_day_receipt(request.run_id),
+            )
+
+    runner = _Blocked()
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id='SYN-PAPER-A',
+        now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(),
+    )
+    assert receipt['status'] == 'INPUT_BLOCKED'
+    ref = receipt['p11_replay_day_receipt_ref']
+    assert ref['run_id'] == receipt['run_id']
+    assert (state / ref['path']).is_file()
+    loaded = DailyPackageStore(state).read_day_receipt(ref)
+    assert loaded['day_block']['reason'] == 'history_gate_unsatisfied'
+
+
+def test_p11_day_receipt_ref_readback_refuses_replaced_file(env):
+    prod, state, _ = env
+    inner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    runner = _DayReceiptRunner(inner, _replay_day_receipt('x'))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id='SYN-PAPER-A',
+        now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(),
+    )
+    ref = receipt['p11_replay_day_receipt_ref']
+    path = state / ref['path']
+    path.write_text('{"schema_version":"p11.paper-replay-day.v1","tampered":1}')
+    store = DailyPackageStore(state)
+    with pytest.raises(FactError):
+        store.read_day_receipt(ref)
+

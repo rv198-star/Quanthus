@@ -295,6 +295,7 @@ class E1ReplayRunner:
                 evaluation_receipt=receipt.get("receipt"),
                 source_closure=source_closure,
                 held_signals=held_signals,
+                p11_day_receipt=dict(receipt),
             )
         wire_sets = list(package.get("decision_sets") or ())
         if len(wire_sets) != 1:
@@ -318,5 +319,6 @@ class E1ReplayRunner:
             evaluation_receipt=receipt.get("receipt"),
             source_closure=source_closure,
             held_signals=held_signals,
+            p11_day_receipt=dict(receipt),
         )
 

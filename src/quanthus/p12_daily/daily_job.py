@@ -742,6 +742,25 @@ def _run_daily_inner(
 
     t = time.monotonic()
 
+    def _bind_day_receipt() -> None:
+        # Issue #748 unified carrier: when the runner produced a
+        # p11.paper-replay-day.v1 day receipt inside this same run, persist
+        # it as its own immutable file and record the binding on the run
+        # record - the page and the workbench read ONLY the current run
+        # binding (path + sha256 + scenario identity), never a
+        # date-enumerated sidecar that could mis-bind an earlier run.
+        payload = getattr(output, "p11_day_receipt", None) or getattr(
+            output, "evaluation_receipt", None
+        )
+        if not isinstance(payload, dict):
+            return
+        if payload.get("schema_version") != "p11.paper-replay-day.v1":
+            return
+        ref = store.write_day_receipt(
+            run_id=receipt["run_id"], payload=payload
+        )
+        receipt["p11_replay_day_receipt_ref"] = ref
+
     # The decision cutoff is configured per use (e.g. forward-day-1 22:30+08),
     # carried with its timezone.  A run without it cannot fix the package
     # knowledge cutoff, so the whole day is blocked before any input read.
@@ -1348,6 +1367,7 @@ def _run_daily_inner(
             receipt["diagnostics"] = output.diagnostics
         receipt["evaluation_receipt"] = output.evaluation_receipt
         receipt["source_closure"] = output.source_closure
+        _bind_day_receipt()
         if output.exclusions:
             receipt["exclusions"] = [
                 {
@@ -1457,6 +1477,9 @@ def _run_daily_inner(
             receipt["disposition"] = output.disposition
         if output.diagnostics is not None:
             receipt["diagnostics"] = output.diagnostics
+        receipt["evaluation_receipt"] = output.evaluation_receipt
+        receipt["source_closure"] = output.source_closure
+        _bind_day_receipt()
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt
@@ -1465,6 +1488,7 @@ def _run_daily_inner(
     # rewrites them; the client never rebuilds them either.
     receipt["evaluation_receipt"] = output.evaluation_receipt
     receipt["source_closure"] = output.source_closure
+    _bind_day_receipt()
 
     outcome = store.publish(
         decision_set=decision_set,

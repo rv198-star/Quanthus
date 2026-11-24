@@ -337,6 +337,19 @@ def main(argv=None) -> int:
         )
     )
 
+    # P10-pinned October window map (when the frozen file is present):
+    # the rule reads each T's verbatim windows, UNKNOWN coverage and
+    # audit keys in the same run.  #737 applies before native reads.
+    wk_path = args.window_keys or Path(
+        "/Users/william/Documents/Codex/2026-11-25/"
+        "quanthus-p10-october-action-feasibility/v1/WINDOW-AND-KEYS.json"
+    )
+    window_map = OctoberWindowMap.load(wk_path) if wk_path.is_file() else None
+    if window_map is not None:
+        dropped = apply_exclusion(bars_by_day, window_map.exclusion)
+        if dropped:
+            print(json.dumps({"exclusion_applied": dropped}))
+
     def factory(reset: bool) -> ReplayEngine:
         return make_engine(
             state_dir=args.state_dir,
@@ -374,19 +387,6 @@ def main(argv=None) -> int:
         except KeyboardInterrupt:
             server.shutdown()
         return 0
-
-    # P10-pinned October window map (when the frozen file is present):
-    # the rule reads each T's verbatim windows, UNKNOWN coverage and
-    # audit keys in the same run.  #737 applies before native reads.
-    wk_path = args.window_keys or Path(
-        "/Users/william/Documents/Codex/2026-11-25/"
-        "quanthus-p10-october-action-feasibility/v1/WINDOW-AND-KEYS.json"
-    )
-    window_map = OctoberWindowMap.load(wk_path) if wk_path.is_file() else None
-    if window_map is not None:
-        dropped = apply_exclusion(bars_by_day, window_map.exclusion)
-        if dropped:
-            print(json.dumps({"exclusion_applied": dropped}))
 
     # Headless: same engine, same steps as the console - run each day's
     # evening job, confirm every published plan through the same

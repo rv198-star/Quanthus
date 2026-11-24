@@ -45,6 +45,37 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+
+def _project_securities(raw_securities):
+    """Project #749 securities[] into the P11 raw-history shape.
+
+    The v4 envelope carries each security's *listing regime* under the
+    "limits" key ({ipo_phase, effective_from, effective_to, ...}) - the
+    interval rows P11 keeps on "listing_regime".  P11's LimitFacts contract
+    instead expects "limits[]" to be per-session entry-window records keyed by
+    "session_date".  A regime-shaped row has no "session_date", so it is
+    moved to "listing_regime" verbatim (the original row is preserved) and
+    "limits" keeps only session-dated records; a security with no per-day
+    limit record stays an honest empty list, never a price filled from the
+    regime ratio.
+    """
+    projected = []
+    for sec in raw_securities or ():
+        sec_o = dict(sec) if isinstance(sec, Mapping) else {}
+        limits = sec_o.get("limits")
+        if isinstance(limits, list) and any(
+            isinstance(lim, dict) and "session_date" not in lim and "ipo_phase" in lim
+            for lim in limits
+        ):
+            sec_o["listing_regime"] = list(limits)
+            sec_o["limits"] = [
+                lim for lim in limits
+                if isinstance(lim, dict) and "session_date" in lim
+            ]
+        projected.append(sec_o)
+    return projected
+
+
 def build_replay_request(
     raw_history: Mapping[str, Any],
     *,
@@ -92,7 +123,7 @@ def build_replay_request(
         "source_members": list(raw_history.get("source_members") or ()),
         "calendar_rows": list(raw_history.get("calendar_rows") or ()),
         "listing_rows": list(raw_history.get("listing_rows") or ()),
-        "securities": list(raw_history.get("securities") or ()),
+        "securities": _project_securities(raw_history.get("securities")),
         "exclusions": list(exclusions),
         "member_evidence": list(member_evidence),
         "required_member_ids": list(required_member_ids),

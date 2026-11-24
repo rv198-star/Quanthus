@@ -127,6 +127,36 @@ def test_e1_replay_runner_runs_real_chain_to_runner_output(assets):
     assert out.source_closure is not None
 
 
+def test_e1_replay_runner_carries_p12_evidence_into_closure(assets):
+    days = tuple(d for d in fx.SESSION_DAYS if d <= fx.T1)
+    req = fx._request(
+        market_dates=(fx.T1,),
+        securities=[fx._security("600000", days)],
+    )
+    raw = _raw_history(fx.T1, req)
+    evidence = {
+        "envelope": {"uri": "mem://749-envelope", "sha256": "ab" * 32},
+        "read_receipt": {"uri": "mem://749-receipt", "sha256": "cd" * 32},
+        "member_consumption": {"used_for_t": 138, "opened_unread": 17},
+        "scenario_account": {"ledger_digest": "ef" * 32, "as_of": "2026-10-08T21:30:00+08:00"},
+        "action_use": {"b02": ["member:ca-600000"], "b10": []},
+    }
+    ctx = E1ReplayContext(
+        **{k: v for k, v in vars(_context(req)).items()},
+        p12_evidence=evidence,
+    )
+    runner = E1ReplayRunner(
+        runner_ref_id="p11.e1-replay-day",
+        runner_version="1.0.0",
+        assets=assets,
+        context=ctx,
+    )
+    out = runner.run(_request(raw))
+    assert out.publishable is True
+    closure = dict(out.source_closure or {})
+    assert closure.get("p12") == evidence
+
+
 def test_e1_replay_runner_blocks_missing_envelope(assets):
     req = fx._request(market_dates=(fx.T1,))
     runner = E1ReplayRunner(

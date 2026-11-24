@@ -132,6 +132,7 @@ class E1ReplayContext:
     action_coverage: Mapping[str, Any] | None = None
     clock: Callable[[], datetime] | None = None
     observed_clock: Callable[[], datetime] | None = None
+    p12_evidence: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -244,6 +245,7 @@ class E1ReplayRunner:
                 snapshot_manifest_digest=c.snapshot_manifest_digest,
                 clock=c.clock,
                 observed_clock=c.observed_clock or _utc_now,
+                p12_evidence=c.p12_evidence,
             )
         except FactError:
             raise

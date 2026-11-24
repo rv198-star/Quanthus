@@ -420,6 +420,12 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
             member_sha = _sha256(
                 eo.get("member_sha256"), "window_evidence[].member_sha256"
             )
+            # member_map_sha256: the digest of the P10 member map that located
+            # the raw register rows this record claims.  A verified state must
+            # reach back to named raw member rows, never a bare summary hash.
+            member_map_sha = _sha256(
+                eo.get("member_map_sha256"), "window_evidence[].member_map_sha256"
+            )
             # Upstream credential: the bound P10 batch/result identity that
             # actually read and verified this window.  It is the provenance
             # the caller may NOT self-declare -- a record without a bound
@@ -445,10 +451,29 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                 "event_state": state,
                 "coverage_id": coverage_id,
                 "member_sha256": member_sha,
+                "member_map_sha256": member_map_sha,
                 "credential": cred_o,
                 "sessions": [
                     _isodate(d, "window_evidence[].sessions[]").isoformat()
                     for d in _seq(eo.get("sessions", ()), "window_evidence[].sessions")
+                ],
+                "scan_sessions": [
+                    {
+                        "date": _isodate(
+                            _obj(s, "scan_sessions[]").get("date"),
+                            "scan_sessions[].date",
+                        ).isoformat(),
+                        "adjustment_effective": _obj(s, "scan_sessions[]").get(
+                            "adjustment_effective"
+                        ),
+                    }
+                    for s in _seq(
+                        eo.get("scan_sessions", ()), "window_evidence[].scan_sessions"
+                    )
+                ],
+                "events": [
+                    _obj(e, "window_evidence[].events[]")
+                    for e in _seq(eo.get("events", ()), "window_evidence[].events")
                 ],
                 "source_published_at": eo.get("source_published_at"),
                 "verified_at": eo.get("verified_at"),
@@ -725,17 +750,6 @@ def build_replay_envelope(
 def _action_coverage_ok(
     request: ReplayRequest, sec_o: Mapping[str, Any], code: str, market_date: date
 ) -> bool:
-    """True only when BOTH the two-session scan AND the 61-session return
-    purposes are verified for this security x signal day, each bound to a
-    hashed register AND an upstream reader credential.
-
-    New entry depends on both the T-1/T effective-state scan (an effective
-    action excludes the day) and the 60 adjacent ordinary-holder returns
-    (an unproven entitlement breaks the return series the rule consumes).  An
-    absent record, an unregistered coverage_id, a non-verified event_state, a
-    missing upstream credential, or a mismatched security identity all fail
-    closed: the empty actions[] cannot be read as 'no adjustment'.
-    """
     if request.action_coverage is None:
         return False
     we = request.action_coverage.get("window_evidence", {})
@@ -748,15 +762,120 @@ def _action_coverage_ok(
             "verified_event",
         ):
             return False
-        # A verified state must reach back to an actual upstream read, never a
-        # caller-supplied summary.
         if record.get("credential") is None:
             return False
+        # member_map_sha256: the digest of the P10 member map that located the
+        # raw register rows; a verified state must reach back to named raw
+        # member rows, never a bare state label + one summary hash.
+        if not record.get("member_map_sha256"):
+            return False
+
+    # Per-security identity in action_coverage.securities is REQUIRED (the R3
+    # probe admitted a record bound to no security identity at all).  The
+    # declared identity must match the security's own listing/venue/security.
     declared = request.action_coverage.get("securities", {}).get(code)
-    if declared is not None:
-        ident = sec_o.get("identity", {}) if isinstance(sec_o, Mapping) else {}
-        for key in ("listing_id", "venue_id", "security_id"):
-            if ident.get(key) and declared.get(key) and ident[key] != declared[key]:
+    if declared is None:
+        return False
+    ident = sec_o.get("identity", {}) if isinstance(sec_o, Mapping) else {}
+    for key in ("security_id", "listing_id", "venue_id"):
+        dv = declared.get(key)
+        iv = ident.get(key)
+        if not dv or not iv or str(dv) != str(iv):
+            return False
+
+    # Authoritative venue open calendar: the SAME bound calendar the envelope
+    # uses, so sessions are checked verbatim against the venue's real open
+    # days -- a session list that skips a real open day, duplicates, goes out
+    # of order, or lands on a non-session is a local exclusion.
+    opens = list(request.open_sessions)
+
+    # --- scan_two_session: exactly [T-1, T] on the venue calendar, both real
+    # open days, no gap/dup/disorder.  An adjustment_effective event in either
+    # session blocks the new entry outright.
+    idx = opens.index(market_date)
+    expected_scan = [opens[idx - 1].isoformat(), market_date.isoformat()] if idx >= 1 else None
+    scan_dates = _session_dates(scan.get("scan_sessions") or scan.get("sessions"))
+    if expected_scan is None or scan_dates != expected_scan:
+        return False
+    if _sessions_have_effective_action(scan):
+        return False
+
+    # --- returns_61_session: exactly the 61 contiguous venue open sessions
+    # ending at T (60 adjacent returns), verbatim and in order.  A positive
+    # event record must carry the FULL original terms; an unknown/missing one
+    # keeps the security out (fail closed), it is not filled in.
+    if idx + 1 < BAR_CONTEXT:
+        return False
+    expected_returns = [d.isoformat() for d in opens[idx - BAR_CONTEXT + 1 : idx + 1]]
+    returns_dates = _session_dates(returns.get("sessions"))
+    if returns_dates != expected_returns:
+        return False
+    # A verified_event returns window must carry full raw terms; verified_none
+    # passes.  The negated condition is returned directly.
+    return not (
+        returns.get("event_state") == "verified_event"
+        and not _returns_events_have_full_terms(returns.get("events"))
+    )
+
+
+def _session_dates(value: Any) -> list[str]:
+    """Normalize a session list to ISO dates.
+
+    Accepts either a list of ISO date strings (returns) or a list of objects
+    with a 'date' key (scan).  Duplicates and order are preserved so the
+    caller's verbatim list is checked, not a re-derived set.
+    """
+    out: list[str] = []
+    for item in value or ():
+        if isinstance(item, str):
+            out.append(item)
+        elif isinstance(item, Mapping):
+            d = item.get("date")
+            out.append(d.isoformat() if isinstance(d, date) else str(d))
+    return out
+
+
+def _sessions_have_effective_action(scan: Mapping[str, Any]) -> bool:
+    """True when any scanned session has an adjustment_effective action.
+
+    A scan session object carries 'adjustment_effective'; the raw
+    WINDOW-USE shape may also list events with an 'adjustment_effective' or
+    an effective 'ex_date' on a scanned session.  Any effective action on a
+    scanned session blocks the new entry.
+    """
+    for s in scan.get("scan_sessions") or ():
+        if isinstance(s, Mapping) and s.get("adjustment_effective") is True:
+            return True
+    for e in scan.get("events") or ():
+        if isinstance(e, Mapping) and e.get("adjustment_effective") is True:
+            return True
+    return False
+
+
+# Raw-term fields a positive returns event must carry verbatim, per
+# P11-P10-ACTION-REGISTER-EVIDENCE-v1 / WINDOW-USE.  A 'verified_event' with
+# missing or null original terms is not evidence the return series is clean.
+RETURNS_EVENT_REQUIRED_FIELDS = (
+    "ex_date",
+    "implementation_sha256",
+    "cash_gross_per_share",
+    "bonus_share_ratio",
+    "transfer_share_ratio",
+    "register_row",
+    "currency",
+)
+
+
+def _returns_events_have_full_terms(events: Any) -> bool:
+    """True only when every declared returns event carries full raw terms."""
+    evs = list(events or ())
+    if not evs:
+        return False
+    for e in evs:
+        if not isinstance(e, Mapping):
+            return False
+        for field in RETURNS_EVENT_REQUIRED_FIELDS:
+            if e.get(field) is None:
                 return False
     return True
 

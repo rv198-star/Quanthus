@@ -251,6 +251,38 @@ def test_activate_mismatched_scope_refuses():
         activate_use_receipt(doc, **exp)
 
 
+def test_r4_activate_irrelevant_key_with_none_refuses():
+    # Root R3 probe: six blocks each filled with one unrelated None field still
+    # activated.  An unrelated key + a None value is not a verified pin set.
+    doc = _receipt()
+    exp = _expected(doc)
+    for key in exp:
+        exp[key] = {"some_unrelated_field": None}
+    with pytest.raises(ProductDailyError):
+        activate_use_receipt(doc, **exp)
+
+
+def test_r4_activate_partial_map_missing_required_refuses():
+    # A real but PARTIAL expected map (missing one required named pin) must
+    # refuse -- the block is the full named pin set, not a subset.
+    doc = _receipt()
+    exp = _expected(doc)
+    exp["expected_rule"] = {
+        k: v for k, v in doc["rule_binding"].items() if k != "code_tree"
+    }
+    with pytest.raises(ProductDailyError):
+        activate_use_receipt(doc, **exp)
+
+
+def test_r4_activate_none_value_in_required_pin_refuses():
+    # A required named pin present but valued None fails the verified set.
+    doc = _receipt()
+    exp = _expected(doc)
+    exp["expected_source"] = dict(doc["source_binding"], manifest_sha256=None)
+    with pytest.raises(ProductDailyError):
+        activate_use_receipt(doc, **exp)
+
+
 def test_reduce_execute_requires_e8_and_consumer_pin():
     doc = _receipt()
     doc["execution_binding"]["reduce"] = "execute"

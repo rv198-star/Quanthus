@@ -182,8 +182,10 @@ def _listing(security_id: str, venue: str = "SSE") -> dict:
 def _coverage(mode, securities, market_dates):
     """Build an action_coverage block for the requested admission mode.
 
-    verified = each security gets a verified_none window_evidence record bound
-    to its identity + each signal date + scan_two_session + a hashed register.
+    verified = each security gets verified_none window_evidence records bound
+    to its identity + each signal date, each carrying the verbatim venue-
+    calendar session set (scan = [T-1,T], returns = the 61 sessions ending at
+    T), a hashed register, a member_map digest and an upstream credential.
     unknown  = default unknown, no window_evidence (fail-closed on entry).
     empty    = default 'covered' caller label, no evidence -- must be refused.
     partial  = only the FIRST security is evidenced; the rest stay unknown.
@@ -210,6 +212,7 @@ def _coverage(mode, securities, market_dates):
     }
     base["registers"] = [reg]
     target = securities if mode == "verified" else securities[:1]
+    opens = list(SESSION_DAYS)
     for sec in target:
         ident = sec["identity"]
         code = ident["listing_code"]
@@ -222,28 +225,58 @@ def _coverage(mode, securities, market_dates):
             }
         )
         for t in market_dates:
-            for purpose in ("scan_two_session", "returns_61_session"):
-                base["window_evidence"].append(
-                    {
-                        "security_code": code,
-                        "signal_date": t.isoformat(),
-                        "purpose": purpose,
-                        "event_state": "verified_none",
-                        "coverage_id": reg["coverage_id"],
-                        "member_sha256": "sha256:" + "6" * 64,
-                        # Bound upstream reader credential -- the P10 batch that
-                        # actually verified this window; never a caller summary.
-                        "credential": {
-                            "batch_id": "p10-synthetic-b02",
-                            "manifest_sha256": "sha256:" + "7" * 64,
-                            "result_sha256": "sha256:" + "8" * 64,
-                            "reader": "p10.register-reader.v1",
-                        },
-                        "sessions": [t.isoformat()],
-                        "source_published_at": "2026-07-10",
-                        "verified_at": "2026-11-24T00:00:00+08:00",
-                    }
-                )
+            if t not in opens:
+                # Non-open signal days are rejected by the request validator
+                # before coverage is consulted; skip building records for them.
+                continue
+            idx = opens.index(t)
+            scan_sessions = [
+                {"date": opens[idx - 1].isoformat(), "adjustment_effective": False},
+                {"date": t.isoformat(), "adjustment_effective": False},
+            ]
+            returns_sessions = [
+                d.isoformat() for d in opens[idx - 60 : idx + 1]
+            ]
+            cred = {
+                "batch_id": "p10-synthetic-b02",
+                "manifest_sha256": "sha256:" + "7" * 64,
+                "result_sha256": "sha256:" + "8" * 64,
+                "reader": "p10.register-reader.v1",
+            }
+            mmap = "sha256:" + "6" * 64
+            base["window_evidence"].append(
+                {
+                    "security_code": code,
+                    "signal_date": t.isoformat(),
+                    "purpose": "scan_two_session",
+                    "event_state": "verified_none",
+                    "coverage_id": reg["coverage_id"],
+                    "member_sha256": mmap,
+                    "member_map_sha256": mmap,
+                    "credential": cred,
+                    "scan_sessions": scan_sessions,
+                    "sessions": [s["date"] for s in scan_sessions],
+                    "events": [],
+                    "source_published_at": "2026-07-10",
+                    "verified_at": "2026-11-24T00:00:00+08:00",
+                }
+            )
+            base["window_evidence"].append(
+                {
+                    "security_code": code,
+                    "signal_date": t.isoformat(),
+                    "purpose": "returns_61_session",
+                    "event_state": "verified_none",
+                    "coverage_id": reg["coverage_id"],
+                    "member_sha256": mmap,
+                    "member_map_sha256": mmap,
+                    "credential": cred,
+                    "sessions": returns_sessions,
+                    "events": [],
+                    "source_published_at": "2026-07-10",
+                    "verified_at": "2026-11-24T00:00:00+08:00",
+                }
+            )
     return base
 
 
@@ -605,6 +638,120 @@ def test_coverage_wrong_identity_on_returns_isolates():
     for ev in req["action_coverage"]["window_evidence"]:
         if ev["purpose"] == "returns_61_session":
             ev["security_code"] = "600999"
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+# --- R4: verbatim venue-calendar session binding + full event terms ------------
+
+
+def test_r4_single_date_scan_and_returns_isolated():
+    # Root R3 probe: both purposes given only the single T still produced an
+    # entry.  Scan must be exactly [T-1,T] and returns the 61-session set.
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        ev["sessions"] = [T1.isoformat()]
+        ev["scan_sessions"] = [{"date": T1.isoformat(), "adjustment_effective": False}]
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+    assert cov[0]["reason"] == "replay_action_coverage_unknown"
+
+
+def test_r4_scan_effective_action_blocks_new_entry():
+    # A verified scan hit on [T-1,T] with an adjustment_effective event must
+    # block the new entry outright.
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "scan_two_session":
+            ev["event_state"] = "verified_event"
+            ev["scan_sessions"][1]["adjustment_effective"] = True
+            ev["events"] = [{"adjustment_effective": True, "ex_date": T1.isoformat()}]
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r4_returns_event_missing_raw_terms_isolated():
+    # verified_event on returns without the full original terms (per-share /
+    # cash / register_row / implementation_sha256) is not proof the series is
+    # clean -- the security stays out.
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "returns_61_session":
+            ev["event_state"] = "verified_event"
+            ev["events"] = [{"ex_date": "2026-07-28"}]  # terms missing
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r4_returns_event_full_terms_admitted():
+    # The named Nanjing-Gang-style case: a verified_event with complete raw
+    # terms bound to the member map admits the new entry.
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "returns_61_session":
+            ev["event_state"] = "verified_event"
+            ev["events"] = [
+                {
+                    "ex_date": "2026-07-28",
+                    "notice": "1225435299",
+                    "implementation_sha256": "a" * 64,
+                    "currency": "CNY",
+                    "cash_gross_per_share": "0.116",
+                    "bonus_share_ratio": "0",
+                    "transfer_share_ratio": "0",
+                    "register_row": 302,
+                }
+            ]
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 0
+
+
+def test_r4_no_security_identity_isolated():
+    # R3 probe admitted a record bound to NO security identity.  A bare code
+    # without security_id/listing_id/venue_id is not admitted.
+    req = _request(market_dates=(T1,), coverage="verified")
+    req["action_coverage"]["securities"] = []
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r4_missing_member_map_isolated():
+    # A verified state without member_map_sha256 cannot reach named raw rows.
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        ev["member_map_sha256"] = None
+    with pytest.raises(ProductDailyError):
+        load_replay_request(req)
+
+
+def test_r4_skipped_open_session_isolated():
+    # returns sessions missing one real open day must not pass the verbatim
+    # 61-session check.
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "returns_61_session":
+            ev["sessions"] = ev["sessions"][:-2] + ev["sessions"][-1:]  # drop one
+    request = load_replay_request(req)
+    _, _, window_info, cov = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r4_wrong_session_day_isolated():
+    # A scan session list that lands on a non-open day fails verbatim check.
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "scan_two_session":
+            ev["scan_sessions"] = [
+                {"date": "2026-10-26", "adjustment_effective": False},  # Sunday
+                {"date": T1.isoformat(), "adjustment_effective": False},
+            ]
+            ev["sessions"] = [s["date"] for s in ev["scan_sessions"]]
     request = load_replay_request(req)
     _, _, window_info, cov = build_replay_envelope(request, T1)
     assert window_info["coverage_isolated"] == 1

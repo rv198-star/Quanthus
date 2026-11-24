@@ -371,6 +371,6 @@
     "registers": [],
     "securities": [],
     "window_evidence": [],
-    "note": "October action coverage is UNKNOWN unless a window_evidence record binds (security_code x signal_date x purpose) to a hashed register AND an upstream reader credential.  New entry requires BOTH scan_two_session AND returns_61_session verified for the security identity; an unproven record, missing credential, or wrong identity isolates new entry (replay_action_coverage_unknown) while held members keep their own evidence path.  A register is a locator, not a proof."
+    "note": "October action coverage is UNKNOWN unless a window_evidence record binds (security_code x signal_date x purpose) to a hashed register, a member_map digest and an upstream reader credential.  New entry requires BOTH scan_two_session (verbatim venue sessions [T-1,T]) AND returns_61_session (verbatim 61 venue sessions ending at T) verified for the security identity; a scan adjustment_effective event blocks entry, a returns verified_event requires full original terms.  An unproven record, missing credential/member_map, verbatim-session or identity mismatch isolates new entry (replay_action_coverage_unknown); held members keep their own evidence path."
   }
 }

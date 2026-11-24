@@ -70,6 +70,11 @@ REQUIRED_SCOPE_KEYS = (
     "open_sessions_manifest_sha256",
     "protected_exclusions_manifest_sha256",
 )
+REQUIRED_REPLAY_RUN_KEYS = (
+    "scenario_id",
+    "account_id",
+    "ledger_namespace",
+)
 
 
 def _fail(code: str, message: str) -> NoReturn:
@@ -273,16 +278,18 @@ def activate_use_receipt(
     """Activation entry: every expected binding block is required and verified.
 
     E5 calls this (not load_use_receipt) when deciding whether actions may run.
-    A None expected_* mapping is itself a refusal: there is no adopted replay
-    use without the caller's independently verified pins for every block.
+    A None expected_* mapping is itself a refusal, AND each expected block must
+    carry the COMPLETE named pin set for its scope with every value non-empty.
+    A single irrelevant key, a None value, or a partial map activates nothing:
+    the caller can never 'verify' a receipt it did not fully pin.
     """
-    for name, value in (
-        ("expected_source", expected_source),
-        ("expected_rule", expected_rule),
-        ("expected_consumer", expected_consumer),
-        ("expected_execution", expected_execution),
-        ("expected_scope", expected_scope),
-        ("expected_replay_run", expected_replay_run),
+    for name, value, required in (
+        ("expected_source", expected_source, REQUIRED_SOURCE_PINS),
+        ("expected_rule", expected_rule, REQUIRED_RULE_PINS),
+        ("expected_consumer", expected_consumer, REQUIRED_CONSUMER_PINS),
+        ("expected_execution", expected_execution, REQUIRED_EXECUTION_PINS),
+        ("expected_scope", expected_scope, REQUIRED_SCOPE_KEYS),
+        ("expected_replay_run", expected_replay_run, REQUIRED_REPLAY_RUN_KEYS),
     ):
         # An empty mapping activates nothing: every block must be present AND
         # non-empty so the caller can never 'verify' a receipt it did not pin.
@@ -291,6 +298,16 @@ def activate_use_receipt(
                 "use_receipt_expected_missing",
                 f"{name} is required and must be a non-empty verified pin set",
             )
+        # Every named required pin must be present with a real non-empty value.
+        # None, an absent key, an empty string or an arbitrary unrelated field
+        # all refuse -- the block is a verified pin SET, not a free-form map.
+        for key in required:
+            v = value.get(key)
+            if v is None or (isinstance(v, str) and not v):
+                _fail(
+                    "use_receipt_expected_missing",
+                    f"{name}.{key} is required and must carry a verified non-empty pin",
+                )
     receipt = load_use_receipt(
         raw,
         expected_source=expected_source,

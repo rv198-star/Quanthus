@@ -34,6 +34,10 @@ def read_actions(source_map: SourceMap, market_date: date):
     action_reads, term_reads = [], []
     actions = {}
     for member in source_map.base_members("dwd_corporate_action"):
+        verify = source_map.verify_member(member)
+        if not verify.get("matches"):
+            action_reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False})
+            continue
         try:
             recs = _rows(
                 member.abs_path,
@@ -65,8 +69,12 @@ def read_actions(source_map: SourceMap, market_date: date):
                 "source_revision": str(rec.get("source_revision") or ""),
                 "terms": {},
             })
-        action_reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
+        action_reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True})
     for member in source_map.base_members("dwd_corporate_action_term"):
+        verify = source_map.verify_member(member)
+        if not verify.get("matches"):
+            term_reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False})
+            continue
         try:
             recs = _rows(
                 member.abs_path,
@@ -92,7 +100,7 @@ def read_actions(source_map: SourceMap, market_date: date):
                     "knowledge_from": iso(parse_ts(rec.get("knowledge_from"))),
                     "knowledge_to": iso(parse_ts(rec.get("knowledge_to"))),
                 }
-        term_reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
+        term_reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True})
     return actions, {"action_reads": action_reads, "term_reads": term_reads}
 
 
@@ -100,6 +108,10 @@ def read_exceptions(source_map: SourceMap, market_date: date):
     """Quality exceptions + observation gaps that block sessions."""
     qe, gaps, reads = [], [], []
     for member in source_map.base_members("dwd_quality_exception"):
+        verify = source_map.verify_member(member)
+        if not verify.get("matches"):
+            reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False})
+            continue
         try:
             recs = _rows(
                 member.abs_path,
@@ -110,8 +122,12 @@ def read_exceptions(source_map: SourceMap, market_date: date):
             reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
             continue
         qe.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True})
     for member in source_map.base_members("dwd_observation_gap"):
+        verify = source_map.verify_member(member)
+        if not verify.get("matches"):
+            reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False})
+            continue
         try:
             recs = _rows(
                 member.abs_path,
@@ -122,7 +138,7 @@ def read_exceptions(source_map: SourceMap, market_date: date):
             reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
             continue
         gaps.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True})
     return {"quality_exceptions": qe, "observation_gaps": gaps}, {"reads": reads}
 
 
@@ -130,6 +146,10 @@ def read_limits(source_map: SourceMap, market_date: date):
     """Price-limit regimes + per-session tradability state."""
     regimes, tradability, reads = [], [], []
     for member in source_map.base_members("dwd_price_limit_regime"):
+        verify = source_map.verify_member(member)
+        if not verify.get("matches"):
+            reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False})
+            continue
         try:
             recs = _rows(
                 member.abs_path,
@@ -141,8 +161,12 @@ def read_limits(source_map: SourceMap, market_date: date):
             reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
             continue
         regimes.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True})
     for member in source_map.base_members("dwd_tradability_state"):
+        verify = source_map.verify_member(member)
+        if not verify.get("matches"):
+            reads.append({"member_id": member.member_id, "status": "SHA_MISMATCH", "sha256": member.sha256, "verify": verify, "sha_match": False})
+            continue
         try:
             recs = _rows(
                 member.abs_path,
@@ -154,5 +178,5 @@ def read_limits(source_map: SourceMap, market_date: date):
             reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
             continue
         tradability.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True})
     return {"price_limit_regimes": regimes, "tradability_state": tradability}, {"reads": reads}

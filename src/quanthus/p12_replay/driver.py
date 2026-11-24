@@ -299,6 +299,7 @@ def make_engine(
     e1_runner: E1ReplayRunner | None = None,
     history_reader=None,
     account_projection=None,
+    decision_cutoff_time: time | None = None,
     base_manifest_path: Path = BASE_MANIFEST,
     base_manifest_sha256: str = BASE_MANIFEST_SHA256,
     knowledge_cutoff: str | None = None,
@@ -348,6 +349,9 @@ def make_engine(
         observed_sessions_by_day=observed_sessions_by_day,
         history_reader=history_reader,
         account_projection=account_projection,
+        decision_cutoff_time=(
+            decision_cutoff_time or time(22, 30, tzinfo=EXCHANGE_TZ)
+        ),
         base_manifest_path=Path(base_manifest_path),
         base_manifest_sha256=base_manifest_sha256,
         account_id=account_id,
@@ -514,6 +518,7 @@ def main(argv=None) -> int:
     # back to the labelled synthetic runner.
     e1_runner = None
     e1_history_reader = None
+    e1_decision_cutoff = None
     if args.e1_scenario is not None:
         e1_block = {"status": "ok"}
         try:
@@ -522,6 +527,19 @@ def main(argv=None) -> int:
             e1_runner, e1_history_reader = load_e1_scenario(
                 args.e1_scenario,
                 repo_root=Path(__file__).resolve().parents[3],
+            )
+            # Frozen October decision cutoff: the scenario may pin
+            # decision_cutoff_time; the phase-1 default is 21:30+08 (the
+            # T evening cutoff the #749 envelope, the outer daily read and
+            # the P11 day receipt all share).
+            try:
+                scen_doc = json.loads(Path(args.e1_scenario).read_text())
+                raw_ct = scen_doc.get("decision_cutoff_time")
+            except Exception:
+                raw_ct = None
+            hh, mm = (raw_ct or "21:30").split(":")[:2]
+            e1_decision_cutoff = time(
+                int(hh), int(mm), tzinfo=EXCHANGE_TZ
             )
         except Exception as exc:  # noqa: BLE001 - assembly is best effort
             e1_block = {
@@ -554,6 +572,7 @@ def main(argv=None) -> int:
             observed_sessions_by_day=observed_by_day,
             e1_runner=e1_runner,
             history_reader=e1_history_reader,
+            decision_cutoff_time=e1_decision_cutoff,
             reset=reset,
         )
 

@@ -483,10 +483,14 @@ def _october_package_clock(
     }
 
 
-def _envelope_read_at(evidence: Mapping[str, Any] | None, observed: datetime) -> datetime:
+def _envelope_read_at(
+    evidence: Mapping[str, Any] | None,
+    observed: datetime,
+    original_intake: datetime,
+    cutoff: datetime,
+) -> datetime:
     """Use the original input read when replaying a previously sealed envelope."""
-    if not evidence:
-        return observed
+    evidence = evidence or {}
     members = evidence.get("member_consumption")
     stamps = []
     for record, key in ((evidence, "read_at"), (members, "run_read_at")):
@@ -501,7 +505,13 @@ def _envelope_read_at(evidence: Mapping[str, Any] | None, observed: datetime) ->
         stamps.append(value)
     if len(set(stamps)) > 1:
         _fail("conflicting_source_read_at", "envelope and member receipt disagree on read time")
-    return stamps[0] if stamps else observed
+    if stamps:
+        return stamps[0]
+    if original_intake > min(cutoff, observed):
+        _fail(
+            "missing_original_read_at", "late archive intake requires its original reader receipt"
+        )
+    return original_intake
 
 
 def run_e1_replay_day(
@@ -599,7 +609,11 @@ def run_e1_replay_day(
     # run reads) are excluded from the period's input and named with a reason,
     # never a hard failure.  The container edge and the used-row business date
     # are disclosed separately per member.
-    source_read_at = _envelope_read_at(p12_evidence, observed_at)
+    source_read_at = _envelope_read_at(
+        p12_evidence, observed_at,
+        _package_instant(req.facts_template.get("intake_first_read_at")),
+        paper_replay.replay_decision_at(market_date),
+    )
     member_use = _analyze_member_use(req, market_date, observed_at=source_read_at)
     # Only a SHARED whole-day dependency blocks the whole day; a member bound
     # to one security isolates that security (neighbours keep evaluating),

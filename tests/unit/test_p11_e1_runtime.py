@@ -189,6 +189,10 @@ def e_run_e1_replay(
     from quanthus.product_daily.recommendation.e1_runtime import run_e1_replay_day
 
     observed_clock = (lambda: datetime.fromisoformat(observed_at)) if observed_at else None
+    # These sealed-archive fixtures model a reader that retained its own clock.
+    evidence = dict(p12_evidence or {})
+    if not evidence.get("read_at") and not evidence.get("member_consumption"):
+        evidence["read_at"] = observed_at or "2026-11-25T02:00:00+08:00"
     return run_e1_replay_day(
         req,
         day,
@@ -196,7 +200,7 @@ def e_run_e1_replay(
         snapshot_id="s",
         snapshot_manifest_digest="sha256:" + "a" * 64,
         observed_clock=observed_clock,
-        p12_evidence=p12_evidence,
+        p12_evidence=evidence,
         calendar_schedule_evidence=calendar_schedule_evidence,
     )
 
@@ -666,3 +670,14 @@ def test_shenzhen_preholiday_date_binds_weekly_rule_and_annual_notice(assets):
     (record,) = evidence["sessions"]
     assert record["schedule_basis"] == "RULE_DERIVED_SCHEDULE"
     assert {doc["kind"] for doc in record["source_documents"]} == {"WEEKLY_RULE", "ANNUAL_CLOSURES"}
+
+
+def test_missing_original_read_never_borrows_the_rerun():
+    from quanthus.product_daily.recommendation.e1_runtime import _envelope_read_at
+
+    t = datetime.fromisoformat("2026-10-08T21:30:00+08:00")
+    physical_read = datetime.fromisoformat("2026-11-24T22:31:00+00:00")
+    rerun = datetime.fromisoformat("2026-11-26T12:00:00+00:00")
+    assert _envelope_read_at(None, rerun, t, t) == t
+    with pytest.raises(ProductDailyError, match="missing_original_read_at"):
+        _envelope_read_at(None, rerun, physical_read, t)

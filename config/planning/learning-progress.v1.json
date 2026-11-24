@@ -16465,6 +16465,90 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-20261124T192909452705Z",
+      "recorded_at": "2026-11-24T19:29:09.452705Z",
+      "actor": "P11-root-october-e1-replay",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "十月浦发普通持有者分红在CN02的60段实际收益对账通过。按真实代码与时钟的回放适配退修，已分别派实现与独审，E5仍待签。",
+      "updates": [],
+      "no_change_reason": "独立实源对账形成联合验证基准。账户、来源投影、最终同树实测仍在进行。",
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T19:24:36Z",
+          "body_sha256": "ebb35d200d68c0d7140313dd9c4cfc455f245d6387172eaf49ac56a828983714"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "OCT08-SH-ORACLE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/CN02-CASH-ORACLE.json",
+          "sha256": "f490215b7ee43a1ebef90c91b62d1d49f658505d70cdf0bc3f96c110ea75652f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "P10 signed ordinary holder terms against 60 actual adjacent prices through the baseline SQL. October engineering replay input purpose only."
+        },
+        {
+          "id": "OCT08-INPUT-SHAPE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/ORIGINAL-E1-SHAPE.json",
+          "sha256": "2670f1bf12f1f351e8497d86c9043bf3e390cd6e247aae46815efb69b81a49b8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual named security in the fixed 59a October envelope, input fields only."
+        },
+        {
+          "id": "OCT08-SH-CODE-SHAPE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/action.json",
+          "sha256": "9abe52f66ae5faf4d5d1f08f40d50f4fe637eed453fcc4f7c9bd63529ce27c92",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Production E1 called with synthetic data using actual exchange-qualified code shape on 65be. Referred to R7 and independent review."
+        },
+        {
+          "id": "OCT08-CLOCK-R2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/clock-584e710f.json",
+          "sha256": "0a7521ba55a78899f01817e3af2776881df2921e1408ba57333f1e55c832e34b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Month-container admission works. A used member visible after actual reading still passes the October replay entry. Returned to author."
+        },
+        {
+          "id": "OCT08-CN02-HEADER",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/CN02-MEMBERS.json",
+          "sha256": "7273c6cda79a1c635cab5405f393766042d4dc49e5acbd2d5cc72d7e7f123542",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Read only the named 59a header. 127 members have declared end after Oct 9."
+        },
+        {
+          "id": "OCT08-DISPATCH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/owner-oct08-followup/DISPATCH.json",
+          "sha256": "e47e4d8c05c00e28d53419e1a335982a8a4cc040f1a1487fd95a93ba23b8f113",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Work accepted by the registered implementers. Fixed integration acceptance and E5 remain outstanding."
+        }
+      ]
     }
   ],
   "history_imports": [

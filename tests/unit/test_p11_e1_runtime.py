@@ -355,8 +355,8 @@ def test_r4_read_instant_is_signed_into_source_closure(assets):
     base["source_members"][0]["visible_at"] = "2026-11-01T00:00:00+08:00"
     a = e_run_e1_replay(base, f.T1, assets, observed_at="2026-11-25T03:00:00+08:00")
     b = e_run_e1_replay(base, f.T1, assets, observed_at="2026-11-25T03:01:00+08:00")
-    da = a["source_closure_digest"] if "source_closure_digest" in a else a.get("receipt", {}).get("source_closure_digest")
-    db = b["source_closure_digest"] if "source_closure_digest" in b else b.get("receipt", {}).get("source_closure_digest")
+    da = a.get("source_closure_digest") or a.get("receipt", {}).get("source_closure_digest")
+    db = b.get("source_closure_digest") or b.get("receipt", {}).get("source_closure_digest")
     assert da and db and da != db
     ev = a["source_closure"].get("consumption_evidence")
     assert ev and ev["actual_read_at"] == "2026-11-25T03:00:00+08:00"

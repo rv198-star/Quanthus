@@ -306,26 +306,20 @@ def resolve_pinned_v2_loader(
         # so this resolution binds exactly the byte-verified bound checkout.
         consumer_prefix = str(consumer_root.resolve()) + "/"
         for name in list(sys.modules):
-            if not (name == "quanthus.p12_daily" or name.startswith("quanthus.p12_daily.")):
+            if not (
+                name == "quanthus.p12_daily"
+                or name.startswith("quanthus.p12_daily.")
+                or name == "quanthus.capabilities"
+                or name.startswith("quanthus.capabilities.")
+                or name == "quanthus.shared"
+                or name.startswith("quanthus.shared.")
+            ):
                 continue
-            module = sys.modules[name]
-            module_file = getattr(module, "__file__", None)
-            if module_file is None or not str(Path(module_file).resolve()).startswith(
-                consumer_prefix
-            ):
-                del sys.modules[name]
-        for name in (
-            "quanthus.capabilities.decision_access",
-            "quanthus.shared.fact_contracts",
-            "quanthus.shared.values",
-        ):
-            module = sys.modules.get(name)
-            module_file = getattr(module, "__file__", None)
-            if module is not None and (
-                module_file is None
-                or not str(Path(module_file).resolve()).startswith(consumer_prefix)
-            ):
-                del sys.modules[name]
+            # These subpackages exist only inside the pinned consumer tree - the
+            # host never ships quanthus.p12_daily/capabilities/shared, so evicting
+            # a previously cached entry can only clear consumer state.  Rebinding
+            # always re-imports from the byte-verified checkout mounted above.
+            del sys.modules[name]
         import quanthus.p12_daily.decision_loader as pinned_loader
     finally:
         pkg_path.remove(mounted)

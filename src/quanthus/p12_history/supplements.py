@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import date
 
 from quanthus.p12_history.calendar_listing import _date, _rows
-from quanthus.p12_history.clocks import parse_ts
+from quanthus.p12_history.clocks import iso, parse_ts
 from quanthus.p12_history.source_pins import SourceMap
 
 UNKNOWN = "UNKNOWN"
@@ -59,7 +59,7 @@ def read_actions(source_map: SourceMap, market_date: date):
                 "payment_date": _date(rec.get("payment_date")),
                 "announced_at": parse_ts(rec.get("announced_at")),
                 "knowledge_from": parse_ts(rec.get("knowledge_from")),
-                "knowledge_to": parse_ts(rec.get("knowledge_to")),
+                "knowledge_to": iso(parse_ts(rec.get("knowledge_to"))),
                 "record_source": str(rec.get("record_source") or ""),
                 "source_record_id": str(rec.get("source_record_id") or ""),
                 "source_revision": str(rec.get("source_revision") or ""),
@@ -89,8 +89,8 @@ def read_actions(source_map: SourceMap, market_date: date):
                     "record_source": str(rec.get("record_source") or ""),
                     "source_record_id": str(rec.get("source_record_id") or ""),
                     "source_revision": str(rec.get("source_revision") or ""),
-                    "knowledge_from": parse_ts(rec.get("knowledge_from")),
-                    "knowledge_to": parse_ts(rec.get("knowledge_to")),
+                    "knowledge_from": iso(parse_ts(rec.get("knowledge_from"))),
+                    "knowledge_to": iso(parse_ts(rec.get("knowledge_to"))),
                 }
         term_reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
     return actions, {"action_reads": action_reads, "term_reads": term_reads}

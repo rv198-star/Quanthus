@@ -811,6 +811,32 @@ def test_replay_day_runs_real_chain_positive(runner, resources):
     assert receipt["publishable"] is True
     assert receipt["package_present"] is True
     assert any(d["status"] == "entry" for d in receipt["entry_decisions"])
+    assert "replay_no_action" not in receipt["package"]["decision_sets"][0]["audit"]
+
+
+def test_qualified_quiet_package_explains_each_scanned_security(runner, resources):
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    securities = [_security(code, days) for code in ("600000", "600001")]
+    for security in securities:
+        bar = security["bars"][-1]
+        bar.update(high_price=bar["close_price"], low_price=bar["close_price"], amount="100")
+    raw = _request(market_dates=(T1,), securities=securities)
+    raw["listing_rows"].append(_listing("security-600001"))
+    day = _run(load_replay_request(raw), T1, runner, resources)
+    assert day["publishable"] and not day["candidates"] and not day["held_signals"]
+    ds = day["package"]["decision_sets"][0]
+    assert ds["audit"]["admission_disposition"] == "empty_advice"
+    summary = ds["audit"]["replay_no_action"]
+    assert summary["market_date"] == T1.isoformat()
+    assert summary["source_closure_digest"] == sha256_digest(day["source_closure"])
+    assert summary["candidate_count"] == 0
+    assert summary["message"] == ds["decisions"][0]["explanations"][0]["text"] == "今日无操作"
+    assert {s["security_code"] for s in summary["scans"]} == {"600000", "600001"}
+    for scan in summary["scans"]:
+        assert scan["verdict"] == "not_triggered"
+        assert scan["gates"]["events"]["required"] == 22
+        assert scan["gates"]["features"]["observed"] == 61
+        assert scan["gates"]["listing"]["status"] == "satisfied"
 
 
 def test_replay_day_blocks_on_late_source_visibility(runner, resources):

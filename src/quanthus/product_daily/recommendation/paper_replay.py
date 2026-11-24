@@ -2725,6 +2725,47 @@ def _rule_day_projection(output: Any, window_info: Mapping[str, Any]) -> dict[st
         for item in pkg.decision_sets:
             raw = item.to_wire_dict()
             raw[DECISION_SET_SCHEMA_FIELD] = V2_DS_SCHEMA
+            if (
+                result.publishable
+                and item.audit.admission_disposition == "empty_advice"
+                and not output.candidates
+                and not output.held_signals
+                and output.receipt is not None
+                and seam.scan_result is not None
+            ):
+                # A quiet day comes from the scan that actually evaluated T.
+                # The P12 receipt keeps the full signed input closure; carry the
+                # qualified rows into the package so it can explain its own date.
+                t = item.market_date.isoformat()
+                verdicts = {
+                    sec_id: verdict
+                    for sec_id, session, verdict in seam.scan_result.signal_verdicts
+                    if session == t
+                }
+                scans = [
+                    {
+                        "security_code": r["security_code"],
+                        "security_id": r["security_id"],
+                        "verdict": verdicts.get(r["security_id"]),
+                        "gates": r["gates"],
+                    }
+                    for r in output.source_closure.get("history_receipts", ())
+                    if r["status"] == "qualified"
+                ]
+                if scans and all(row["verdict"] == "not_triggered" for row in scans):
+                    raw["audit"]["replay_no_action"] = {
+                        "schema_version": "p11.replay-no-action.v1",
+                        "market_date": t,
+                        "run_id": output.receipt.run_id,
+                        "source_closure_digest": output.receipt.source_closure_digest,
+                        "candidate_count": 0,
+                        "scans": scans,
+                        "message": "今日无操作",
+                    }
+                    raw["decisions"][0]["explanations"][0] = {
+                        **raw["decisions"][0]["explanations"][0],
+                        "text": "今日无操作",
+                    }
             sets.append(raw)
         wire = pkg.to_dict()
         wire["decision_sets"] = sets

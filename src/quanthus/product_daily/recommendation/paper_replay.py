@@ -31,6 +31,8 @@ daily, or live evidence.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
@@ -465,11 +467,73 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                 "source_published_at": eo.get("source_published_at"),
                 "verified_at": eo.get("verified_at"),
             }
+        # Verified-artifact catalogues: per-register named original rows the
+        # bound credential actually verified.  The catalogue must carry a
+        # digest plus producer/authority identity bound to the P10-signed
+        # member bytes (B02/B03/B10 lineage) - a bare caller-assembled list
+        # with only register_row is not an authority.  Each row carries the
+        # complete original clause (identity, ex_date, cash/bonus/transfer,
+        # currency, implementation sha/notice) so the declared event AND the
+        # projected action are both compared to the same source row.
+        ART_ROW_REQUIRED = (
+            "ex_date",
+            "cash_gross_per_share",
+            "bonus_share_ratio",
+            "transfer_share_ratio",
+            "currency",
+            "implementation_sha256",
+            "register_row",
+        )
+        verified_artifacts: dict[str, dict[str, Any]] = {}
+        for i, va in enumerate(
+            _seq(aco.get("verified_artifacts", ()), "action_coverage.verified_artifacts")
+        ):
+            vo = _obj(va, f"action_coverage.verified_artifacts[{i}]")
+            cid = _text(vo.get("coverage_id"), "verified_artifacts[].coverage_id")
+            if cid not in registers:
+                _fail(
+                    "invalid_action_coverage",
+                    f"verified_artifacts[{i}] references unregistered coverage_id {cid!r}",
+                )
+            digest = _text(vo.get("digest"), f"verified_artifacts[{i}].digest")
+            producer = _text(vo.get("producer"), f"verified_artifacts[{i}].producer")
+            authority = vo.get("authority") or vo.get("receipt")
+            if authority is None:
+                _fail(
+                    "invalid_action_coverage",
+                    f"verified_artifacts[{i}] lacks authority/receipt binding",
+                )
+            auth_o = _obj(authority, f"verified_artifacts[{i}].authority")
+            authority_id = {
+                "manifest_sha256": _sha256(
+                    auth_o.get("manifest_sha256"), "authority.manifest_sha256"
+                ),
+                "result_sha256": _sha256(auth_o.get("result_sha256"), "authority.result_sha256"),
+                "batch_id": _text(auth_o.get("batch_id"), "authority.batch_id"),
+            }
+            rows: dict[Any, dict[str, Any]] = {}
+            for j, r in enumerate(_seq(vo.get("rows", ()), "verified_artifacts[].rows")):
+                rr = _obj(r, f"verified_artifacts[{i}].rows[{j}]")
+                for field in ART_ROW_REQUIRED:
+                    if rr.get(field) is None:
+                        _fail(
+                            "invalid_action_coverage",
+                            f"verified_artifacts[{i}].rows[{j}] lacks {field}",
+                        )
+                reg_row = rr.get("register_row")
+                rows[reg_row] = dict(rr)
+            verified_artifacts[cid] = {
+                "digest": digest,
+                "producer": producer,
+                "authority": authority_id,
+                "rows": rows,
+            }
         action_coverage = {
             "default_state": default_state,
             "registers": registers,
             "securities": securities_cov,
             "window_evidence": window_evidence,
+            "verified_artifacts": verified_artifacts,
             "note": aco.get("note"),
         }
 
@@ -767,6 +831,20 @@ def _action_coverage_ok(
         if not dv or not iv or str(dv) != str(iv):
             return False
 
+    # The source action/feature key is identity.stock_code (e.g. sh.600000);
+    # listing_code (600000) is the trading/coverage key.  When the frozen
+    # identity distinguishes them, ONLY stock_code keys this security's
+    # action rows (R7-P2): a bare listing_code row is a foreign key, not a
+    # fallback.  When they are the same code the single value is the key.
+    stock_code = str(ident.get("stock_code") or "")
+    listing_code = str(ident.get("listing_code") or code)
+    codes = (stock_code,) if stock_code != listing_code else (listing_code,)
+
+    # Verified-artifact catalogues bound to each coverage register: the named
+    # rows the upstream credential actually verified.  Caller-supplied events
+    # must hit these rows, never a self-recomputed hash.
+    bound_artifacts = request.action_coverage.get("verified_artifacts", {})
+
     # Authoritative venue open calendar: the SAME bound calendar the envelope
     # uses, so sessions are checked verbatim against the venue's real open
     # days -- a session list that skips a real open day, duplicates, goes out
@@ -816,16 +894,606 @@ def _action_coverage_ok(
         # double-counted); the ex-date that affects a return is inside
         # (first_close, last_close] i.e. sessions[1:].
         if not _returns_events_join_actions(
-            returns.get("events"), sec_o.get("actions"), code, returns_dates
+            returns.get("events"),
+            sec_o.get("actions"),
+            codes,
+            returns_dates,
+            identity=ident,
+            bound_artifacts=bound_artifacts,
+            coverage_id=returns.get("coverage_id"),
         ):
             return False
     elif returns.get("event_state") == "verified_none" and _actions_in_window(
-        sec_o.get("actions"), code, returns_dates
+        sec_o.get("actions"), codes, returns_dates
     ):
         # A positively "no adjustment" returns window contradicts any raw
         # action row inside it (the conflict is isolated, never coalesced away).
         return False
     return True
+
+
+# --- signed action-authority assembly (R9) ------------------------------------------
+_SIGNED_ACTION_PRODUCER = "p10.signed-action-members.v1"
+_SIGNED_ACTION_READER = "p12.e1-signed-member-reader"
+
+
+def _pointer_rows(pointer_root: Mapping[str, Any]) -> dict[str, dict[str, str]]:
+    """Normalize a batch RESULT pointer to {basename: {path, sha256}}."""
+    out: dict[str, dict[str, str]] = {}
+    ml = pointer_root.get("members")
+    if isinstance(ml, (list, tuple)):
+        for m in ml:
+            if not isinstance(m, Mapping):
+                continue
+            rel = _text(m.get("path"), "pointer_root.members[].path")
+            out[rel.rsplit("/", 1)[-1]] = {
+                "path": rel,
+                "sha256": _sha256(m.get("sha256"), "pointer_root.members[].sha256"),
+            }
+    for key in ("events", "windows", "coverage"):
+        p = pointer_root.get(key)
+        if isinstance(p, Mapping) and p.get("path") is not None:
+            rel = _text(p.get("path"), "pointer_root." + key + ".path")
+            out[rel.rsplit("/", 1)[-1]] = {
+                "path": rel,
+                "sha256": _sha256(p.get("sha256"), "pointer_root." + key + ".sha256"),
+            }
+    return out
+
+
+def _member_bytes(members: Mapping[str, bytes], rel_path: str) -> bytes:
+    b = members.get(rel_path)
+    if not isinstance(b, (bytes, bytearray)):
+        _fail(
+            "action_authority_member_missing",
+            "member " + repr(rel_path) + " not present in members map",
+        )
+    return bytes(b)
+
+
+def _member_sha(b: bytes) -> str:
+    return "sha256:" + hashlib.sha256(b).hexdigest()
+
+
+def bind_signed_manifest(
+    manifest_bytes: bytes,
+    expected_sha256: str,
+) -> dict[str, Any]:
+    """Verify real MANIFEST bytes once and return a reuse-bound object.
+
+    #749 reads the pinned release MANIFEST file once, recomputes its sha256,
+    and confirms it equals the release's frozen pin (ROUTES.json /
+    external_manifests).  This helper performs that single verification and
+    returns an object the same job can hand to build_signed_action_authority()
+    for every signed security-day - the parsed ``manifest`` plus the proven
+    ``manifest_sha256`` derived from the actual bytes, never a caller-copied
+    digest.  A byte whose recomputed hash differs from the frozen pin fails
+    closed.
+    """
+    expected = _sha256(expected_sha256, "expected_manifest_sha256")
+    actual = _member_sha(bytes(manifest_bytes))
+    if actual != expected:
+        _fail(
+            "action_authority_manifest_pin_mismatch",
+            "MANIFEST bytes sha " + actual + " != frozen pin " + expected,
+        )
+    return {
+        "manifest": _obj(json.loads(bytes(manifest_bytes).decode("utf-8")), "manifest"),
+        "manifest_sha256": actual,
+    }
+
+
+def _resolve(
+    manifest_members: Mapping[str, Any],
+    members: Mapping[str, bytes],
+    rel_path: str,
+) -> tuple[bytes, str]:
+    """Locate member bytes by exact MANIFEST path and verify declared sha256.
+
+    MANIFEST.members is keyed by the path under the P10 source_prefix; each
+    entry carries {path, sha256, bytes}.  The caller names the member by that
+    MANIFEST path (or a unique trailing suffix of it); we require the entry
+    then verify the recomputed bytes equal the declared sha256.  A basename
+    alone is NOT sufficient - many batches share filenames like RESULT.json.
+    """
+    entry = manifest_members.get(rel_path)
+    if entry is None:
+        matches = [
+            (k, e)
+            for k, e in manifest_members.items()
+            if isinstance(e, Mapping)
+            and (str(k).endswith("/" + rel_path) or str(e.get("path", "")) == rel_path)
+        ]
+        if len(matches) == 1:
+            entry = matches[0][1]
+        elif len(matches) > 1:
+            _fail(
+                "action_authority_member_ambiguous",
+                "member path "
+                + repr(rel_path)
+                + " matches "
+                + str(len(matches))
+                + " MANIFEST entries",
+            )
+    if not isinstance(entry, Mapping):
+        _fail(
+            "action_authority_manifest_member_missing",
+            "MANIFEST has no member entry for " + repr(rel_path),
+        )
+    declared = _sha256(entry.get("sha256"), "manifest.members[].sha256")
+    b = _member_bytes(members, rel_path)
+    if _member_sha(b) != declared:
+        _fail(
+            "action_authority_member_sha_mismatch",
+            "member " + rel_path + " sha " + _member_sha(b) + " != MANIFEST " + declared,
+        )
+    return b, declared
+
+
+def build_signed_action_authority(
+    *,
+    manifest: Mapping[str, Any],
+    manifest_sha256: str | Mapping[str, Any],
+    accepted_member: str,
+    result_member: str,
+    members: Mapping[str, bytes],
+    accepted_manifest_members: Mapping[str, Any] | None = None,
+    index_member: str | None = None,
+    security_code: str,
+    listing_code: str,
+    stock_code: str,
+    security_id: str,
+    listing_id: str,
+    venue_id: str,
+    signal_date: str,
+    coverage_id: str | None = None,
+    routes_sha256: str | None = None,
+) -> dict[str, Any]:
+    """Rebuild action_coverage for ONE signed security-day from real P10 members.
+
+    The content root is the pinned release MANIFEST
+    (quanthus.p10.action-evidence-reader-map.v1): ``manifest.members`` names
+    every member's path under the P10 source_prefix and its declared sha256,
+    and ``manifest_sha256`` is the real sha256 of the MANIFEST file bytes.
+    ``result_member`` / ``accepted_member`` are the MANIFEST paths of the
+    batch RESULT pointer and the Owner-signed accepted-uses table; both are
+    resolved by content sha256 out of the same members map, so the file the
+    caller read must equal the MANIFEST-declared member.
+
+    ``members`` maps MANIFEST path -> raw bytes P12 read once.  Every resolved
+    member is recomputed and compared to the MANIFEST-declared sha256; a
+    substituted member fails closed.  The emitted credential carries the
+    actual manifest/result/accepted file sha256 - never a recomputed JSON
+    digest - so the bound provenance is the named original, not a hash the
+    caller could fill in.
+    """
+    iso = _isodate(signal_date, "signal_date").isoformat()
+    # ``manifest_sha256`` may be the bound object returned by
+    # bind_signed_manifest() (carrying the proven file sha derived from the
+    # real bytes) or the raw digest string a caller verified itself.  Both
+    # resolve to the same proven sha - never a recomputed JSON digest.
+    if isinstance(manifest_sha256, Mapping):
+        manifest_sha = _sha256(manifest_sha256.get("manifest_sha256"), "manifest_sha256")
+        mroot = _obj(manifest_sha256.get("manifest", manifest), "manifest")
+    else:
+        manifest_sha = _sha256(manifest_sha256, "manifest_sha256")
+        mroot = _obj(manifest, "manifest")
+    manifest_members = _obj(mroot.get("members"), "manifest.members")
+    routes_sha = _sha256(routes_sha256, "routes_sha256") if routes_sha256 is not None else None
+
+    # accepted table bytes -> the versioned Owner-signed uses table.  It may
+    # live in this release's MANIFEST or in the separate MANIFEST that pins the
+    # signed uses (e.g. B10 when the batch itself is B02); resolve by sha.
+    acc_members = manifest_members
+    if accepted_member not in acc_members and accepted_manifest_members is not None:
+        acc_members = _obj(accepted_manifest_members, "accepted_manifest_members")
+    accepted_b, accepted_decl = _resolve(acc_members, members, accepted_member)
+    accepted = json.loads(accepted_b.decode("utf-8"))
+    # batch RESULT pointer -> which member files belong to this batch.
+    pointer_b, result_decl = _resolve(manifest_members, members, result_member)
+    pointer_root = json.loads(pointer_b.decode("utf-8"))
+
+    # Resolve this batch's events/windows/coverage members by their declared
+    # sha256 out of the same MANIFEST-pinned members map.
+    prows = _pointer_rows(pointer_root)
+    for need in ("events", "security-windows", "coverage"):
+        name = "security-windows.json" if need == "security-windows" else need + ".json"
+        if name not in prows:
+            _fail(
+                "action_authority_pointer_missing",
+                "batch RESULT does not name member " + name,
+            )
+    batch_dir = result_member.rsplit("/", 1)[0]
+
+    def _batch_rel(p: str) -> str:
+        # Pointer paths may already be MANIFEST paths or batch-relative names.
+        return p if p in manifest_members else (batch_dir + "/" + p)
+
+    events_rel = _batch_rel(prows["events.json"]["path"])
+    windows_rel = _batch_rel(prows["security-windows.json"]["path"])
+    coverage_rel = _batch_rel(prows["coverage.json"]["path"])
+    events_b, _ = _resolve(manifest_members, members, events_rel)
+    windows_b, batch_windows_sha = _resolve(manifest_members, members, windows_rel)
+    coverage_b, _ = _resolve(manifest_members, members, coverage_rel)
+    events_doc = json.loads(events_b.decode("utf-8"))
+    windows_doc = json.loads(windows_b.decode("utf-8"))
+    coverage_doc = json.loads(coverage_b.decode("utf-8"))
+    # Optional signed windows INDEX (accepted.windows_file e.g. WINDOW-USE.json):
+    # for security-days the batch member does not cover, this signed index is
+    # the authoritative per-(code,T) window record.  Resolve it by sha too.
+    index_doc = None
+    windows_index_sha: str | None = None
+    if index_member is not None:
+        idx_members = manifest_members
+        if index_member not in idx_members and accepted_manifest_members is not None:
+            idx_members = _obj(accepted_manifest_members, "accepted_manifest_members")
+        index_b, windows_index_sha = _resolve(idx_members, members, index_member)
+        index_doc = json.loads(index_b.decode("utf-8"))
+    # 2. The Owner-signed table must name this security/date and both uses.
+    acc = _obj(accepted, "accepted")
+    acc_codes = _obj(acc.get("accepted_codes_by_date"), "accepted.accepted_codes_by_date")
+    day_codes = acc_codes.get(iso)
+    if not isinstance(day_codes, list) or listing_code not in [str(c) for c in day_codes]:
+        _fail(
+            "action_authority_security_day_not_signed",
+            "(security "
+            + listing_code
+            + ", T "
+            + iso
+            + ") is not in the signed accepted_codes_by_date",
+        )
+    required = {
+        _text(u, "accepted.required_uses[]")
+        for u in _seq(acc.get("required_uses", ()), "accepted.required_uses")
+    }
+    if not {"scan_two_session", "returns_61_session"} <= required:
+        _fail(
+            "action_authority_required_uses_missing",
+            "signed table does not require both window purposes",
+        )
+    # windows_sha256 pins the signed windows INDEX document; verify the bytes
+    # the caller supplied for accepted.windows_file when present.
+    acc_windows_file = acc.get("windows_file")
+    if acc_windows_file is not None:
+        acc_windows_sha = _sha256(acc.get("windows_sha256"), "accepted.windows_sha256")
+        if index_doc is not None and windows_index_sha != acc_windows_sha:
+            _fail(
+                "action_authority_windows_index_sha_mismatch",
+                "selected index member differs from the signed windows index",
+            )
+        idx_b = members.get(str(acc_windows_file))
+        if idx_b is not None and _member_sha(idx_b) != acc_windows_sha:
+            _fail(
+                "action_authority_windows_index_sha_mismatch",
+                "signed windows index member sha != accepted.windows_sha256",
+            )
+        if windows_index_sha is None and idx_b is not None:
+            windows_index_sha = acc_windows_sha
+    member_map_sha = _sha256(acc.get("source_members_sha256"), "accepted.source_members_sha256")
+
+    # 3. Rebuild the two windows for THIS security/T.
+    rows = [
+        w
+        for w in _seq(windows_doc.get("windows"), "windows.windows")
+        if isinstance(w, Mapping)
+        and str(w.get("security_code")) == listing_code
+        and str(w.get("T")) == iso
+    ]
+
+    def _find(use: str) -> dict[str, Any] | None:
+        for w in rows:
+            if str(w.get("use")) == use:
+                return dict(w)
+        return None
+
+    scan_w = _find("scan_previous_and_T")
+    returns_w = _find("61_session_total_return_and_exceptions")
+    scan_member_sha = returns_member_sha = batch_windows_sha
+
+    # Fallback: the signed windows INDEX (WINDOW-USE.json) carries the per-
+    # (code,T) window for signed security-days the batch member does not cover.
+    # Its row names code/signal_date/security_id/listing_id/venue_id and a
+    # `scan` + `returns` sub-record; map it to the same internal shape.
+    if (scan_w is None or returns_w is None) and index_doc is not None:
+        assert windows_index_sha is not None  # returned by _resolve for this index
+        idx_row = None
+        for x in _seq(index_doc.get("windows"), "index.windows"):
+            if (
+                isinstance(x, Mapping)
+                and str(x.get("code")) == listing_code
+                and str(x.get("signal_date")) == iso
+            ):
+                idx_row = dict(x)
+                break
+        if idx_row is not None:
+            idx_scan = idx_row.get("scan") or {}
+            idx_ret = idx_row.get("returns") or {}
+            if scan_w is None and idx_scan:
+                scan_member_sha = windows_index_sha
+                scan_w = {
+                    "use": "scan_previous_and_T",
+                    "event_state": _text(idx_scan.get("state"), "index.scan.state"),
+                    "session_states": [
+                        {
+                            "session": s.get("date"),
+                            "event_state": (
+                                "verified_event"
+                                if s.get("adjustment_effective")
+                                else "verified_none"
+                            ),
+                        }
+                        for s in _seq(idx_scan.get("sessions"), "index.scan.sessions")
+                    ],
+                    "sessions": [
+                        s.get("date") for s in _seq(idx_scan.get("sessions"), "index.scan.sessions")
+                    ],
+                    "security_id": idx_row.get("security_id"),
+                    "listing_id": idx_row.get("listing_id"),
+                    "venue_id": idx_row.get("venue_id"),
+                    "observed_at": (idx_row.get("original_clocks") or {}).get("observed_at"),
+                    "verified_at": (idx_row.get("original_clocks") or {}).get("verified_at"),
+                }
+            if returns_w is None and idx_ret:
+                returns_member_sha = windows_index_sha
+                returns_w = {
+                    "use": "61_session_total_return_and_exceptions",
+                    "event_state": _text(idx_ret.get("state"), "index.returns.state"),
+                    "sessions": [
+                        _text(d, "index.returns.sessions[]")
+                        for d in _seq(idx_ret.get("sessions"), "index.returns.sessions")
+                    ],
+                    "effective_dates_in_60_return_intervals": [
+                        e.get("ex_date")
+                        for e in _seq(idx_ret.get("events", ()), "index.returns.events")
+                    ],
+                    "_index_events": _seq(idx_ret.get("events", ()), "index.returns.events"),
+                    "security_id": idx_row.get("security_id"),
+                    "listing_id": idx_row.get("listing_id"),
+                    "venue_id": idx_row.get("venue_id"),
+                    "observed_at": (idx_row.get("original_clocks") or {}).get("observed_at"),
+                    "verified_at": (idx_row.get("original_clocks") or {}).get("verified_at"),
+                }
+    if scan_w is None or returns_w is None:
+        _fail(
+            "action_authority_window_missing",
+            "no window for " + listing_code + " T=" + iso + " in batch member or signed index",
+        )
+    for w in (scan_w, returns_w):
+        for key, expected in (
+            ("security_id", security_id),
+            ("listing_id", listing_id),
+            ("venue_id", venue_id),
+        ):
+            if str(w.get(key)) != expected:
+                _fail(
+                    "action_authority_identity_mismatch",
+                    "window "
+                    + repr(w.get("use"))
+                    + " "
+                    + key
+                    + " "
+                    + repr(w.get(key))
+                    + " != frozen "
+                    + repr(expected),
+                )
+
+    # scan window -> loader's scan_sessions shape
+    scan_sessions = []
+    for s in _seq(scan_w.get("session_states"), "window.session_states"):
+        so = _obj(s, "window.session_states[]")
+        st = _text(so.get("event_state"), "session_states[].event_state")
+        scan_sessions.append(
+            {
+                "date": _isodate(so.get("session"), "session_states[].session").isoformat(),
+                "adjustment_effective": st == "verified_event",
+            }
+        )
+
+    # returns window -> sessions + declared events joined to bound terms
+    returns_sessions = [
+        _isodate(d, "window.sessions[]").isoformat()
+        for d in _seq(returns_w.get("sessions"), "window.sessions")
+    ]
+    returns_state = _text(returns_w.get("event_state"), "window.event_state")
+    # 4. Catalogue of named original rows the bound credential verified.
+    #    SSE events carry sse_directory_positive.evidence.source_row_ordinal;
+    #    SZSE events name the issuer notice_id and a version/raw implementation
+    #    sha instead - both resolve to the row's register key + impl digest.
+    # Index-sourced windows carry their own pre-normalized event rows (full
+    # terms + register_row + implementation sha) - use them directly; batch
+    # windows use the events member filtered to this security.
+    idx_events = returns_w.get("_index_events") or []
+    if idx_events:
+        ev_rows = [e for e in idx_events if isinstance(e, Mapping)]
+    else:
+        ev_rows = [
+            e
+            for e in _seq(events_doc.get("events"), "events.events")
+            if isinstance(e, Mapping) and str(e.get("security_code")) == listing_code
+        ]
+    cat_rows: dict[Any, dict[str, Any]] = {}
+    event_rows: list[dict[str, Any]] = []
+    effective_dates = {
+        str(d)
+        for d in _seq(
+            returns_w.get("effective_dates_in_60_return_intervals"),
+            "window.effective_dates_in_60_return_intervals",
+        )
+    }
+    for e in ev_rows:
+        pos = e.get("sse_directory_positive")
+        pos_e = (
+            _obj(pos.get("evidence"), "sse_directory_positive.evidence")
+            if isinstance(pos, Mapping)
+            else {}
+        )
+        reg_row: Any = pos_e.get("source_row_ordinal")
+        if reg_row is None:
+            reg_row = e.get("register_row")
+        if reg_row is None:
+            reg_row = e.get("notice_id") or e.get("notice")
+        if reg_row is None:
+            _fail("action_authority_event_no_register", "event has no register key")
+        # implementation digest: official_pdf.sha256 (SSE), version/raw.sha256
+        # (SZSE batch), or implementation_sha256 (signed-index normalized row).
+        impl_raw = e.get("official_pdf")
+        impl: str | None = None
+        if isinstance(impl_raw, Mapping) and impl_raw.get("sha256"):
+            impl = _sha256(impl_raw.get("sha256"), "events[].official_pdf.sha256")
+        else:
+            for cand in (
+                e.get("implementation_sha256"),
+                e.get("version"),
+                (e.get("raw") or {}).get("sha256") if isinstance(e.get("raw"), Mapping) else None,
+            ):
+                if cand:
+                    impl = _sha256(cand, "events[].implementation sha")
+                    break
+        if impl is None:
+            _fail("action_authority_event_no_implementation", "event has no implementation sha")
+        row = {
+            "register_row": reg_row,
+            "ex_date": _text(e.get("ex_date"), "events[].ex_date"),
+            "cash_gross_per_share": _text(
+                e.get("cash_dividend_per_share_gross")
+                if e.get("cash_dividend_per_share_gross") is not None
+                else e.get("cash_gross_per_share"),
+                "events[].cash_dividend_per_share_gross",
+            ),
+            "bonus_share_ratio": _text(e.get("bonus_share_ratio"), "events[].bonus_share_ratio"),
+            "transfer_share_ratio": _text(
+                e.get("transfer_share_ratio"), "events[].transfer_share_ratio"
+            ),
+            "currency": _text(e.get("currency"), "events[].currency"),
+            "implementation_sha256": impl,
+            "notice": _text(e.get("notice_id") or e.get("notice"), "events[].notice_id"),
+            "security_id": str(e.get("security_id")),
+            "listing_id": str(e.get("listing_id")),
+            "venue_id": str(e.get("venue_id")),
+            "stock_code": stock_code,
+        }
+        cat_rows[reg_row] = row
+        ex_iso = row["ex_date"]
+        if returns_state == "verified_event" and ex_iso in effective_dates:
+            event_rows.append(
+                {
+                    "ex_date": ex_iso,
+                    "cash_gross_per_share": row["cash_gross_per_share"],
+                    "bonus_share_ratio": row["bonus_share_ratio"],
+                    "transfer_share_ratio": row["transfer_share_ratio"],
+                    "currency": row["currency"],
+                    "implementation_sha256": impl,
+                    "register_row": reg_row,
+                    "notice": row["notice"],
+                }
+            )
+    cov_id = coverage_id or coverage_doc.get("coverage_id") or coverage_doc.get("id")
+    if not cov_id:
+        # SZSE coverage.json carries no coverage_id; derive a stable register id
+        # from the batch RESULT id + venue, never from the member bytes' hash.
+        cov_id = (
+            str(pointer_root.get("id", "batch"))
+            + "-"
+            + str(coverage_doc.get("register", {}).get("venue", venue_id)).replace("XSHE", "XSHE")
+            + "-action-coverage"
+        )
+    batch_id = _text(pointer_root.get("batch", pointer_root.get("id")), "pointer_root.batch")
+    cred = {
+        "batch_id": batch_id,
+        "manifest_sha256": manifest_sha,
+        "result_sha256": result_decl,
+        "accepted_sha256": accepted_decl,
+        "reader": _SIGNED_ACTION_READER,
+    }
+    if routes_sha is not None:
+        cred["routes_sha256"] = routes_sha
+    catalog = {
+        "coverage_id": cov_id,
+        "digest": sha256_digest(
+            {str(k): v for k, v in sorted(cat_rows.items(), key=lambda kv: str(kv[0]))}
+        ),
+        "producer": _SIGNED_ACTION_PRODUCER,
+        "authority": {
+            "manifest_sha256": manifest_sha,
+            "result_sha256": result_decl,
+            "accepted_sha256": accepted_decl,
+            "batch_id": batch_id,
+        },
+        "rows": list(cat_rows.values()),
+    }
+
+    def _ev(
+        purpose: str, w: dict[str, Any], member_sha: str, extra: dict[str, Any]
+    ) -> dict[str, Any]:
+        return {
+            "security_code": listing_code,
+            "signal_date": iso,
+            "purpose": purpose,
+            "event_state": _text(w.get("event_state"), "window.event_state"),
+            "coverage_id": cov_id,
+            "member_sha256": member_sha,
+            "member_map_sha256": member_map_sha,
+            "credential": dict(cred),
+            "observed_at": w.get("observed_at"),
+            "verified_at": w.get("verified_at"),
+            **extra,
+        }
+
+    return {
+        "default_state": "unknown",
+        "registers": [
+            {
+                "coverage_id": cov_id,
+                "version": str(coverage_doc.get("version", "1")),
+                "sha256": _member_sha(coverage_b),
+                "venue_id": venue_id,
+                "event_types": [
+                    _text(t, "coverage.categories[]")
+                    for t in _seq(coverage_doc.get("categories", ()), "coverage.categories")
+                ],
+                "source_member_id": coverage_rel,
+            }
+        ],
+        "securities": [
+            {
+                "security_code": security_code,
+                "security_id": security_id,
+                "listing_id": listing_id,
+                "venue_id": venue_id,
+            }
+        ],
+        "window_evidence": [
+            _ev(
+                "scan_two_session",
+                scan_w,
+                scan_member_sha,
+                {
+                    "scan_sessions": scan_sessions,
+                    "sessions": [s["date"] for s in scan_sessions],
+                },
+            ),
+            _ev(
+                "returns_61_session",
+                returns_w,
+                returns_member_sha,
+                {"sessions": returns_sessions, "events": event_rows},
+            ),
+        ],
+        "verified_artifacts": [catalog],
+        "bound_provenance": {
+            "manifest_sha256": manifest_sha,
+            "result_sha256": result_decl,
+            "accepted_sha256": accepted_decl,
+            "source_members_sha256": member_map_sha,
+            "windows_index_sha256": windows_index_sha,
+            "routes_sha256": routes_sha,
+            "batch_id": batch_id,
+        },
+        "note": (
+            "derived from Owner-signed member bytes resolved through the pinned "
+            "MANIFEST; caller-copied fields are not independently qualifying"
+        ),
+    }
 
 
 def _dedupe_action_rows(actions: Any) -> list[Any]:
@@ -838,6 +1506,13 @@ def _dedupe_action_rows(actions: Any) -> list[Any]:
     """
     if not isinstance(actions, Sequence) or isinstance(actions, str):
         return list(actions) if isinstance(actions, Sequence) else []
+
+    def _nd(v: Any) -> Decimal | None:
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return None
+
     seen: set[tuple[Any, ...]] = set()
     out: list[Any] = []
     for a in actions:
@@ -846,12 +1521,14 @@ def _dedupe_action_rows(actions: Any) -> list[Any]:
             continue
         eff = a.get("effective_date")
         eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
+        ka = a.get("known_at")
+        ka_iso = ka.isoformat() if isinstance(ka, (date, datetime)) else str(ka)
         key = (
             str(a.get("security_code")),
             eff_iso,
-            str(a.get("cash_dividend_per_share")),
-            str(a.get("bonus_share_ratio")),
-            str(a.get("known_at")),
+            _nd(a.get("cash_dividend_per_share")),
+            _nd(a.get("bonus_share_ratio")),
+            ka_iso,
         )
         if key in seen:
             continue
@@ -860,16 +1537,24 @@ def _dedupe_action_rows(actions: Any) -> list[Any]:
     return out
 
 
-def _actions_in_window(actions: Any, code: str, window_sessions: Sequence[str]) -> bool:
-    """True when any projected action has an effective_date inside the return
-    window (first_close, last_close] = window_sessions[1:]."""
+def _actions_in_window(
+    actions: Any, codes: tuple[str, ...], window_sessions: Sequence[str]
+) -> bool:
+    """True when any projected action for THIS security has an effective_date
+    inside the return window (first_close, last_close] = window_sessions[1:].
+
+    The action row key is the source stock_code (e.g. sh.600000); a bare
+    listing_code is admitted only when it is the identity's own listing_code.
+    An action row keyed to neither code is not this security's action.
+    """
+    allowed = {c for c in codes if c}
     if not isinstance(actions, Sequence) or isinstance(actions, str):
         return False
     window_set = set(window_sessions[1:])
     for a in actions:
         if not isinstance(a, Mapping):
             continue
-        if str(a.get("security_code")) != code:
+        if str(a.get("security_code")) not in allowed:
             continue
         eff = a.get("effective_date")
         eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
@@ -879,7 +1564,13 @@ def _actions_in_window(actions: Any, code: str, window_sessions: Sequence[str]) 
 
 
 def _returns_events_join_actions(
-    events: Any, actions: Any, code: str, window_sessions: Sequence[str]
+    events: Any,
+    actions: Any,
+    codes: tuple[str, ...],
+    window_sessions: Sequence[str],
+    identity: Mapping[str, Any] | None = None,
+    bound_artifacts: Mapping[str, Mapping[Any, Mapping[str, Any]]] | None = None,
+    coverage_id: str | None = None,
 ) -> bool:
     """Join verified returns events to the projected actions[] for this security.
 
@@ -892,9 +1583,12 @@ def _returns_events_join_actions(
         (the panel's single dilution ratio; summed once, never double-counted)
       event.currency must be CNY (the amount column's declared unit)
       action.known_at must precede effective_date (the panel's mapped_actions filter)
-      event.implementation_sha256 / register_row bind the original register row.
+      event.implementation_sha256 / register_row / notice bind the named
+        register artifact the bound credential actually verified.
     """
     window_set = set(window_sessions[1:])
+    ident = identity or {}
+    allowed_codes = {c for c in codes if c}
 
     def _dec(v: Any) -> Decimal | None:
         try:
@@ -903,14 +1597,27 @@ def _returns_events_join_actions(
             return None
 
     def _event_ex(e: Mapping[str, Any]) -> str | None:
+        """Parse the declared ex_date strictly; an unparseable date is NOT
+        skipped (that would silently admit a malformed row) - it returns the
+        sentinel '!' which never matches an in-window or out-window date, and
+        the caller treats it as a hard failure below."""
         ex = e.get("ex_date")
-        return ex.isoformat() if isinstance(ex, date) else (str(ex) if ex else None)
+        if ex is None:
+            return None
+        if isinstance(ex, date):
+            return ex.isoformat()
+        try:
+            return date.fromisoformat(str(ex)).isoformat()
+        except (ValueError, TypeError):
+            return "!"
 
-    # Index in-window projected actions by effective_date for this security.
+    # Index in-window projected actions by effective_date for THIS security.
+    # The action row key is the source stock_code (e.g. sh.600000); a bare
+    # listing_code is admitted only when it is the identity's own listing_code.
     window_actions: dict[str, list[Mapping[str, Any]]] = {}
     if isinstance(actions, Sequence) and not isinstance(actions, str):
         for a in actions:
-            if not isinstance(a, Mapping) or str(a.get("security_code")) != code:
+            if not isinstance(a, Mapping) or str(a.get("security_code")) not in allowed_codes:
                 continue
             eff = a.get("effective_date")
             eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
@@ -949,7 +1656,12 @@ def _returns_events_join_actions(
         if not isinstance(e, Mapping):
             return False
         ex_iso = _event_ex(e)
-        if ex_iso is None or ex_iso not in window_set:
+        if ex_iso == "!" or ex_iso is None:
+            # An unparseable or absent ex_date on a declared verified event is
+            # a hard failure, not an out-of-window skip - the caller asserted
+            # a concrete event and the row cannot be located.
+            return False
+        if ex_iso not in window_set:
             # An event outside (first_close, last_close] does not affect these
             # returns; it is neither required nor a conflict for THIS window.
             continue
@@ -969,6 +1681,60 @@ def _returns_events_join_actions(
             return False
         declared_terms[ex_iso] = this_terms
         declared_dates.add(ex_iso)
+        # Original provenance: the declared implementation_sha256 /
+        # register_row / notice must hit the named row in the verified
+        # artifact catalogue the bound credential actually verified - a
+        # caller may not self-declare a forged register row, and an event
+        # whose coverage register carries NO catalogue has no object the
+        # provenance can bind to, so the verified_event is refused (the
+        # evidence grade is preserved, never upgraded by a non-null field).
+        cat = (bound_artifacts or {}).get(coverage_id) if coverage_id else None
+        if cat is None:
+            return False
+        artifacts = cat.get("rows", cat) if isinstance(cat, Mapping) else cat
+        reg_row = e.get("register_row")
+        reg_key: Any
+        try:
+            reg_key = int(reg_row)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            reg_key = str(reg_row)
+        row = artifacts.get(reg_key) or artifacts.get(str(reg_row))
+        if row is None:
+            return False
+        impl = row.get("implementation_sha256") or row.get("sha256")
+        if impl is None or str(e.get("implementation_sha256")) != str(impl):
+            return False
+        notice = row.get("notice") or row.get("notice_id")
+        if notice is not None and str(e.get("notice")) != str(notice):
+            return False
+        # Bind the verified security identity the row names.
+        for k in ("security_id", "listing_id", "venue_id"):
+            rv = row.get(k)
+            if rv is not None and ident.get(k) is not None and str(rv) != str(ident.get(k)):
+                return False
+        # Source terms: the catalogue row's original clause must equal the
+        # event's declared clause AND the projected action's clause.  A row
+        # may carry the true announcement digest while the event/action use a
+        # different economic term - compare ex_date, cash, bonus+transfer
+        # (combined once) and currency so the real clause actually governs.
+        row_ex = row.get("ex_date")
+        row_ex_iso = (
+            row_ex.isoformat()
+            if isinstance(row_ex, date)
+            else (str(row_ex) if row_ex is not None else None)
+        )
+        if row_ex_iso is not None and row_ex_iso != ex_iso:
+            return False
+        row_cash = _dec(row.get("cash_gross_per_share"))
+        row_bonus = _dec(row.get("bonus_share_ratio"))
+        row_transfer = _dec(row.get("transfer_share_ratio"))
+        if row_cash is None or row_bonus is None or row_transfer is None:
+            return False
+        if row_cash != cash or (row_bonus + row_transfer) != expected_bonus:
+            return False
+        row_cur = row.get("currency")
+        if row_cur is not None and str(row_cur) != "CNY":
+            return False
         cands = distinct_window_actions.get(ex_iso) or []
         matched = False
         for a in cands:
@@ -987,7 +1753,20 @@ def _returns_events_join_actions(
                 except ValueError:
                     ka_date = None
                 if ka_date is not None and ka_date < date.fromisoformat(ex_iso):
-                    matched = True
+                    # The action row key already bound this security via
+                    # allowed_codes; if it also names security_id/listing_id
+                    # /venue_id they must equal the frozen identity.
+                    row_ok = True
+                    for k in ("security_id", "listing_id", "venue_id"):
+                        rv = a.get(k)
+                        if (
+                            rv is not None
+                            and ident.get(k) is not None
+                            and str(rv) != str(ident.get(k))
+                        ):
+                            row_ok = False
+                    if row_ok:
+                        matched = True
         if not matched:
             return False
 
@@ -1046,28 +1825,54 @@ def _sessions_have_effective_action(scan: Mapping[str, Any]) -> bool:
 
 
 def _scan_events_resolvable(events: Any, scan_sessions: Any) -> bool:
-    """True when a scan verified_event names a resolvable adjustment row.
+    """True when a scan verified_event names a resolvable adjustment bound to
+    one of the two scanned sessions.
 
-    A scan 'verified_event' state must reach a concrete event row carrying an
-    ex-date (or session date) or an explicit adjustment_effective marker - a
-    bare positive label with no bindable subtype row is self-contradictory and
-    the caller keeps the security out rather than granting a free clean scan.
+    A scan 'verified_event' must reach a concrete event row that either marks
+    a scanned session adjustment_effective or names an ex/effective/session
+    date ON one of the two scanned days.  A positive label whose rows only
+    carry unrelated dates is evidence-bound-to-nothing - the security is
+    isolated, never granted a free clean scan.  (A real on-session ex-date
+    separately blocks the entry via _sessions_have_effective_action; this
+    check catches the 'verified but for another day' contradiction.)
     """
+    scanned: set[str] = set()
+    for sess in scan_sessions or ():
+        if isinstance(sess, Mapping):
+            d = sess.get("date")
+            if d is not None:
+                scanned.add(d.isoformat() if isinstance(d, date) else str(d))
+        elif isinstance(sess, str):
+            scanned.add(sess)
+
+    def _day(v: Any) -> str | None:
+        if isinstance(v, date):
+            return v.isoformat()
+        try:
+            return date.fromisoformat(str(v)).isoformat()
+        except (ValueError, TypeError):
+            return None
+
     evs = list(events or ())
     if not evs:
         return False
+    bound = False
     for e in evs:
         if not isinstance(e, Mapping):
             return False
-        # A resolvable row names WHEN the adjustment applies (ex_date or a
-        # session date inside the two scanned sessions) or carries an explicit
-        # adjustment marker; a row with neither is unbindable.
         if e.get("adjustment_effective") is True:
-            return True
-        ex = e.get("ex_date") or e.get("effective_date") or e.get("session_date") or e.get("date")
-        if ex is not None:
-            return True
-    return False
+            bound = True
+            continue
+        raw = e.get("ex_date") or e.get("effective_date") or e.get("session_date") or e.get("date")
+        if raw is None:
+            return False
+        day = _day(raw)
+        if day is None:
+            # An unparseable date on a declared verified row is a hard failure.
+            return False
+        if day in scanned:
+            bound = True
+    return bound
 
 
 # Raw-term fields a positive returns event must carry verbatim, per

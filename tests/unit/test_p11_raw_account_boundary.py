@@ -113,11 +113,14 @@ def test_held_pending_overlap_still_reviews_the_position(runner, resources):
     assert "position return unavailable" in str(decision.explanations)
 
 
-def test_account_hint_without_market_rows_still_raises_alert(runner, resources):
+def test_account_hint_without_market_rows_blocks_entry_without_inventing_hold(runner, resources):
     _, _, account = original._producer_inputs()
     account = replace(account, active_or_reserved_security_codes=("600001",))
     output = original._run(runner, resources, [original._trend_raw("600000")], account=account)
-    _assert_hold_alert(output, "600001")
+    assert output.seam.held_decisions == ()
+    unknown = output.source_closure["account_membership"][1]
+    assert unknown["security_code"] == "600001" and unknown["held"] is False
+    assert unknown["membership_source"] == "combined_account_hint"
     assert _entry_codes(output) == {"600000"}
 
 

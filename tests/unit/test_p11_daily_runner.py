@@ -702,7 +702,8 @@ def test_r1_known_held_missing_facts_hold_alert_no_entry(runner, resources):
 
     facts, policy, account = _producer_inputs()
     account = _replace(account, active_or_reserved_security_codes=("600001",))
-    output = _run(runner, resources, [_quiet_held("600001")], account=account)
+    raw = _replace(_quiet_held("600001"), held_membership=True)
+    output = _run(runner, resources, [raw], account=account)
     actions = [d.action for d in output.seam.held_decisions]
     assert actions == ["hold_alert"], actions
     stages = [d.stage for ds in output.result.package.decision_sets for d in ds.decisions]
@@ -718,7 +719,7 @@ def test_r1_held_trigger_missing_facts_stays_hold_not_entry(runner, resources):
     facts, policy, account = _producer_inputs()
     account = _replace(account, active_or_reserved_security_codes=("600001",))
     raw = _trend_raw("600001")
-    raw = _replace(raw, position_facts=None)
+    raw = _replace(raw, held_membership=True, position_facts=None)
     output = _run(runner, resources, [raw], account=account)
     actions = [d.action for d in output.seam.held_decisions]
     assert actions == ["hold_alert"], actions
@@ -757,7 +758,9 @@ def test_r1_held_with_real_facts_exit_positive(runner, resources):
 def test_r1_pending_security_blocks_entry_no_held_review(runner, resources):
     """A pending open buy order blocks a new entry; it is not a held review."""
 
-    pending = _trend_raw("600001")
+    from dataclasses import replace as _replace
+
+    pending = _replace(_trend_raw("600001"), pending_kind="open_buy_order", pending_quantity=100)
     output = _run(
         runner,
         resources,

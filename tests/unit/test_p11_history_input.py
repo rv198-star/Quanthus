@@ -147,9 +147,13 @@ def _security_entry(raw: RawSecurityInput, **extra) -> dict:
             }
             for lf in raw.limits
         ],
-        "close_at_by_date": {d.isoformat(): t.isoformat() for d, t in raw.close_at_by_date.items()},
+        "close_at_by_date": {
+            d.isoformat(): (None if t is None else t.isoformat())
+            for d, t in raw.close_at_by_date.items()
+        },
         "knowledge_cutoff_by_date": {
-            d.isoformat(): t.isoformat() for d, t in raw.knowledge_cutoff_by_date.items()
+            d.isoformat(): (None if t is None else t.isoformat())
+            for d, t in raw.knowledge_cutoff_by_date.items()
         },
         **extra,
     }
@@ -1273,3 +1277,117 @@ def test_eqday_receipt_marks_proof_source_and_kind():
     # exact_instant kind when nothing needed the day bound
     _, receipts2 = raw_security_inputs_from_history(load_raw_history(_trend_envelope()))
     assert receipts2[0]["membership_proof"]["kind"] == "exact_instant"
+
+
+# --- oct08-context-real: date-context warm-up rows inside the as-observed envelope ---
+
+
+def _gap_clocked_entry(code="600000", gap_days=42):
+    """Security entry whose trailing gap window has null close/cutoff instants."""
+
+    from tests.unit.test_p11_daily_runner import _gap_clocked_raw
+
+    return _security_entry(_gap_clocked_raw(code, gap_days))
+
+
+def _gap_envelope(code="600000", venue="SSE", gap_days=42, days=260):
+    raw = _trend_raw(code)
+    sec = _gap_clocked_entry(code, gap_days)
+    cal_days = _weekdays_ending(TARGET, days)
+    return _envelope(
+        [sec],
+        calendar=_calendar(venue=venue, days=cal_days),
+        listing=[_listing(raw.identity.security_id, venue=venue, effective_from="2026-01-01")],
+    )
+
+
+def test_date_context_envelope_loads_and_projects():
+    """Explicit null close/cutoff entries load and project as declared absences."""
+
+    env = _gap_envelope()
+    history = load_raw_history(env)
+    inputs, _receipts = raw_security_inputs_from_history(history)
+    assert inputs
+    signal = date.fromisoformat(env["market_date"])
+    assert inputs[0].close_at_by_date[signal] is not None
+    gaps = [d for d, v in inputs[0].close_at_by_date.items() if v is None]
+    assert len(gaps) == 42
+
+
+def test_date_context_strict_envelope_still_blocks(runner, resources):
+    """Strict envelope: null warm-up instants stay a shared block."""
+
+    env = _gap_envelope()
+    with pytest.raises(ProductDailyError, match="missing_raw_inputs"):
+        run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+
+
+def test_date_context_numeric_context_gated(runner, resources):
+    """numeric_context without as_observed is a contract breach."""
+
+    env = _gap_envelope()
+    with pytest.raises(ProductDailyError, match="numeric_context"):
+        run_daily_advice_from_history(
+            env,
+            runner=runner,
+            resources=resources,
+            numeric_context="october_replay_as_observed",
+            **_run_kwargs(),
+        )
+
+
+def test_date_context_as_observed_equivalent(runner, resources):
+    """as_observed + named context reaches the same numeric path as full clocks."""
+
+    env = _gap_envelope()
+    out_ctx = run_daily_advice_from_history(
+        env,
+        runner=runner,
+        resources=resources,
+        as_observed=True,
+        numeric_context="october_replay_as_observed",
+        consumption_evidence={"replay": "oct08-42"},
+        **_run_kwargs(),
+    )
+    out_full = run_daily_advice_from_history(
+        _trend_envelope(), runner=runner, resources=resources, **_run_kwargs()
+    )
+    assert [d.disposition for d in out_ctx.seam.decisions] == [
+        d.disposition for d in out_full.seam.decisions
+    ]
+    assert [d.decision.to_dict() for d in out_ctx.seam.entries] == [
+        d.decision.to_dict() for d in out_full.seam.entries
+    ]
+    named = out_ctx.source_closure["consumption_evidence"]["date_context_rows"]
+    assert len(named) == 42
+
+
+def test_date_context_neighbor_isolated(runner, resources):
+    """A malformed neighbour is isolated while the date-context entry stands."""
+
+    good = _gap_clocked_entry("600000")
+    bad_raw = _trend_raw("600001")
+    bad = _security_entry(bad_raw)
+    bad["bars"] = []  # malformed market member -> per-security exclusion
+    cal_days = _weekdays_ending(TARGET, 200)
+    listing = [
+        _listing("security-600000", effective_from=cal_days[0].isoformat()),
+        _listing("security-600001", effective_from=cal_days[0].isoformat()),
+    ]
+    env = _envelope(
+        [good, bad],
+        calendar=_calendar(days=cal_days),
+        listing=listing,
+    )
+    out = run_daily_advice_from_history(
+        env,
+        runner=runner,
+        resources=resources,
+        as_observed=True,
+        numeric_context="october_replay_as_observed",
+        consumption_evidence={"replay": "oct08-42"},
+        **_run_kwargs(),
+    )
+    assert any(e["security_code"] == "600001" for e in out.source_closure["exclusions"])
+    named = out.source_closure["consumption_evidence"]["date_context_rows"]
+    assert len(named) == 42

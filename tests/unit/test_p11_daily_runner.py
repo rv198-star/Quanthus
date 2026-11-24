@@ -852,3 +852,148 @@ def test_r1_raw_to_p12_real_entry_plan(runner, resources):
         validated = validate(ds.to_dict())
     stages = [str(d.stage) for d in validated.decisions]
     assert any("ENTRY_PLAN" in s for s in stages), stages
+
+
+# --- oct08-context-real: single-T numeric context with null warm-up instants -------
+
+
+def _gap_clocked_raw(code: str, gap_days: int = 42) -> RawSecurityInput:
+    """The 600000/2026-10-08 shape: last <=61 sessions, early rows null instants.
+
+    Mirrors the P10 OPEN-AT-GAPS evidence: the bound venue calendar keeps the
+    session date/is_open flag but the native close/cutoff entries are explicit
+    nulls; T keeps its real close instant.  gap_days=42 counts the trailing
+    window sessions ending at T-1 (matching the 08-03..09-30 gap block).
+    """
+
+    from dataclasses import replace as _replace
+
+    raw = _trend_raw(code)
+    days = [bar.session_date for bar in raw.bars]
+    gaps = set(days[-(gap_days + 1) : -1])
+    assert len(gaps) == gap_days
+    close_map = dict(raw.close_at_by_date)
+    cutoff_map = dict(raw.knowledge_cutoff_by_date)
+    for day in gaps:
+        close_map[day] = None
+        cutoff_map[day] = None
+    return _replace(
+        raw,
+        close_at_by_date=close_map,
+        knowledge_cutoff_by_date=cutoff_map,
+    )
+
+
+def _run_context(runner, resources, raws, context=None, **kw):
+    return _run(
+        runner,
+        resources,
+        raws,
+        numeric_context=context,
+        consumption_evidence={"replay": "oct08-42"},
+        **kw,
+    )
+
+
+def test_date_context_strict_entry_refused(runner, resources):
+    """Without the named context a null warm-up instant stays a shared block."""
+
+    raw = _gap_clocked_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw])
+    assert "missing_raw_inputs" in str(exc.value)
+
+
+def test_date_context_context_kwarg_gated(runner, resources):
+    """numeric_context is required; an unknown context string fails loudly."""
+
+    raw = _gap_clocked_raw("600000")
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw], numeric_context="bogus_context")
+    assert "unknown_numeric_context" in str(exc.value)
+
+
+def test_date_context_warmup_rows_equivalent(runner, resources):
+    """Null-instant warm-up rows reach the same numeric path as full clocks.
+
+    Same 61 bars, last 22 scan sessions including T-1: the anchored run must
+    produce identical dispositions/package and identical four scan ratios as
+    the fully-clocked run, with every date-context row named in the closure.
+    """
+
+    gap = _gap_clocked_raw("600000")
+    full = _trend_raw("600000")
+    out_ctx = _run_context(runner, resources, [gap], context="october_replay_as_observed")
+    out_full = _run(runner, resources, [full])
+    assert [d.disposition for d in out_ctx.seam.decisions] == [
+        d.disposition for d in out_full.seam.decisions
+    ]
+    assert (out_ctx.result.package is not None) == (out_full.result.package is not None)
+    # The real entry (same bars trigger the real transition) is preserved.
+    assert [d.entry_allowed for d in out_ctx.seam.decisions] == [
+        d.entry_allowed for d in out_full.seam.decisions
+    ]
+    # The emitted candidate's four real scan ratios are identical (the
+    # numeric evidence digests match on the same bars).
+    # The four real scan ratios are identical: the emitted entry decision's
+    # canonical bytes bind the feature-evidence digest computed from the
+    # 22-session window, so equal digests prove equal ratios on equal bars.
+    ctx_decs = [d.decision.to_dict() for d in out_ctx.seam.entries]
+    full_decs = [d.decision.to_dict() for d in out_full.seam.entries]
+    assert ctx_decs == full_decs
+    # Every date-context row is named inside the signed closure.
+    named = out_ctx.source_closure["consumption_evidence"]["date_context_rows"]
+    assert len(named) == 42
+    assert {r["session_date"] for r in named} == {
+        b.session_date.isoformat()
+        for b in gap.bars
+        if b.session_date in {d for d, v in gap.close_at_by_date.items() if v is None}
+    }
+    assert all(r["kind"] == "date_context_warmup_row" for r in named)
+
+
+def test_date_context_missing_t_close_still_blocks(runner, resources):
+    """A missing native T close keeps blocking under the numeric context."""
+
+    from dataclasses import replace as _replace
+
+    raw = _gap_clocked_raw("600000")
+    signal = raw.bars[-1].session_date
+    close_map = dict(raw.close_at_by_date)
+    close_map[signal] = None
+    raw = _replace(raw, close_at_by_date=close_map)
+    with pytest.raises(ProductDailyError) as exc:
+        _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    assert "missing_raw_inputs" in str(exc.value)
+
+
+def test_date_context_partial_pair_still_blocks(runner, resources):
+    """close present + cutoff absent (or reverse) stays fail-closed."""
+
+    from dataclasses import replace as _replace
+
+    raw = _gap_clocked_raw("600000")
+    gap_days = [d for d, v in raw.close_at_by_date.items() if v is None]
+    day = gap_days[0]
+    cutoff_map = dict(raw.knowledge_cutoff_by_date)
+    cutoff_map[day] = raw.knowledge_cutoff_by_date[  # restore one side only
+        [d for d in raw.knowledge_cutoff_by_date if raw.knowledge_cutoff_by_date[d] is not None][0]
+    ]
+    raw = _replace(raw, knowledge_cutoff_by_date=cutoff_map)
+    with pytest.raises(ProductDailyError) as exc:
+        _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    assert "missing_raw_inputs" in str(exc.value)
+
+
+def test_date_context_held_member_uses_t_row(runner, resources):
+    """A held security's T row keeps its real instants for the held review."""
+
+    from dataclasses import replace as _replace
+
+    raw = _replace(_gap_clocked_raw("600000"), held_membership=True, held_quantity=1000)
+    out = _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    # Held review ran on the T row with its real instants.
+    held = [d for d in out.seam.held_decisions]
+    assert held, "a held member must produce a held review"
+    named = out.source_closure["consumption_evidence"]["date_context_rows"]
+    assert len(named) == 42

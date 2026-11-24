@@ -132,8 +132,13 @@ class CandidateDailyInput:
     instrument_type: str
     static_level1_industry_id: str | None
     session_date: date
-    close_at: datetime
-    knowledge_cutoff: datetime
+    # A qualified row carries its own session close + source knowledge instants.
+    # A replay warm-up row on a named open session whose native instants are
+    # absent may carry BOTH as None (a date-context row): its knowledge
+    # coordinate is then its business DATE under the ordered session
+    # sequence, never a borrowed clock.  A partial pair stays invalid.
+    close_at: datetime | None
+    knowledge_cutoff: datetime | None
     open_price: Decimal | None
     high_price: Decimal | None
     low_price: Decimal | None
@@ -154,9 +159,15 @@ class CandidateDailyInput:
             "instrument_type",
         ):
             _require_text(getattr(self, field_name), field_name)
-        _require_aware(self.close_at, "close_at")
-        _require_aware(self.knowledge_cutoff, "knowledge_cutoff")
-        if self.close_at.date() != self.session_date:
+        if (self.close_at is None) != (self.knowledge_cutoff is None):
+            raise CandidateScanError(
+                "close_at and knowledge_cutoff must be both present or both absent"
+            )
+        if self.close_at is not None:
+            _require_aware(self.close_at, "close_at")
+        if self.knowledge_cutoff is not None:
+            _require_aware(self.knowledge_cutoff, "knowledge_cutoff")
+        if self.close_at is not None and self.close_at.date() != self.session_date:
             raise CandidateScanError("close_at date must match session_date")
         if not isinstance(self.listing_sessions, int) or isinstance(self.listing_sessions, bool):
             raise CandidateScanError("listing_sessions must be an integer")
@@ -588,6 +599,11 @@ def _window_reason(
         return CandidateReason.INSTRUMENT_NOT_ALLOWED
     if current.listing_sessions < card.eligibility.minimum_listing_sessions:
         return CandidateReason.INSUFFICIENT_LISTING_HISTORY
+    if current.close_at is None or current.knowledge_cutoff is None:
+        # A signal row is never a date-context row: the current session's own
+        # native close and knowledge bound are required real coordinates (the
+        # missing_close_at gate owns the fail-closed name upstream).
+        return CandidateReason.MISSING_INPUT
     if prior.is_tradable is not True:
         return CandidateReason.T_MINUS_1_NOT_TRADABLE
     if current.is_tradable is not True:
@@ -595,7 +611,14 @@ def _window_reason(
     if prior.adjustment_effective is not False or current.adjustment_effective is not False:
         return CandidateReason.CORPORATE_ACTION_BOUNDARY
     for item in window:
-        if item.knowledge_cutoff > current.close_at:
+        if item.knowledge_cutoff is None:
+            # A date-context row carries no instant to compare; it qualifies by
+            # business date - strictly earlier than the current signal session,
+            # so its facts precede T close under the ordered session sequence.
+            # The current row itself always carries its real instants.
+            if item.session_date >= current.session_date:
+                return CandidateReason.KNOWLEDGE_AFTER_T_CLOSE
+        elif current.close_at is not None and item.knowledge_cutoff > current.close_at:
             return CandidateReason.KNOWLEDGE_AFTER_T_CLOSE
         prices = (item.open_price, item.high_price, item.low_price, item.close_price)
         if any(value is None for value in prices) or item.turnover is None:
@@ -770,6 +793,11 @@ def _precomputed_window_reason(
         return CandidateReason.INSTRUMENT_NOT_ALLOWED
     if current.listing_sessions < card.eligibility.minimum_listing_sessions:
         return CandidateReason.INSUFFICIENT_LISTING_HISTORY
+    if current.close_at is None or current.knowledge_cutoff is None:
+        # A signal row is never a date-context row: the current session's own
+        # native close and knowledge bound are required real coordinates (the
+        # missing_close_at gate owns the fail-closed name upstream).
+        return CandidateReason.MISSING_INPUT
     if prior.is_tradable is not True:
         return CandidateReason.T_MINUS_1_NOT_TRADABLE
     if current.is_tradable is not True:
@@ -777,7 +805,13 @@ def _precomputed_window_reason(
     if prior.adjustment_effective is not False or current.adjustment_effective is not False:
         return CandidateReason.CORPORATE_ACTION_BOUNDARY
     for index in range(first_index, current_index + 1):
-        if rows[index].knowledge_cutoff > (knowledge_deadline or current.close_at):
+        cutoff = rows[index].knowledge_cutoff
+        if cutoff is None:
+            # Date-context row: qualified by business date, not an invented
+            # instant - it must be strictly earlier than the signal session.
+            if rows[index].session_date >= current.session_date:
+                return CandidateReason.KNOWLEDGE_AFTER_T_CLOSE
+        elif cutoff > (knowledge_deadline or current.close_at):
             return CandidateReason.KNOWLEDGE_AFTER_T_CLOSE
         reason = row_reasons[index]
         if reason is not None:
@@ -1020,8 +1054,15 @@ def _scan_security_series(
                 company_id=current.company_id,
                 industry_id=current.static_level1_industry_id,
                 signal_date=current.session_date,
+                # The signal row always keeps its real native close; the
+                # window knowledge bound is the max over the instants actually
+                # present (date-context rows contribute no instant to compare -
+                # a strictly earlier business day precedes T close by the
+                # session order the replay envelope already declares).
                 signal_close=current.close_at,
-                knowledge_cutoff=max(item.knowledge_cutoff for item in window),
+                knowledge_cutoff=max(
+                    item.knowledge_cutoff for item in window if item.knowledge_cutoff is not None
+                ),
                 feature_start=features.feature_start,
                 entry_date=ordered_dates[trading_index + 1],
                 feature_evidence=features,

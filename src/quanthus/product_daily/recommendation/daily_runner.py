@@ -86,8 +86,13 @@ class RawSecurityInput:
     actions: tuple[CorporateAction, ...] = ()
     exceptions: tuple[ExceptionSpan, ...] = ()
     limits: tuple[LimitFacts, ...] = ()
-    close_at_by_date: Mapping[date, datetime] | None = None
-    knowledge_cutoff_by_date: Mapping[date, datetime] | None = None
+    # Explicit null entries are declared absences (the bound calendar kept the
+    # session date/is_open but no native instant), NOT a stored clock.  A
+    # date-context warm-up row joins the numeric window only under the
+    # versioned as-observed replay context; every other entry still fails
+    # closed on any missing instant.
+    close_at_by_date: Mapping[date, datetime | None] | None = None
+    knowledge_cutoff_by_date: Mapping[date, datetime | None] | None = None
     position_facts: HeldPositionFacts | None = None
     prior_deterioration_sessions: int | None = None
     # Explicit held membership: True = a confirmed open position, False = confirmed not
@@ -149,10 +154,15 @@ def raw_security_input_closure(item: RawSecurityInput) -> dict[str, Any]:
             return str(value)
         return value
 
-    def mapping_dates(table: Mapping[date, datetime] | None) -> dict[str, str] | None:
+    def mapping_dates(
+        table: Mapping[date, datetime | None] | None,
+    ) -> dict[str, str | None] | None:
         if table is None:
             return None
-        return {day.isoformat(): instant.isoformat() for day, instant in sorted(table.items())}
+        return {
+            day.isoformat(): (None if instant is None else instant.isoformat())
+            for day, instant in sorted(table.items())
+        }
 
     return {
         "identity": {k: norm(v) for k, v in asdict(item.identity).items()},
@@ -378,6 +388,16 @@ def run_daily_advice_from_raw(
     # observe instants, exclusions and the member catalogue).  Strict/daily
     # callers omit it and see no field.
     consumption_evidence: Mapping[str, Any] | None = None,
+    # Versioned single-T numeric context for the October replay.  Only the
+    # "october_replay_as_observed" context admits a date-context warm-up row:
+    # a bar strictly before T on a named open session whose close/cutoff
+    # entries are BOTH absent joins the numeric window with its own business
+    # date as the knowledge coordinate -- original nulls preserved, never a
+    # borrowed T clock or a fabricated 15:00/midnight.  Each admitted row is
+    # named inside the signed closure.  Any other value (or None) keeps the
+    # original per-bar instant requirement; a forward/H1/M2 caller cannot
+    # substitute this with an anchor or a bare boolean.
+    numeric_context: str | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Build real panel facts + the scan series from raw inputs, then run the core.
@@ -404,6 +424,13 @@ def run_daily_advice_from_raw(
     input_exclusions: list[dict[str, Any]] = list(caller_input_exclusions or ())
     signal_date = facts.market_date
     all_trading_dates: set[date] = set()
+    date_context_rows: list[dict[str, Any]] = []
+    # The named numeric context is the ONLY thing that admits a date-context
+    # row.  It is established by the versioned as-observed replay entry, not by
+    # a caller-supplied anchor or flag; the string is asserted below so an
+    # unrecognized context fails loudly instead of silently widening.
+    if numeric_context not in (None, "october_replay_as_observed"):
+        raise ProductDailyError("unknown_numeric_context", f"numeric_context {numeric_context!r}")
     # Account and raw closures are bound even when a particular market input fails.
     raw_closures = [raw_security_input_closure(item) for item in raw]
 
@@ -430,12 +457,31 @@ def run_daily_advice_from_raw(
             )
             action_dates = {action.effective_date for action in item.actions}
             security_rows: list[CandidateDailyInput] = []
+            security_date_rows: list[dict[str, Any]] = []
             for bar in sorted(item.bars, key=lambda row: row.session_date):
                 day = bar.session_date
                 if day > signal_date:
                     continue
                 close_at, cutoff = close_map.get(day), cutoff_map.get(day)
-                if close_at is None or cutoff is None:
+                if (
+                    close_at is None
+                    and cutoff is None
+                    and day < signal_date
+                    and numeric_context == "october_replay_as_observed"
+                ):
+                    # Date-context warm-up row: original nulls preserved.  The
+                    # scan treats its session_date as the knowledge coordinate
+                    # (strictly earlier than T under the declared sequence); T
+                    # itself still requires its real close, and a partial pair
+                    # (close without cutoff, or the reverse) stays fail-closed.
+                    security_date_rows.append(
+                        {
+                            "security_code": code,
+                            "session_date": day.isoformat(),
+                            "kind": "date_context_warmup_row",
+                        }
+                    )
+                elif close_at is None or cutoff is None:
                     raise ProductDailyError("missing_session_clock", f"{code}: {day}")
                 security_rows.append(
                     daily_input_from_bar(
@@ -468,6 +514,7 @@ def run_daily_advice_from_raw(
         # Commit both projections together, only after this security is fully valid.
         features_by_security[code] = facts_row
         scan_rows.extend(security_rows)
+        date_context_rows.extend(security_date_rows)
         all_trading_dates.update(security_dates)
         if item.prior_deterioration_sessions is not None:
             prior_det[code] = item.prior_deterioration_sessions
@@ -486,9 +533,18 @@ def run_daily_advice_from_raw(
         # caller's real objects, so the report is this job's actual computation.
         import dataclasses as _dc
 
-        resources = _dc.replace(
-            resources, panel_report=panel_report_factory(features_by_security)
-        )
+        resources = _dc.replace(resources, panel_report=panel_report_factory(features_by_security))
+
+    if date_context_rows:
+        # Every date-context warm-up row admitted under the named context is
+        # named inside the signed closure (code, session_date, kind) -- the
+        # original nulls stay original, never a clock borrowed from T.  The
+        # evidence dict is caller-owned; copy before attaching.
+        consumption_evidence = {
+            **(dict(consumption_evidence) if consumption_evidence else {}),
+            "date_context_rows": tuple(date_context_rows),
+            "numeric_context": numeric_context,
+        }
 
     return run_daily_advice(
         runner=runner,

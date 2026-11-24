@@ -731,7 +731,14 @@ def evaluate_day(
     excluded: list[dict[str, str]] = []
     source_rows: dict[tuple[str, date], list[CandidateDailyInput]] = {}
     for row in rows:
-        if row.knowledge_cutoff <= knowledge_cutoff:
+        if row.knowledge_cutoff is None:
+            # A date-context warm-up row carries no instant; it qualifies by
+            # business date -- strictly earlier than the declared decision
+            # cutoff's session day under the ordered session sequence, never
+            # a borrowed clock.
+            if row.session_date < knowledge_cutoff.date():
+                source_rows.setdefault((row.listing_code, row.session_date), []).append(row)
+        elif row.knowledge_cutoff <= knowledge_cutoff:
             source_rows.setdefault((row.listing_code, row.session_date), []).append(row)
     for candidate in candidates:
         code = candidate.listing_code

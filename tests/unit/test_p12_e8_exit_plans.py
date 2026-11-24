@@ -698,6 +698,36 @@ def test_sell_confirm_refused_outside_bound_session(tmp_path):
     assert app.paper_projection().quantity("600000") == 0
 
 
+def test_sell_confirm_refused_during_lunch_break(tmp_path):
+    # r4 delta: the bound-session lunch break sits outside continuous
+    # auction, so an 11:45 confirm is refused like the pre/post-close
+    # cases (advisory, nothing persisted, the id stays usable); the same
+    # id confirms at the 13:00 resume and re-sizes on the live mark.
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    open_ = day.replace(day=20, hour=9, minute=30)
+    lunch = open_.replace(hour=11, minute=45)
+    resume = open_.replace(hour=13, minute=0)
+    box = [lunch]
+    ds = _set_for(day.date(), (_exit_decision(exit_kind="full", fraction=None),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    for ev in _buy_events(day):
+        app.submit_order_event(app.scope, ev)
+    paper = _paper(app, tmp_path, box)
+    plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
+    # lunch_break is not a confirmable state for a bound sell.
+    mid = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
+    assert mid.status == "rejected" and mid.reason_code == "MARKET_CLOSED"
+    assert paper._store.get(plan_id, app.scope.account_id) is None
+    assert app.paper_projection().quantity("600000") == 400
+    # At the 13:00 resume the same confirm id re-sizes live and fills.
+    box[0] = resume
+    paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
+    opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
+    assert opened.status == "filled" and opened.filled_qty == 400
+    assert app.paper_projection().quantity("600000") == 0
+
+
 def test_sell_confirm_refused_on_disagreeing_calendar(tmp_path):
     # r4: a sell confirm outside the bound next_session is refused, even
     # while the quote clock reads a trading day - the package binds

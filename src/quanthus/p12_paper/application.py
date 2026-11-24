@@ -576,12 +576,14 @@ class PaperAccount:
         # after the T close, so its confirm rests until the bound session
         # open).  A suspended or quoteless security still refuses up front.
         if command.side == "sell" and bound_session_date is not None:
-            # The confirmable window is the bound session's trading day from
-            # its 09:30 open through the 15:00 close - continuous auction and
-            # the midday break both sit inside it; a resting sell simply
-            # cannot match until the afternoon resumes.
+            # The confirmable window is the bound session's continuous
+            # auction only - the same window the matcher trades in.  The
+            # midday lunch break sits outside continuous auction, so an
+            # 11:45 confirm is refused like the pre-open/post-close cases;
+            # the same order id may confirm again at the 13:00 resume and
+            # re-sizes on the facts live at that instant (E8 r4 delta).
             bound_open = (
-                session["market_state"] in ("trading", "lunch_break")
+                session["market_state"] == "trading"
                 and session["trading_date"] == bound_session_date
             )
             if not bound_open:

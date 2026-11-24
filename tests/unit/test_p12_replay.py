@@ -693,3 +693,104 @@ class TestCoverageDisplay:
         only = pool_only_block(2, delivered_codes=["600000", "000002"])
         assert only["pool_count"] == 2
         assert only["evaluated_count"] is None
+
+
+class TestR5ExpireAndSkip:
+    '''R5 #1: advancing into the bound session's open proactively expires a
+    never-confirmed executable advice - no confirm click needed.  A new
+    package, a later day or a restart reuses the SAME original-ID receipt.
+    R5 #2: a SKIPPED plan is listed by plan_id with its real receipt.'''
+
+    def _bar(self, code, d, open_="9.79"):
+        from decimal import Decimal
+        from quanthus.p12_replay.replay_quotes import DayBar
+        return DayBar(security_code=code, trade_date=d, open=Decimal(open_),
+                      high=Decimal("9.9"), low=Decimal("9.6"),
+                      close=Decimal("9.8"), volume=1, amount=Decimal("1"))
+
+    def _engine(self, tmp_path, sessions, bars_by_day):
+        from quanthus.p12_replay.engine import ReplayEngine
+        from quanthus.p12_replay.replay_product import ReplayInputSpec
+        from quanthus.p12_daily.rule_runner import SyntheticRuleRunner
+        class _App:
+            def __init__(self):
+                self.reports = []
+                self.observations = []
+            def workbench(self, scope):
+                class V: pass
+                return V()
+            def records(self, scope):
+                class V:
+                    history = type('H',(),{'outbox_pending':0})()
+                    reports=(); orders=(); plans=(); events=()
+                return V()
+            def paper_projection(self):
+                class P: cash=0; positions=()
+                return P()
+            def paper_history(self):
+                class H: orders=(); reports=()
+                return H()
+            def rebuild_matches(self, scope): return True
+            @property
+            def scope(self): return "synthetic"
+        spec = ReplayInputSpec(history={}, corporate_actions={}, volume={},
+                               knowledge_cutoff=None, completed_at=None)
+        app = _App()
+        eng = ReplayEngine(state_dir=tmp_path/"st", sessions=sessions,
+                           bars_by_day=bars_by_day,
+                           runner=SyntheticRuleRunner(candidates=()), spec=spec,
+                           base_manifest_path=tmp_path/"m.json",
+                           base_manifest_sha256="sha256:"+"0"*64,
+                           app_builder=lambda **kw: app)
+        return eng, app
+
+    def test_unconfirmed_executable_expires_at_bound_open(self, tmp_path):
+        from datetime import date
+        sessions = [date(2026,10,19), date(2026,10,20), date(2026,10,21)]
+        bars = {d:{"600000": self._bar("600000", d)} for d in sessions}
+        eng, app = self._engine(tmp_path, sessions, bars)
+        plan = {"plan_id":"p1","security_code":"600000","action_code":"BUY",
+                "side":"buy","target_qty":100,"delta_qty":100,"price_cap":"10.0"}
+        eng._open_plans = lambda: [plan]
+        # Offered 10-19 evening, never confirmed; bind its exec to 10-20 open.
+        eng.set_now(datetime(2026,10,19,23,0,tzinfo=TZ))
+        eng._plan_publish_day["p1"] = "2026-10-19"
+        eng._save_records("publish-day")
+        eng._bound_package = lambda pid: (date(2026,10,19), date(2026,10,20),
+                                          datetime(2026,10,20,9,30,tzinfo=TZ), "")
+        # Advance into 10-20: the bound open passes with no confirm ->
+        # proactive expired terminal + receipt, zero orders/fills.
+        eng.advance_day()
+        rec = eng._confirm_records["p1"]
+        assert rec["status"] == "expired"
+        assert rec["reason"] == "BOUND_SESSION_OPEN_PASSED_UNCONFIRMED"
+        assert rec["bound_fill_day"] == "2026-10-20"
+        assert len(app.reports) == 0 and len(app.observations) == 0
+        # Late first confirm reuses the SAME receipt (idempotent).
+        out = eng.confirm("p1")
+        assert out["status"] == "expired"
+        assert out.get("idempotent_replay") is True
+        assert len(app.reports) == 0
+
+    def test_skip_receipt_listed_in_plans(self, tmp_path):
+        from datetime import date
+        sessions = [date(2026,10,19), date(2026,10,20)]
+        bars = {d:{"600000": self._bar("600000", d)} for d in sessions}
+        eng, app = self._engine(tmp_path, sessions, bars)
+        # The store reports a persisted skip receipt; the app's history
+        # plans list lacks it - records_view must append the SKIPPED row.
+        eng._store = type('S',(),{'skipped_plans': staticmethod(
+            lambda: {"p1":{"plan_id":"p1","skipped_at":"2026-10-19T23:05:00+08:00",
+                           "reason":"manual","actor":"desktop"}})})()
+        class V:
+            history = type('H',(),{'outbox_pending':0})()
+            reports=(); orders=(); events=()
+            plans=()  # app does NOT write a SKIPPED status row
+        eng._build_app = lambda: type('A',(),{'records':lambda s,scope: V(),
+            'workbench':lambda s,scope: V(), 'scope':'synthetic',
+            'rebuild_matches':lambda s,scope:True,
+            'paper_projection':lambda s: type('P',(),{'cash':0,'positions':()})(),
+            'paper_history':lambda s: type('H',(),{'orders':(),'reports':()})()})()
+        recs = eng.records_view()
+        assert {"plan_id":"p1","status":"SKIPPED"} in recs["plans"]
+        assert recs["skips"][0]["plan_id"] == "p1"

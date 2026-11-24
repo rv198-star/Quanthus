@@ -1079,7 +1079,16 @@ class ReplayEngine:
         return outcome
 
     def _settle_open_intents(self) -> None:
-        """Settle every registered intent bound to the CURRENT session's open."""
+        """Settle every registered intent bound to the CURRENT session's open,
+        and expire every still-unconfirmed executable advice whose bound
+        session open is now (R5 #1).
+
+        An intent registered on the package's bound session fills through
+        the identical confirm code path.  An executable advice the Owner
+        never confirmed expires AT its bound open: the replay writes the
+        expired terminal + named receipt without needing a confirm click,
+        so a new package, a later day or a restart all read the SAME
+        original-ID receipt - zero orders, zero fills."""
         today = self.current_day
         today_iso = today.isoformat()
         for plan_id, rec in list(self._confirm_records.items()):
@@ -1110,11 +1119,52 @@ class ReplayEngine:
                     bound_fill_day=fill_day,
                     outcome=rec,
                 )
+        self._expire_unconfirmed_at_bound_open()
 
-    def _expire_unconfirmed(self, plan_id: str) -> dict | None:
+    def _expire_unconfirmed_at_bound_open(self) -> None:
+        """Expire every open, still-unconfirmed executable advice whose bound
+        session open is today (R5 #1).
+
+        A published advice offered on an earlier replay day but never
+        confirmed expires the moment its bound session's open arrives - the
+        replay writes the expired terminal + receipt proactively, not on a
+        later confirm click.  Plans the Owner already skipped or already
+        holds a terminal receipt for are left alone."""
+        today_iso = self.current_day.isoformat()
+        try:
+            open_plans = self._open_plans()
+        except Exception:  # noqa: BLE001 - expiry sweep is additive
+            return
+        for plan in open_plans:
+            plan_id = plan.get("plan_id")
+            if not plan_id:
+                continue
+            rec = self._confirm_records.get(plan_id)
+            if rec is not None and rec.get("status") in (
+                "filled", "rejected", "not_marketable", "expired",
+                "intent_registered",
+            ):
+                # A registered intent is settled by the intent sweep above;
+                # a terminal receipt stays the single authoritative receipt.
+                continue
+            # Expire only advice that actually could have executed at this
+            # open: an actionable code with a real quantity, bound to a
+            # session whose open is today.
+            action_code = str(plan.get("action_code") or "").upper()
+            if action_code not in ("BUY", "SELL"):
+                continue
+            if not (plan.get("delta_qty") or plan.get("target_qty")):
+                continue
+            self._expire_unconfirmed(plan_id, market_date=today_iso)
+
+    def _expire_unconfirmed(
+        self, plan_id: str, *, market_date: str | None = None
+    ) -> dict | None:
         """When the bound session open has passed and the intent was never
         confirmed, expire it.  Returns the expiry receipt, or None when the
-        plan is not yet past its bound open."""
+        plan is not yet past its bound open.  ``market_date`` lets the
+        proactive sweep stamp the bound session's own date; an explicit
+        late confirm still lands on today."""
         pkg_day, bound_next, eligible_at, _stage = self._bound_package(plan_id)
         if bound_next is None:
             return None
@@ -1143,7 +1193,7 @@ class ReplayEngine:
         self._save_records("confirm")
         self._log(
             "expired",
-            market_date=bound_next.isoformat(),
+            market_date=market_date or bound_next.isoformat(),
             plan_id=plan_id,
             outcome=outcome,
         )
@@ -1388,10 +1438,6 @@ class ReplayEngine:
             }
             for o in view.orders
         ]
-        plans = [
-            {"plan_id": p.plan_id, "status": p.status}
-            for p in view.plans
-        ]
         # Real skip receipts from the store's own skip log: the day review
         # binds a SKIPPED plan to its skipped_at instant + reason, never to
         # a bare "未处理" label.
@@ -1405,6 +1451,19 @@ class ReplayEngine:
             }
             for rec in (store.skipped_plans().values() if hasattr(store, "skipped_plans") else ())
         ]
+        skip_ids = {s["plan_id"] for s in skips if s.get("plan_id")}
+        # R5 #2: the records' plan-status list must carry a SKIPPED plan by
+        # its real plan_id so the review reads 已跳过, never 未处理.  The
+        # app's own history does not write a SKIPPED status row (skips live
+        # in the store's append-only skip log), so a skipped plan absent
+        # from view.plans is appended as status SKIPPED.
+        plans = [
+            {"plan_id": p.plan_id, "status": p.status}
+            for p in view.plans
+        ]
+        seen = {p["plan_id"] for p in plans}
+        for pid in sorted(skip_ids - seen):
+            plans.append({"plan_id": pid, "status": "SKIPPED"})
         events = [
             {
                 "event_id": e.event_id,

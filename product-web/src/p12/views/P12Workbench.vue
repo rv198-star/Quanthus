@@ -612,7 +612,7 @@
               </template>
             </template>
 
-            <template v-else-if="selected.stage === 'exit_plan' && !isUnheldExit(selected) && !isReduceExit(selected)">
+            <template v-else-if="selected.stage === 'exit_plan' && !isUnheldExit(selected) && !isReduceExit(selected) && !isUnverifiedExit(selected)">
               <dl class="p12-plan p12-num" data-testid="p12-sell-plan">
                 <div><dt>当前持有</dt><dd>{{ qty(sellTask ? sellTask.held : 0) }}</dd></div>
                 <div><dt>卖出数量</dt><dd>{{ sellTask ? qty(sellTask.total) : '—' }}</dd></div>
@@ -661,6 +661,7 @@
                 本账户此前未买入 {{ selectedDisplayName }}（当前持仓 0 股），本轮退出计划对你的账户不产生卖出任务或待办费用。
               </p>
               <p v-else-if="selected.stage === 'exit_plan' && isReduceExit(selected)" data-testid="p12-reduce-note">减仓建议（执行将在批次 B 接入）：建议减少对 {{ selectedDisplayName }} 的持仓，本批不生成卖出任务，持仓继续持有。</p>
+              <p v-else-if="selected.stage === 'exit_plan' && isUnverifiedExit(selected)" data-testid="p12-unverified-note">退出类型无法核实，暂不确认；持仓继续持有。</p>
               <p v-else-if="selected.stage === 'exit_plan' && selected.status_code === 'ENDED'" data-testid="p12-ended-note">{{ actionSentence }}</p>
               <p v-else-if="selected.stage === 'exit_plan'" data-testid="p12-sell-note">{{ actionSentence }}</p>
               <p v-if="selected.stage === 'exit_plan'" class="p12-precheck-warn" data-testid="p12-sell-unverified-note">无法核验停牌或跌停，委托可能无法成交；卖出确认照常放行。</p>
@@ -1403,7 +1404,7 @@ export default {
     },
     sellTask () {
       const item = this.selected
-      if (!item || item.stage !== 'exit_plan') return null
+      if (!item || item.stage !== 'exit_plan' || this.isUnverifiedExit(item)) return null
       const orders = this.sellOrders
       const filled = orders.reduce((sum, o) => sum + (o.known_fill_qty || 0), 0)
       const accepted = orders.find(o => o.accepted_total_qty)
@@ -1443,6 +1444,7 @@ export default {
       if (!item) return '今天的任务'
       if (item.selfDirected) return '自主模拟操作单'
       if (this.isUnheldExit(item)) return '账户核对结论'
+      if (this.isUnverifiedExit(item)) return '账户核对结论'
       if (this.isOpportunityExpired(item)) return '原计划已过有效期'
       if (item.stage === 'exit_plan') return this.sellIsTomorrow ? '下一交易日计划' : '今天的任务'
       return item.plan ? '下一交易日计划' : '今天的任务'
@@ -1452,6 +1454,7 @@ export default {
       if (!item) return ''
       if (item.selfDirected) return '基于实时行情自主委托，与系统推荐分开记账'
       if (this.isUnheldExit(item)) return '未持有该股，无需卖出操作'
+      if (this.isUnverifiedExit(item)) return '退出类型无法核实，暂不确认；持仓继续持有'
       if (this.isOpportunityExpired(item)) return '有效执行窗口已结束，不再引导现在下单'
       if (item.applicability) {
         if (item.applicability.status === 'NEEDS_REASSESSMENT') {
@@ -1484,6 +1487,9 @@ export default {
     sellNext () {
       const item = this.selected
       if (!item || item.stage !== 'exit_plan') return ''
+      if (this.isUnverifiedExit(item)) {
+        return '退出类型无法核实，暂不确认；持仓继续持有'
+      }
       if (this.isUnheldExit(item)) {
         return '本账户未持有该股（0 股），无需执行卖出或费用确认'
       }
@@ -1764,6 +1770,14 @@ export default {
     // and keeps the position held, never a full-liquidation form.
     isReduceExit (item) {
       return Boolean(item && item.stage === 'exit_plan' && item.exit_kind === 'reduce')
+    },
+    isUnverifiedExit (item) {
+      // Issue #722 r6-3: an exit_plan whose reduce/full type cannot be
+      // verified stays held and shows no sell task or prefilled sell entry.
+      return Boolean(
+        item && item.stage === 'exit_plan' && item.exit_kind == null
+        && item.action_code === 'HOLD' && item.status_code === 'MISSING_INPUT'
+      )
     },
     groupTitle (key) {
       const map = {

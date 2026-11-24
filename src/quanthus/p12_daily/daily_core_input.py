@@ -170,10 +170,16 @@ def _read_json(path: Path) -> dict:
 
 
 def _sha256_file(path: Path) -> str:
+    # Issue #722 r6-5: an unreadable manifest/member (PermissionError or any
+    # OSError) surfaces as INPUT_UNAVAILABLE so the caller writes a blocked
+    # receipt instead of crashing with no receipt.
     digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise FactError("INPUT_UNAVAILABLE", f"cannot read {path}: {exc}") from exc
     return "sha256:" + digest.hexdigest()
 
 
@@ -410,7 +416,18 @@ def qualify_daily_input(
             + (" (pinned read-only path)" if using_pin else ""),
             ("base_manifest",),
         )
-    base_sha_actual = _sha256_file(base_path)
+    try:
+        base_sha_actual = _sha256_file(base_path)
+    except FactError as exc:
+        # Issue #722 r6-5: a present but unreadable parent base manifest
+        # (PermissionError or other OSError) blocks the day with a
+        # base_manifest receipt - it never escapes as an unhandled crash.
+        return block(
+            INPUT_UNAVAILABLE,
+            "parent base manifest unreadable: " + str(exc)
+            + (" (pinned read-only path)" if using_pin else ""),
+            ("base_manifest",),
+        )
     if base_sha_actual != declared_base_sha:
         return block(
             INPUT_UNAVAILABLE,

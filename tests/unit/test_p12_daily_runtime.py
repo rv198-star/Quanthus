@@ -2125,7 +2125,7 @@ def test_reduce_projection_requires_the_package_run_identity(tmp_path):
 def test_exit_type_unverified_blocks_confirmation(tmp_path):
     """Issue #722 r4-1: with no receipt binding the published package's
     digest and run identity, the exit plan reads HOLD + MISSING_INPUT +
-    EXIT_TYPE_UNVERIFIED ("退出类型无法核实") and is not confirmable."""
+    MISSING_INPUT ("退出类型无法核实") and is not confirmable."""
     from quanthus.platform.adapters.p12_synthetic_fixture import (
         load_synthetic_fixture,
     )
@@ -2166,7 +2166,9 @@ def test_exit_type_unverified_blocks_confirmation(tmp_path):
         assert item.action_code == "HOLD"
         assert item.status_code == "MISSING_INPUT"
         assert item.exit_kind is None
-        assert "EXIT_TYPE_UNVERIFIED" in item.reason_codes
+        # Issue #722 r6-2: the unverifiable note reuses the registered
+        # INPUT_UNAVAILABLE code - no new closed enum value.
+        assert "INPUT_UNAVAILABLE" in item.reason_codes
 
 
 def test_ledger_dangling_symlink_is_a_read_failure(env):
@@ -2366,3 +2368,167 @@ def test_base_manifest_pin_supplies_missing_location(tmp_path):
     )
     from quanthus.p12_daily.daily_core_input import InputBlock
     assert isinstance(blocked, InputBlock)
+
+
+# Issue #722 r6-4: the publish slots are configured in three places that must
+# never drift - the Python DEFAULT_PUBLISH_SLOTS, the repository systemd
+# timer, and the deployment's QUANTHUS_P12_PUBLISH_SLOTS env.  This check
+# parses the timer's post-cutoff slots and compares them to the Python
+# default; a drift between any two fails the suite.
+def test_publish_slots_consistent_across_python_timer_and_deployment():
+    from datetime import time as _time
+
+    from quanthus.p12_daily.package_source import (
+        DEFAULT_PUBLISH_SLOTS,
+        DEFAULT_PUBLISH_TIME,
+        EXCHANGE_TZ,
+    )
+
+    cutoff = DEFAULT_PUBLISH_TIME
+    # Repository timer: the post-cutoff OnCalendar entries are the publish
+    # slots (the pre-cutoff 20/21/22:00 lines are precheck passes).
+    timer = Path("ops/systemd/quanthus-p12-daily.timer").read_text()
+    timer_slots = set()
+    for line in timer.splitlines():
+        line = line.strip()
+        if not line.startswith("OnCalendar="):
+            continue
+        spec = line.split("=", 1)[1]
+        # form: *-*-* HH:MM:SS Asia/Shanghai
+        clock = spec.split()[1].rsplit(" ", 1)[0]
+        hh, mm, _ss = clock.split(":")
+        t = _time(int(hh), int(mm), tzinfo=EXCHANGE_TZ)
+        if t >= cutoff:
+            timer_slots.add(t)
+    assert timer_slots == set(DEFAULT_PUBLISH_SLOTS)
+
+    # Deployment env: when the deployment pins QUANTHUS_P12_PUBLISH_SLOTS it
+    # must equal the same slot set; unset falls back to the Python default.
+    import os
+    raw = os.environ.get("QUANTHUS_P12_PUBLISH_SLOTS")
+    if raw:
+        env_slots = {
+            _time.fromisoformat(tok.strip()).replace(tzinfo=EXCHANGE_TZ)
+            if _time.fromisoformat(tok.strip()).tzinfo is None
+            else _time.fromisoformat(tok.strip())
+            for tok in raw.split(",")
+            if tok.strip()
+        }
+        assert env_slots == set(DEFAULT_PUBLISH_SLOTS)
+
+
+def test_already_published_receipt_never_supplies_the_exit_type(tmp_path):
+    """Issue #722 r6-1: an ALREADY_PUBLISHED receipt for the same package
+    digest and package_id but a DIFFERENT run_id does not bind the
+    published package - only the PUBLISHED receipt whose run_id the
+    envelope recorded supplies the exit type.  Removing that run leaves
+    the exit type unverifiable."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    receipt, store = _publish_reduce_package(state, prod)
+    assert receipt["status"] == "PUBLISHED"
+    stored = store.package_for(MARKET_DATE)
+    assert stored is not None
+    assert stored.published_by_run_id == receipt["run_id"]
+    now = datetime(2026, 11, 23, 9, 31, tzinfo=TZ)
+    source = PublishedPackageSource(state, lambda: now)
+    bound = source.published_run_for(MARKET_DATE)
+    assert bound is not None and bound["run_id"] == receipt["run_id"]
+
+    # The r5 counterexample: identical package digest + package_id under a
+    # different run id with ALREADY_PUBLISHED status.
+    shadow = {
+        **receipt,
+        "run_id": "20261120T224500000000+0800",
+        "status": "ALREADY_PUBLISHED",
+        "package": dict(receipt["package"]),
+        "held_signals": [],
+    }
+    store.write_run(shadow)
+    bound = source.published_run_for(MARKET_DATE)
+    assert bound is not None
+    assert bound["run_id"] == receipt["run_id"]
+    assert bound["status"] == "PUBLISHED"
+
+    # With the producing run deleted, only the shadow remains: the exit
+    # type can no longer be verified.
+    (store.runs_dir / (receipt["run_id"] + ".json")).unlink()
+    source2 = PublishedPackageSource(state, lambda: now)
+    assert source2.published_run_for(MARKET_DATE) is None
+
+    # A pre-provenance package (no published_by_run_id on the envelope) is
+    # unverifiable even while a matching PUBLISHED receipt exists.
+    package_path = (
+        state / "daily-packages" / (MARKET_DATE.isoformat() + ".json")
+    )
+    body = json.loads(package_path.read_text())
+    body.pop("published_by_run_id", None)
+    package_path.write_text(json.dumps(body, sort_keys=True))
+    store.write_run(receipt)
+    source3 = PublishedPackageSource(state, lambda: now)
+    assert source3.published_run_for(MARKET_DATE) is None
+
+
+def test_prior_day_never_masks_present_day_overdue(tmp_path):
+    """Issue #722 r6-4: a prior market_date's successful receipt or
+    published package never masks the CURRENT day's overdue - overdue is
+    judged on the clock date, the expected publication day."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+    receipt, store = _publish_reduce_package(state, prod)
+    assert receipt["status"] == "PUBLISHED"
+    assert store.package_for(MARKET_DATE) is not None
+
+    # Three days later, past that day's first publish slot: still overdue
+    # even though an older package and receipt are in the store.
+    now = datetime(2026, 11, 23, 22, 36, tzinfo=TZ)
+    source = PublishedPackageSource(state, lambda: now)
+    assert source.expected_overdue(now) is True
+
+    # Same day before the first slot: not overdue.
+    early = datetime(2026, 11, 23, 22, 34, tzinfo=TZ)
+    assert source.expected_overdue(early) is False
+
+    # A successful receipt for TODAY clears it; a package for today does too.
+    today_run = {
+        **receipt,
+        "run_id": "20261123T223500000000+0800",
+        "market_date": "2026-11-23",
+        "package": None,
+    }
+    store.write_run(today_run)
+    assert source.expected_overdue(now) is False
+
+
+def test_unreadable_input_manifest_writes_blocked_receipt(tmp_path):
+    """Issue #722 r6-5: an input manifest that exists but cannot be read
+    (PermissionError) still produces an INPUT_BLOCKED run receipt - the
+    job never exits with zero receipts."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    make_product(prod, MARKET_DATE.isoformat())
+
+    original_open = Path.open
+
+    def denied(self, *args, **kwargs):
+        if self.name == "manifest.json":
+            raise PermissionError(13, "denied fixture", str(self))
+        return original_open(self, *args, **kwargs)
+
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(Path, "open", denied)
+        receipt = run_daily(
+            state_dir=state, job_root=prod, runner=runner,
+            market_date=MARKET_DATE, next_session=NEXT_SESSION,
+            account_id="SYN-PAPER-A", now=now, decision_cutoff=CUTOFF,
+        )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    store = DailyPackageStore(state)
+    assert len(store.runs()) == 1

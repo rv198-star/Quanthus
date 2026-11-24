@@ -555,13 +555,16 @@ class P12DesktopApplication:
                 pub_time = pub.timetz() if hasattr(pub, "timetz") else pub.time()
             next_check_at = datetime.combine(next_session, pub_time)
         published = self._visible(decisions, now)
-        # Issue #722 r3-3: overdue is judged from the market_date's publish
-        # deadline (configured cutoff + publish slot), never next_check_at.
-        # The pending placeholder still has no successful receipt, so a
-        # missed deadline marks it overdue; a late publish today does not
-        # shift the configured next-session point.
+        # Issue #722 r6-4: overdue is judged for the CURRENT expected market
+        # date - a prior day's package or receipt never masks a present-day
+        # overdue.  A stale package stays readable AND still flags the day it
+        # failed to refresh; the package-store source answers this directly
+        # while a fixture without it keeps the older market_date check.
         overdue = False
-        if not published:
+        expected_overdue = getattr(self._decisions, "expected_overdue", None)
+        if callable(expected_overdue):
+            overdue = bool(expected_overdue(now))
+        elif not published:
             publish_deadline = getattr(self._decisions, "publish_deadline", None)
             if callable(publish_deadline):
                 deadline = publish_deadline(decisions.market_date)
@@ -1177,8 +1180,12 @@ class P12DesktopApplication:
                 # HOLD + MISSING_INPUT ("退出类型无法核实") rather than a
                 # guessed full sell.
                 action, status = "HOLD", "MISSING_INPUT"
-                reasons.append("EXIT_TYPE_UNVERIFIED")
-                primary = "EXIT_TYPE_UNVERIFIED"
+                # Issue #722 r6-2: reuse the registered INPUT_UNAVAILABLE
+                # reason (no new closed enum) - the unverifiable-exit note is
+                # carried in the explanation text, not a new reason value.
+                if "INPUT_UNAVAILABLE" not in reasons:
+                    reasons.append("INPUT_UNAVAILABLE")
+                primary = "INPUT_UNAVAILABLE"
             else:
                 is_reduce = item.opportunity_id in reduce_exit_ids
                 action, status = (
@@ -1476,15 +1483,22 @@ class P12DesktopApplication:
         # a blocked INPUT_UNAVAILABLE day is a run receipt, so a package absent
         # past the deadline with no successful receipt is overdue.
         overdue = False
-        publish_deadline = getattr(self._decisions, "publish_deadline", None)
-        if callable(publish_deadline):
-            deadline = publish_deadline(market_date)
-            if deadline is not None and now > deadline:
-                ok = (run_receipt or {}).get("status") in (
-                    "PUBLISHED",
-                    "ALREADY_PUBLISHED",
-                )
-                overdue = not ok
+        # Issue #722 r6-4: the blocked page also judges the CURRENT expected
+        # market date, not the displayed receipt's date - a prior day's
+        # package or receipt never masks a present-day overdue.
+        expected_overdue = getattr(self._decisions, "expected_overdue", None)
+        if callable(expected_overdue):
+            overdue = bool(expected_overdue(now))
+        else:
+            publish_deadline = getattr(self._decisions, "publish_deadline", None)
+            if callable(publish_deadline):
+                deadline = publish_deadline(market_date)
+                if deadline is not None and now > deadline:
+                    ok = (run_receipt or {}).get("status") in (
+                        "PUBLISHED",
+                        "ALREADY_PUBLISHED",
+                    )
+                    overdue = not ok
         return WorkbenchView(
             scope=scope,
             package=None,

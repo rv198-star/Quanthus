@@ -7,7 +7,7 @@ from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
 SCHEMA_VERSION = 'p12.desktop.v1'
-SCHEMA_DIGEST = 'sha256:df497b188b480060c902c728702678e372b249d2d8a304ba05fb3f25d93f714c'
+SCHEMA_DIGEST = 'sha256:c82c77a99f8f004217f82a81aa9055d1c4f97f8df5014f482c4cb2b9c040d340'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -69,7 +69,6 @@ REASON_TEXTS: dict[str, str] = {'ACCOUNT_NOT_ADMITTED': '该账户未对当前�
  'EXECUTION_WINDOW_INVALID': '执行窗口不在下一交易日的交易时段内，暂不提示操作',
  'EXISTING_SECURITY_CYCLE': '这只股票已有进行中的周期',
  'EXIT_SIGNAL': '达到退出条件，按计划卖出',
- 'EXIT_TYPE_UNVERIFIED': '退出类型无法核实，暂不确认',
  'EXPERT_ENTRY_BLOCKED': '风险检查不允许买入',
  'EXTERNAL_TRADE': '计划外的持仓或交易',
  'FACT_NOT_FOUND': '找不到这条成交记录',
@@ -931,7 +930,6 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                          'EXECUTION_WINDOW_INVALID',
                          'EXISTING_SECURITY_CYCLE',
                          'EXIT_SIGNAL',
-                         'EXIT_TYPE_UNVERIFIED',
                          'EXPERT_ENTRY_BLOCKED',
                          'EXTERNAL_TRADE',
                          'FACT_NOT_FOUND',

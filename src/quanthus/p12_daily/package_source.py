@@ -199,6 +199,27 @@ class PublishedPackageSource:
         """The day's configured publish slots (the post-cutoff timers)."""
         return self._publish_slots
 
+    def expected_overdue(self, now) -> bool:
+        # Issue #722 r6-4: is the CURRENT expected market date overdue?  The
+        # clock date is the expected publication day (the pending
+        # placeholder's market_date is today).  Overdue means now is past
+        # today's first publish slot and today still has neither a package
+        # nor a successful run receipt; a prior day's package or receipt
+        # never masks a present-day overdue.
+        today = now.date() if hasattr(now, "date") else now
+        deadline = self.publish_deadline(today)
+        if deadline is None or now <= deadline:
+            return False
+        if self._store.package_for(today) is not None:
+            return False
+        for candidate in reversed(self._store.runs()):
+            if (
+                str(candidate.get("market_date")) == today.isoformat()
+                and str(candidate.get("status")) in ("PUBLISHED", "ALREADY_PUBLISHED")
+            ):
+                return False
+        return True
+
     def published_run_for(self, market_date: date) -> dict | None:
         """The run receipt that produced THIS market_date's published package.
 
@@ -216,11 +237,15 @@ class PublishedPackageSource:
         stored = self._store.package_for(market_date)
         if stored is None:
             return None
+        producing_run = stored.published_by_run_id
+        if producing_run is None:
+            # A pre-run-id envelope cannot prove its producer; unverifiable.
+            return None
         for candidate in reversed(self._store.runs()):
             if (
                 str(candidate.get("market_date")) == market_date.isoformat()
-                and str(candidate.get("status"))
-                in ("PUBLISHED", "ALREADY_PUBLISHED")
+                and str(candidate.get("status")) == "PUBLISHED"
+                and str(candidate.get("run_id") or "") == producing_run
                 and str((candidate.get("package") or {}).get("file_sha256") or "")
                 == stored.file_sha256
                 and str((candidate.get("package") or {}).get("package_id") or "")

@@ -82,6 +82,10 @@ class StoredPackage:
     published_at: datetime
     retracted: bool
     retraction: dict | None
+    # Issue #722 r6-1: the run that produced this package, recorded on the
+    # envelope.  None on a pre-provenance (v1-era) package; the workbench then
+    # treats exit types as unverifiable.
+    published_by_run_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -257,6 +261,7 @@ class DailyPackageStore:
             published_at=datetime.fromisoformat(str(raw["published_at"])),
             retracted=retraction is not None,
             retraction=retraction,
+            published_by_run_id=raw.get("published_by_run_id"),
         )
 
     def packages(self) -> tuple[StoredPackage, ...]:
@@ -280,6 +285,7 @@ class DailyPackageStore:
         runner: dict,
         input_evidence: dict,
         published_at: datetime,
+        published_by_run_id: str | None = None,
     ) -> PublishOutcome:
         '''Write the one allowed package for a market date; never overwrite.
 
@@ -299,6 +305,8 @@ class DailyPackageStore:
             "input_evidence": input_evidence,
             "decision_set": decision_set,
         }
+        if published_by_run_id is not None:
+            body["published_by_run_id"] = published_by_run_id
         if path.is_file():
             existing = self._load_package_file(path)
             if existing.decision_set == decision_set:

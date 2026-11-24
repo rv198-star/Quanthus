@@ -650,9 +650,30 @@ def run_daily(
         if job_root.is_dir()
         else job_root
     )
-    qualified = qualify_daily_input(
-        pointer, expected_market_date=market_date, checked_at=moment
-    )
+    try:
+        qualified = qualify_daily_input(
+            pointer, expected_market_date=market_date, checked_at=moment
+        )
+    except (FactError, OSError) as exc:
+        # Issue #722 r6-5: an input read that raises (unreadable pointer,
+        # manifest or member) still leaves a blocked run receipt - the day
+        # never exits with no receipt.
+        t = stage("input", t, result="blocked", reason_code="INPUT_UNAVAILABLE")
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail="daily input read failed: " + str(exc),
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=None,
+            ),
+            market_date=market_date,
+            missing_members=["daily-core-base24"],
+        )
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
     if isinstance(qualified, InputBlock):
         t = stage(
             "input",
@@ -1247,6 +1268,8 @@ def run_daily(
             "source_closure": output.source_closure,
         },
         published_at=moment,
+        # Issue #722 r6-1: bind this publication to the run that produced it.
+        published_by_run_id=receipt["run_id"],
     )
     t = stage(
         "publish",

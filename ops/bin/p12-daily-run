@@ -21,66 +21,57 @@ DECISION_CUTOFF="${QUANTHUS_P12_DECISION_CUTOFF:-}"
 # share one locked runtime.
 PY_BIN="${P12_VENV_PYTHON:-/opt/quanthus/p12-acceptance/venv/bin/python}"
 CALENDAR_ROOT="${QUANTHUS_P12_CALENDAR_ROOT:-/srv/agentdock/quanthus-ops/p10-forward-calendar-v1}"
+# Issue #722 r8-2: the wrapper file digest is the fixed runner identity written
+# into every input-fault receipt - traceable and contract-conformant
+# (sha256:<64-hex>), never the empty string that broke the workbench reader.
+WRAPPER_SHA="$(shasum -a 256 "$0" | awk '{print $1}')"
 
 if [ -z "$MARKET_DATE" ]; then
-  # Issue #722 r7-5: an unreadable/missing DATES index must still leave a
-  # run receipt - the wrapper records the INPUT_BLOCKED day itself rather
-  # than exiting with no receipt (the daily job never ran to write one).
+  # Issue #722 r7-5/r8-2: an unreadable, missing, or unparseable DATES index
+  # (including a valid-JSON latest key that is not an ISO date) must still
+  # leave a contract-conformant run receipt - the wrapper records the
+  # INPUT_BLOCKED day via the shared writer rather than exiting with no
+  # receipt or handing a bad date to the CLI.
   set +e
-  MARKET_DATE="$("$PY_BIN" - "$JOB_ROOT" "$STATE_DIR" "$ACCOUNT" "$DECISION_CUTOFF" <<'PY'
+  MARKET_DATE="$("$PY_BIN" - "$JOB_ROOT" "$STATE_DIR" "$ACCOUNT" "$WRAPPER_SHA" <<'PY'
 import json, sys
-from datetime import datetime
+from datetime import date
 from pathlib import Path
 try:
-    from quanthus.p12_daily.daily_core_input import EXCHANGE_TZ
-    from quanthus.p12_daily.package_store import RUN_SCHEMA, DailyPackageStore
+    from quanthus.p12_daily.daily_job import write_input_blocked_receipt
 except ImportError:
     import os
     for cand in (Path(os.environ.get("QUANTHUS_P12_SRC_ROOT") or "/nonexistent"), Path.cwd() / "src", Path(sys.argv[1]).parent / "src"):
-        if (cand / "quanthus/p12_daily/package_store.py").is_file():
+        if (cand / "quanthus/p12_daily/daily_job.py").is_file():
             sys.path.insert(0, str(cand))
             break
-    from quanthus.p12_daily.daily_core_input import EXCHANGE_TZ
-    from quanthus.p12_daily.package_store import RUN_SCHEMA, DailyPackageStore
+    from quanthus.p12_daily.daily_job import write_input_blocked_receipt
 
-root, state_dir, account, cutoff = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], sys.argv[4]
+root, state_dir, account, wrapper_sha = (
+    Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], sys.argv[4]
+)
+runner_ref = ("p12-daily-run", "wrapper", "sha256:" + wrapper_sha)
 dates = []
 try:
-    dates = sorted(json.loads((root / "DATES.json").read_text()).get("dates", {}))
-    if not dates:
+    raw = json.loads((root / "DATES.json").read_text())
+    keys = [k for k in (raw.get("dates") or {}) if isinstance(k, str)]
+    parsed = [date.fromisoformat(k) for k in keys]
+    if not parsed:
         raise ValueError("no dates in DATES.json")
-    print(dates[-1])
+    dates = sorted(parsed)
+    print(dates[-1].isoformat())
 except Exception as exc:  # noqa: BLE001 - record the blocked day ourselves
-    now = datetime.now(EXCHANGE_TZ)
-    rid = now.strftime("%Y%m%dT%H%M%S%f%z")
-    md = dates[-1] if dates else now.date().isoformat()
-    DailyPackageStore(state_dir).write_run({
-        "schema_version": RUN_SCHEMA,
-        "run_id": rid,
-        "market_date": md,
-        "next_session": None,
-        "decision_cutoff": cutoff or None,
-        "account_id": account,
-        "runner": {"ref_id": "p12-daily-run", "version": "wrapper", "digest": ""},
-        "started_at": now.isoformat(),
-        "stages": [{"stage": "input", "elapsed_ms": 0, "result": "blocked",
-                    "reason_code": "INPUT_UNAVAILABLE"}],
-        "status": "INPUT_BLOCKED",
-        "input_block": {
-            "reason_code": "INPUT_UNAVAILABLE",
-            "detail": "wrapper could not resolve the market date from "
-                      + str(root / "DATES.json") + ": "
-                      + type(exc).__name__ + ": " + str(exc),
-            "checked_at": now.isoformat(),
-            "expected_market_date": None,
-            "observed_market_date": None,
-            "affected_scope": "new_entries",
-            "missing_members": ["DATES.json"],
-            "recovery_condition": "restore a readable DATES.json index; "
-                                  "the next scheduled run then proceeds",
-        },
-        "elapsed_ms": 0,
-    })
+    md = dates[-1] if dates else None
+    write_input_blocked_receipt(
+        state_dir,
+        account_id=account,
+        market_date=md,
+        detail="wrapper could not resolve the market date from "
+        + str(root / "DATES.json") + ": "
+        + type(exc).__name__ + ": " + str(exc),
+        runner_ref=runner_ref,
+        missing_members=("DATES.json",),
+    )
     sys.exit(2)
 PY
 )"

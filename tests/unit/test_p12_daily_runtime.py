@@ -1615,6 +1615,91 @@ def test_reduce_exit_plan_workbench_shows_suggestion_not_sell(tmp_path):
         o.side == "sell" and o.security_code == "600000"
         for o in bench.orders
     )
+    # Issue #722 r8-1: a reduce held row drops the producer's sell
+    # explanation and shows only the held-reduction note - never a
+    # "按计划卖出 N 股" instruction.
+    texts = " ".join(e.text for e in row.explanations)
+    assert "按计划卖出" not in texts
+    assert "减仓建议" in texts
+
+
+def test_held_disposition_never_shows_a_sell_text(tmp_path):
+    """Issue #722 r8-1 / product directive comment-7139311000 suppl.: when
+    the final disposition is held, every user-facing string on the plan
+    reads held - no "卖出"/"清仓"/"减仓 N 股" instruction survives in the
+    queue row or the expanded explanations."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    make_product(prod, MARKET_DATE.isoformat())
+
+    from quanthus.platform.adapters.p12_synthetic_fixture import (
+        load_synthetic_fixture,
+    )
+    from quanthus.platform.p12.paper_fixture import (
+        PAPER_ACCOUNT_ID,
+        build_paper_application,
+    )
+    from quanthus.product_daily.application.models import (
+        SyntheticRuntimeAuthorization,
+    )
+
+    forbidden = ("按计划卖出", "清仓信号已触发", "卖出 500", "减仓 500")
+
+    def bench_rows(state, when):
+        fixture = load_synthetic_fixture(
+            Path("config/p12/synthetic-desktop.v1.json")
+        )
+        app = build_paper_application(
+            state_dir=state,
+            policy=fixture.policy,
+            now=lambda: when,
+            authorization=SyntheticRuntimeAuthorization(
+                "audit", frozenset({PAPER_ACCOUNT_ID})
+            ),
+            decision_source=PublishedPackageSource(
+                state, lambda: when, mode="synthetic"
+            ),
+        )
+        return app.workbench(AccountScope(PAPER_ACCOUNT_ID, "synthetic"))
+
+    # Case A - reduce kept held (no verifiable reduce binding needed for the
+    # held-disposition text check; a plain reduce publish reads held).
+    state = tmp_path / "state-reduce"
+    runner = SyntheticRuleRunner(
+        candidates=(one_candidate(holding_signal={"action": "REDUCE"}),)
+    )
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(HeldPositionFact(security_code="600000", quantity=500),),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    bench = bench_rows(state, datetime(2026, 11, 20, 23, 0, tzinfo=TZ))
+    for row in bench.opportunities:
+        if row.action_code == "SELL":
+            continue
+        blob = " ".join(
+            [e.text for e in row.explanations]
+            + ([row.next_observation] if row.next_observation else [])
+        )
+        for bad in forbidden:
+            assert bad not in blob, (row.opportunity_id, bad, blob)
+
+    # Case B - unverifiable exit: drop receipts so the reduce cannot bind.
+    for path in DailyPackageStore(state).runs_dir.glob("*.json"):
+        path.unlink()
+    bench = bench_rows(state, datetime(2026, 11, 23, 9, 31, tzinfo=TZ))
+    unver = [o for o in bench.opportunities if o.security_code == "600000"]
+    assert unver
+    for row in unver:
+        blob = " ".join(
+            [e.text for e in row.explanations]
+            + ([row.next_observation] if row.next_observation else [])
+        )
+        for bad in forbidden + ("按计划卖出",):
+            assert bad not in blob, (row.opportunity_id, bad, blob)
 
 
 def test_pending_placeholder_publishes_at_configured_publish_time(tmp_path):
@@ -2182,6 +2267,55 @@ def test_exit_type_unverified_blocks_confirmation(tmp_path):
         assert item.next_observation == (
             "退出类型无法核实，暂不确认；持仓继续持有。"
         )
+
+
+def test_every_input_fault_receipt_reads_on_the_workbench(tmp_path):
+    """Issue #722 r8-2: every input-fault receipt - wrapper DATES, CLI
+    argument, descriptor/pointer - lands via the shared writer with a
+    contract-conformant sha256 runner digest, and the workbench serves it
+    over the authenticated read path instead of a 500."""
+    import re
+
+    from quanthus.p12_daily.daily_job import write_input_blocked_receipt
+    from quanthus.platform.p12.transport import _run_receipt
+
+    digest_re = re.compile(r"^sha256:[0-9a-f]{64}$")
+    faults = [
+        dict(
+            detail="wrapper could not resolve the market date: bad DATES",
+            runner_ref=("p12-daily-run", "wrapper", "sha256:" + "a" * 64),
+            missing=("DATES.json",),
+        ),
+        dict(
+            detail="daily-job CLI could not parse --market-date 'broken-date'",
+            runner_ref=("quanthus.p12_daily.daily_job", "cli", "sha256:" + "b" * 64),
+            missing=("--market-date",),
+        ),
+        dict(
+            detail="core pointer descriptor unreadable",
+            runner_ref=("p12-daily-job", "input", "sha256:" + "c" * 64),
+            missing=("CURRENT_DAILY_CORE_BASE24.json",),
+        ),
+    ]
+    for index, fault in enumerate(faults):
+        state = tmp_path / ("state-" + str(index))
+        receipt = write_input_blocked_receipt(
+            state,
+            account_id="SYN-PAPER-A",
+            detail=fault["detail"],
+            runner_ref=fault["runner_ref"],
+            missing_members=fault["missing"],
+            now=datetime(2026, 11, 25, 9, 31, tzinfo=TZ),
+        )
+        assert receipt["status"] == "INPUT_BLOCKED"
+        assert digest_re.match(receipt["runner"]["digest"])
+        store_receipt = DailyPackageStore(state).latest_run()
+        assert store_receipt is not None
+        projected = _run_receipt(store_receipt)
+        assert projected is not None
+        assert projected["status"] == "INPUT_BLOCKED"
+        assert digest_re.match(projected["runner"]["digest"])
+        assert projected["input_block"]["detail"]
 
 
 def test_ledger_dangling_symlink_is_a_read_failure(env):

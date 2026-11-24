@@ -507,6 +507,86 @@ def _blocked_receipt(
     return receipt
 
 
+def write_input_blocked_receipt(
+    state_dir: Path,
+    *,
+    account_id: str,
+    detail: str,
+    runner_ref: tuple[str, str, str],
+    market_date: date | None = None,
+    missing_members: tuple[str, ...] = (),
+    reason_code: str = "INPUT_UNAVAILABLE",
+    now: datetime | None = None,
+) -> dict:
+    """Write one INPUT_BLOCKED run receipt for an input fault that never
+    reached the daily job (issue #722 r8-2 / product directive).
+
+    Every input-read failure that escapes before or outside ``run_daily`` -
+    the wrapper's unreadable/unparseable DATES index, or the CLI's own
+    argument rejection - lands here, in one shared writer, instead of
+    exiting with no receipt.  ``runner_ref`` is a fixed
+    ``(ref_id, version, sha256-digest)`` identity for the producing entry
+    point (the wrapper file's own sha256, or the job module's code digest),
+    so the workbench reads a contract-conformant receipt whose source is
+    traceable.  Returns the written receipt dict.
+    """
+
+    ref_id, version, runner_digest = runner_ref
+    if not (
+        isinstance(runner_digest, str)
+        and runner_digest.startswith("sha256:")
+        and len(runner_digest) == len("sha256:") + 64
+    ):
+        raise FactError(
+            "INVALID_PACKAGE",
+            "runner_digest must be a sha256:<64-hex> digest, got "
+            f"{runner_digest!r}",
+        )
+    moment = (now or datetime.now(EXCHANGE_TZ)).astimezone(EXCHANGE_TZ)
+    md = market_date.isoformat() if market_date else moment.date().isoformat()
+    receipt: dict[str, Any] = {
+        "schema_version": RUN_SCHEMA,
+        "run_id": _run_id(moment),
+        "market_date": md,
+        "next_session": None,
+        "decision_cutoff": None,
+        "account_id": account_id,
+        "runner": {
+            "ref_id": ref_id,
+            "version": version,
+            "digest": runner_digest,
+        },
+        "started_at": moment.isoformat(),
+        "stages": [
+            {
+                "stage": "input",
+                "elapsed_ms": 0,
+                "result": "blocked",
+                "reason_code": reason_code,
+            }
+        ],
+        "status": STATUS_INPUT_BLOCKED,
+        "input_block": {
+            "reason_code": reason_code,
+            "detail": detail,
+            "checked_at": moment.isoformat(),
+            "expected_market_date": (
+                market_date.isoformat() if market_date else None
+            ),
+            "observed_market_date": None,
+            "affected_scope": "new_entries",
+            "missing_members": list(missing_members),
+            "recovery_condition": (
+                "restore a readable, qualified input; the next scheduled run "
+                "then proceeds"
+            ),
+        },
+        "elapsed_ms": 0,
+    }
+    DailyPackageStore(state_dir).write_run(receipt)
+    return receipt
+
+
 def run_daily(
     *,
     state_dir: Path,
@@ -1451,6 +1531,18 @@ def _load_runner(spec: str | None, candidates_path: Path | None) -> StrategyRule
     return SyntheticRuleRunner(candidates=tuple(raw["candidates"]))
 
 
+def _cli_runner_ref() -> tuple[str, str, str]:
+    """Fixed runner identity for CLI input faults.
+
+    Covers a bad ``--market-date`` / ``--next-session`` / ``--decision-cutoff``
+    parsed before a strategy runner exists.  The digest is this module file's
+    sha256 so the receipt runner is traceable (issue #722 r8-2).
+    """
+    import hashlib
+    file_sha = hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest()
+    return ("quanthus.p12_daily.daily_job", "cli", "sha256:" + file_sha)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state-dir", type=Path, required=True)
@@ -1465,10 +1557,9 @@ def main(argv: list[str] | None = None) -> int:
         default="synthetic",
         help="account mode binding the trusted producer list (synthetic|simulation|live)",
     )
-    parser.add_argument("--market-date", type=date.fromisoformat, required=True)
+    parser.add_argument("--market-date", required=True)
     parser.add_argument(
         "--next-session",
-        type=date.fromisoformat,
         default=None,
         help="optional; the governed calendar decides next_session (M2 F2)",
     )
@@ -1476,7 +1567,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--candidates", type=Path)
     parser.add_argument(
         "--decision-cutoff",
-        type=lambda v: datetime.fromisoformat(v),
         default=None,
         help="configured tz-aware decision cutoff, e.g. 2026-11-20T22:30:00+08:00",
     )
@@ -1502,12 +1592,43 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--retract-reason", default=None)
     args = parser.parse_args(argv)
 
+    def _input_fault(field, raw, exc):
+        write_input_blocked_receipt(
+            args.state_dir,
+            account_id=args.account,
+            market_date=None,
+            detail=(
+                "daily-job CLI could not parse --" + field + " " + repr(raw)
+                + ": " + type(exc).__name__ + ": " + str(exc)
+            ),
+            runner_ref=_cli_runner_ref(),
+            missing_members=("--" + field,),
+        )
+        return 2
+
+    try:
+        market_date = date.fromisoformat(str(args.market_date))
+    except (TypeError, ValueError) as exc:
+        return _input_fault("market-date", str(args.market_date), exc)
+    next_session = None
+    if args.next_session is not None:
+        try:
+            next_session = date.fromisoformat(str(args.next_session))
+        except (TypeError, ValueError) as exc:
+            return _input_fault("next-session", str(args.next_session), exc)
+    decision_cutoff = None
+    if args.decision_cutoff is not None:
+        try:
+            decision_cutoff = datetime.fromisoformat(str(args.decision_cutoff))
+        except (TypeError, ValueError) as exc:
+            return _input_fault("decision-cutoff", str(args.decision_cutoff), exc)
+
     store = DailyPackageStore(args.state_dir)
     if args.retract:
         if not args.retract_reason:
             parser.error("--retract requires --retract-reason")
         record = store.retract(
-            market_date=args.market_date,
+            market_date=market_date,
             reason=args.retract_reason,
             retracted_at=datetime.now(EXCHANGE_TZ),
             actor="operator-cli",
@@ -1520,12 +1641,12 @@ def main(argv: list[str] | None = None) -> int:
         state_dir=args.state_dir,
         job_root=args.job_root,
         runner=runner,
-        market_date=args.market_date,
-        next_session=args.next_session,
+        market_date=market_date,
+        next_session=next_session,
         account_id=args.account,
         account_mode=args.account_mode,
         sidecar_path=args.sidecar,
-        decision_cutoff=args.decision_cutoff,
+        decision_cutoff=decision_cutoff,
         calendar_root=args.calendar_root,
     )
     print(json.dumps(receipt, ensure_ascii=False, indent=2))

@@ -191,6 +191,47 @@ def test_envelope_shape_and_membership(tmp_path):
     assert res.read_at == "2026-11-24T23:00:00Z"
 
 
+def test_open_at_is_native_not_observation_start(tmp_path):
+    # 协调/原件: 09-30 open_at=null (exchange gave no native open) vs
+    # observation_start=09-29T16:00Z; 10-08 open_at=01:30Z vs
+    # observation_start=10-07T16:00Z.  envelope.open_at must carry the
+    # NATIVE open_at column - never the observation_start instant.
+    from quanthus.p12_history import calendar_listing as cal_mod
+    from quanthus.p12_history.envelope import build_envelope
+    from quanthus.p12_history.calendar_listing import CalendarRow
+
+    # Direct row-level check: CalendarRow keeps open_at distinct.
+    rows = [
+        CalendarRow(venue_id="SSE", session_date=date(2026, 9, 30),
+                    is_open=True, open_at=None, close_at=None,
+                    observation_start=datetime(2026, 9, 29, 16, 0, tzinfo=UTC),
+                    knowledge_from=datetime(2026, 10, 8, 0, 0, tzinfo=UTC),
+                    source_member_id="part-000039"),
+        CalendarRow(venue_id="SSE", session_date=date(2026, 10, 8),
+                    is_open=True,
+                    open_at=datetime(2026, 10, 8, 1, 30, tzinfo=UTC),
+                    close_at=datetime(2026, 10, 8, 7, 0, tzinfo=UTC),
+                    observation_start=datetime(2026, 10, 7, 16, 0, tzinfo=UTC),
+                    knowledge_from=datetime(2026, 10, 8, 0, 0, tzinfo=UTC),
+                    source_member_id="part-000040"),
+    ]
+    env = build_envelope(
+        market_date=date(2026, 10, 8),
+        decision_cutoff=datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_member_entries=[], calendar_rows=rows,
+        listing_rows=[], securities=[],
+    )
+    cal = {r["session_date"]: r for r in env["calendar_rows"]}
+    # 09-30: open_at stays null (not back-filled from observation_start)
+    assert cal["2026-09-30"]["open_at"] is None
+    assert cal["2026-09-30"]["observation_start"] == "2026-09-29T16:00:00Z"
+    # 10-08: open_at is the real 01:30Z open, not the 10-07 observation_start
+    assert cal["2026-10-08"]["open_at"] == "2026-10-08T01:30:00Z"
+    assert cal["2026-10-08"]["observation_start"] == "2026-10-07T16:00:00Z"
+    # close_at and knowledge_from preserved natively too
+    assert cal["2026-10-08"]["close_at"] == "2026-10-08T07:00:00Z"
+
+
 def test_missing_listing_leaves_membership_unproven(tmp_path):
     smap = _build_map(tmp_path, with_listing=False)
     res = reader_mod.read_history(

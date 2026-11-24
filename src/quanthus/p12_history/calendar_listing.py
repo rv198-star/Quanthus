@@ -31,6 +31,11 @@ class CalendarRow:
     venue_id: str
     session_date: date
     is_open: bool
+    # The session's native open instant - a distinct source column, never
+    # the observation_start.  09-30 carries open_at=null (exchange gave no
+    # native open), 10-08 carries the real 01:30Z open; the two are never
+    # merged (协调: envelope must not write observation_start as open_at).
+    open_at: datetime | None
     close_at: datetime | None
     observation_start: datetime | None
     knowledge_from: datetime
@@ -133,7 +138,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
         try:
             records = _rows(
                 member.abs_path,
-                ["venue_id", "trade_date", "is_open", "close_at",
+                ["venue_id", "trade_date", "is_open", "open_at", "close_at",
                  "observation_start", "knowledge_from", "calendar_session_id"],
             )
         except Exception as exc:  # noqa: BLE001
@@ -152,6 +157,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
                 venue_id=venue_id,
                 session_date=session,
                 is_open=bool(rec.get("is_open")),
+                open_at=parse_ts(rec.get("open_at")),
                 close_at=parse_ts(rec.get("close_at")),
                 observation_start=parse_ts(rec.get("observation_start")),
                 knowledge_from=knowledge_from,

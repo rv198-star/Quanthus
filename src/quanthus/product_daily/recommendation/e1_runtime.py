@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
@@ -477,10 +477,12 @@ def run_e1_replay_day(
         observed_sink=observed_sink,
     )
 
-    # Business-content assertion: every sealed member's declared business rows
-    # must end on/before the signal T.  A member whose content runs past T
-    # carries post-T business fact and is refused here (named, never consumed).
-    _assert_business_content_on_or_before(req, market_date)
+    # Business-content window assertion: a member may declare content through
+    # T+1 -- the T+1 open is consumed only for matching, not as signal input.
+    # Content declared past T+1 carries post-window business fact and is
+    # refused here (named, never consumed).  The declared edge is disclosed on
+    # the receipt either way.
+    declared = _assert_business_content_window(req, market_date)
 
     receipt = paper_replay.run_replay_day(
         req,
@@ -509,6 +511,7 @@ def run_e1_replay_day(
     receipt["as_observed"] = {
         "schema_version": "p11.october-replay-as-observed.v1",
         "logical_decision_at": receipt.get("logical_decision_at"),
+        "member_content_windows": declared,
         "sealed_archives": {
             "members": observed_sink.get("sealed_members", []),
             "calendar": observed_sink.get("sealed_calendar", []),
@@ -574,22 +577,30 @@ def _pending_panel_placeholder(assets: E1RuleAssets) -> BaselineFeaturePanelRepo
     )
 
 
-def _assert_business_content_on_or_before(request: Any, market_date: date) -> None:
-    """Refuse the replay day when a member declares business rows past T.
+def _assert_business_content_window(request: Any, market_date: date) -> list[dict[str, Any]]:
+    """Refuse when a member declares business content past the T+1 match window.
 
-    A sealed post-cutoff archive is admitted for its historical fact rows
-    only; a member whose declared date_to exceeds the signal date carries
-    post-T business data and is isolated fail-closed, never silently consumed
-    or back-dated.
+    Signal input (the 61-session bars) is sliced to <=T by the envelope; the
+    T+1 open is carried only for later matching per the October replay time
+    contract.  A member may therefore legitimately declare a content window
+    ending at T+1.  A declared edge past T+1 carries post-window business fact
+    and is isolated fail-closed.  Returns the per-member declared content
+    window for disclosure on the receipt.
     """
+    declared: list[dict[str, Any]] = []
+    match_end = market_date + timedelta(days=1)
     for m in request.source_members:
         date_to = m.get("date_to") if isinstance(m, Mapping) else getattr(m, "date_to", None)
+        member_id = m.get("member_id") if isinstance(m, Mapping) else getattr(m, "member_id", None)
         if date_to is None:
+            declared.append({"member_id": member_id, "content_through": None})
             continue
         d = date_to if isinstance(date_to, date) else date.fromisoformat(str(date_to)[:10])
-        if d > market_date:
+        declared.append({"member_id": member_id, "content_through": d.isoformat()})
+        if d > match_end:
             _fail(
                 "as_observed_post_T_content",
-                f"source_member {m.get('member_id') if isinstance(m, Mapping) else m.member_id} "
-                f"declares business content through {d} past signal {market_date}",
+                f"source_member {member_id} declares business content through {d} "
+                f"past the T+1 match window of signal {market_date}",
             )
+    return declared

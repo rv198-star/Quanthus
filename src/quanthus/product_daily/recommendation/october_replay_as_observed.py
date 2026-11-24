@@ -5,8 +5,8 @@ ENGINEERING_REPLAY_AS_OBSERVED use.  It does NOT change the strict H1 path or
 the original member clocks: sealed members/calendar/listings whose archival
 publish/acquire instant is later than the logical T are admitted as NAMED
 post-cutoff archives on the receipt, never relabelled October-known, and
-their business content date is asserted <= T before entry (a post-T business
-fact stays isolated, never back-dated).
+    their business content window is asserted <= the T+1 match window before
+    entry (a post-window business fact stays isolated, never back-dated).
 
 The three clocks stay distinct on the signed receipt:
   * logical decision instant = T 21:30 Asia/Shanghai (the bound coordinate);
@@ -23,7 +23,7 @@ identity, and the as_observed block is part of source_closure.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from quanthus.product_daily.contracts import ProductDailyError
@@ -41,16 +41,17 @@ def _fail(code: str, message: str) -> None:
 def _sealed_business_content_check(
     raw_history: Mapping[str, Any], market_date: date
 ) -> list[dict[str, Any]]:
-    """Assert every member's declared business content ends on/before T.
+    """Assert each member's declared content ends within the T+1 match window.
 
-    A sealed archive is admitted for its historical fact rows only; a member
-    whose declared date_to extends PAST the signal date carries post-T business
-    data and is isolated here (named, never silently consumed).  Returns the
-    per-member business-content assertion records for the receipt.
+    Signal bars are sliced to <=T by the envelope; the T+1 open is carried
+    only for later matching.  A member may therefore legitimately declare
+    content through T+1.  A declared edge past T+1 carries post-window
+    business fact and is isolated here (named, never silently consumed).
+    Returns the per-member content-window records for the receipt.
     """
     out: list[dict[str, Any]] = []
     env = raw_history.get("raw_history", raw_history)
-    cutoff = market_date.isoformat()
+    match_end = (market_date + timedelta(days=1)).isoformat()
     for m in env.get("source_members") or ():
         if not isinstance(m, Mapping):
             continue
@@ -59,8 +60,8 @@ def _sealed_business_content_check(
             {
                 "member_id": m.get("member_id"),
                 "business_content_through": date_to,
-                "content_on_or_before_T": (
-                    None if date_to is None else str(date_to) <= cutoff
+                "within_T_plus_1_window": (
+                    None if date_to is None else str(date_to) <= match_end
                 ),
             }
         )
@@ -98,11 +99,12 @@ def run_october_replay_as_observed(
     """
     signal = facts.market_date
     content_check = _sealed_business_content_check(raw_history, signal)
-    leaking = [c for c in content_check if c["content_on_or_before_T"] is False]
+    leaking = [c for c in content_check if c["within_T_plus_1_window"] is False]
     if leaking:
         _fail(
             "as_observed_post_T_content",
-            f"member business content extends past {signal}: "
+            f"member business content extends past the T+1 match window of "
+            f"signal {signal}: "
             f"{[c['member_id'] for c in leaking]}",
         )
 
@@ -140,7 +142,7 @@ def run_october_replay_as_observed(
             "calendar": observed_sink.get("sealed_calendar", []),
             "listings": observed_sink.get("sealed_listings", []),
         },
-        "business_content_assertion": content_check,
+        "member_content_windows": content_check,
         "actual_consumption": {
             "verified_at": actual_verified,
             "run_id": run_id,
@@ -149,8 +151,8 @@ def run_october_replay_as_observed(
         "pit_disguise": False,
         "note": (
             "Post-cutoff archives keep their original publish/acquire clocks; "
-            "their business content is asserted on/before T.  No clock is "
-            "rewritten to fake October-known."
+            "their declared business content is asserted within the T+1 "
+            "match window.  No clock is rewritten to fake October-known."
         ),
     }
     return output, as_observed

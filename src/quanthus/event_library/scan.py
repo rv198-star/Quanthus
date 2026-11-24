@@ -7,7 +7,7 @@ import time
 from bisect import bisect_left, insort
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -303,6 +303,14 @@ class CandidateIndustryGap:
             raise CandidateScanError("industry-gap event count must be a positive integer")
 
 
+@dataclass
+class _TransitionCapture:
+    """Single-day audit of the ratios the scanner actually compared."""
+
+    signal_date: date
+    rows: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
 @dataclass(frozen=True)
 class CandidateScanResult:
     candidates: tuple[ScannedCandidate, ...]
@@ -314,6 +322,7 @@ class CandidateScanResult:
     # This is what the day receipt reads for the per-security T verdict - it is the
     # real scan output, never re-derived from reason_counts.
     signal_verdicts: tuple[tuple[str, str, str], ...] = ()
+    transition_evidence: Mapping[str, dict[str, Any]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         event_ids = [candidate.event_id for candidate in self.candidates]
@@ -953,7 +962,8 @@ def _scan_security_series(
     snapshot_manifest_digest: str,
     card: CandidateRuleCard,
     source_policy: EventScanSourcePolicy,
-) -> tuple[list[_RawCandidate], Counter[str], int]:
+    capture: _TransitionCapture | None = None,
+) -> tuple[list[_RawCandidate], Counter[str], int, dict[tuple[str, date], str]]:
     if not security_rows:
         return [], Counter(), 0, {}
     rows = tuple(security_rows)
@@ -1069,12 +1079,38 @@ def _scan_security_series(
         prior_turnover_ratio = prior_turnover / prior_turnover_median
         current_range_ratio = current_range / current_range_median
         current_turnover_ratio = current_turnover / current_turnover_median
-        if not (
-            prior_range_ratio <= thresholds["quiet_range_ratio_max"]
-            and prior_turnover_ratio <= thresholds["quiet_turnover_ratio_max"]
-            and current_range_ratio >= thresholds["active_range_ratio_min"]
-            and current_turnover_ratio >= thresholds["active_turnover_ratio_min"]
-        ):
+        quiet_range = prior_range_ratio <= thresholds["quiet_range_ratio_max"]
+        quiet_turnover = prior_turnover_ratio <= thresholds["quiet_turnover_ratio_max"]
+        active_range = current_range_ratio >= thresholds["active_range_ratio_min"]
+        active_turnover = current_turnover_ratio >= thresholds["active_turnover_ratio_min"]
+        prior_quiet = quiet_range and quiet_turnover
+        current_active = active_range and active_turnover
+        if capture is not None and current.session_date == capture.signal_date:
+            comparisons = (
+                ("quiet_range_ratio_max", prior_range_ratio, "<=", quiet_range),
+                ("quiet_turnover_ratio_max", prior_turnover_ratio, "<=", quiet_turnover),
+                ("active_range_ratio_min", current_range_ratio, ">=", active_range),
+                ("active_turnover_ratio_min", current_turnover_ratio, ">=", active_turnover),
+            )
+            capture.rows[security_id] = {
+                "schema_version": "p11.scan-transition.v1",
+                "prior_session": rows[local_index - 1].session_date.isoformat(),
+                "signal_date": current.session_date.isoformat(),
+                "window_start": window[0].session_date.isoformat(),
+                "prior_quiet": prior_quiet,
+                "current_active": current_active,
+                "checks": {
+                    key: {
+                        "actual": _fraction_text(ratio),
+                        "op": op,
+                        "threshold": _fraction_text(thresholds[key]),
+                        "passed": passed,
+                    }
+                    for key, ratio, op, passed in comparisons
+                },
+                "source_evidence_digests": [row.source_evidence_digest for row in window],
+            }
+        if not (prior_quiet and current_active):
             reasons[CandidateReason.NOT_TRIGGERED.value] += 1
             verdicts[(security_id, current.session_date)] = CandidateReason.NOT_TRIGGERED.value
             continue
@@ -1315,6 +1351,7 @@ def scan_candidate_series_shard(
     split_policy: SplitPolicy,
     source_policy: EventScanSourcePolicy,
     progress: Callable[[str, Mapping[str, Any]], None] | None = None,
+    capture: _TransitionCapture | None = None,
 ) -> CandidateScanShard:
     """Scan disjoint complete security series without applying global candidate gates."""
 
@@ -1359,6 +1396,7 @@ def scan_candidate_series_shard(
         scan_started = time.perf_counter()
         child_raw, child_reasons, child_evaluated, child_verdicts = _scan_security_series(
             rows,
+            capture=capture,
             ordered_dates=ordered_dates,
             date_index=date_index,
             history_sessions=history_sessions,
@@ -1486,11 +1524,14 @@ def scan_forward_candidate_series(
     split_policy: SplitPolicy,
     source_policy: EventScanSourcePolicy,
     progress: Callable[[str, Mapping[str, Any]], None] | None = None,
+    explain_date: date | None = None,
 ) -> CandidateScanResult:
     """Scan sorted one-security series while keeping only triggers globally in memory."""
 
+    capture = _TransitionCapture(explain_date) if explain_date is not None else None
     shard = scan_candidate_series_shard(
         series,
+        capture=capture,
         trading_dates=trading_dates,
         snapshot_id=snapshot_id,
         snapshot_manifest_digest=snapshot_manifest_digest,
@@ -1521,7 +1562,7 @@ def scan_forward_candidate_series(
                 "candidate_events": result.counters.candidate_events,
             },
         )
-    return result
+    return replace(result, transition_evidence=capture.rows) if capture is not None else result
 
 
 def scan_forward_candidates(
@@ -1533,6 +1574,7 @@ def scan_forward_candidates(
     card: CandidateRuleCard,
     split_policy: SplitPolicy,
     source_policy: EventScanSourcePolicy,
+    explain_date: date | None = None,
 ) -> CandidateScanResult:
     """Scan an in-memory corpus; production callers should prefer the series-streaming API."""
 
@@ -1545,6 +1587,7 @@ def scan_forward_candidates(
             tuple(sorted(grouped[key], key=lambda item: item.session_date))
             for key in sorted(grouped)
         ),
+        explain_date=explain_date,
         trading_dates=trading_dates,
         snapshot_id=snapshot_id,
         snapshot_manifest_digest=snapshot_manifest_digest,

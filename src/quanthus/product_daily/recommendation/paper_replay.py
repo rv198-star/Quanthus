@@ -2748,6 +2748,7 @@ def _rule_day_projection(output: Any, window_info: Mapping[str, Any]) -> dict[st
                         "security_id": r["security_id"],
                         "verdict": verdicts.get(r["security_id"]),
                         "gates": r["gates"],
+                        "transition": seam.scan_result.transition_evidence.get(r["security_id"]),
                     }
                     for r in output.source_closure.get("history_receipts", ())
                     if r["status"] == "qualified"

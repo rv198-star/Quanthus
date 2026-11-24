@@ -73,7 +73,7 @@ class PublishedPackage:
 class PublicationStatus:
     status: str
     market_date: date
-    published_at: datetime
+    published_at: datetime | None
     retracted: bool = False
     retraction_reason: str | None = None
     # Issue #721 R15: the next scheduled publish/check point, from the
@@ -81,6 +81,9 @@ class PublicationStatus:
     # carried on the decision set.  Optional contract field; None when no
     # authoritative next session is known.
     next_check_at: datetime | None = None
+    # Issue #721 R16 (r2): the moment the workbench actually observed this
+    # state - the reader's clock, never a fabricated publish time.
+    observed_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -112,6 +115,11 @@ class OpportunityView:
     cost_price: MaybeDecimal
     plan: PublishedPlan | None
     applicability: PlanApplicability | None
+    # Issue #723 comment-7117663809: P11 encodes reduce and exit as the same
+    # exit_plan stage; the held_signal's action tells them apart.  "reduce"
+    # marks a 减仓建议 (no full sell task in batch A), "full" a liquidation,
+    # None a non-exit row.
+    exit_kind: str | None = None
 
 
 @dataclass(frozen=True)

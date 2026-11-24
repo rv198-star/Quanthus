@@ -226,6 +226,7 @@ export interface Opportunity {
   changes: Array<"FACT_CORRECTED" | "FACT_RECEIVED" | "NEW_ENTRY_PLAN">
   chart: Chart | null
   cost_price: MaybeRatio
+  exit_kind: "full" | "reduce" | null
   explanations: Array<Explanation>
   next_observation: string | null
   opportunity_id: string
@@ -324,7 +325,8 @@ export interface PriceBar {
 export interface PublicationStatus {
   market_date: MarketDate
   next_check_at: Timestamp
-  published_at: Timestamp
+  observed_at: Timestamp
+  published_at: Timestamp | null
   retracted: boolean
   retraction_reason: string | null
   status: "NOT_YET_PUBLISHED" | "PUBLISHED"

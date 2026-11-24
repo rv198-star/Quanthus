@@ -90,6 +90,10 @@ class MemberReceipt:
     first_read_at: str | None
     verified_at: str | None
     clock_note: str | None
+    # Audit R3 (r2): the member's sha256 is RECOMPUTED by P12 over the bytes
+    # it read - never echoed from the sidecar's declaration.  null when no
+    # bytes could be located to recompute.
+    p12_recomputed_sha256: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         def bounds(pair):
@@ -108,6 +112,7 @@ class MemberReceipt:
             "received_at": self.received_at,
             "first_read_at": self.first_read_at,
             "verified_at": self.verified_at,
+            "p12_recomputed_sha256": self.p12_recomputed_sha256,
             "clock_note": self.clock_note,
         }
 
@@ -158,6 +163,7 @@ def read_sidecar(
     *,
     consumer_now: datetime,
     decision_cutoff: datetime | None = None,
+    member_files_root: Path | None = None,
 ) -> SidecarRead:
     '''Load one sidecar record and check the consumed member clocks.
 
@@ -191,10 +197,6 @@ def read_sidecar(
     published = _clock_bounds((payload.get("publication") or {}).get("published_at"))
     blocked: list[str] = []
 
-    def _observe() -> str:
-        # The real observation moment for this member; per-member distinct.
-        return datetime.now(EXCHANGE_TZ).isoformat()
-
     members: list[MemberReceipt] = []
     for index, raw in enumerate(payload.get("members") or []):
         if not isinstance(raw, dict):
@@ -206,6 +208,71 @@ def read_sidecar(
         val = _clock_bounds(raw.get("validated_at"))
         av = _clock_bounds(raw.get("available_at"))
         member_block: list[str] = []
+        clock_notes: list[str] = []
+
+        # Audit R3 (r2): bind each stamp to its real event.  received_at =
+        # the moment P12 first located the member's bytes; first_read_at =
+        # the moment the bytes were actually read; verified_at = the moment
+        # after P12 recomputed the member sha itself.  The declared sha is a
+        # claim to verify, never copied into the stamp.  When the member's
+        # file cannot be located under member_files_root the stamps stay
+        # null with the reason in clock_note.
+        received_at = None
+        first_read_at = None
+        verified_at = None
+        recomputed_sha = None
+        member_rel = raw.get("path")
+        member_file = None
+        if member_rel and member_files_root is not None:
+            # Try the path as declared, then stripped of leading "fixtures/"
+            # segments (the fixture tree nests the member files one level
+            # deeper than the sidecar's relative paths).
+            candidates = []
+            p = Path(member_rel)
+            candidates.append(p)
+            parts = list(p.parts)
+            while parts and parts[0] in ("fixtures", "synthetic"):
+                parts = parts[1:]
+                candidates.append(Path(*parts) if parts else p)
+            for cand_rel in candidates:
+                candidate = (Path(member_files_root) / cand_rel).resolve()
+                try:
+                    candidate.relative_to(Path(member_files_root).resolve())
+                except ValueError:
+                    continue
+                if candidate.is_file():
+                    member_file = candidate
+                    break
+        if member_file is not None:
+            received_at = datetime.now(EXCHANGE_TZ).isoformat()
+            try:
+                h = hashlib.sha256()
+                with member_file.open("rb") as stream:
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                        h.update(chunk)
+                first_read_at = datetime.now(EXCHANGE_TZ).isoformat()
+                recomputed_sha = "sha256:" + h.hexdigest()
+                verified_at = datetime.now(EXCHANGE_TZ).isoformat()
+            except OSError:
+                member_block.append(mid + " bytes unreadable; consumer stamps null")
+        else:
+            # Audit R3 (r2): no bytes could be located - stamps stay null
+            # with the reason on the note; never a fabricated time.  An
+            # unlocatable file is an evidence NOTE, not a blocking fact -
+            # the sidecar's own clock order already gates the run above.
+            clock_notes.append(
+                mid + " member file not located; consumer stamps null"
+            )
+        # Audit R3 (r2): the member's declared sha is a CLAIM to verify
+        # against P12's own recomputation; a mismatch on a located file is
+        # a block, never a copy.
+        # Audit R3 (r2): the member's declared sha is a CLAIM to verify
+        # against P12's own recomputation; a mismatch on a located file is
+        # a block, never a copy.
+        if recomputed_sha is not None and str(raw.get("sha256") or "") != recomputed_sha:
+            member_block.append(
+                mid + " declared sha256 differs from P12's recomputed digest"
+            )
 
         if required_member and event in HARD_EVENTS_REQUIRING_CLOCK_ORDER:
             chain = [
@@ -272,10 +339,11 @@ def read_sidecar(
                     None if av is None else (av[1].isoformat() if av[1] else None),
                 ),
                 unavailable_reason=raw.get("unavailable_reason"),
-                received_at=_observe(),
-                first_read_at=_observe(),
-                verified_at=_observe(),
-                clock_note="; ".join(member_block) or None,
+                received_at=received_at,
+                first_read_at=first_read_at,
+                verified_at=verified_at,
+                p12_recomputed_sha256=recomputed_sha,
+                clock_note="; ".join(member_block + clock_notes) or None,
             )
         )
 

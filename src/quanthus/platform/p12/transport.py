@@ -183,8 +183,16 @@ def _publication(value: PublicationStatus) -> dict[str, Any]:
     out = {
         "status": value.status,
         "market_date": value.market_date.isoformat(),
-        "published_at": _ts(value.published_at),
+        # Issue #721 R16 (r2): null until the package is actually visible -
+        # never the request's clock dressed as a publish time.
+        "published_at": (
+            _ts(value.published_at) if value.published_at is not None else None
+        ),
     }
+    # observed_at carries the reader's observation moment (always present).
+    observed = getattr(value, "observed_at", None)
+    if observed is not None:
+        out["observed_at"] = _ts(observed)
     # Issue #721 R15: next-check time, an optional contract field emitted
     # only when an authoritative next session is known.
     next_check = getattr(value, "next_check_at", None)
@@ -207,6 +215,7 @@ def _opportunity(value: OpportunityView) -> dict[str, Any]:
         "queue_group": value.queue_group,
         "action_code": value.action_code,
         "status_code": value.status_code,
+        "exit_kind": value.exit_kind,
         "reason_codes": _reasons(value.reason_codes),
         "primary_constraint": None
         if value.primary_constraint is None

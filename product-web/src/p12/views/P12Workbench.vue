@@ -22,7 +22,7 @@
           系统日频策略尚未面向个人模拟账户签发盘后推荐（不以历史信号或行情冒充推荐）；实时行情查询、当日分时与自主模拟委托（{{ paperRuleVersion }}）正常可用
         </p>
         <p v-else-if="workbench" class="p12-today-sub">
-          {{ workbench.publication.market_date }} 盘后策略计划尚未发布（预计 {{ time(workbench.publication.published_at) }}）；实时行情查询、自主模拟委托与账户核对正常可用
+          {{ workbench.publication.market_date }} 盘后策略计划尚未发布{{ workbench.publication.next_check_at ? '（预计 ' + time(workbench.publication.next_check_at) + '）' : '' }}；实时行情查询、自主模拟委托与账户核对正常可用
         </p>
       </div>
       <div class="heading-actions">
@@ -113,7 +113,7 @@
       <div v-else-if="runOverdue" class="p12-banner-note warning" data-testid="p12-run-overdue">
         <div>
           <strong>今日建议已逾发布时间仍未生成</strong>
-          <p>系统计划本应在 {{ time(workbench.publication.published_at) }} 发布，当前既无建议包也无缺数暂停回执；请按运行回执核查任务状态。</p>
+          <p>系统计划本应在 {{ time(workbench.publication.next_check_at) }} 发布，当前既无建议包也无缺数暂停回执；请按运行回执核查任务状态。</p>
         </div>
       </div>
 
@@ -128,7 +128,7 @@
         <div class="p12-unpublished-inner">
           <div v-if="!runBlocked" data-testid="p12-not-yet-generated">
             <h2>今日建议尚未生成</h2>
-            <p>{{ workbench.publication.market_date }} 收盘后的系统计划将于 {{ time(workbench.publication.published_at) }} 发布。发布前系统不展示未定稿的策略推荐；你可以直接查询真实 A 股行情并进行自主模拟操作。</p>
+            <p>{{ workbench.publication.market_date }} 收盘后的系统计划{{ workbench.publication.next_check_at ? '将于 ' + time(workbench.publication.next_check_at) + ' 发布' : '发布时间待运行回执确定' }}。发布前系统不展示未定稿的策略推荐；你可以直接查询真实 A 股行情并进行自主模拟操作。</p>
           </div>
           <form v-if="!isRehearsal" class="p12-lookup-inline" @submit.prevent="lookupSecurity()">
             <input
@@ -917,13 +917,15 @@ export default {
       return status === 'FAILED' || status === 'TIMED_OUT'
     },
     runOverdue () {
-      // Issue #721 R16: past the publish point with no package and no blocked
-      // receipt is an overdue run, surfaced separately from "尚未生成".
+      // Issue #721 R16 (r2): past the NEXT CHECK point with no package and
+      // no blocked receipt is an overdue run, surfaced separately from
+      // "尚未生成".  published_at is null until publication, so the
+      // check-point field is what the overdue clock reads.
       if (this.workbench?.package || this.runBlocked || this.runFailed) return false
-      const publishedAt = this.workbench?.publication?.published_at
-      if (!publishedAt) return false
+      const nextCheck = this.workbench?.publication?.next_check_at
+      if (!nextCheck) return false
       const now = this.workbench?.clock || new Date().toISOString()
-      return new Date(now) > new Date(publishedAt)
+      return new Date(now) > new Date(nextCheck)
     },
     nextCheckText () {
       // Issue #721 R15: the next scheduled publish/check point, shown on the

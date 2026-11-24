@@ -14,6 +14,12 @@ from quanthus.p12_daily.decision_loader import (
     INPUT_BLOCKED_IN_PACKAGE,
     load_decision_set_dict,
 )
+from quanthus.p12_daily.forward_calendar import (
+    DESCRIPTOR_SCHEMA as FC_DESCRIPTOR_SCHEMA,
+)
+from quanthus.p12_daily.forward_calendar import (
+    POINTER_SCHEMA as FC_POINTER_SCHEMA,
+)
 from quanthus.p12_daily.package_source import PublishedPackageSource
 from quanthus.p12_daily.package_store import (
     PACKAGE_EXISTS_DIFFERS,
@@ -38,24 +44,138 @@ def _sha(payload: bytes) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
+def alter(**manifest_overrides):
+    '''Audit-shim: mutate the core manifest, then rebind every digest the
+    pointer/index declare (the audit's replay script calls this shape).
+
+    Usage in show(): alter(volume={...}) sets manifest["volume"]={...};
+    alter(calendar=None) removes the member.  The core manifest sha, the
+    index entry sha and the pointer's index sha are all recomputed so the
+    result still qualifies at the descriptor level - the test then exercises
+    whichever downstream check the mutation targets.'''
+
+    def apply(manifest: dict, core: Path, pointer: dict, index: dict) -> None:
+        for key, value in manifest_overrides.items():
+            if value is None:
+                manifest.pop(key, None)
+            else:
+                manifest[key] = value
+        mpath = core / "manifest.json"
+        mpath.write_text(json.dumps(manifest, sort_keys=True))
+        core_sha = _sha(mpath.read_bytes())
+        if "dates" in index and MARKET_DATE.isoformat() in index["dates"]:
+            index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
+        if isinstance(pointer.get("entry"), dict):
+            pointer["entry"]["core_manifest_sha256"] = core_sha
+        return None
+
+    return apply
+
+
+def make_forward_calendar(
+    calendar_root: Path,
+    *,
+    next_map: dict | None = None,
+    available_at: str = "2026-11-20T15:35:00+08:00",
+    published_at: str = "2026-11-20T15:35:00+08:00",
+    coverage_end: str = "2026-12-31",
+    bse_status: str = "unavailable",
+    bse_reason: str = "OFFICIAL_DOCUMENT_REDIRECT_LOOP",
+    version: str = "p10-calendar-test-v1",
+) -> Path:
+    '''Materialize the P10 forward-calendar product (pointer + descriptor).'''
+
+    root = Path(calendar_root)
+    root.mkdir(parents=True, exist_ok=True)
+    if next_map is None:
+        next_map = {
+            "2026-11-20": "2026-11-21",
+            "2026-11-21": "2026-11-23",
+            "2026-11-27": "2026-11-30",
+            "2026-12-30": "2026-12-31",
+            "2026-12-31": None,
+        }
+    descriptor = {
+        "schema_version": FC_DESCRIPTOR_SCHEMA,
+        "product_id": "p10-forward-exchange-calendar-v1",
+        "status": "PARTIAL",
+        "timezone": "Asia/Shanghai",
+        "coverage": {"start": "2026-11-01", "end": coverage_end},
+        "venues": {
+            "SSE": {"status": "AVAILABLE", "next_session": dict(next_map),
+                    "next_session_unavailable": {
+                        k: "NEXT_SESSION_OUTSIDE_COVERAGE"
+                        for k, v in next_map.items() if v is None}},
+            "SZSE": {"status": "AVAILABLE", "next_session": dict(next_map),
+                     "next_session_unavailable": {}},
+            "BSE": {"status": bse_status, "reason": bse_reason,
+                    "next_session": None, "sessions": None},
+        },
+    }
+    vdir = root / version
+    vdir.mkdir(parents=True, exist_ok=True)
+    (vdir / "descriptor.json").write_text(json.dumps(descriptor, sort_keys=True))
+    dsha = hashlib.sha256(
+        (vdir / "descriptor.json").read_bytes()
+    ).hexdigest()
+    pointer = {
+        "schema_version": FC_POINTER_SCHEMA,
+        "product_id": "p10-forward-exchange-calendar-v1",
+        "status": "PARTIAL",
+        "version": version,
+        "descriptor": f"{version}/descriptor.json",
+        "descriptor_sha256": "sha256:" + dsha,
+        "published_at": published_at,
+        "available_at": available_at,
+    }
+    (root / "CURRENT_FORWARD_CALENDAR.json").write_text(json.dumps(pointer))
+    return root
+
+
 def make_product(job_root: Path, market_date: str, rows: int = 5213) -> dict:
     '''Materialize the CN02 base24 pointer layout under a local replay root.'''
+
+    # Issue #743: the job's calendar root resolves to a job_root-local
+    # "calendar/" replica when present - the fixture always builds one.
+    cal_root = Path(job_root) / "calendar"
+    make_forward_calendar(cal_root)
 
     core = job_root / (f"{market_date}-20261120T000000Z") / "core"
     payload = core / "payload"
     payload.mkdir(parents=True, exist_ok=True)
-    (payload / "1d.parquet").write_bytes(b"PAR1-fake-daily-bars")
+    # Audit R5 (r2): write a REAL 1d parquet so the listing-facts read works;
+    # the audit's pq1() rewrites it for the no-code-column case.
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        pq.write_table(
+            pa.table({"security_code": ["600000", "000001"]}),
+            payload / "1d.parquet",
+        )
+    except ImportError:
+        (payload / "1d.parquet").write_bytes(b"PAR1-fake-daily-bars")
+    daily_sha = _sha((payload / "1d.parquet").read_bytes())
+    daily_size = (payload / "1d.parquet").stat().st_size
+    # Audit R4 (r2): the parent Base manifest must be locatable so its
+    # declared sha can be recomputed - materialize it inside the core dir.
+    base_file = core / "base.json"
+    base_file.write_text(json.dumps({"kind": "base", "stub": True}))
+    base_sha_real = _sha(base_file.read_bytes())
     manifest = {
         "kind": "cn02_base24_core_v1",
         "package_id": f"core-{market_date}",
         "market_date": market_date,
-        "base": {"manifest_sha256": BASE_SHA, "content_digest": "sha256:" + "2" * 64},
+        "base": {
+            "manifest_sha256": base_sha_real,
+            "content_digest": "sha256:" + "2" * 64,
+            "path": "base.json",
+        },
         "row_counts": {"dwd_security_bar": rows, "dwd_trading_calendar": 3},
         "files": [
             {
                 "path": "payload/1d.parquet",
-                "sha256": _sha(b"PAR1-fake-daily-bars"),
-                "size_bytes": len(b"PAR1-fake-daily-bars"),
+                "sha256": daily_sha,
+                "size_bytes": daily_size,
             },
         ],
         "content_digest": "sha256:" + "3" * 64,
@@ -63,7 +183,8 @@ def make_product(job_root: Path, market_date: str, rows: int = 5213) -> dict:
         "consumer_admission": "NOT_GRANTED",
         # M2 F2: the governed calendar member declares the authoritative next
         # open session at this cutoff; the job never guesses the date.
-        "calendar": {"next_session": "2026-11-21"},
+        # Issue #743 (r2): calendar.next_session and dwd_trading_calendar are
+        # retired - no member here; the forward calendar product decides.
         # M2 section 3: the three independent history floors, each separately
         # satisfied by the observed sessions this input supplies.
         "history": {
@@ -95,7 +216,7 @@ def make_product(job_root: Path, market_date: str, rows: int = 5213) -> dict:
         "market_date": market_date,
         "core": str(core),
         "core_manifest_sha256": core_sha,
-        "base_manifest_sha256": BASE_SHA,
+        "base_manifest_sha256": base_sha_real,
         "core_row_counts": manifest["row_counts"],
         "completed_at": manifest["completed_at"],
         "consumer_admission": "NOT_GRANTED",
@@ -483,55 +604,58 @@ def test_history_feature_warmup_valid_bar_gap_blocks(tmp_path):
     assert "有效 bar" in (gate["unavailable_reason"] or "")
 
 
-def test_history_listing_floor_corporate_action_anomaly_blocks(tmp_path):
-    """R8: a corporate-action anomaly inside the 61-day window is evidence.
-
-    The listing floor reaches 120 sessions but the member records a recent
-    corporate-action anomaly; the gate fails closed and the reason rides the
-    receipt rather than being dropped."""
+def test_history_gates_are_independent(tmp_path):
+    """R8 (r2): the three history floors are independent - a corporate-action
+    anomaly belongs to the 61-day feature-warmup gate, NOT the 120-day
+    listing floor (which reads only listing facts + the trading calendar).
+    Each mutated member trips only its own gate; the other two still hold."""
     prod = tmp_path / "job"
     prod.mkdir()
     state = tmp_path / "state"
 
-    def mutate(manifest):
-        manifest["history"]["listing_sessions"] = {
-            "observed_sessions": 200,
-            "unavailable_reason": (
-                "近 61 日存在公司行为异常，上市满 120 日仍需按成员证据阻断"
-            ),
+    # Case 1: a 61-day corporate-action anomaly trips ONLY feature_warmup_61;
+    # the listing floor (120) and event window (22) stay satisfied.
+    def mutate_warmup(manifest):
+        manifest["history"]["feature_warmup_sessions"] = {
+            "observed_sessions": 80,
+            "unavailable_reason": "近 61 日存在公司行为异常",
         }
+        manifest["history"]["listing_sessions"] = {"observed_sessions": 200}
 
-    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate)
+    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate_warmup)
     receipt = _run_and_receipt(state, prod)
     assert receipt["status"] == "INPUT_BLOCKED"
-    assert "history.listing_floor_120" in receipt["input_block"]["missing_members"]
-    gate = next(
-        g
-        for g in receipt["history_gates"]
-        if g["gate_id"] == "history.listing_floor_120"
-    )
-    assert gate["observed_sessions"] == 200
-    assert "公司行为异常" in (gate["unavailable_reason"] or "")
+    gates = {g["gate_id"]: g for g in receipt["history_gates"]}
+    assert gates["history.feature_warmup_61"]["satisfied"] is False
+    assert gates["history.listing_floor_120"]["satisfied"] is True
+    assert gates["history.event_window_22"]["satisfied"] is True
+    assert "公司行为异常" in (gates["history.feature_warmup_61"]["unavailable_reason"] or "")
+
+    # Case 2: only the listing floor fails; warmup + event window hold.
+    def mutate_listing(manifest):
+        manifest["history"]["listing_sessions"] = {
+            "observed_sessions": 90,
+        }
+
+    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate_listing)
+    receipt = _run_and_receipt(tmp_path / "state2", prod)
+    assert receipt["status"] == "INPUT_BLOCKED"
+    gates = {g["gate_id"]: g for g in receipt["history_gates"]}
+    assert gates["history.listing_floor_120"]["satisfied"] is False
+    assert gates["history.feature_warmup_61"]["satisfied"] is True
+    assert gates["history.event_window_22"]["satisfied"] is True
 
 
-def test_missing_calendar_blocks(tmp_path):
-    """Without the governed calendar member the run cannot fix next_session."""
+def test_missing_forward_calendar_pointer_blocks(tmp_path):
+    """Issue #743: without the forward-calendar pointer the run cannot fix
+    next_session - the retired manifest member is never consulted."""
     prod = tmp_path / "job"
     prod.mkdir()
     state = tmp_path / "state"
-    meta = make_product(prod, MARKET_DATE.isoformat())
-    manifest_path = meta["core"] / "manifest.json"
-    manifest = json.loads(manifest_path.read_text())
-    del manifest["calendar"]
-    manifest_path.write_text(json.dumps(manifest, sort_keys=True))
-    core_sha = _sha(manifest_path.read_bytes())
-    index = json.loads((prod / "DATES.json").read_text())
-    index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
-    (prod / "DATES.json").write_text(json.dumps(index, sort_keys=True))
-    pointer = json.loads((prod / "CURRENT_DAILY_CORE_BASE24.json").read_text())
-    pointer["index_sha256"] = _sha((prod / "DATES.json").read_bytes())
-    pointer["entry"]["core_manifest_sha256"] = core_sha
-    (prod / "CURRENT_DAILY_CORE_BASE24.json").write_text(json.dumps(pointer))
+    make_product(prod, MARKET_DATE.isoformat())
+    # Remove the job-local calendar replica entirely.
+    import shutil
+    shutil.rmtree(prod / "calendar")
     runner = SyntheticRuleRunner(candidates=(one_candidate(),))
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
@@ -539,9 +663,157 @@ def test_missing_calendar_blocks(tmp_path):
         account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
         decision_cutoff=CUTOFF,
         holdings=(),
+        # strict: no job-local replica, so the CN02 default path would be
+        # read - point at an empty root instead to prove the block is the
+        # calendar, not a filesystem accident.
+        calendar_root=tmp_path / "no-calendar",
     )
     assert receipt["status"] == "INPUT_BLOCKED"
-    assert "trading_calendar" in receipt["input_block"]["missing_members"]
+    assert "forward_calendar" in receipt["input_block"]["missing_members"]
+
+
+def test_forward_calendar_weekend_next_session(tmp_path):
+    """Issue #743: 11-27 maps to 11-30 across the weekend (SSE/SZSE agree)."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    cal_root = tmp_path / "cal"
+    make_forward_calendar(cal_root, next_map={
+        "2026-11-27": "2026-11-30",
+        "2026-11-30": "2026-12-01",
+    })
+    make_product(prod, "2026-11-27")
+    # The fixture's own manifest market_date is 11-27; the calendar decides
+    # next_session=11-30.
+    receipt = run_daily(
+        state_dir=state, job_root=prod,
+        runner=SyntheticRuleRunner(candidates=(one_candidate(),)),
+        market_date=date(2026, 11, 27), next_session=None,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 27, 22, 31, tzinfo=TZ),
+        decision_cutoff=datetime(2026, 11, 27, 22, 30, tzinfo=TZ),
+        holdings=(), calendar_root=cal_root,
+    )
+    assert receipt["status"] == "PUBLISHED"
+    assert receipt["next_session"] == "2026-11-30"
+
+
+def test_forward_calendar_coverage_end_blocks(tmp_path):
+    """Issue #743: a next_session beyond coverage (12-31 -> null) blocks."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    cal_root = tmp_path / "cal"
+    make_forward_calendar(cal_root, next_map={"2026-12-31": None})
+    make_product(prod, "2026-12-31")
+    receipt = run_daily(
+        state_dir=state, job_root=prod,
+        runner=SyntheticRuleRunner(candidates=(one_candidate(),)),
+        market_date=date(2026, 12, 31), next_session=None,
+        account_id="SYN-PAPER-A", now=datetime(2026, 12, 31, 22, 31, tzinfo=TZ),
+        decision_cutoff=datetime(2026, 12, 31, 22, 30, tzinfo=TZ),
+        holdings=(), calendar_root=cal_root,
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert "forward_calendar" in receipt["input_block"]["missing_members"]
+
+
+def test_forward_calendar_venue_disagreement_blocks(tmp_path):
+    """Issue #743: SSE and SZSE disagreeing on next_session blocks whole-day."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    cal_root = tmp_path / "cal"
+    root = make_forward_calendar(cal_root, next_map={
+        "2026-11-20": "2026-11-21",
+    })
+    # Corrupt only SZSE's map.
+    desc = root / "p10-calendar-test-v1" / "descriptor.json"
+    d = json.loads(desc.read_text())
+    d["venues"]["SZSE"]["next_session"]["2026-11-20"] = "2026-11-24"
+    desc.write_text(json.dumps(d, sort_keys=True))
+    dsha = hashlib.sha256(desc.read_bytes()).hexdigest()
+    ptr_path = root / "CURRENT_FORWARD_CALENDAR.json"
+    ptr = json.loads(ptr_path.read_text())
+    ptr["descriptor_sha256"] = "sha256:" + dsha
+    ptr_path.write_text(json.dumps(ptr))
+    make_product(prod, MARKET_DATE.isoformat())
+    receipt = run_daily(
+        state_dir=state, job_root=prod,
+        runner=SyntheticRuleRunner(candidates=(one_candidate(),)),
+        market_date=MARKET_DATE, next_session=None,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(), calendar_root=cal_root,
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert "disagree" in receipt["input_block"]["detail"]
+
+
+def test_forward_calendar_post_cutoff_version_rejected(tmp_path):
+    """Issue #743: a version made available AFTER the decision cutoff is not
+    visible at decision time - the day blocks rather than consume it."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    cal_root = make_forward_calendar(
+        tmp_path / "cal",
+        available_at="2026-11-20T23:30:00+08:00",  # after the 22:30 cutoff
+    )
+    make_product(prod, MARKET_DATE.isoformat())
+    receipt = run_daily(
+        state_dir=state, job_root=prod,
+        runner=SyntheticRuleRunner(candidates=(one_candidate(),)),
+        market_date=MARKET_DATE, next_session=None,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(), calendar_root=cal_root,
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert "not visible at decision time" in receipt["input_block"]["detail"]
+
+
+def test_forward_calendar_bse_isolation(tmp_path):
+    """Issue #743: BSE venue unavailable drops BSE new candidates only;
+    SSE/SZSE candidates still publish and a BSE holding keeps holding."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    state = tmp_path / "state"
+    cal_root = make_forward_calendar(
+        tmp_path / "cal",
+        bse_status="unavailable",
+        bse_reason="OFFICIAL_DOCUMENT_REDIRECT_LOOP",
+    )
+    make_product(prod, MARKET_DATE.isoformat())
+    # A BSE new candidate (920xxx) + a mainland one (600000).
+    receipt = run_daily(
+        state_dir=state, job_root=prod,
+        runner=SyntheticRuleRunner(candidates=(
+            one_candidate(security_code="920001"),
+            one_candidate(security_code="600000"),
+        )),
+        market_date=MARKET_DATE, next_session=None,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(
+            HeldPositionFact(security_code="430001", quantity=100),
+        ), calendar_root=cal_root,
+    )
+    assert receipt["status"] == "PUBLISHED"
+    # The BSE new candidate is excluded; the mainland one published.
+    codes = [e["security_code"] for e in receipt["exclusions"]]
+    assert "920001" in codes
+    stored = DailyPackageStore(state).package_for(MARKET_DATE)
+    assert stored is not None
+    sec_codes = [d["security_code"] for d in stored.decision_set["decisions"]]
+    assert "600000" in sec_codes
+    assert "920001" not in sec_codes
+    # The BSE holding kept holding with the venue reason on the receipt.
+    assert any(
+        h["security_code"] == "430001" and h["action"] == "HOLD_AND_ALERT"
+        for h in receipt["holding_directives"]
+    )
+    # Calendar clocks recorded.
+    assert receipt["calendar_version"] == "p10-calendar-test-v1"
+    assert receipt["calendar_sha256"].startswith("sha256:")
+    assert receipt["calendar_received_at"]
+    assert receipt["calendar_verified_at"]
 
 
 def test_missing_corporate_actions_blocks(tmp_path):
@@ -581,9 +853,12 @@ def _copy_fixture_sidecar(tmp_path, name):
     ) / name
     if not src.is_file():
         return None
-    dest = tmp_path / name
-    dest.write_bytes(src.read_bytes())
-    return dest
+    # Copy the whole fixtures tree so member paths ("fixtures/synthetic/…")
+    # resolve under member_files_root = the copied "fixtures" dir (audit R3).
+    fixtures_root = tmp_path / "fixtures"
+    import shutil
+    shutil.copytree(src.parent.parent, fixtures_root)
+    return fixtures_root / "synthetic" / name
 
 
 def test_sidecar_publish_records_consumer_stamps(tmp_path):
@@ -1175,3 +1450,149 @@ def test_volume_boundary_with_price_exit_still_sells(env):
     loaded = load_decision_set_dict(stored.decision_set, mode="synthetic")
     exits = [d for d in loaded.decisions if d.stage.value == "exit_plan"]
     assert exits and exits[0].security_code == "600000"
+
+
+# Issue #723 comment-7117663809: the producer encodes both reduce and exit as
+# exit_plan; the held_signal's action alone distinguishes them.  Batch A
+# covers the three cases - a reduce exit_plan is a \u51cf\u4ed3\u5efa\u8bae
+# (no full sell task), an exit exit_plan is a liquidation, and a mismatch
+# between the emitted exit_plan and the held_signal set refuses the day.
+
+
+def _run_with_signal(tmp_path, signal, held_qty=500):
+    prod = tmp_path / "job"
+    prod.mkdir()
+    make_product(prod, MARKET_DATE.isoformat())
+    state = tmp_path / "state"
+    runner = SyntheticRuleRunner(
+        candidates=(one_candidate(holding_signal=signal),)
+    )
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(HeldPositionFact(security_code="600000", quantity=held_qty),),
+    )
+    return receipt, state, runner
+
+
+def test_reduce_signal_emits_exit_plan_and_held_signal(tmp_path):
+    receipt, state, runner = _run_with_signal(
+        tmp_path,
+        {"action": "REDUCE", "detail": "trim toward target", "target_maximum_position": "0.30"},
+    )
+    assert receipt["status"] == "PUBLISHED"
+    # The held signal rides the run receipt verbatim - action and target are
+    # the only fields that tell this exit_plan is a 减仓建议, not a sale.
+    assert receipt["held_signals"] == [
+        {
+            "security_code": "600000",
+            "opportunity_id": "OPP-D1B-20261120-600000",
+            "action": "reduce",
+            "target_maximum_position": "0.30",
+        }
+    ]
+    stored = DailyPackageStore(state).package_for(MARKET_DATE)
+    loaded = load_decision_set_dict(stored.decision_set, mode="synthetic")
+    exits = [d for d in loaded.decisions if d.stage.value == "exit_plan"]
+    assert len(exits) == 1
+    assert exits[0].opportunity_id == "OPP-D1B-20261120-600000"
+
+
+def test_exit_signal_emits_full_exit_plan(tmp_path):
+    receipt, state, runner = _run_with_signal(
+        tmp_path,
+        {"action": "EXIT", "reason_code": "EXIT_SIGNAL", "detail": "liquidate"},
+    )
+    assert receipt["status"] == "PUBLISHED"
+    assert receipt["held_signals"][0]["action"] == "exit"
+    stored = DailyPackageStore(state).package_for(MARKET_DATE)
+    loaded = load_decision_set_dict(stored.decision_set, mode="synthetic")
+    exits = [d for d in loaded.decisions if d.stage.value == "exit_plan"]
+    assert exits and exits[0].reason_codes == ("EXIT_SIGNAL",)
+
+
+def test_exit_plan_without_matching_held_signal_blocks(tmp_path):
+    prod = tmp_path / "job"
+    prod.mkdir()
+    make_product(prod, MARKET_DATE.isoformat())
+    state = tmp_path / "state"
+
+    class DropSignals(SyntheticRuleRunner):
+        def run(self, request):
+            out = super().run(request)
+            # Strip the producer's held_signals - the emitted exit_plan then
+            # has no reduce/exit identity and the day must refuse to publish.
+            import dataclasses as dc
+            return dc.replace(out, held_signals=())
+
+    runner = DropSignals(
+        candidates=(one_candidate(holding_signal={"action": "EXIT"}),)
+    )
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(HeldPositionFact(security_code="600000", quantity=500),),
+    )
+    assert receipt["status"] == "INPUT_BLOCKED"
+    assert receipt["publish_gate"]["reason_code"] == "exit_plan_signal_mismatch"
+    assert DailyPackageStore(state).package_for(MARKET_DATE) is None
+
+
+def test_reduce_exit_plan_workbench_shows_suggestion_not_sell(tmp_path):
+    prod = tmp_path / "job"
+    prod.mkdir()
+    make_product(prod, MARKET_DATE.isoformat())
+    state = tmp_path / "state"
+    runner = SyntheticRuleRunner(
+        candidates=(one_candidate(holding_signal={"action": "REDUCE"}),)
+    )
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(HeldPositionFact(security_code="600000", quantity=500),),
+    )
+    assert receipt["status"] == "PUBLISHED"
+
+    from quanthus.platform.adapters.p12_synthetic_fixture import (
+        load_synthetic_fixture,
+    )
+    from quanthus.platform.p12.paper_fixture import (
+        PAPER_ACCOUNT_ID,
+        build_paper_application,
+    )
+    from quanthus.product_daily.application.models import (
+        SyntheticRuntimeAuthorization,
+    )
+
+    fixture = load_synthetic_fixture(Path("config/p12/synthetic-desktop.v1.json"))
+    queue = [datetime(2026, 11, 20, 23, 0, tzinfo=TZ)]
+    app = build_paper_application(
+        state_dir=state,
+        policy=fixture.policy,
+        now=lambda: queue[0],
+        authorization=SyntheticRuntimeAuthorization(
+            "audit", frozenset({PAPER_ACCOUNT_ID})
+        ),
+        decision_source=PublishedPackageSource(
+            state, lambda: queue[0], mode="synthetic"
+        ),
+    )
+    scope = AccountScope(PAPER_ACCOUNT_ID, "synthetic")
+    bench = app.workbench(scope)
+    row = next(
+        o for o in bench.opportunities if o.stage == "exit_plan"
+    )
+    # A reduce exit_plan is a 减仓建议: no full-sell action, exit_kind marks
+    # it reduce so the page renders the suggestion instead of the sell form.
+    assert row.exit_kind == "reduce"
+    assert row.action_code == "HOLD"
+    assert not any(
+        o.side == "sell" and o.security_code == "600000"
+        for o in bench.orders
+    )

@@ -165,11 +165,14 @@ class DailyPackageStore:
     def _registry_path(self) -> Path:
         return self._root / PUBLISHER_REGISTRY_FILE
 
-    def publisher_registry(self) -> dict[str, str]:
-        '''The trusted publisher ledger: source_id -> registered package digest.
+    def publisher_registry(self) -> dict:
+        '''The trusted publisher ledger: {(source_id, market_date) -> digest}.
 
-        Written only by the publish gate's own write path.  Readers must not
-        serve a package whose source_id is absent or whose digest differs.'''
+        Audit #720 R13 (r2): registration is APPEND-ONLY per
+        (source_id, market_date) - a second day's package must not overwrite
+        the first day's digest or a restarted reader could no longer verify
+        the older package.  Readers must not serve a package whose
+        (source_id, market_date) pair is absent or whose digest differs.'''
 
         path = self._registry_path()
         if not path.is_file():
@@ -178,14 +181,45 @@ class DailyPackageStore:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return {}
-        return {str(k): str(v) for k, v in (raw.get("sources") or {}).items()}
+        out = {}
+        for key, value in (raw.get("sources") or {}).items():
+            if isinstance(value, dict):
+                for market_date, digest_ in value.items():
+                    out[(str(key), str(market_date))] = str(digest_)
+            else:
+                # Legacy single-digest shape: keep it under the wildcard key
+                # so a pre-r2 registry still verifies its one package.
+                out[(str(key), "*")] = str(value)
+        return out
 
-    def register_source(self, source_id: str, package_digest: str) -> None:
-        '''Record a package digest under its source_id in the publish ledger.'''
+    def register_source(
+        self, source_id: str, market_date: date | str, package_digest: str
+    ) -> None:
+        '''Append one (source_id, market_date) -> digest registration.'''
 
-        registry = self.publisher_registry()
-        registry[str(source_id)] = str(package_digest)
-        _write_atomic(self._registry_path(), {"sources": registry})
+        path = self._registry_path()
+        raw = {}
+        if path.is_file():
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                raw = {}
+        sources = raw.setdefault("sources", {})
+        day = str(market_date)
+        entry = sources.get(str(source_id))
+        if not isinstance(entry, dict):
+            entry = {} if entry is None else {"*": str(entry)}
+        # Never overwrite a registered digest for the same (source, date).
+        existing = entry.get(day)
+        if existing is not None and existing != str(package_digest):
+            raise FactError(
+                "PACKAGE_EXISTS_DIFFERS",
+                "publisher registry already binds " + repr(source_id)
+                + " " + day + " to a different digest",
+            )
+        entry[day] = str(package_digest)
+        sources[str(source_id)] = entry
+        _write_atomic(self._registry_path(), {"sources": sources})
 
     def retractions(self) -> tuple[dict, ...]:
         path = self._retractions_path()
@@ -281,7 +315,9 @@ class DailyPackageStore:
         # package whose source_id is unregistered can never be read back.
         source_id = str(decision_set.get("source_id") or "")
         if source_id:
-            self.register_source(source_id, stored.file_sha256)
+            self.register_source(
+                source_id, market_date, stored.file_sha256
+            )
         return PublishOutcome("published", stored, None)
 
     def retract(

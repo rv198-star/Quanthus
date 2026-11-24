@@ -69,11 +69,11 @@ from quanthus.product_daily.application.history import ConfigurationBinding, Fac
 from quanthus.product_daily.application.models import Baseline
 from quanthus.product_daily.application.service import SyntheticFactService
 from quanthus.product_daily.funding import (
+    BucketPhase,
     CycleSettlementEvidence,
     FundingDecision,
     FundingState,
     SettlementRequest,
-    BucketPhase,
 )
 from quanthus.shared.fact_contracts import FactError, digest
 from quanthus.shared.values import (
@@ -548,13 +548,19 @@ class P12DesktopApplication:
             next_check_at = datetime.combine(
                 next_session, pub.timetz() if hasattr(pub, "timetz") else pub.time()
             )
+        published = self._visible(decisions, now)
+        # Issue #721 R16 (r2): published_at is the REAL publish moment only -
+        # null while the package is not yet visible to the reader (never the
+        # request's own clock passed off as a publish).  observed_at carries
+        # the reader's observation moment instead.
         return PublicationStatus(
-            status="PUBLISHED" if self._visible(decisions, now) else "NOT_YET_PUBLISHED",
+            status="PUBLISHED" if published else "NOT_YET_PUBLISHED",
             market_date=decisions.market_date,
-            published_at=decisions.published_at,
+            published_at=decisions.published_at if published else None,
             retracted=retraction is not None,
             retraction_reason=None if retraction is None else str(retraction.get("reason")),
             next_check_at=next_check_at,
+            observed_at=now,
         )
 
     # ---- package publication ----------------------------------------------------------
@@ -1049,6 +1055,7 @@ class P12DesktopApplication:
         account: AccountSummary,
         blockers: tuple[str, ...],
         now: datetime,
+        reduce_exit_ids: frozenset[str] = frozenset(),
     ) -> OpportunityView:
         plan = next((p for p in package.plans if p.opportunity_id == item.opportunity_id), None)
         applicability = (
@@ -1093,6 +1100,7 @@ class P12DesktopApplication:
             status = {
                 "ACTIONABLE": "READY",
                 "SCHEDULED": "READY",
+                "SKIPPED": "ENDED",
                 "NEEDS_REASSESSMENT": "NEEDS_REASSESSMENT",
                 "EXPIRED": "EXPIRED",
                 "POLICY_NOT_ADOPTED": "POLICY_NOT_ADOPTED",
@@ -1106,6 +1114,8 @@ class P12DesktopApplication:
                 action = "REVIEW"
             elif status == "POLICY_NOT_ADOPTED":
                 action = "PAUSED"
+            elif status == "ENDED":
+                action = "NONE"
             else:
                 action = "NONE"
             # A cleanly executed plan reads as held/completed, never as pending
@@ -1129,7 +1139,13 @@ class P12DesktopApplication:
         elif stage is OpportunityStage.HOLDING:
             action, status = "HOLD", "READY"
         elif stage is OpportunityStage.EXIT_PLAN:
-            action, status = "SELL", "READY"
+            # Issue #723 comment-7117663809: an exit_plan whose held_signal
+            # action is "reduce" is a 减仓建议, never a full liquidation
+            # task in batch A - the position stays held and the page shows
+            # the reduction suggestion; only action "exit" produces the
+            # sell task.
+            is_reduce = item.opportunity_id in reduce_exit_ids
+            action, status = ("HOLD", "READY") if is_reduce else ("SELL", "READY")
             # Once the position is flat the exit is complete: it no longer
             # prompts a sell.  An exit plan is sized for the whole held
             # quantity, so quantity 0 after its report marks it done — but only
@@ -1174,6 +1190,11 @@ class P12DesktopApplication:
             (p.average_cost for p in account.positions if p.security_code == item.security_code),
             MaybeDecimal.unknown("NO_POSITION"),
         )
+        exit_kind = None
+        if stage is OpportunityStage.EXIT_PLAN:
+            exit_kind = (
+                "reduce" if item.opportunity_id in reduce_exit_ids else "full"
+            )
         return OpportunityView(
             opportunity_id=item.opportunity_id,
             security_code=item.security_code,
@@ -1191,6 +1212,7 @@ class P12DesktopApplication:
             cost_price=cost,
             plan=plan,
             applicability=applicability,
+            exit_kind=exit_kind,
         )
 
     def _state(
@@ -1243,8 +1265,22 @@ class P12DesktopApplication:
         account = self._account(projection, history, decisions, funding, now)
         blockers = self._policy.missing_for_action(scope.mode)
         visible = self._visible(decisions, now)
+        # Issue #723 comment-7117663809: the run receipt's held_signals carry
+        # the producer action; a "reduce" action marks the matching
+        # exit_plan as a 减仓建议 on the workbench (no full sell task in
+        # batch A).
+        latest = getattr(self._decisions, "latest_run", None)
+        run_doc = latest() if callable(latest) else None
+        reduce_exit_ids = frozenset(
+            str(sig.get("opportunity_id"))
+            for sig in (run_doc or {}).get("held_signals") or ()
+            if str(sig.get("action")).lower() == "reduce"
+        )
         items = [
-            self._opportunity(item, decisions, package, projection, history, account, blockers, now)
+            self._opportunity(
+                item, decisions, package, projection, history, account,
+                blockers, now, reduce_exit_ids,
+            )
             for item in (decisions.decisions if visible else ())
             # The no-qualified-candidate no-op marks a published "nothing to
             # do" day: it is evidence, never a queue row, a position or an
@@ -1356,10 +1392,11 @@ class P12DesktopApplication:
             publication=PublicationStatus(
                 status="NOT_YET_PUBLISHED",
                 market_date=market_date,
-                published_at=now,
+                published_at=None,
                 retracted=False,
                 retraction_reason=None,
                 next_check_at=None,
+                observed_at=now,
             ),
             clock=now,
             clock_kind=self._clock_kind,
@@ -1639,7 +1676,8 @@ class P12DesktopApplication:
         if form_code and order_code and form_code != order_code:
             raise FactError(
                 "INVALID_REPORT_SHAPE",
-                f"security_code {form_code} does not match order {command.order_id} security {order_code}",
+                f"security_code {form_code} does not match order "
+                f"{command.order_id} security {order_code}",
             )
         return order_code or form_code
 

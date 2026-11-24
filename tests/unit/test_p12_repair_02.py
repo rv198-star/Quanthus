@@ -165,7 +165,10 @@ def test_package_is_hidden_until_published(tmp_path: Path) -> None:
     view = app.workbench(app.scope)
     assert view.package is None and view.opportunities == ()
     assert view.publication.status == "NOT_YET_PUBLISHED"
-    assert view.publication.published_at == _at("2026-11-18T18:30:00+08:00")
+    # Issue #721 R16 (r2): published_at is the REAL publish moment only;
+    # before visibility it stays null (never the request's own clock).
+    assert view.publication.published_at is None
+    assert view.publication.observed_at == _at("2026-11-18T16:00:00+08:00")
     assert app.records(app.scope).package is None
     with pytest.raises(FactError, match="PLAN_NOT_FOUND"):
         _fill(app, at="2026-11-18T15:30:00+08:00")

@@ -157,6 +157,7 @@ _EXCLUSION_EVIDENCE_KEYS = ("metric", "window_start", "window_end", "regime_vers
 VOLUME_REGIME_BOUNDARY = "VOLUME_REGIME_BOUNDARY"
 HOLD_AND_ALERT = "HOLD_AND_ALERT"
 EXIT_SIGNAL = "EXIT_SIGNAL"
+REDUCE = "REDUCE"
 
 
 @dataclass(frozen=True)
@@ -173,6 +174,24 @@ class HoldingDirective:
     action: str  # HOLD_AND_ALERT | EXIT_SIGNAL | HOLD
     reason_code: str
     detail: str
+
+
+@dataclass(frozen=True)
+class HeldSignal:
+    '''The producer's held-position signal for one open position, carried
+    verbatim on the run receipt (P11 producer.py HeldSignal form).
+
+    `action` is the producer's held outcome: held | reduce | exit |
+    hold_alert.  A reduce is an exit-class action on the P11 side - it lands
+    in the package as an exit_plan decision - but the E1 adapter reads this
+    action back so the workbench shows 减仓建议 instead of a full sell task
+    (issue #723 comment-7117663809).  `target_maximum_position` is the
+    reduce target fraction P11 declared; batch B sizes the sell from it.'''
+
+    security_code: str
+    opportunity_id: str
+    action: str  # held | reduce | exit | hold_alert
+    target_maximum_position: str | None = None
 
 
 @dataclass(frozen=True)
@@ -195,6 +214,13 @@ class RunnerOutput:
     # Per-holding dispositions (volume-boundary HOLD_AND_ALERT vs qualified
     # exits); recorded on the run receipt, never inside the published package.
     holding_directives: tuple[HoldingDirective, ...] = ()
+    # The producer's held-position signals (P11 HeldSignal form), produced by
+    # the runner in this same run.  P12 transports them verbatim onto the run
+    # receipt; the E1 adapter reads `action` to tell a reduce exit_plan
+    # (减仓建议) from a full exit (exit); a package exit_plan
+    # without its matching held_signal fails the publish gate (issue #723
+    # comment-7117663809).
+    held_signals: tuple[HeldSignal, ...] = ()
     # M2 F10: P11-bound trend observations carried verbatim, abstentions kept.
     trend_observations: tuple[TrendObservation, ...] = ()
     # M2 section 3: the three independent history floors evaluated for this run.
@@ -244,8 +270,10 @@ class SyntheticRuleRunner:
         *,
         candidates: tuple[dict, ...],
         runner_ref: VersionRef | None = None,
+        volume_hard_prerequisite: bool = False,
     ) -> None:
         self._candidates = candidates
+        self._volume_hard_prerequisite = volume_hard_prerequisite
         self._ref = runner_ref or VersionRef(
             RUNNER_REF, RUNNER_VERSION, digest({"ref": RUNNER_REF, "v": RUNNER_VERSION})
         )
@@ -269,12 +297,82 @@ class SyntheticRuleRunner:
         exclusions: list[SecurityExclusion] = []
         trend_observations: list[TrendObservation] = []
         holding_directives: list[HoldingDirective] = []
+        publishable = True
+        disposition = None
+        diagnostics = None
+        # Audit R1 (r2): consume the input's volume_member_breach.  A
+        # candidate that depends on the breached member (requires_volume)
+        # is dropped single-security; when the member is a hard prerequisite
+        # for the rule itself the whole day is refused publishable instead.
+        if snapshot.volume_member_breach:
+            if self._volume_hard_prerequisite:
+                publishable = False
+                disposition = "blocked: volume member contract breach is a hard prerequisite"
+                diagnostics = {"volume_member_breach": snapshot.volume_member_breach}
+            exclusions.extend(
+                SecurityExclusion(
+                    security_code=str(item["security_code"]),
+                    reason_code="INPUT_UNAVAILABLE",
+                    detail=snapshot.volume_member_breach,
+                )
+                for item in self._candidates
+                if item.get("requires_volume")
+            )
+            excluded = {e.security_code for e in exclusions}
+            self_candidates = tuple(
+                item for item in self._candidates
+                if str(item["security_code"]) not in excluded
+            )
+        else:
+            self_candidates = self._candidates
+        # Issue #743 (r2): the forward calendar's BSE venue may read
+        # unavailable - BSE-coded NEW candidates drop single-security with
+        # the venue's own reason; BSE holdings are handled on the holding
+        # path below (kept holding + alert), never sold.
+        bse_unavailable = getattr(snapshot, "bse_unavailable", None)
+        if bse_unavailable:
+            from quanthus.p12_daily.forward_calendar import is_bse
+            exclusions.extend(
+                SecurityExclusion(
+                    security_code=str(item["security_code"]),
+                    reason_code="INPUT_UNAVAILABLE",
+                    detail=bse_unavailable,
+                )
+                for item in self_candidates
+                if is_bse(item["security_code"])
+            )
+            excluded = {e.security_code for e in exclusions}
+            self_candidates = tuple(
+                item for item in self_candidates
+                if str(item["security_code"]) not in excluded
+            )
         # Audit R5: the port consumes the real listed-securities facts read
         # from the verified 1d payload; a candidate whose security is not in
         # the input's listing set is dropped with its reason recorded, never
-        # evaluated from configuration alone.
+        # evaluated from configuration alone.  Audit R5 (r2): the listing
+        # fact's own status leads - PRESENT restricts to the listed set;
+        # NO_CODE_COLUMN/UNREADABLE mean the verified payload cannot name a
+        # listing universe at all, so EVERY new candidate is an input breach
+        # (an empty set must never read as "unrestricted").
         listed = set(snapshot.listed_securities or ())
+        listed_status = getattr(snapshot, "listed_securities_status", "PRESENT")
+        if listed_status != "PRESENT":
+            exclusions.extend(
+                SecurityExclusion(
+                    security_code=str(item["security_code"]),
+                    reason_code="INPUT_UNAVAILABLE",
+                    detail=(
+                        "verified 1d payload carries no security-code column "
+                        "(status " + listed_status + "); the listing universe "
+                        "cannot be established for any new candidate"
+                    ),
+                )
+                for item in self_candidates
+            )
+            self_candidates = ()
         for item in self._candidates:
+            if item not in self_candidates:
+                continue
             code = str(item["security_code"])
             if listed and code not in listed:
                 exclusions.append(
@@ -374,7 +472,7 @@ class SyntheticRuleRunner:
             )
         # M2 F10: a candidate may carry the P11 evaluate_trend_stability
         # observation identity; P12 transports it verbatim, abstentions kept.
-        for item in self._candidates:
+        for item in self_candidates:
             obs = item.get("trend_observation")
             if not isinstance(obs, dict):
                 continue
@@ -405,18 +503,44 @@ class SyntheticRuleRunner:
             if item.reason_code == VOLUME_REGIME_BOUNDARY
         }
         holding_signals = {
-            str(item["security_code"]): item
-            for item in self._candidates
+            str(item["security_code"]): item["holding_signal"]
+            for item in self_candidates
             if item.get("holding_signal")
         }
+        # Issue #723 comment-7117663809: the runner emits the producer's own
+        # held_signals inside this run (P11 HeldSignal form); P12 transports
+        # them verbatim onto the run receipt so the E1 adapter can tell a
+        # reduce exit_plan from a full exit.
+        held_signals: list[HeldSignal] = []
         for fact in request.holdings:
             if fact.quantity <= 0:
                 continue
             signal = holding_signals.get(fact.security_code)
             if signal is not None:
-                action = str(signal.get("action", EXIT_SIGNAL))
+                action = str(signal.get("action", EXIT_SIGNAL)).upper()
                 if action == "EXIT":
                     action = EXIT_SIGNAL
+                opp_id = "OPP-D1B-{}-{}".format(
+                    snapshot.market_date.strftime("%Y%m%d"),
+                    fact.security_code,
+                )
+                # Issue #723 comment-7117663809: emit the producer's held
+                # signal verbatim inside this run - the E1 adapter reads the
+                # action back to tell a reduce exit_plan (减仓建议)
+                # from a full exit; the publish gate refuses a package whose
+                # exit_plan has no matching held_signal.
+                held_signals.append(
+                    HeldSignal(
+                        security_code=fact.security_code,
+                        opportunity_id=opp_id,
+                        action="reduce" if action == REDUCE else "exit",
+                        target_maximum_position=(
+                            None
+                            if signal.get("target_maximum_position") is None
+                            else str(signal["target_maximum_position"])
+                        ),
+                    )
+                )
                 holding_directives.append(
                     HoldingDirective(
                         security_code=fact.security_code,
@@ -430,32 +554,49 @@ class SyntheticRuleRunner:
                         ),
                     )
                 )
-                if action == EXIT_SIGNAL:
-                    # A qualified volume-independent exit/reduction signal
-                    # still publishes; the boundary reason is recorded on the
-                    # receipt, it never rewrites the signal into a hold.
+                if action in (EXIT_SIGNAL, REDUCE):
+                    # P11 producer.py: stage = EXIT_PLAN for both reduce and
+                    # exit ("a reduce is still an exit-class action").  The
+                    # decision stage alone no longer distinguishes the two;
+                    # the held_signal's action does.  A reduce exit_plan
+                    # surfaces as a 减仓建议 on the workbench and
+                    # never becomes a full sell task in batch A.
                     decisions.append(
                         MarketDecision(
-                            opportunity_id="OPP-D1B-{}-{}".format(
-                                snapshot.market_date.strftime("%Y%m%d"),
-                                fact.security_code,
-                            ),
+                            opportunity_id=opp_id,
                             security_code=fact.security_code,
                             security_name=str(
                                 signal.get("security_name", fact.security_code)
                             ),
                             stage=OpportunityStage.EXIT_PLAN,
-                            reason_codes=(EXIT_SIGNAL,),
+                            reason_codes=(
+                                EXIT_SIGNAL if action == EXIT_SIGNAL else REDUCE,
+                            ),
                             explanations=(
                                 Explanation(
-                                    EXIT_SIGNAL,
+                                    EXIT_SIGNAL if action == EXIT_SIGNAL else REDUCE,
                                     ExplanationUse.ACTION,
                                     f"{self._ref.ref_id}@{self._ref.version}",
-                                    str(
-                                        signal.get(
-                                            "detail",
-                                            "qualified volume-independent "
-                                            "exit/reduction signal",
+                                    (
+                                        str(
+                                            signal.get(
+                                                "detail",
+                                                "qualified volume-independent "
+                                                "exit signal",
+                                            )
+                                        )
+                                        if action == EXIT_SIGNAL
+                                        else (
+                                            "reduction suggestion "
+                                            + str(
+                                                signal.get(
+                                                    "detail",
+                                                    "qualified volume-independent "
+                                                    "reduction signal",
+                                                )
+                                            )
+                                            + "; execution wires in batch B - "
+                                            "the position stays held"
                                         )
                                     ),
                                 ),
@@ -477,6 +618,43 @@ class SyntheticRuleRunner:
                             "boundary; the holding evaluation that depends on "
                             "it is deferred, the position is kept"
                         ),
+                    )
+                )
+            elif bse_unavailable and is_bse(fact.security_code):
+                # Issue #743 (r2): a BSE position whose venue's calendar is
+                # unavailable keeps holding with the venue reason on the
+                # receipt - never sold, never re-entered.
+                holding_directives.append(
+                    HoldingDirective(
+                        security_code=fact.security_code,
+                        action=HOLD_AND_ALERT,
+                        reason_code="INPUT_UNAVAILABLE",
+                        detail=bse_unavailable,
+                    )
+                )
+                decisions.append(
+                    MarketDecision(
+                        opportunity_id="OPP-D1B-{}-{}".format(
+                            snapshot.market_date.strftime("%Y%m%d"),
+                            fact.security_code,
+                        ),
+                        security_code=fact.security_code,
+                        security_name=fact.security_code,
+                        stage=OpportunityStage.HOLDING,
+                        reason_codes=(HOLD_AND_ALERT,),
+                        explanations=(
+                            Explanation(
+                                HOLD_AND_ALERT,
+                                ExplanationUse.EXPLANATION,
+                                f"{self._ref.ref_id}@{self._ref.version}",
+                                "BSE forward calendar unavailable; the "
+                                "position stays held and alerts",
+                            ),
+                        ),
+                        next_observation="next qualified daily input",
+                        chart=None,
+                        entry=None,
+                        component_ref=self._ref,
                     )
                 )
             elif fact.unavailable_reason:
@@ -510,6 +688,33 @@ class SyntheticRuleRunner:
                                 f"{self._ref.ref_id}@{self._ref.version}",
                                 "holding evidence incomplete; the position "
                                 "stays held and alerts",
+                            ),
+                        ),
+                        next_observation="next qualified daily input",
+                        chart=None,
+                        entry=None,
+                        component_ref=self._ref,
+                    )
+                )
+            else:
+                # Audit #723 (r2): an ordinary evaluated holding emits a real
+                # HOLDING decision - never the 000000 no-op placeholder.
+                decisions.append(
+                    MarketDecision(
+                        opportunity_id="OPP-D1B-{}-{}".format(
+                            snapshot.market_date.strftime("%Y%m%d"),
+                            fact.security_code,
+                        ),
+                        security_code=fact.security_code,
+                        security_name=fact.security_code,
+                        stage=OpportunityStage.HOLDING,
+                        reason_codes=(HOLD_AND_ALERT,),
+                        explanations=(
+                            Explanation(
+                                HOLD_AND_ALERT,
+                                ExplanationUse.EXPLANATION,
+                                f"{self._ref.ref_id}@{self._ref.version}",
+                                "holding evaluated; the position stays held",
                             ),
                         ),
                         next_observation="next qualified daily input",
@@ -580,7 +785,7 @@ class SyntheticRuleRunner:
         evaluated_universe = sorted(
             {
                 str(item["security_code"])
-                for item in self._candidates
+                for item in self_candidates
                 if item.get("security_code")
             }
             | {
@@ -669,9 +874,13 @@ class SyntheticRuleRunner:
         return RunnerOutput(
             decision_set=decision_set,
             exclusions=tuple(exclusions),
+            publishable=publishable,
+            disposition=disposition,
+            diagnostics=diagnostics,
             evaluation_receipt=evaluation_receipt,
             source_closure=source_closure,
             holding_directives=tuple(holding_directives),
+            held_signals=tuple(held_signals),
             trend_observations=tuple(trend_observations),
             history_gates=tuple(snapshot.history_gates),
         )

@@ -19,6 +19,7 @@ later retry inside the job window.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import time
@@ -39,6 +40,13 @@ from quanthus.p12_daily.daily_core_input import (
     qualify_daily_input,
 )
 from quanthus.p12_daily.decision_loader import decision_set_to_dict
+from quanthus.p12_daily.forward_calendar import (
+    DEFAULT_CALENDAR_ROOT,
+    load_forward_calendar,
+)
+from quanthus.p12_daily.forward_calendar import (
+    next_session as calendar_next_session,
+)
 from quanthus.p12_daily.package_store import (
     RUN_SCHEMA,
     DailyPackageStore,
@@ -170,7 +178,10 @@ def _publish_gate_block(
     #    candidates; hold and exit decisions correspond one-to-one with the
     #    receipt's holding signals.  A holdings-only package has an empty
     #    candidate list but a real holding binding and still publishes
-    #    (issue #723).
+    #    (issue #723).  Audit r2: the receipt's COUNTS must agree with its
+    #    own content too - qualified_count equals the buy-decision count,
+    #    evaluated_count equals the evaluated-universe size; a fabricated
+    #    count refuses the day even when the bindings themselves match.
     emitted_buys = sorted(
         ({
             "opportunity_id": d.opportunity_id,
@@ -180,6 +191,20 @@ def _publish_gate_block(
         if d.entry is not None),
         key=_candidate_sort_key,
     )
+    if receipt.get("qualified_count") != len(emitted_buys):
+        return (
+            "evaluation_count_mismatch",
+            {"field": "qualified_count",
+             "claimed": receipt.get("qualified_count"),
+             "actual": len(emitted_buys)},
+        )
+    if receipt.get("evaluated_count") != len(receipt.get("evaluated_universe") or ()):
+        return (
+            "evaluation_count_mismatch",
+            {"field": "evaluated_count",
+             "claimed": receipt.get("evaluated_count"),
+             "actual": len(receipt.get("evaluated_universe") or ())},
+        )
     claimed_candidates = sorted(
         ({
             "opportunity_id": c.get("opportunity_id"),
@@ -217,6 +242,36 @@ def _publish_gate_block(
         return (
             "holding_signal_binding_mismatch",
             {"emitted": emitted_holds, "claimed": claimed_signals},
+        )
+    # Issue #723 comment-7117663809: every package exit_plan must match one
+    # held_signal by opportunity_id (a reduce and a full exit share the
+    # exit_plan stage; the held_signal's action alone tells them apart).
+    # A stray exit_plan, or a held_signal with no decision, refuses the day.
+    signal_ids = {
+        str(sig.opportunity_id)
+        for sig in (output.held_signals or ())
+    }
+    emitted_exits = sorted(
+        str(d.opportunity_id)
+        for d in output.decision_set.decisions
+        if d.stage is OpportunityStage.EXIT_PLAN
+    )
+    unmatched = [oid for oid in emitted_exits if oid not in signal_ids]
+    if unmatched:
+        return (
+            "exit_plan_signal_mismatch",
+            {"unmatched_exit_plans": unmatched},
+        )
+    decided_ids = {
+        str(d.opportunity_id)
+        for d in output.decision_set.decisions
+        if d.stage is not OpportunityStage.ENDED
+    }
+    orphan_signals = [oid for oid in signal_ids if oid not in decided_ids]
+    if orphan_signals:
+        return (
+            "exit_plan_signal_mismatch",
+            {"orphan_held_signals": sorted(orphan_signals)},
         )
     return None
 
@@ -326,6 +381,7 @@ def run_daily(
     sidecar_path: Path | None = None,
     decision_cutoff: datetime | None = None,
     publish_gate_config: Path | None = None,
+    calendar_root: Path | None = None,
 ) -> dict:
     '''Execute one daily run and persist its receipt; returns the receipt.'''
 
@@ -455,6 +511,31 @@ def run_daily(
             ),
             market_date=market_date,
             missing_members=empty_tables,
+        )
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
+    # Audit R5 (r2): a verified 1d payload that reads but carries NO
+    # security-code column cannot name a listing universe - the whole day
+    # blocks here rather than letting the runner treat the absence as an
+    # open universe.  UNREADABLE/ABSENT flow to the runner as fail-closed
+    # evidence (the input was verified but the fact could not be read -
+    # every new candidate is then an input breach).
+    if snapshot.listed_securities_status == "NO_CODE_COLUMN":
+        t = stage("input", t, result="blocked",
+                  listed_status="NO_CODE_COLUMN")
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail="verified 1d payload carries no security-code column; "
+                "the listing universe cannot be established",
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=snapshot.market_date,
+            ),
+            market_date=market_date,
+            missing_members=["payload/1d.parquet"],
         )
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
@@ -595,26 +676,76 @@ def run_daily(
 
     # M2 F11 / audit R7: each declared corporate-action / adjustment field is
     # checked individually against the input - never trusted by the
-    # fields_complete flag alone.  A missing or unmappable field blocks.
+    # fields_complete flag alone.  Audit R7 (r2): each value must also be
+    # VALID - a numeric field holding a non-numeric string, or exceptions
+    # holding a non-list, blocks.  Two admitted input paths: the per-field
+    # corporate-action fields, OR a valid effective_adjustment_factor alone.
     ca = snapshot.corporate_actions
     required_ca_fields = (
         "cash_dividend_per_share",
         "bonus_share_ratio",
         "exceptions",
     )
-    ca_missing_fields = []
+
+    def _ca_numeric(value) -> bool:
+        if isinstance(value, bool):
+            return False
+        if isinstance(value, (int, float)):
+            return True
+        if isinstance(value, str):
+            try:
+                float(value)
+            except ValueError:
+                return False
+            return True
+        return False
+
+    ca_invalid_fields: list[str] = []
+    ca_missing_fields: list[str] = []
     if ca is None:
         ca_missing_fields = list(required_ca_fields)
     else:
-        for field in required_ca_fields:
-            if field not in ca or ca.get(field) is None:
-                ca_missing_fields.append(field)
+        # Path B: a valid effective_adjustment_factor alone satisfies F11.
+        factor = ca.get("effective_adjustment_factor")
+        factor_only_ok = factor is not None and _ca_numeric(factor)
+        if factor is not None and not _ca_numeric(factor):
+            ca_invalid_fields.append("effective_adjustment_factor")
+        if not factor_only_ok:
+            for field in ("cash_dividend_per_share", "bonus_share_ratio"):
+                value = ca.get(field)
+                if field not in ca or value is None:
+                    ca_missing_fields.append(field)
+                elif not _ca_numeric(value):
+                    ca_invalid_fields.append(field)
+            exc = ca.get("exceptions")
+            if "exceptions" not in ca or exc is None:
+                ca_missing_fields.append("exceptions")
+            elif not isinstance(exc, list):
+                ca_invalid_fields.append("exceptions")
+        else:
+            # The factor path still refuses declared-but-invalid siblings.
+            for field in ("cash_dividend_per_share", "bonus_share_ratio"):
+                value = ca.get(field)
+                if value is not None and not _ca_numeric(value):
+                    ca_invalid_fields.append(field)
+            exc = ca.get("exceptions")
+            if exc is not None and not isinstance(exc, list):
+                ca_invalid_fields.append("exceptions")
         for field in ca.get("unmapped_fields") or ():
             ca_missing_fields.append(str(field))
-    if ca_missing_fields:
+    if ca_missing_fields or ca_invalid_fields:
+        detail_parts = []
+        if ca_missing_fields:
+            detail_parts.append(
+                "absent: " + ", ".join(sorted(set(ca_missing_fields)))
+            )
+        if ca_invalid_fields:
+            detail_parts.append(
+                "invalid value: " + ", ".join(sorted(set(ca_invalid_fields)))
+            )
         detail = (
-            "corporate-action/adjustment fields absent from the daily input: "
-            + ", ".join(sorted(set(ca_missing_fields)))
+            "corporate-action/adjustment fields unqualified in the daily "
+            "input (" + "; ".join(detail_parts) + ")"
         )
         t = stage("corporate_actions", t, result="blocked")
         _blocked_receipt(
@@ -636,29 +767,57 @@ def run_daily(
         k: v for k, v in ca.items() if k != "fields_complete"
     }
 
-    # M2 F2: next_session is the governed calendar's declared next open
-    # session, not a caller guess.  A snapshot without a calendar member is a
-    # whole-day block; a caller next_session that disagrees with the calendar
-    # is refused rather than silently used.
-    if snapshot.authoritative_next_session is None:
-        t = stage("calendar", t, result="blocked")
+    # Issue #743 / M2 F2 (r2): next_session comes ONLY from the P10 forward
+    # calendar - the pointer at calendar_root (default: the CN02 product
+    # root; a job_root-local "calendar/" replica when present, for replay).
+    # SSE and SZSE must agree; null, out-of-coverage or post-cutoff versions
+    # block the whole day.  The retired manifest calendar.next_session and
+    # dwd_trading_calendar members are never consulted.
+    if calendar_root is None:
+        job_local = Path(job_root) / "calendar"
+        calendar_root = (
+            job_local if job_local.is_dir() else DEFAULT_CALENDAR_ROOT
+        )
+    cal, cal_block, cal_receipt = load_forward_calendar(
+        calendar_root, decision_cutoff=decision_cutoff
+    )
+    receipt.update(cal_receipt)
+    if cal is None:
+        t = stage("calendar", t, result="blocked", detail=cal_block.detail)
         _blocked_receipt(
             receipt,
             InputBlock(
                 reason_code="INPUT_UNAVAILABLE",
-                detail="daily input lacks the governed trading-calendar member; "
-                "next_session cannot be determined from an authoritative source",
+                detail=cal_block.detail,
                 checked_at=moment,
                 expected_market_date=market_date,
                 observed_market_date=snapshot.market_date,
             ),
             market_date=market_date,
-            missing_members=["trading_calendar"],
+            missing_members=[cal_block.missing_member],
         )
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt
-    if next_session is not None and next_session != snapshot.authoritative_next_session:
+    nxt, cal_err = calendar_next_session(cal, market_date)
+    if cal_err is not None:
+        t = stage("calendar", t, result="blocked", detail=cal_err.detail)
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail=cal_err.detail,
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=snapshot.market_date,
+            ),
+            market_date=market_date,
+            missing_members=[cal_err.missing_member],
+        )
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
+    if next_session is not None and next_session != nxt:
         t = stage("calendar", t, result="blocked", caller=next_session.isoformat())
         _blocked_receipt(
             receipt,
@@ -667,20 +826,30 @@ def run_daily(
                 detail=(
                     "caller next_session "
                     + next_session.isoformat()
-                    + " disagrees with the governed calendar next_session "
-                    + snapshot.authoritative_next_session.isoformat()
+                    + " disagrees with the forward calendar next_session "
+                    + nxt.isoformat()
                 ),
                 checked_at=moment,
                 expected_market_date=market_date,
                 observed_market_date=snapshot.market_date,
             ),
             market_date=market_date,
-            missing_members=["trading_calendar"],
+            missing_members=["forward_calendar"],
         )
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt
-    next_session = snapshot.authoritative_next_session
+    next_session = nxt
+    receipt["next_session"] = next_session.isoformat()
+    # BSE venue unavailability is a per-security fact the rule consumes -
+    # it drops BSE-coded new candidates and alerts BSE holdings, never a
+    # whole-day block.
+    snapshot_bse_unavailable = (
+        ("BSE forward calendar unavailable: " + str(cal.bse_reason))
+        if cal.bse_status == "unavailable"
+        else None
+    )
+    snapshot = dataclasses.replace(snapshot, bse_unavailable=snapshot_bse_unavailable)
 
     # P10 consumer sidecar (task #726): when present, each consumed member's
     # clocks must order source<=validated<=published<=available<=cutoff.  A
@@ -693,6 +862,12 @@ def run_daily(
                 sidecar_path,
                 consumer_now=moment,
                 decision_cutoff=decision_cutoff,
+                # Member paths are relative to the fixture root (the dir
+                # that contains "synthetic/x.json"), one level above the
+                # record's own directory.
+                member_files_root=sidecar_path.parent.parent
+                if sidecar_path.parent.name in ("synthetic", "fixtures")
+                else sidecar_path.parent,
             )
         except SidecarError as exc:
             t = stage("sidecar", t, result="blocked", detail=str(exc))
@@ -803,6 +978,19 @@ def run_daily(
                 "detail": item.detail,
             }
             for item in output.holding_directives
+        ]
+    # Issue #723 comment-7117663809: the producer's held_signals ride the run
+    # receipt verbatim - action and target_maximum_position are the E1
+    # adapter's only way to tell a reduce exit_plan from a full exit.
+    if output.held_signals:
+        receipt["held_signals"] = [
+            {
+                "security_code": item.security_code,
+                "opportunity_id": item.opportunity_id,
+                "action": item.action,
+                "target_maximum_position": item.target_maximum_position,
+            }
+            for item in output.held_signals
         ]
 
     decision_set = decision_set_to_dict(decisions)
@@ -978,6 +1166,14 @@ def main(argv: list[str] | None = None) -> int:
         help="configured tz-aware decision cutoff, e.g. 2026-11-20T22:30:00+08:00",
     )
     parser.add_argument(
+        "--calendar-root",
+        type=Path,
+        default=None,
+        help="P10 forward-calendar product root (pointer + versioned "
+        "descriptors); default: the CN02 product path, or a "
+        "job_root-local 'calendar/' replica when present",
+    )
+    parser.add_argument(
         "--sidecar",
         type=Path,
         default=None,
@@ -1015,6 +1211,7 @@ def main(argv: list[str] | None = None) -> int:
         account_mode=args.account_mode,
         sidecar_path=args.sidecar,
         decision_cutoff=args.decision_cutoff,
+        calendar_root=args.calendar_root,
     )
     print(json.dumps(receipt, ensure_ascii=False, indent=2))
     return 0 if receipt["status"] in (STATUS_PUBLISHED, STATUS_ALREADY_PUBLISHED) else 1

@@ -46,10 +46,24 @@ function check (schema, value, path) {
       return
     case 'object': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ContractError(path, 'must be an object')
-      const keys = Object.keys(value).sort()
-      const required = [...schema.required].sort()
-      if (keys.join(',') !== required.join(',')) throw new ContractError(path, `fields differ: ${keys.join(',')}`)
-      for (const key of required) check(schema.properties[key], value[key], `${path}.${key}`)
+      // required ⊆ actual keys ⊆ declared properties; optional fields pass
+      const keys = Object.keys(value)
+      const required = schema.required || []
+      const properties = schema.properties || {}
+      for (const req of required) {
+        if (!(req in value)) throw new ContractError(path, `missing required field ${req}`)
+      }
+      for (const key of keys) {
+        if (!(key in properties)) throw new ContractError(path, `undeclared field ${key}`)
+      }
+      for (const key of keys) {
+        if (properties[key] === undefined) {
+          // undeclared keys were already rejected above; a key admitted by an
+          // anyOf arm may reach here without its own properties entry
+          continue
+        }
+        check(properties[key], value[key], `${path}.${key}`)
+      }
       return
     }
     default:

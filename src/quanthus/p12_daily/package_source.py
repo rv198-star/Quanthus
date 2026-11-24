@@ -135,28 +135,40 @@ class PublishedPackageSource:
             raise FactError("ACCOUNT_NOT_ADMITTED", "account is not bound to this source")
 
     def _load(self, stored: StoredPackage) -> MarketDecisionSet:
-        cached = self._cache.get(stored.package_id)
-        if cached is not None:
-            return cached
-        # Audit R13: the reader only trusts a package written by the publish
-        # gate into the publisher ledger.  A package whose source_id is not
-        # registered, or whose registered digest differs from the bytes on
-        # disk, is refused rather than served.
+        # Audit #720 R13 (r2): the reader only trusts a package written by
+        # the publish gate into the publisher ledger under THIS package's
+        # (source_id, market_date).  The hot cache is keyed by the package's
+        # digest identity; a hit still re-checks the registry so a corrupted
+        # file or a stale entry is refused rather than replayed.
         source_id = str(stored.decision_set.get("source_id") or "")
-        registered = self._store.publisher_registry().get(source_id)
+        registered = self._store.publisher_registry().get(
+            (source_id, stored.market_date.isoformat())
+        ) or self._store.publisher_registry().get((source_id, "*"))
         if registered is None:
             raise FactError(
                 "POLICY_NOT_ADOPTED",
-                f"package source_id {source_id!r} is not a registered publisher",
+                f"package source_id {source_id!r} is not a registered "
+                "publisher for " + stored.market_date.isoformat(),
             )
+        # The hot cache keys the verified decision set by market date.  A
+        # same-reader hit still re-checks the registry: the cached package
+        # serves only while the registered digest for this (source_id,
+        # market_date) still equals the digest this reader already
+        # verified - a re-registered or deregistered entry is refused
+        # rather than replayed.  A reader that never verified the file
+        # falls through and must prove the stored bytes match the
+        # registry itself, so a corrupted file is refused.
+        cached = self._cache.get(stored.market_date.isoformat())
+        if cached is not None and registered == cached[0]:
+            return cached[1]
         if registered != stored.file_sha256:
             raise FactError(
                 "POLICY_NOT_ADOPTED",
                 "package digest does not match the publisher registry for "
-                + repr(source_id),
+                + repr(source_id) + " " + stored.market_date.isoformat(),
             )
         value = load_decision_set_dict(stored.decision_set, mode=self._mode)
-        self._cache[stored.package_id] = value
+        self._cache[stored.market_date.isoformat()] = (stored.file_sha256, value)
         return value
 
     def _published(self) -> list[StoredPackage]:

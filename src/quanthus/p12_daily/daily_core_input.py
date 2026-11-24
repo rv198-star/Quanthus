@@ -97,6 +97,13 @@ class DailyCoreSnapshot:
     # payload (the listing facts the port consumes).  Empty when the payload
     # cannot be read; the runner may only evaluate what is actually present.
     listed_securities: tuple[str, ...] = ()
+    # Audit R5 (r2): the verified 1d payload MUST carry a security-code
+    # column; a payload without one is a block, not an empty universe.
+    listed_securities_status: str = "UNKNOWN"
+    # Issue #743 (r2): the forward calendar's BSE venue unavailability,
+    # carried verbatim for the rule - drops BSE new candidates, alerts BSE
+    # holdings, never a whole-day block.
+    bse_unavailable: str | None = None
 
 
 VOLUME_SCOPE_FULL_DAY = "FULL_DAY"
@@ -260,11 +267,26 @@ def qualify_daily_input(
     # Audit R4: re-hash every member file the manifest declares, not only the
     # descriptor fields.  A consumed member whose bytes no longer match its
     # declared sha256 blocks the run.  The parent Base manifest is re-hashed
-    # from its own file, never trusted by description alone.
+    # from its own file, never trusted by description alone.  Audit R4 (r2):
+    # a REQUIRED member that declares no sha256 blocks - skipping it would
+    # publish over unverified bytes.  Optional members without a declared
+    # digest are left unread (never consumed).
+    required_member_paths = {
+        "payload/1d.parquet",
+    }
     for member in manifest.get("files") or []:
         rel = str(member.get("path") or "")
         declared = str(member.get("sha256") or "")
-        if not rel or not declared.startswith("sha256:"):
+        if not rel:
+            continue
+        if not declared.startswith("sha256:"):
+            if rel in required_member_paths:
+                return block(
+                    INPUT_UNAVAILABLE,
+                    "required manifest member " + repr(rel)
+                    + " declares no sha256; its bytes cannot be verified",
+                    ("core/" + rel,),
+                )
             continue
         candidate = (core_root / rel).resolve()
         try:
@@ -288,26 +310,34 @@ def qualify_daily_input(
                 "manifest member " + repr(rel) + " sha256 differs from the declared digest",
                 ("core/" + rel,),
             )
-    # Re-hash the parent Base manifest when the manifest names its file; the
-    # declared sha must be recomputed, not only compared on description fields.
+    # Re-hash the parent Base manifest.  Audit R4 (r2): the manifest MUST
+    # name the base manifest's file so its declared sha can be recomputed on
+    # the bytes - a description-only base reference that cannot be located
+    # blocks the run rather than skipping verification.
     base_member = manifest.get("base") or {}
     base_ref = base_member.get("path") or base_member.get("manifest")
-    if isinstance(base_ref, str) and base_ref:
-        base_path = Path(base_ref)
-        if not base_path.is_absolute():
-            base_path = (core_root / base_ref).resolve()
-        if not base_path.is_file():
-            return block(
-                INPUT_UNAVAILABLE,
-                "parent base manifest missing: " + str(base_path),
-                ("base_manifest",),
-            )
-        if _sha256_file(base_path) != str(base_member.get("manifest_sha256") or ""):
-            return block(
-                INPUT_UNAVAILABLE,
-                "parent base manifest sha256 differs from the declared digest",
-                ("base_manifest",),
-            )
+    if not isinstance(base_ref, str) or not base_ref:
+        return block(
+            INPUT_UNAVAILABLE,
+            "core manifest declares a base manifest sha but no file location "
+            "to recompute it from",
+            ("base_manifest",),
+        )
+    base_path = Path(base_ref)
+    if not base_path.is_absolute():
+        base_path = (core_root / base_ref).resolve()
+    if not base_path.is_file():
+        return block(
+            INPUT_UNAVAILABLE,
+            "parent base manifest missing: " + str(base_path),
+            ("base_manifest",),
+        )
+    if _sha256_file(base_path) != str(base_member.get("manifest_sha256") or ""):
+        return block(
+            INPUT_UNAVAILABLE,
+            "parent base manifest sha256 differs from the declared digest",
+            ("base_manifest",),
+        )
 
     # 1d payload only: find the declared daily parquet and exclude 5m.
     files = manifest.get("files") or []
@@ -326,20 +356,29 @@ def qualify_daily_input(
             break
     # Audit R5: read the verified 1d payload's security codes so the port
     # receives the real listed-securities facts, not only file metadata.
+    # Audit R5 (r2): three outcomes are distinct - PRESENT (codes read),
+    # NO_CODE_COLUMN (a readable parquet with no security-code column is a
+    # BLOCK, never an open universe), UNREADABLE (pyarrow missing or bytes
+    # that cannot parse; the runner treats it as fail-closed too - an
+    # unreadable verified member is a contradiction the gate resolves by
+    # blocking evaluation, not by trusting nothing).
     listed_securities: tuple[str, ...] = ()
+    listed_status = "ABSENT"
     if daily_payload is not None and daily_payload.is_file():
         try:
             import pyarrow.parquet as pq
 
             frame = pq.read_table(daily_payload)
+            listed_status = "NO_CODE_COLUMN"
             for name in ("security_code", "code", "symbol"):
                 if name in frame.column_names:
                     listed_securities = tuple(
                         sorted({str(v) for v in frame[name].to_pylist() if v})
                     )
+                    listed_status = "PRESENT"
                     break
-        except Exception:  # noqa: BLE001 - unreadable payload leaves the set empty
-            listed_securities = ()
+        except Exception:  # noqa: BLE001 - unreadable payload stays fail-closed
+            listed_status = "UNREADABLE"
     row_counts = {
         str(k): int(v)
         for k, v in (entry.get("core_row_counts") or manifest.get("row_counts") or {}).items()
@@ -358,13 +397,11 @@ def qualify_daily_input(
     # completed_at.  completed_at is only the job's completion timestamp.
     cutoff = _aware_ts(manifest.get("knowledge_cutoff") or entry.get("knowledge_cutoff"))
     completed_at = _aware_ts(manifest.get("completed_at") or entry.get("completed_at"))
-    calendar = manifest.get("calendar") or entry.get("calendar") or {}
+    # Issue #743 (r2): the manifest calendar.next_session member and the
+    # dwd_trading_calendar fallback are RETIRED - next_session comes only
+    # from the P10 forward-calendar product (forward_calendar.py).  The
+    # snapshot no longer carries a calendar answer.
     authoritative_next_session = None
-    if isinstance(calendar, dict) and calendar.get("next_session"):
-        try:
-            authoritative_next_session = date.fromisoformat(str(calendar["next_session"]))
-        except ValueError:
-            authoritative_next_session = None
     history_gates = _history_gates(manifest.get("history"))
     corporate_actions = manifest.get("corporate_actions")
     if corporate_actions is not None and not isinstance(corporate_actions, dict):
@@ -417,6 +454,7 @@ def qualify_daily_input(
         full_day_volume_amount_observation_end=volume_end,
         volume_member_breach=volume_member_breach,
         listed_securities=listed_securities,
+        listed_securities_status=listed_status,
     )
 
 

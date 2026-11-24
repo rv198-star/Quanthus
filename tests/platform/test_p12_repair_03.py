@@ -66,11 +66,16 @@ def test_reads_before_publication_expose_no_candidate_identity(tmp_path, attribu
         publication = body["publication"]
         assert publication["status"] == "NOT_YET_PUBLISHED"
         assert publication["market_date"] == "2026-11-18"
-        assert publication["published_at"] == "2026-11-18T18:30:00+08:00"
-        # next_check_at is an optional additive field (issue #721 R15), never
-        # a candidate identity; only its presence/shape is checked here.
+        # Issue #721 R16 (r2): published_at is the REAL publish moment only -
+        # null while the package is not yet visible (never the request's own
+        # clock passed off as a publish).  observed_at carries the reader's
+        # observation moment; next_check_at the scheduled check point.
+        assert publication["published_at"] is None
+        # next_check_at/observed_at are optional additive fields (issue #721
+        # R15/R16), never candidate identities; only presence/shape is checked.
         assert set(publication).issubset(
-            {"status", "market_date", "published_at", "retracted", "retraction_reason", "next_check_at"}
+            {"status", "market_date", "published_at", "retracted",
+             "retraction_reason", "next_check_at", "observed_at"}
         )
         serialized = json.dumps(body, ensure_ascii=False)
         leaked = [marker for marker in CANDIDATE_MARKERS if marker in serialized]

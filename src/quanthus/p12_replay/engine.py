@@ -54,6 +54,25 @@ def _sh_now(day: date, tm: time) -> datetime:
     return datetime.combine(day, tm, tzinfo=EXCHANGE_TZ)
 
 
+def _sha256_file_safe(path) -> str | None:
+    """sha256 of a member file by its absolute/relative path; None when
+    the path is not a readable local file (the replay then falls back to
+    the pinned manifest digest, named - never fabricated)."""
+    import hashlib
+
+    try:
+        p = Path(path)
+        if not p.is_file():
+            return None
+        d = hashlib.sha256()
+        with p.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                d.update(chunk)
+        return "sha256:" + d.hexdigest()
+    except OSError:
+        return None
+
+
 @dataclass
 class ReplayEngine:
     """State + step drivers for one isolated replay account.
@@ -183,6 +202,39 @@ class ReplayEngine:
         # session's own bars plus up to 60 prior open sessions (61
         # total, T inclusive), plus the reference facts already sliced.
         window_sessions = [s for s in self.sessions if s <= day][-61:]
+        # Per-security dependency-window session counts (R3 item 5):
+        # the floors report how many sessions THIS security's own bars
+        # actually cover within each window - never a single all-venue
+        # total applied to every security.  A security with no bar on a
+        # session simply does not count it.
+        def _sec_window_sessions(code: str, count: int) -> int:
+            wins = [s for s in self.sessions if s <= day][-count:]
+            return sum(
+                1 for s in wins
+                if code in (self.bars_by_day.get(s) or {})
+            )
+
+        pool_codes = sorted({
+            c for s in window_sessions for c in (self.bars_by_day.get(s) or {})
+        })
+        per_security_history = {
+            code: {
+                "event_window_22": _sec_window_sessions(code, 22),
+                "feature_warmup_61": _sec_window_sessions(code, 61),
+                "listing_120": _sec_window_sessions(code, 120),
+            }
+            for code in pool_codes
+        }
+        # The actual member(s) the bars came from + their source
+        # knowledge_from carried verbatim per member (R3 item 6).
+        member_knowledge = {}
+        member_paths = {}
+        for s in window_sessions:
+            for bar in (self.bars_by_day.get(s) or {}).values():
+                if bar.source_member:
+                    member_paths[bar.source_member] = True
+                if bar.knowledge_from:
+                    member_knowledge[bar.source_member] = bar.knowledge_from
         raw_history = {
             "schema_version": "p11.raw-history-input.v1",
             "market_date": day.isoformat(),
@@ -205,19 +257,26 @@ class ReplayEngine:
             # merged into the source knowledge clock.
             "source_members": [
                 {
-                    "member": "dwd_security_bar/interval_size=1d",
+                    "member": mp,
                     "sessions": len(window_sessions),
                     "rows": sum(
                         len(self.bars_by_day.get(s) or {})
                         for s in window_sessions
                     ),
-                    "sha256": self.base_manifest_sha256,
-                    "knowledge_from": "2026-10-31T16:00:00+00:00",
+                    # The actual member's own source clock, verbatim -
+                    # never the parent manifest rollup (R3 item 6).
+                    "knowledge_from": member_knowledge.get(mp),
+                    "sha256": _sha256_file_safe(mp) or self.base_manifest_sha256,
                     "physical_read_at": datetime.now(EXCHANGE_TZ).isoformat(),
                     "logical_clock": self.now().isoformat(),
                     "as_observed": "ENGINEERING_REPLAY_AS_OBSERVED",
                 }
+                for mp in sorted(member_paths)
             ],
+            # Per-security dependency-window evidence handed to the rule
+            # (R3 item 5): the affected set is per security, never a
+            # global total.
+            "per_security_history": per_security_history,
         }
         # The P10-pinned per-T windows and audit keys: the rule reads
         # them in the same run and decides which securities drop.
@@ -341,6 +400,7 @@ class ReplayEngine:
         if not log.is_file():
             return
         last_index = None
+        last_clock = None
         try:
             for line in log.read_text().splitlines():
                 try:
@@ -349,11 +409,25 @@ class ReplayEngine:
                     continue
                 if isinstance(rec.get("day_index"), int):
                     last_index = rec["day_index"]
+                    lc = rec.get("logical_clock")
+                    if lc:
+                        try:
+                            last_clock = datetime.fromisoformat(str(lc))
+                        except ValueError:
+                            pass
         except OSError:
             return
         if last_index is not None and 0 <= last_index < len(self.sessions):
             self.day_index = last_index
-            self.set_now(_sh_now(self.sessions[last_index], time(9, 25)))
+            # Restore the clock the replay actually reached (its last logged
+            # logical_clock) - never rewind a post-publish evening back to
+            # the session open (R3 item 2).  Fall back to the session open
+            # only when no logical_clock was logged.
+            self.set_now(
+                last_clock
+                if last_clock is not None
+                else _sh_now(self.sessions[last_index], time(9, 25))
+            )
 
     # ---- steps --------------------------------------------------------------------
     def _log(self, event: str, **fields) -> None:
@@ -455,11 +529,42 @@ class ReplayEngine:
                         "target_qty": plan.get("target_qty"),
                         "delta_qty": plan.get("delta_qty"),
                         "price_cap": plan.get("price_cap"),
+                        "stage": item.get("stage"),
                     }
                 )
         return plans
 
+    def _bound_package(self, plan_id: str):
+        """The published package that issued plan_id + its bound facts.
+
+        Returns (market_date, next_session, eligible_at, stage).  The
+        plan's execution day is the package's declared next_session,
+        never a recomputed next index - the replay binds the fill to
+        the day the package promised (R3 item 1)."""
+        for pkg in self._store.packages():
+            ds = pkg.decision_set or {}
+            for d in ds.get("decisions") or ():
+                opp = str(d.get("opportunity_id") or "")
+                if plan_id.endswith(opp) or opp in plan_id:
+                    entry = d.get("entry") or {}
+                    eligible = entry.get("eligible_at")
+                    eligible_at = (
+                        datetime.fromisoformat(str(eligible))
+                        if eligible is not None else None
+                    )
+                    return (
+                        pkg.market_date,
+                        (
+                            date.fromisoformat(str(ds["next_session"]))
+                            if ds.get("next_session") else None
+                        ),
+                        eligible_at,
+                        str(d.get("stage") or ""),
+                    )
+        return (None, None, None, "")
+
     def confirm(self, plan_id: str) -> dict:
+
         """Confirm one published plan: the session's real OPEN decides.
 
         Phase-1 fill rule (P11 口径): the pre-open limit is compared to
@@ -471,14 +576,19 @@ class ReplayEngine:
         reason verbatim - it is evidence, not a swallowed error."""
         # Idempotent: a repeated confirm reuses the original receipt - the
         # ledger never double-posts a fill and a restart replays the record.
+        # Only a TERMINAL outcome (filled / rejected / not_marketable) is
+        # replayed; a pending intent falls through so the real fill posts
+        # once the execution clock is reached (R3 items 1-2).
         prior = self._confirm_records.get(plan_id)
-        if prior is not None:
+        if prior is not None and prior.get("status") in (
+            "filled", "rejected", "not_marketable",
+        ):
             return dict(prior, idempotent_replay=True)
 
         def _ret(outcome):
             self._confirm_records[plan_id] = outcome
             self._save_records("confirm")
-            return _ret(outcome)
+            return outcome
 
         app = self._build_app()
         plan = next(
@@ -486,26 +596,72 @@ class ReplayEngine:
         )
         if plan is None:
             return {"plan_id": plan_id, "status": "rejected", "reason": "PLAN_NOT_FOUND"}
+        # REVIEW / non-actionable advice never executes (R3 item 1): the
+        # plan keeps its original state; a confirm attempt records the
+        # intent only, never posts a fill.
+        stage = str(plan.get("stage") or "").lower()
+        if stage in ("review", "holding", "waiting", "ended", "input_blocked"):
+            outcome = {
+                "plan_id": plan_id,
+                "status": "pending_review",
+                "reason": "NON_ACTIONABLE_STAGE",
+                "stage": stage,
+            }
+            self._log("confirm", market_date=self.current_day.isoformat(),
+                      plan_id=plan_id, outcome=outcome)
+            return _ret(outcome)
         side = str(plan.get("side") or ("buy" if plan["action_code"] == "BUY" else "sell"))
         code = plan["security_code"]
-        # The advice is published on session T evening; the earliest it can
-        # fill is the T+1 session at 09:30 against that session's real open
-        # (review R2 item 1).  Never fill on the publish day's own open.
-        publish_day = self.current_day
-        if self.day_index + 1 >= len(self.sessions):
+        # Bind the fill to the package's declared next_session (R3 item 1) -
+        # never a recomputed "next index".  The package is the authority for
+        # which session the advice may execute on.
+        pkg_day, bound_next, eligible_at, pkg_stage = self._bound_package(plan_id)
+        publish_day = pkg_day if pkg_day is not None else self.current_day
+        # When no package binds this plan (a synthetic/unit engine without
+        # a stored package), the fill still binds the next session - the
+        # real replay always carries the package's own next_session.
+        fill_day = bound_next if bound_next is not None else (
+            self.sessions[self.day_index + 1]
+            if self.day_index + 1 < len(self.sessions)
+            else None
+        )
+        if fill_day is None:
             outcome = {
                 "plan_id": plan_id,
                 "status": "rejected",
                 "reason": "PENDING_NO_EXECUTION_DAY",
                 "detail": (
                     f"advice published on {publish_day.isoformat()} has no "
-                    "next session to fill on"
+                    "bound next_session to fill on"
                 ),
             }
             self._log("confirm", market_date=publish_day.isoformat(),
                       plan_id=plan_id, outcome=outcome)
             return _ret(outcome)
-        fill_day = self.sessions[self.day_index + 1]
+        # The replay clock must reach the execution instant (the package's
+        # eligible_at, or that session's 09:30 open) before any fill posts.
+        # Confirming early registers the intent only - the fill posts when
+        # the clock reaches the bound session open (R3 item 1).
+        exec_clock = (
+            eligible_at.astimezone(EXCHANGE_TZ)
+            if eligible_at is not None
+            else _sh_now(fill_day, time(9, 30))
+        )
+        if self.now() < exec_clock:
+            outcome = {
+                "plan_id": plan_id,
+                "status": "intent_registered",
+                "reason": "PENDING_EXECUTION_CLOCK",
+                "detail": (
+                    f"intent registered on {publish_day.isoformat()}; fill posts "
+                    f"at {exec_clock.isoformat()} (bound session open)"
+                ),
+                "fill_day": fill_day.isoformat(),
+                "exec_clock": exec_clock.isoformat(),
+            }
+            self._log("confirm", market_date=publish_day.isoformat(),
+                      plan_id=plan_id, outcome=outcome)
+            return _ret(outcome)
         bar = (self.bars_by_day.get(fill_day) or {}).get(code)
         if bar is None:
             outcome = {

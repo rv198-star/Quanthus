@@ -170,12 +170,20 @@ def base_sessions_through(base_root: Path, end: date) -> int:
 def apply_exclusion(
     bars_by_day: dict,
     exclusion,
+    expected_sha256: str | None = None,
 ) -> dict:
     """#737 pre-read filter applied BEFORE the replay enters: drop a
     security's bar on an excluded (security, date) pair.  Returns the
     receipt {config_sha256, filtered_count, filtered[]} for the run/day
     receipt - the binding is in place for later phases and the count +
-    digest are recorded even when the October window makes it a no-op."""
+    digest are recorded even when the October window makes it a no-op.
+
+    When ``expected_sha256`` is given the exclusion config is BOUND to
+    that pinned digest (R3 item 4): a byte-mismatched file is named in
+    the receipt (sha_match=False) rather than silently filtering
+    against the wrong list."""
+    actual = getattr(exclusion, "sha256", "")
+    sha_match = expected_sha256 is None or actual == expected_sha256
 
     dropped = []
     for day, bars in list(bars_by_day.items()):
@@ -184,13 +192,22 @@ def apply_exclusion(
                 del bars[code]
                 dropped.append({"security": code, "date": day.isoformat()})
     return {
-        "config_sha256": getattr(exclusion, "sha256", ""),
+        "config_sha256": actual,
+        "expected_sha256": expected_sha256,
+        "sha_match": sha_match,
         "config_path": str(getattr(exclusion, "path", "")),
         "securities": sorted(getattr(exclusion, "securities", ()) or ()),
         "dates": sorted(getattr(exclusion, "dates", ()) or ()),
         "filtered_count": len(dropped),
         "filtered": dropped,
     }
+
+
+# The frozen #737 exclusion list's own pinned sha256 (commit bb4a429f).
+# The replay binds the config to this digest before applying it.
+EXPECTED_EXCLUSION_SHA256 = (
+    "sha256:7482a9ef837aabe2019ec5daba7132d5729e7f3e43786b6a0b1efb43e95a573e"
+)
 
 
 def default_spec(observed_sessions: int, knowledge_cutoff: str | None) -> ReplayInputSpec:
@@ -392,7 +409,14 @@ def main(argv=None) -> int:
     window_map = OctoberWindowMap.load(wk_path) if wk_path.is_file() else None
     exclusion_receipt = None
     if window_map is not None:
-        exclusion_receipt = apply_exclusion(bars_by_day, window_map.exclusion)
+        exclusion_receipt = apply_exclusion(
+            bars_by_day,
+            window_map.exclusion,
+            # Bind to the frozen #737 digest (bb4a429f); a byte-mismatched
+            # file names sha_match=False rather than filtering silently
+            # (R3 item 4).
+            expected_sha256=EXPECTED_EXCLUSION_SHA256,
+        )
         if exclusion_receipt["filtered_count"]:
             print(json.dumps({"exclusion_applied": exclusion_receipt}))
 

@@ -37,6 +37,12 @@ class DayBar:
     volume: int | None = None
     amount: Decimal | None = None
     security_name: str | None = None
+    # The source row's own knowledge_from (R3 item 6) - the member's
+    # declared observed clock, carried verbatim per bar, never the
+    # parent manifest's rollup.
+    knowledge_from: str | None = None
+    # The actual member (parquet path) this bar was read from.
+    source_member: str | None = None
 
 
 class DailyBarQuoteService:

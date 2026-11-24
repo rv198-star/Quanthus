@@ -39,7 +39,7 @@ LOGIN_PAGE = r"""<!doctype html>
 <title>P12 历史回放 · 登录</title>
 <style>body{margin:0;font:14px -apple-system,"PingFang SC",sans-serif;background:#f6f7f8;display:flex;align-items:center;justify-content:center;min-height:100vh}.box{background:#fff;border:1px solid #e3e5e8;border-radius:8px;padding:36px 40px;width:340px}.badge{font-weight:700;color:#fff;background:#8c1d18;padding:4px 14px;border-radius:3px;font-size:13px;display:inline-block;margin-bottom:18px}h1{font-size:19px;margin:0 0 6px}p{color:#7a7f85;font-size:13px;margin:0 0 20px}input{width:100%;padding:9px 12px;border:1px solid #e3e5e8;border-radius:4px;margin-bottom:12px;font:inherit;box-sizing:border-box}button{width:100%;padding:10px;background:#1a1d21;color:#fff;border:none;border-radius:4px;font:inherit;cursor:pointer}#err{color:#a02215;font-size:13px;min-height:18px;margin-top:8px}</style></head>
 <body><div class=box><span class=badge>历史回放 · 模拟</span><h1>登录</h1><p>这是独立回放控制台，与 8791/8790 完全隔离。</p><form onsubmit="return go()"><input id=u placeholder=用户名 autocomplete=username><input id=pw type=password placeholder=密码 autocomplete=current-password><button>进入</button></form><div id=err></div>
-<script>async function go(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:pw.value})});const d=await r.json();if(r.ok&&d.token){sessionStorage.setItem('replay-token',d.token);location='/'}else{err.textContent=d.error||'用户名或密码不对'}return false}</script>
+<script>async function go(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:pw.value}),credentials:'same-origin'});const d=await r.json();if(r.ok&&d.ok){location='/'}else{err.textContent=d.error||'用户名或密码不对'}return false}</script>
 </body></html>
 """
 
@@ -228,9 +228,18 @@ def make_handler(engine_factory, users: dict | None = None):
         if not users:
             return "local"
         auth = headers.get("Authorization") or ""
-        if not auth.lower().startswith("bearer "):
+        token = None
+        if auth.lower().startswith("bearer "):
+            token = auth.split(None, 1)[1].strip()
+        else:
+            cookie = headers.get("Cookie") or ""
+            for part in cookie.split(";"):
+                part = part.strip()
+                if part.startswith("replay_token="):
+                    token = part.split("=", 1)[1].strip()
+                    break
+        if token is None:
             return None
-        token = auth.split(None, 1)[1].strip()
         rec = sessions.get(token)
         if rec is None or rec[1] < time.time():
             return None
@@ -294,7 +303,14 @@ def make_handler(engine_factory, users: dict | None = None):
                 ):
                     token = secrets.token_urlsafe(32)
                     sessions[token] = (username, time.time() + SESSION_TTL)
-                    return self._json({"ok": True, "token": token, "user": username, "role": rec[0]})
+                    body = json.dumps({"ok": True, "token": token, "user": username, "role": rec[0]}, ensure_ascii=False).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Set-Cookie", f"replay_token={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={SESSION_TTL}")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
                 return self._json({"error": "用户名或密码不对"}, 401)
             if users and _check_auth(self.headers) is None:
                 return self._json({"error": "unauthorized"}, 401)

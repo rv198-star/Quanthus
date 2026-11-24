@@ -76,6 +76,7 @@ def read_month_bars(
         "close",
         "volume",
         "turnover",
+        "knowledge_from",
     ),
 ) -> tuple[dict[date, dict[str, DayBar]], SliceRead]:
     """Project one Base month partition into {session_date: {code: DayBar}}.
@@ -128,6 +129,15 @@ def read_month_bars(
                     if row.get("turnover") is not None
                     else None
                 ),
+                # The source row's own knowledge_from + the actual member
+                # path it was read from (R3 item 6) - never the parent
+                # manifest rollup or a hardcoded window date.
+                knowledge_from=(
+                    str(row["knowledge_from"])
+                    if row.get("knowledge_from") is not None
+                    else None
+                ),
+                source_member=str(member_path),
             )
         except Exception:  # noqa: BLE001 - an unparseable row is a named gap
             continue

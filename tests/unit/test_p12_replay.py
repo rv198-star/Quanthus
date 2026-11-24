@@ -312,6 +312,14 @@ class TestFillDay:
             "plan_id": "p1", "security_code": "600000", "action_code": "BUY",
             "side": "buy", "target_qty": 1200, "delta_qty": 1200, "price_cap": "10.0",
         })
+        # Confirming before the bound session's 09:30 open registers the
+        # intent only; the fill posts once the clock reaches it (R3 #1).
+        eng.set_now(datetime(2026, 10, 19, 23, 0, tzinfo=TZ))
+        early = eng.confirm("p1")
+        assert early["status"] == "intent_registered"
+        assert early["fill_day"] == "2026-10-20"
+        # Reaching the execution instant posts the real T+1 open fill.
+        eng.set_now(datetime(2026, 10, 20, 9, 30, tzinfo=TZ))
         out = eng.confirm("p1")
         assert out["status"] == "filled"
         # filled at the T+1 open (9.79), not the publish day's open (9.72)
@@ -339,7 +347,10 @@ class TestFillDay:
         plan = {"plan_id": "p1", "security_code": "600000", "action_code": "BUY",
                 "side": "buy", "target_qty": 100, "delta_qty": 100, "price_cap": "10.0"}
         self._patch_plans(eng, plan)
+        # Advance the clock to the execution instant so the first confirm fills.
+        eng.set_now(datetime(2026, 10, 20, 9, 30, tzinfo=TZ))
         first = eng.confirm("p1")
+        assert first["status"] == "filled"
         # plan no longer open -> without the record a repeat would PLAN_NOT_FOUND
         self._patch_plans(eng, plan)  # still listed; the record must short-circuit
         second = eng.confirm("p1")

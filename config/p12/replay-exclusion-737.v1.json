@@ -1,0 +1,14 @@
+{
+ "schema_version": "quanthus.p12.replay-exclusion.v1",
+ "purpose": "Issue #748 replay exclusion list for the #737 NVDA validation set: the frozen securities + event dates that must not enter the historical replay.  Codes and dates only; the validation set's design, metrics and other contents stay in #737.",
+ "source_issue": 737,
+ "frozen_at": "2026-11-23T21:15:58Z",
+ "securities": [
+  "300308", "300502", "300394", "002463", "300476",
+  "601138", "000977", "002916", "002436", "002837",
+  "688256", "688041",
+  "399006", "000300"
+ ],
+ "excluded_dates": ["2026-11-23", "2026-11-24", "2026-11-25"],
+ "note": "Exclusion applies per (security, date): a replay covering 11-23..11-25 drops only these securities on these dates; outside the window they read normally.  The replay's October window (2026-10-01..10-31) does not intersect these dates, so the list is inert for phase 1 and documented for later phases."
+}

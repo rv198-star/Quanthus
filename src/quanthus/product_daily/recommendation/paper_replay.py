@@ -94,6 +94,18 @@ def _text(value: Any, label: str) -> str:
     return str(value)
 
 
+def _coverage_records(coverage: dict[str, Any], field: str) -> dict[str, dict[str, Any]]:
+    """Coalesce identical records and reject a key that names two different sources."""
+    records: dict[str, dict[str, Any]] = {}
+    for i, raw in enumerate(_seq(coverage.get(field, ()), f"action_coverage.{field}")):
+        record = _obj(raw, f"{field}[{i}]")
+        key = _text(record.get("coverage_id"), f"{field}[].coverage_id")
+        if key in records and records[key] != record:
+            _fail("conflicting_action_coverage_id", f"{field}: conflicting records for {key!r}")
+        records[key] = record
+    return records
+
+
 def _isodate(value: Any, label: str) -> date:
     if isinstance(value, date) and not isinstance(value, datetime):
         return value
@@ -352,9 +364,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
         # carries the member bytes identity P12 reads; a register alone is a
         # locator, not proof of a security's window state.
         registers: dict[str, dict[str, Any]] = {}
-        for i, reg in enumerate(_seq(aco.get("registers", ()), "action_coverage.registers")):
-            ro = _obj(reg, f"action_coverage.registers[{i}]")
-            rid = _text(ro.get("coverage_id"), "registers[].coverage_id")
+        for rid, ro in _coverage_records(aco, "registers").items():
             registers[rid] = {
                 "coverage_id": rid,
                 "version": _text(ro.get("version"), "registers[].version"),
@@ -485,11 +495,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
             "register_row",
         )
         verified_artifacts: dict[str, dict[str, Any]] = {}
-        for i, va in enumerate(
-            _seq(aco.get("verified_artifacts", ()), "action_coverage.verified_artifacts")
-        ):
-            vo = _obj(va, f"action_coverage.verified_artifacts[{i}]")
-            cid = _text(vo.get("coverage_id"), "verified_artifacts[].coverage_id")
+        for i, (cid, vo) in enumerate(_coverage_records(aco, "verified_artifacts").items()):
             if cid not in registers:
                 _fail(
                     "invalid_action_coverage",

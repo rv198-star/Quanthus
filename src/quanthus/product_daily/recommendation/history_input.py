@@ -1057,6 +1057,17 @@ def raw_security_inputs_from_history(
         except ProductDailyError as exc:
             rc = getattr(exc, "reason_code", "")
             if rc == "calendar_coverage_incomplete":
+                # A venue with NO open sessions at all is a shared whole-venue
+                # gap: every security on it is unverifiable, so the failure is
+                # shared, not per-security.  Re-raise it so the day fails
+                # closed; a per-security truncated-calendar isolation stays in
+                # the branch below.
+                venue_has_sessions = any(
+                    row.venue_id == identity.venue_id and row.is_open
+                    for row in history.calendar_rows
+                )
+                if not venue_has_sessions:
+                    raise
                 if is_account_member:
                     membership = ()
                     receipts.append(

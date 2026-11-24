@@ -1114,19 +1114,31 @@ def _enriched_history_receipts(
         # Resolve this security's real scan verdict at T (receipts are keyed on
         # listing_code; scan_verdicts was already re-keyed to listing_code above).
         scan_verdict = scan_verdicts.get((code, signal_date.isoformat()))
-        scan_reached_verdict = facts is not None and window_sufficient and scan_verdict is not None
+        # Only a verdict the scan window actually evaluated to a conclusive
+        # end-state counts as a QUALIFIED day: a real transition ("triggered")
+        # or a real evaluated no-signal ("not_triggered").  Every named
+        # pre-evaluation veto / unusable window - knowledge_after_t_close,
+        # t_minus_1_not_tradable, zero_activity_baseline, observation_gap,
+        # missing_input and the rest - means the T facts never reached a
+        # qualified evaluation; the security is not_qualified at this gate,
+        # never an "evaluated qualified no-signal".  A missing-input or
+        # unusable-window day is a real named outcome but NOT a publishable
+        # qualified verdict.
+        scan_evaluated_ok = scan_verdict in ("triggered", "not_triggered")
+        scan_reached_verdict = facts is not None and window_sufficient and scan_evaluated_ok
         if event_scanned or scan_verdict == "triggered":
             events_reason = "event scan produced a transition"
         elif scan_verdict is not None:
-            # A real verdict from the same scan.  A genuine no-signal keeps its
-            # qualified name; a named eligibility veto / unusable window keeps
-            # its own reason - never flattened to a generic "no-signal".
+            # A real verdict from the same scan.  A genuine evaluated
+            # no-signal keeps its qualified name; a named eligibility veto /
+            # unusable window keeps its own reason and fails the gate - never
+            # flattened to a generic "no-signal" and never counted qualified.
             if scan_verdict == "not_triggered":
                 events_reason = "qualified no-signal: scan window reached a real verdict"
             else:
                 events_reason = f"scan verdict at T: {scan_verdict}"
-        elif scan_reached_verdict:
-            events_reason = "qualified no-signal: scan window reached a real verdict"
+        elif facts is not None and window_sufficient:
+            events_reason = "no qualified event window in the 22-session scan"
         else:
             events_reason = "no qualified event window in the 22-session scan"
         gates["events"] = {

@@ -444,6 +444,18 @@ def run_daily_advice_from_raw(
     # admitted row is named inside the signed closure.  None keeps the original
     # per-bar instant requirement on every caller.
     numeric_context: OctoberReplayContext | None = None,
+    # Versioned as-observed scan calendar: the bounded open-session set the scan
+    # window actually runs over - the named bar_context_window(<=61 contiguous
+    # open sessions ending at T) plus facts.next_session, projected by the
+    # versioned replay entry from the venue calendar (never narrowed by which
+    # bars exist).  Only admitted alongside the private OctoberReplayContext
+    # token; without the token it is a contract breach.  When supplied it
+    # REPLACES the full universe_membership union as the scan's trading_dates -
+    # listing age stays complete inside features/universe_membership (the
+    # listing_sessions row_number), but a security listed since 1991 no longer
+    # drags every pre-2026 session into require_scan_date scope.  Strict/forward
+    # callers omit it and keep the original membership-union semantics.
+    scan_trading_dates: Sequence[date] | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Build real panel facts + the scan series from raw inputs, then run the core.
@@ -482,6 +494,13 @@ def run_daily_advice_from_raw(
     ):
         raise ProductDailyError("unknown_numeric_context", f"numeric_context {numeric_context!r}")
     _date_context_ok = numeric_context is not None
+    if scan_trading_dates is not None and not _date_context_ok:
+        # A bounded scan calendar is an as-observed projection: only the
+        # versioned replay entry (which mints the private token) may supply it.
+        raise ProductDailyError(
+            "scan_calendar_requires_replay_context",
+            "scan_trading_dates requires the versioned as-observed replay context",
+        )
     # Account and raw closures are bound even when a particular market input fails.
     raw_closures = [raw_security_input_closure(item) for item in raw]
 
@@ -605,6 +624,17 @@ def run_daily_advice_from_raw(
     # The scan requires the T+1 session in trading_dates; take it from the bound
     # facts.next_session (the calendar's next open), not invented here.
     all_trading_dates.add(facts.next_session)
+    # Under the versioned as-observed replay the scan runs over the bounded
+    # named calendar supplied by the entry (bar_context_window + next_session),
+    # NOT the full universe_membership union - a 1991 listing keeps its complete
+    # membership inside features/listing_sessions but must not drag pre-scope
+    # sessions into require_scan_date.  The supplied set already carries the
+    # next session; without the token the original union semantics stand.
+    effective_trading_dates = (
+        sorted(set(scan_trading_dates))
+        if scan_trading_dates is not None
+        else sorted(all_trading_dates)
+    )
 
     if panel_report_factory is not None:
         # Rebind only the panel_report field; feature_registry/trend_* stay the
@@ -637,7 +667,7 @@ def run_daily_advice_from_raw(
         runner=runner,
         resources=resources,
         rows=scan_rows,
-        trading_dates=sorted(all_trading_dates),
+        trading_dates=effective_trading_dates,
         snapshot_id=snapshot_id,
         snapshot_manifest_digest=snapshot_manifest_digest,
         card=card,

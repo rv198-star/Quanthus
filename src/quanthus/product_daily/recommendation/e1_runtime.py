@@ -737,7 +737,9 @@ def run_e1_replay_day(
         split_policy=_split_policy_for(market_date),
         snapshot_id=snapshot_id,
         snapshot_manifest_digest=snapshot_manifest_digest,
-        clock=clock,
+        # Evaluation is as of the verified physical replay observation. The
+        # strategy and decision-set cutoff still come from the bound market date.
+        clock=shared_observed_clock if "package_clock" in consumption_evidence else clock,
         observed_clock=shared_observed_clock,
         source_read_at=source_read_at,
     )

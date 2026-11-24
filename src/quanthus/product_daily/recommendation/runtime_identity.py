@@ -283,18 +283,27 @@ def resolve_pinned_v2_loader(
         override if override is not None else os.environ.get("QUANTHUS_P12_CONSUMER_ROOT"),
     )
     pinned_src = str(consumer_root / "src")
-    insert_at = 0
-    # A consumer tree that is already importable through a stale sys.path entry
-    # would let a sibling (unpinned) tree satisfy the name.  Resolve through the
-    # pinned checkout's own src directory first; the byte check above already
-    # guarantees the closure underneath it is exactly the pinned revision.
-    while insert_at < len(sys.path) and sys.path[insert_at] == pinned_src:
-        insert_at += 1
-    sys.path.insert(insert_at, pinned_src)
+    # The host tree already owns the "quanthus" top-level package, so a bare
+    # sys.path bump cannot reach quanthus.p12_daily - the existing package's
+    # __path__ decides which subdirectories the import machinery sees.  Mount
+    # the pinned checkout's package root on that __path__ (the same namespace
+    # mechanism the existing tests use for the synthetic consumer), then import
+    # the loader and verify the module file is exactly the pinned checkout's
+    # byte-verified copy.
+    quanthus_pkg = sys.modules.get("quanthus")
+    if quanthus_pkg is None:
+        import quanthus as quanthus_pkg  # type: ignore[no-redef]
+    pkg_path = getattr(quanthus_pkg, "__path__", None)
+    if pkg_path is None:
+        raise ProductDailyError(
+            "consumer_unavailable", "quanthus top-level package has no __path__"
+        )
+    mounted = str(consumer_root / "src" / "quanthus")
+    pkg_path.insert(0, mounted)
     try:
         import quanthus.p12_daily.decision_loader as pinned_loader
     finally:
-        del sys.path[insert_at]
+        pkg_path.remove(mounted)
     module_file = Path(getattr(pinned_loader, "__file__", "")).resolve()
     expected_loader = (consumer_root / "src/quanthus/p12_daily/decision_loader.py").resolve()
     if module_file != expected_loader:

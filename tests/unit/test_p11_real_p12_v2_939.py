@@ -299,11 +299,10 @@ def test_publish_refuses_tampered_wire(pinned_checkout, tmp_path, monkeypatch):
     # Shift the reduce target by one tick: still a valid P11 object, but the
     # pinned loader + coordinate check must catch the byte-level drift before
     # any file is staged.
-    # Bypass the frozen dataclass so the wire object and the validated object
-    # diverge: the raw bytes carry 0.5 while the tampered decision serializes
-    # 0.51 - exactly the drift the single-call pin check must catch.
+    # A non-plain-decimal target string: legal at the P11 dataclass layer but
+    # refused by the b756 _wire_decimal guard before any file is staged.
     tampered_decision = ds.decisions[0]
-    object.__setattr__(tampered_decision, "target_position_fraction", Decimal("0.51"))
+    object.__setattr__(tampered_decision, "target_position_fraction", Decimal("0.5e-1"))
     tampered_ds = dataclasses.replace(ds, decisions=(tampered_decision,))
     tampered_package = dataclasses.replace(package, decision_sets=(tampered_ds,))
     with pytest.raises(Exception):

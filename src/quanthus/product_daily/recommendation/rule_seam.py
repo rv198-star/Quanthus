@@ -21,6 +21,8 @@ account limit.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -614,7 +616,6 @@ class RuleSeamAdapter:
 
 
 def _digest(label: str) -> str:
-    import hashlib
 
     return "sha256:" + hashlib.sha256(label.encode("utf-8")).hexdigest()
 
@@ -1477,12 +1478,22 @@ def load_action_receipts(path: Any) -> tuple[dict[str, Any], ...]:
 
 
 def load_machine_policy(path: Any) -> dict[str, Any]:
-    """Strict-load the machine invalidation/position policy."""
+    """Strict-load the machine invalidation/position policy.
+
+    v1 files keep the original schema gate.  v2 additionally declares the seven
+    fact-dependency conditions and the confirm_buy action scope from the P11/P12
+    machine-fact contract (#723 comment7116501586): missing or unverified T+1
+    preopen facts may only block the buy confirmations that depend on them, while
+    eligible sell/reduce continues with an alert.  The conditions apply at the
+    T+1 preopen/confirmation phase; they are not a requirement to hold future T+1
+    quotes while producing the T-evening package.
+    """
 
     raw = _load_json(path)
     if not isinstance(raw, dict):
         raise ProductDailyError("invalid_three_piece", "machine-policy must be an object")
-    if raw.get("schema_version") != "quanthus.p11-d1b.machine-policy.v1":
+    schema = raw.get("schema_version")
+    if schema not in {"quanthus.p11-d1b.machine-policy.v1", "quanthus.p11-d1b.machine-policy.v2"}:
         raise ProductDailyError("invalid_three_piece", "machine-policy schema_version differs")
     caps = raw.get("position_caps")
     if not isinstance(caps, list):
@@ -1490,7 +1501,283 @@ def load_machine_policy(path: Any) -> dict[str, Any]:
     for cap in caps:
         if not isinstance(cap, dict) or "denominator" not in cap:
             raise ProductDailyError("invalid_three_piece", "position_cap missing denominator")
+    if schema == "quanthus.p11-d1b.machine-policy.v2":
+        _validate_machine_policy_v2(raw)
     return raw
+
+
+# Actions that a T+1 preopen fact may block.  confirm_buy is the only action a missing
+# or unverified preopen dependency can suppress; sell and reduce confirmations are
+# outside its scope and continue with an alert.
+MACHINE_BUY_ACTIONS = frozenset({"new_entry", "confirm_buy"})
+
+# Frozen v2 contract values (#723 comment7116501586): exactly these seven unique
+# condition identities, in this order; exactly these four position caps; the exact
+# evaluation phase, veto precedence and action-scope semantics below.  The strict
+# loader is an identity gate, not a substring check - a policy that drops, duplicates,
+# reorders, renames or rewords any of these is a different contract and fails closed.
+MACHINE_POLICY_V2_CONDITION_FIELDS: tuple[str, ...] = (
+    "price_limit_or_halt_unavailable",
+    "auction_snapshot_unavailable",
+    "single_security_fraction",
+    "per_industry_max",
+    "new_buckets_per_day",
+    "total_position",
+    "expert_veto",
+)
+MACHINE_POLICY_V2_CAP_FIELDS: tuple[str, ...] = (
+    "single_security_fraction",
+    "per_industry_max",
+    "new_buckets_per_day",
+    "total_position",
+)
+MACHINE_POLICY_V2_CAP_DENOMINATORS: dict[str, str] = {
+    "single_security_fraction": "unit_notional_bucket_budget",
+    "per_industry_max": "active_or_reserved_count",
+    "new_buckets_per_day": "buckets",
+    "total_position": "account_equity",
+}
+MACHINE_POLICY_V2_EVALUATION_PHASE = "T+1 preopen or user confirmation; not T package generation"
+MACHINE_POLICY_V2_VETO_PRECEDENCE: tuple[str, ...] = (
+    "force_liquidate_veto",
+    "reduce_only_veto",
+    "block_new",
+)
+MACHINE_POLICY_V2_ACTION_SCOPE: dict[str, str] = {
+    "new_entry": "new buy plan",
+    "confirm_buy": "buy confirmation only; sell and reduce confirmation excluded",
+}
+
+# The complete frozen semantic surface of the v2 machine policy, expressed as the
+# canonical JSON of each top-level semantic key.  Generated from the authority
+# candidate MACHINE-POLICY-FACT-DEPENDENCIES.candidate.v2.json
+# (sha256:1466daffe451f8025793f710c19191b5b52aa50d416bc8d2e8729d6e406260c2) as
+# transcribed into config/research/r11/d1b-20261124/machine-policy.v2.json: every
+# condition's dependency/provenance/grade/phase/action/on-missing/veto/
+# semantic-limit contents, every cap's value-ref/priority/veto/denominator, the
+# base policy sha256, the invalidation scope and the top-level
+# paper_quote_feed_acceptance/real_account_fact_grade/scope sentences.  A policy
+# file that deviates on any of these keys - or adds semantic keys - is a different
+# contract and fails closed; only the four metadata keys
+# (schema_version/policy_version/adoption_state/daily_adopted) sit outside this
+# surface.
+MACHINE_POLICY_V2_META_KEYS = frozenset(
+    {"schema_version", "policy_version", "adoption_state", "daily_adopted"}
+)
+# fmt: off
+# ruff: noqa: E501
+MACHINE_POLICY_V2_FROZEN_JSON: dict[str, str] = {
+    'base_machine_policy': '"config/research/r11/d1b-20261124/machine-policy.v1.json"',
+    'base_sha256': '"5dcc84c833828a62555b9588ec5341cdb78d63ec87a5a9930a39b495e4c49896"',
+    'invalidations': '[{"applies_to_actions":["new_entry","confirm"],"field":"price_limit_or_halt_unavailable","observed_at":"T+1 pre-open","reason":"T+1 suspension/native price limit not yet a named qualified source","timezone":"Asia/Shanghai","type":"boolean","unit":"flag","value":"block","veto":true},{"applies_to_actions":["confirm"],"field":"auction_snapshot_unavailable","observed_at":"T+1 09:00-09:25","reason":"no named auction semantic snapshot; zero-volume/last_price not a substitute","timezone":"Asia/Shanghai","type":"enum","unit":"state","value":"unavailable","veto":false}]',  # noqa: E501
+    'position_caps': '[{"denominator":"unit_notional_bucket_budget","field":"single_security_fraction","note":"base_trial_position_fraction is a fraction of the trial unit_notional/bucket budget (same bucket as the expert allowed_maximum_position ceiling); P12 sizes the actual quantity against real account equity/cash/fees. NOT the historical 4/8/20 research caps","priority":"expert_ceiling","value":"from card position_and_execution base_trial_position_fraction","veto":false},{"denominator":"active_or_reserved_count","field":"per_industry_max","priority":"entry_limit","value":"EntryLimits.max_active_or_reserved_per_industry","veto":false},{"denominator":"buckets","field":"new_buckets_per_day","priority":"entry_limit","value":"EntryLimits.max_new_buckets_per_day","veto":false},{"denominator":"account_equity","field":"total_position","priority":"capacity","value":"quantity_limits.total","veto":false}]',  # noqa: E501
+    'veto_precedence': '["force_liquidate_veto","reduce_only_veto","block_new"]',
+    'expert_veto': '"system/position guardian + scorer; a veto always suppresses executable entry"',
+    'action_scope_definition': '{"confirm_buy":"buy confirmation only; sell and reduce confirmation excluded","new_entry":"new buy plan"}',  # noqa: E501
+    'evaluation_phase': '"T+1 preopen or user confirmation; not T package generation"',
+    'sell_reduce_on_missing_preopen_facts': '"continue_with_alert"',
+    'opening_auction_window': '"09:15-09:25 Asia/Shanghai; 09:00 unavailable"',
+    'paper_quote_feed_acceptance': '"accepted_only_for_P10_727_verified_fields"',
+    'real_account_fact_grade': '"formal_named_supply_727"',
+    'scope': '"T+1 preopen three fact classes for personal simulated accounts only"',
+    'conditions': '[{"applies_to_actions":["new_entry","confirm_buy"],"conditional_activation":"only_when_active_predicate_depends_on_this_fact","evaluation_phase":"T+1 preopen or user confirmation; not T package generation","field":"price_limit_or_halt_unavailable","on_missing_or_unverified":"block_only_buy_confirmation_depending_on_this_fact","paper_quote_feed_acceptance":"accepted_only_for_P10_727_verified_fields","paper_required_qualification":"P10 #727 field/scope/source/clock receipt","preopen_fact_dependencies":["suspension_resumption","limit_prices"],"preserved_veto_flag":true,"real_account_fact_grade":"formal_named_supply_727","required_provenance":["source_ref","fact_class","fact_grade","security_code","applicable_session","observed_at","received_at","qualification_receipt"],"sell_reduce_on_missing_preopen_facts":"continue_with_alert","semantic_limits":["zero_volume_is_not_suspension","ordinary_last_is_not_relabelled_as_auction","unknown_remains_unavailable"]},{"applies_to_actions":["confirm_buy"],"conditional_activation":"only_when_active_predicate_depends_on_this_fact","evaluation_phase":"T+1 preopen or user confirmation; not T package generation","field":"auction_snapshot_unavailable","on_missing_or_unverified":"block_only_buy_confirmation_depending_on_this_fact","paper_quote_feed_acceptance":"accepted_only_for_P10_727_verified_fields","paper_required_qualification":"P10 #727 field/scope/source/clock receipt","preopen_fact_dependencies":["opening_auction"],"preserved_veto_flag":false,"real_account_fact_grade":"formal_named_supply_727","required_provenance":["source_ref","fact_class","fact_grade","security_code","applicable_session","observed_at","received_at","qualification_receipt"],"sell_reduce_on_missing_preopen_facts":"continue_with_alert","semantic_limits":["zero_volume_is_not_suspension","ordinary_last_is_not_relabelled_as_auction","unknown_remains_unavailable"]},{"field":"single_security_fraction","non_preopen_dependencies":["fixed_strategy_card","qualified_expert_decision","unit_notional_bucket_budget"],"on_missing_or_unverified":"preserve_existing_account_or_rule_admission","paper_quote_feed_acceptance":"not_applicable_to_this_preopen_contract","preopen_fact_dependencies":[],"preserved_denominator":"unit_notional_bucket_budget","preserved_value_ref":"from card position_and_execution base_trial_position_fraction"},{"field":"per_industry_max","non_preopen_dependencies":["qualified_industry_binding","active_or_reserved_account_state","EntryLimits"],"on_missing_or_unverified":"preserve_existing_account_or_rule_admission","paper_quote_feed_acceptance":"not_applicable_to_this_preopen_contract","preopen_fact_dependencies":[],"preserved_denominator":"active_or_reserved_count","preserved_value_ref":"EntryLimits.max_active_or_reserved_per_industry"},{"field":"new_buckets_per_day","non_preopen_dependencies":["daily_account_intake_state","EntryLimits"],"on_missing_or_unverified":"preserve_existing_account_or_rule_admission","paper_quote_feed_acceptance":"not_applicable_to_this_preopen_contract","preopen_fact_dependencies":[],"preserved_denominator":"buckets","preserved_value_ref":"EntryLimits.max_new_buckets_per_day"},{"field":"total_position","non_preopen_dependencies":["account_equity","existing_and_pending_commitments","quantity_limits.total"],"on_missing_or_unverified":"preserve_existing_account_or_rule_admission","paper_quote_feed_acceptance":"not_applicable_to_this_preopen_contract","preopen_fact_dependencies":[],"preserved_denominator":"account_equity","preserved_value_ref":"quantity_limits.total"},{"field":"expert_veto","non_preopen_dependencies":["actual_qualified_guardian_constraint_scorer_decision"],"on_missing_or_unverified":"no_executable_new_entry_and_alert; preserve_independently_qualified_held_exit","paper_quote_feed_acceptance":"not_applicable_to_this_preopen_contract","precedence":["force_liquidate_veto","reduce_only_veto","block_new"],"preopen_fact_dependencies":[]}]',  # noqa: E501
+    'held_reduction_wire': '{"consumer_capability":"supports_held_reduction_v2","exit_kind_field":"exit_kind","missing_consumer_disposition":"display_only","reduce_denominator":"locked_cycle_budget","reduce_denominator_note":"the matching held funding cycle\'s locked_cycle_budget fixed at cycle activation; 45,000 CNY is a paper-account example, not a P11 constant","target_field":"target_position_fraction","wire_version":"p12.decision-set.v2"}',  # noqa: E501
+    'not_changed': '["strategy thresholds","daily/historical input qualification","P6","account adoption","sentiment parked739"]',  # noqa: E501
+}
+
+
+def _machine_policy_v2_frozen(key: str) -> Any:
+    return json.loads(MACHINE_POLICY_V2_FROZEN_JSON[key])
+
+
+# Consumer-binding schema the verified release pipeline resolves against.  A pinned
+# consumer declares the one wire schema it validates; the binding's pinned source
+# identity (commit/tree/loader entry/file hashes) is what makes it more than a caller
+# flag.
+CONSUMER_BINDING_SCHEMA = "quanthus.p11.p12-consumer-binding.v1"
+
+
+def _validate_machine_policy_v2(raw: dict[str, Any]) -> None:
+    """Fail closed on any deviation from the frozen v2 fact-dependency contract.
+
+    Identity gate first (registered condition/cap identities in frozen order, the
+    action-scope wording, buy-only blocking, denominators and the wire contract)
+    so a malformed policy reports the specific rule it broke; then the full
+    frozen semantic surface MACHINE_POLICY_V2_FROZEN_JSON must deep-equal every
+    semantic top-level key - dependency/provenance/grade/phase/veto/
+    semantic-limit contents, cap values/priorities/veto flags, base sha256,
+    invalidation scope and the top-level quote-feed/real-account/scope sentences.
+    Missing, mutated, nested-tampered or extra keys are a different contract and
+    fail closed.
+    """
+
+    if raw.get("adoption_state") != "proposed" or raw.get("daily_adopted") is not False:
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 must stay proposed with daily_adopted=false",
+        )
+    scopes = raw.get("action_scope_definition")
+    if scopes != MACHINE_POLICY_V2_ACTION_SCOPE:
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 action_scope_definition must equal the frozen "
+            f"{MACHINE_POLICY_V2_ACTION_SCOPE}",
+        )
+    if raw.get("sell_reduce_on_missing_preopen_facts") != "continue_with_alert":
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "missing preopen facts must leave sell/reduce as continue_with_alert",
+        )
+    if raw.get("evaluation_phase") != MACHINE_POLICY_V2_EVALUATION_PHASE:
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 evaluation_phase must be exactly "
+            f"{MACHINE_POLICY_V2_EVALUATION_PHASE!r}",
+        )
+    if tuple(raw.get("veto_precedence") or ()) != MACHINE_POLICY_V2_VETO_PRECEDENCE:
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 veto_precedence must be exactly "
+            f"{list(MACHINE_POLICY_V2_VETO_PRECEDENCE)}",
+        )
+    caps = raw.get("position_caps") or []
+    cap_fields = [cap.get("field") for cap in caps if isinstance(cap, dict)]
+    if cap_fields != list(MACHINE_POLICY_V2_CAP_FIELDS):
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 must carry exactly the four registered caps "
+            f"{list(MACHINE_POLICY_V2_CAP_FIELDS)} in order; got {cap_fields}",
+        )
+    for cap in caps:
+        expected_denominator = MACHINE_POLICY_V2_CAP_DENOMINATORS[cap["field"]]
+        if cap.get("denominator") != expected_denominator:
+            raise ProductDailyError(
+                "invalid_three_piece",
+                f"machine-policy v2 cap {cap['field']} denominator must be "
+                f"{expected_denominator}, never {cap.get('denominator')}",
+            )
+    conditions = raw.get("conditions")
+    if not isinstance(conditions, list) or not conditions:
+        raise ProductDailyError("invalid_three_piece", "machine-policy v2 conditions missing")
+    condition_fields = [cond.get("field") for cond in conditions if isinstance(cond, dict)]
+    if condition_fields != list(MACHINE_POLICY_V2_CONDITION_FIELDS):
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 must carry exactly the seven registered conditions "
+            f"{list(MACHINE_POLICY_V2_CONDITION_FIELDS)} in order; got "
+            f"{condition_fields}",
+        )
+    for index, cond in enumerate(conditions):
+        if not isinstance(cond, dict) or "field" not in cond:
+            raise ProductDailyError(
+                "invalid_three_piece", f"machine-policy v2 conditions[{index}] malformed"
+            )
+        preopen_deps = cond.get("preopen_fact_dependencies")
+        if not isinstance(preopen_deps, list):
+            raise ProductDailyError(
+                "invalid_three_piece",
+                f"machine-policy v2 {cond.get('field')} missing preopen_fact_dependencies",
+            )
+        if preopen_deps:
+            applies = cond.get("applies_to_actions")
+            if not isinstance(applies, list) or "confirm_buy" not in applies:
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} preopen scope must include confirm_buy",
+                )
+            if any(action not in MACHINE_BUY_ACTIONS for action in applies):
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} may only block buy actions "
+                    f"{sorted(MACHINE_BUY_ACTIONS)}, never sell/reduce",
+                )
+            if cond.get("on_missing_or_unverified") != (
+                "block_only_buy_confirmation_depending_on_this_fact"
+            ):
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} on_missing_or_unverified "
+                    "must be block_only_buy_confirmation_depending_on_this_fact",
+                )
+            if cond.get("sell_reduce_on_missing_preopen_facts") != "continue_with_alert":
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} must keep "
+                    "sell_reduce_on_missing_preopen_facts=continue_with_alert",
+                )
+            for key in ("required_provenance", "semantic_limits"):
+                if not isinstance(cond.get(key), list) or not cond.get(key):
+                    raise ProductDailyError(
+                        "invalid_three_piece",
+                        f"machine-policy v2 {cond.get('field')} missing {key}",
+                    )
+        else:
+            if not isinstance(cond.get("non_preopen_dependencies"), list):
+                raise ProductDailyError(
+                    "invalid_three_piece",
+                    f"machine-policy v2 {cond.get('field')} missing non_preopen_dependencies",
+                )
+    wire = raw.get("held_reduction_wire")
+    if not isinstance(wire, dict):
+        raise ProductDailyError(
+            "invalid_three_piece", "machine-policy v2 held_reduction_wire missing"
+        )
+    if wire.get("wire_version") != "p12.decision-set.v2":
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "machine-policy v2 held_reduction_wire.wire_version must be "
+            "p12.decision-set.v2",
+        )
+    if wire.get("reduce_denominator") != "locked_cycle_budget":
+        raise ProductDailyError(
+            "invalid_three_piece",
+            "reduce target_position_fraction must divide by the held funding cycle's "
+            "locked_cycle_budget, never account_equity or a sell fraction",
+        )
+    # Full semantic freeze: every semantic top-level key must deep-equal the
+    # frozen canonical surface; only the four metadata keys sit outside it.
+    unknown = set(raw) - MACHINE_POLICY_V2_META_KEYS - set(MACHINE_POLICY_V2_FROZEN_JSON)
+    if unknown:
+        raise ProductDailyError(
+            "invalid_three_piece",
+            f"machine-policy v2 carries unregistered top-level keys: {sorted(unknown)}",
+        )
+    for key in MACHINE_POLICY_V2_FROZEN_JSON:
+        if key not in raw:
+            raise ProductDailyError(
+                "invalid_three_piece",
+                f"machine-policy v2 missing frozen semantic key: {key}",
+            )
+        if raw[key] != _machine_policy_v2_frozen(key):
+            raise ProductDailyError(
+                "invalid_three_piece",
+                f"machine-policy v2 semantic key {key} differs from the frozen"
+                " authority candidate - any change requires an explicit versioned"
+                " successor, never a silent edit",
+            )
+
+
+def machine_policy_action_scope(policy: dict[str, Any], field: str) -> frozenset[str]:
+    """Actions a machine-policy field may block when its facts are missing/unverified.
+
+    Under v2 a preopen dependency only ever yields {confirm_buy} (plus the package-time
+    new_entry invalidation for the halt/limit fact); under v1 the declared
+    applies_to_actions are returned verbatim.  An unregistered field is an empty scope:
+    it blocks nothing.
+    """
+
+    if policy.get("schema_version") == "quanthus.p11-d1b.machine-policy.v2":
+        for cond in policy.get("conditions", ()):
+            if isinstance(cond, dict) and cond.get("field") == field:
+                return frozenset(cond.get("applies_to_actions", ()))
+        for rule in policy.get("invalidations", ()):
+            if isinstance(rule, dict) and rule.get("field") == field:
+                return frozenset(rule.get("applies_to_actions", ()))
+        return frozenset()
+    for rule in policy.get("invalidations", ()):
+        if isinstance(rule, dict) and rule.get("field") == field:
+            return frozenset(rule.get("applies_to_actions", ()))
+    return frozenset()
 
 
 def load_release_manifest(path: Any) -> dict[str, Any]:
@@ -1499,8 +1786,18 @@ def load_release_manifest(path: Any) -> dict[str, Any]:
     raw = _load_json(path)
     if not isinstance(raw, dict):
         raise ProductDailyError("invalid_three_piece", "release-manifest must be an object")
-    if raw.get("schema_version") != "quanthus.p11-d1b.release-manifest.v1":
+    if raw.get("schema_version") not in {
+        "quanthus.p11-d1b.release-manifest.v1",
+        "quanthus.p11-d1b.release-manifest.v2",
+    }:
         raise ProductDailyError("invalid_three_piece", "release-manifest schema_version differs")
+    if raw.get("schema_version") == "quanthus.p11-d1b.release-manifest.v2":
+        wire = raw.get("held_reduction_wire")
+        if not isinstance(wire, dict) or not wire.get("wire_version"):
+            raise ProductDailyError(
+                "invalid_three_piece",
+                "release-manifest v2 must declare held_reduction_wire.wire_version",
+            )
     closure = raw.get("input_closure")
     if not isinstance(closure, dict):
         raise ProductDailyError("invalid_three_piece", "release-manifest input_closure missing")
@@ -1539,7 +1836,29 @@ def load_release_manifest(path: Any) -> dict[str, Any]:
                 "invalid_three_piece",
                 "industry_mapping without a sha256 must declare binding_state pending/blocked",
             )
+    if raw["schema_version"] == "quanthus.p11-d1b.release-manifest.v2":
+        from quanthus.product_daily.recommendation.release_contract import (
+            validate_manifest_structure,
+        )
+
+        validate_manifest_structure(raw)
     return raw
+
+
+def verify_release_manifest_closure(
+    release_manifest: dict[str, Any],
+    *,
+    project_root: Any,
+    pending_is_failure: bool = True,
+) -> None:
+    """Verify registered files, mandatory bindings and index/worktree closure."""
+    from quanthus.product_daily.recommendation.release_contract import verify_manifest
+
+    verify_manifest(
+        release_manifest,
+        project_root=Path(project_root),
+        pending_is_failure=pending_is_failure,
+    )
 
 
 def check_three_piece_consistency(
@@ -1547,24 +1866,19 @@ def check_three_piece_consistency(
     action_receipts: tuple[dict[str, Any], ...],
     machine_policy: dict[str, Any],
     release_manifest: dict[str, Any],
+    project_root: Any = None,
 ) -> None:
-    """Cross-file identity/version check; any inconsistency fails the release."""
+    """Strictly reload and bind every supplied object to the same registered files."""
+    from quanthus.policy import find_project_root
+    from quanthus.product_daily.recommendation.release_contract import verify_manifest
 
-    for entry in action_receipts:
-        if (
-            entry.get("adoption_state") == "adopted"
-            and release_manifest.get("daily_adopted") is False
-        ):
-            raise ProductDailyError(
-                "inconsistent_three_piece",
-                f"action {entry.get('action')} adopted while release-manifest daily_adopted=false",
-            )
-    caps = {cap.get("field"): cap for cap in machine_policy.get("position_caps", ())}
-    if (
-        "single_security_fraction" in caps
-        and caps["single_security_fraction"].get("denominator") == "account_equity"
-    ):
+    verified = verify_manifest(
+        release_manifest,
+        project_root=Path(project_root) if project_root is not None else find_project_root(),
+        pending_is_failure=False,
+    )
+    if machine_policy != verified.policy or action_receipts != verified.receipts:
         raise ProductDailyError(
             "inconsistent_three_piece",
-            "single_security_fraction must not use account_equity as denominator",
+            "machine_policy/action_receipts objects differ from the registered verified files",
         )

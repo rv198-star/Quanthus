@@ -47,6 +47,8 @@ from quanthus.product_daily.recommendation.contracts import (
     ENDED,
     ENTRY_PLAN,
     ENTRY_REASON_CODES,
+    EXIT_KIND_FULL,
+    EXIT_KIND_REDUCE,
     EXIT_PLAN,
     EXPLANATION_CODES,
     HOLDING,
@@ -88,14 +90,15 @@ def _evidence_digest(*parts: str) -> str:
 
 
 def _signal_evidence_payload(item: CandidateSignal | HeldSignal) -> dict[str, Any]:
+    formal = (
+        item.formal_decision.to_dict()
+        if type(item.formal_decision) is FormalStrategyDecision
+        else None
+    )
     return {
         "expert_decision_digest": item.expert_decision_digest,
         "risk_decision_digest": item.risk_decision_digest,
-        "formal_decision": (
-            item.formal_decision.to_dict()
-            if type(item.formal_decision) is FormalStrategyDecision
-            else None
-        ),
+        "formal_decision": formal,
         **{
             name: None if getattr(item, name) is None else getattr(item, name).isoformat()
             for name in ("signal_close", "knowledge_cutoff", "decision_at")
@@ -1315,7 +1318,53 @@ class DailyAdviceProducer:
                 )
                 continue
             stage = EXIT_PLAN if held.action in {"reduce", "exit"} else HOLDING
+            # Held-reduction wire v2: a reduce must publish the expert's own target
+            # remaining-position fraction; it is copied from the actual
+            # FormalStrategyDecision.target_maximum_position the runner produced for this
+            # held unit, never inferred from an explanation or supplied by P12.  A reduce
+            # without that real decision (or with a missing/non-positive target) cannot be
+            # serialized as an executable reduce and falls back to display-only hold+alert
+            # rather than a synthetic full exit.
+            exit_kind: str | None = None
+            target_fraction = None
+            if stage == EXIT_PLAN:
+                if held.action == "exit":
+                    exit_kind = EXIT_KIND_FULL
+                else:
+                    # An executable reduce takes its target ONLY from the actual
+                    # FormalStrategyDecision the fixed runner produced for this held
+                    # unit.  held.target_maximum_position is a caller-supplied claim;
+                    # it is never a substitute for the typed formal decision, in any
+                    # evidence mode.  No formal decision / invalid target -> the reduce
+                    # degrades to display-only hold+alert below, never a caller-
+                    # supplied executable reduce and never a synthetic full exit.
+                    formal_target = (
+                        held.formal_decision.target_maximum_position
+                        if type(held.formal_decision) is FormalStrategyDecision
+                        else None
+                    )
+                    if (
+                        formal_target is None
+                        or not formal_target.is_finite()
+                        or formal_target <= 0
+                        or formal_target > 1
+                    ):
+                        stage = HOLDING
+                    else:
+                        target_fraction = formal_target
+                        exit_kind = EXIT_KIND_REDUCE
             explanations: tuple[dict[str, str], ...] = held.explanations
+            if stage == HOLDING and held.action == "reduce" and exit_kind is None:
+                explanations = (
+                    *explanations,
+                    {
+                        "code": "QUALIFICATION_EVIDENCE",
+                        "use": USE_EXPLANATION,
+                        "component_ref": f"{experts.ref_id}@{experts.version}",
+                        "text": "reduce intent missing a valid expert target fraction; "
+                        "held with alert, never a full sale",
+                    },
+                )
             if held.action == "hold_alert" and not any(
                 item.get("use") == USE_EXPLANATION for item in explanations
             ):
@@ -1339,6 +1388,8 @@ class DailyAdviceProducer:
                     reason_codes=held.reason_codes,
                     explanations=explanations,
                     next_observation=held.next_observation,
+                    exit_kind=exit_kind,
+                    target_position_fraction=target_fraction,
                 )
             )
 

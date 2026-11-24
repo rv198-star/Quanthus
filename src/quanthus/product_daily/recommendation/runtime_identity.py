@@ -12,6 +12,7 @@ from quanthus.event_library.contracts import sha256_digest
 from quanthus.product_daily.contracts import ProductDailyError
 
 CONSUMER_BINDING = "config/research/r11/d1b-20261124/p12-consumer.synthetic.v1.json"
+CONSUMER_BINDING_V2 = "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json"
 CODE_SCOPE = (
     "src",
     "config/expert-strategies",
@@ -74,6 +75,24 @@ def consumer_identity(root: Path) -> dict[str, Any]:
     raw = json.loads((root / CONSUMER_BINDING).read_text())
     if not isinstance(raw, dict) or raw.get("use_grade") != "SYNTHETIC_COMPATIBILITY_ONLY":
         raise ProductDailyError("consumer_binding_invalid", "synthetic consumer binding required")
+    return {**raw, "binding_digest": sha256_digest(raw)}
+
+
+def consumer_identity_v2(root: Path) -> dict[str, Any]:
+    """The candidate v2 consumer binding object.
+
+    Distinct file, distinct schema state: its pin is explicitly pending until the real
+    p12.decision-set.v2 loader/schema/digest is delivered (#723
+    comment7118368788).  The pinned synthetic v1 consumer bytes are never edited to
+    declare a capability it does not have.
+    """
+    raw = json.loads((root / CONSUMER_BINDING_V2).read_text())
+    if not isinstance(raw, dict) or raw.get("schema_version") != (
+        "quanthus.p11.p12-consumer-binding.v1"
+    ):
+        raise ProductDailyError(
+            "consumer_binding_invalid", "versioned v2 consumer binding required"
+        )
     return {**raw, "binding_digest": sha256_digest(raw)}
 
 

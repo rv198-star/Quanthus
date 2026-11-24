@@ -181,3 +181,76 @@ def test_r5_scan_verified_event_resolvable_row_admitted():
     request = load_replay_request(req)
     _, _, window_info, _ = build_replay_envelope(request, T1)
     assert window_info["coverage_isolated"] == 0
+
+
+# --- R6: scan ex-date effectiveness + same-date action one-to-one -------------------
+
+
+def test_r6_scan_ex_date_on_T_blocks_entry():
+    # The R6 probe: scan verified_event with ex_date == T (the signal day) is
+    # an effective adjustment on a scanned session -> blocks new entry even
+    # though the row spells it as a date, not an adjustment_effective bool.
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "scan_two_session":
+            ev["event_state"] = "verified_event"
+            ev["events"] = [{"ex_date": T1.isoformat()}]
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r6_scan_ex_date_on_T_minus_1_blocks_entry():
+    # Same gate on T-1: an ex-date landing on the prior scanned session is an
+    # effective adjustment -> blocked.
+    opens = list(SESSION_DAYS)
+    tm1 = opens[opens.index(T1) - 1]
+    req = _request(market_dates=(T1,), coverage="verified")
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "scan_two_session":
+            ev["event_state"] = "verified_event"
+            ev["events"] = [{"ex_date": tm1.isoformat()}]
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r6_same_date_identical_actions_dedupe_to_one():
+    # Byte-identical re-statements of the same action row collapse to one by
+    # version -> the single proven row feeds the panel, the entry proceeds.
+    win = _returns_window()
+    ex_day = win[30]
+    row = _r5_action("600000", ex_day, cash="0.116")
+    req = _r5_req([_r5_event(ex_day, cash="0.116")], [row, dict(row)])
+    request = load_replay_request(req)
+    env, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 0
+    # One deduped row reaches the feature envelope.
+    assert len(env["securities"][0]["actions"]) == 1
+
+
+def test_r6_same_date_different_actions_isolated():
+    # A proven 0.116 plus an unproven 0.232 on the same ex_date -> two DISTINCT
+    # same-date rows -> multiplicity conflict -> isolated, not passed through.
+    win = _returns_window()
+    ex_day = win[30]
+    good = _r5_action("600000", ex_day, cash="0.116")
+    extra = _r5_action("600000", ex_day, cash="0.232")
+    req = _r5_req([_r5_event(ex_day, cash="0.116")], [good, extra])
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r6_two_declared_events_same_date_conflict_isolated():
+    # Two DECLARED events on the same ex_date with different terms are a
+    # declaration conflict -> isolated (the register cannot pick one).
+    win = _returns_window()
+    ex_day = win[30]
+    req = _r5_req(
+        [_r5_event(ex_day, cash="0.116"), _r5_event(ex_day, cash="0.232")],
+        [_r5_action("600000", ex_day, cash="0.116")],
+    )
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1

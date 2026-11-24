@@ -781,7 +781,19 @@ def _used_member_ids(request: Any) -> dict[str, dict[str, Any]]:
             if isinstance(reg, Mapping):
                 add(reg.get("source_member_id"), "action_register", None)
     for me in getattr(request, "member_evidence", ()) or ():
-        add(_member_id_of(me), "member_evidence", None)
+        me_id = _member_id_of(me)
+        me_required = (
+            bool(me.get("required", True))
+            if isinstance(me, Mapping)
+            else bool(getattr(me, "required", True))
+        )
+        # member_evidence binds the SHA/identity of an opened member; its
+        # content dependency is still carried by the rows above.  A member the
+        # reader opened but marked not relevant_for_T (required=False) is
+        # shared evidence, not a same-T content dependency - it must not be
+        # inflated into the shared required set and must not block neighbours.
+        if me_id is not None and me_id not in used:
+            add(me_id, "member_evidence_opened_not_used" if not me_required else "member_evidence", None)
     for mid in getattr(request, "required_member_ids", ()) or ():
         add(mid, "required", None)
     return used
@@ -827,12 +839,21 @@ def _analyze_member_use(
         shared = sorted(u["shared"])
         secs = sorted(u["securities"])
         is_used = bool(shared or secs)
-        if shared:
+        # Split "opened" evidence-only members from content dependencies: a
+        # member whose only binding is member_evidence with required=False was
+        # opened by the reader but carries no same-T row this run consumes.
+        # It stays evidence-classified, never a shared blocking member.
+        content_shared = [k for k in shared if k != "member_evidence_opened_not_used"]
+        evidence_only = bool(shared) and not content_shared
+        if content_shared:
             tier = "shared"
         elif secs:
             tier = "per_security" if len(secs) == 1 else "multi_security"
+        elif evidence_only:
+            tier = "opened_not_used"
         else:
             tier = "unused"
+        is_used = bool(content_shared or secs)
         rec = {
             "member_id": mid,
             "container_date_from": d_from.isoformat() if d_from else None,
@@ -847,6 +868,13 @@ def _analyze_member_use(
         }
         unreadable = avail is not None and observed_at is not None and avail > observed_at
         wholly_late = d_from is not None and d_from > match_end
+        # An evidence-only opened member that was not yet obtainable by this
+        # run's read instant is named on the evidence list, never a block.
+        if unreadable and tier == "opened_not_used":
+            rec["disposition"] = "opened_not_used"
+            rec["obtained_after_actual_read"] = True
+            members.append(rec)
+            continue
         if unreadable and is_used:
             rec["disposition"] = "unavailable_at_read"
             rec["reason"] = "obtained_after_actual_read"
@@ -899,5 +927,15 @@ def _analyze_member_use(
         "isolated_by_security": {k: sorted(set(v)) for k, v in isolated.items()},
         "excluded_late_partitions": excluded,
         "unavailable_at_read": unavailable,
+        "member_count": len(members),
+        "used_for_T_count": sum(
+            1 for m in members if m.get("disposition") == "used" and m.get("is_used")
+        ),
+        "opened_not_used_count": sum(
+            1 for m in members if m.get("dependency_tier") == "opened_not_used"
+        ),
+        "registered_not_read_count": sum(
+            1 for m in members if m.get("disposition") == "unused"
+        ),
         "match_window_through": match_end.isoformat(),
     }

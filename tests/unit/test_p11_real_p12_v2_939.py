@@ -1,4 +1,4 @@
-"""Real pinned-P12 v2 consumer integration (issue #723 fixed handoff, commit b756c63c).
+"""Real pinned-P12 v2 consumer integration (issue #723 fixed handoff, commit a676de97).
 
 These are the real-wiring cases for the bound consumer pin
 (config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json).
@@ -112,8 +112,8 @@ def _bound_binding() -> dict:
 
 def test_binding_is_bound_to_real_commit_and_files():
     binding = _bound_binding()
-    assert binding["source_commit"] == "b756c63c904544909cc2c2195533808b299daf2c"
-    assert binding["source_tree"] == "2327912269a26f8133a6b7d3554d9e05ba38af79"
+    assert binding["source_commit"] == "a676de9782c85b30a2e7d4a18d4ee5abc88a3906"
+    assert binding["source_tree"] == "6878fc758945264254bfc8a40017bb6d3a2d67fe"
     assert binding["mode"] == PINNED_V2_MODE == "simulation"
     assert binding["purpose"] == "historical_replay"
     assert binding["consumer_schema"] == "p12.decision-set.v2"
@@ -440,7 +440,7 @@ def test_publish_refuses_tampered_wire(pinned_checkout, tmp_path, monkeypatch):
         "quanthus.product_daily.recommendation.publish._serialize_decision_sets",
         _tampered,
     )
-    with pytest.raises(Exception, match="decimal string"):
+    with pytest.raises(Exception, match="canonical 0"):
         publish_package(
             package,
             directory=tmp_path,

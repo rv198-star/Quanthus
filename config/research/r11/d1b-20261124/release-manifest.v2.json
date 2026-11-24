@@ -18,8 +18,8 @@
     "entry_seam": "src/quanthus/product_daily/risk.py",
     "trend_producer": "src/quanthus/expert_evaluation/experts/trend_stability.py",
     "context_builder": "src/quanthus/expert_strategy/runner.py:build_formal_expert_context",
-    "code_commit": "41fb4cf3d9dd653b3b04908706f2b6f314fed058",
-    "code_tree": "585c4dfa5feb64b193cd2874f2087948cded5f45",
+    "code_commit": "8c7aa9f8336f12cbc20d748b11434707c8aa5a63",
+    "code_tree": "b464f035448150989924d71aff35f777b2c294ee",
     "publish_path": "src/quanthus/product_daily/recommendation/publish.py",
     "contracts_path": "src/quanthus/product_daily/recommendation/contracts.py",
     "runtime_identity": "src/quanthus/product_daily/recommendation/runtime_identity.py",
@@ -105,7 +105,7 @@
     },
     "consumer": {
       "path": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json",
-      "sha256": "sha256:492a2dc4fd9d149e5c5fc7739eb0b1e796d383f2283bc1b67292bab8363d5823"
+      "sha256": "sha256:21963532a99a9292d86bd4ebebfe7b02d54e865f5fba16ba8f1d8c9f1dda206d"
     }
   }
 }

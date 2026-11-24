@@ -122,7 +122,8 @@ def _isodatetime(value: Any, label: str) -> datetime:
         out = value
     elif isinstance(value, str):
         try:
-            out = datetime.fromisoformat(value)
+            iso = value[:-1] + "+00:00" if value.endswith("Z") else value
+            out = datetime.fromisoformat(iso)
         except ValueError:
             _fail("invalid_replay_request", f"{label} must be an ISO datetime")
     else:

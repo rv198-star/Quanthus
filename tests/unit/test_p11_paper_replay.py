@@ -19,6 +19,7 @@ from quanthus.policy import find_project_root
 from quanthus.product_daily.contracts import ProductDailyError
 from quanthus.product_daily.recommendation.paper_replay import (
     INPUT_GRADE,
+    _facts_for_day,
     build_replay_envelope,
     load_replay_request,
     preview_replay_plan,
@@ -423,6 +424,17 @@ def test_request_roundtrip():
     assert request.request_digest.startswith("sha256:")
     assert request.market_dates == (T1, T2)
     assert request.signal_window == (date(2026, 10, 8), date(2026, 10, 29))
+
+
+def test_native_utc_intake_clocks_keep_source_precision():
+    raw = _request()
+    keys = ("intake_received_at", "intake_first_read_at", "intake_verified_at")
+    for key in keys:
+        raw["facts_template"][key] = "2026-11-24T22:31:16.606519Z"
+    facts = _facts_for_day(load_replay_request(raw), T1)
+    assert all(
+        getattr(facts, key).isoformat() == "2026-11-24T22:31:16.606519+00:00" for key in keys
+    )
 
 
 def test_request_rejects_bad_schema():

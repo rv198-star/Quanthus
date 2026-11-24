@@ -176,6 +176,12 @@ def day_review(replay: dict, day_state: dict, records: dict) -> dict:
         p.get("plan_id"): p.get("status")
         for p in records.get("plans") or []
     }
+    # Real skip receipts (plan_id -> {skipped_at, reason, actor}) carried on
+    # the records chain; the review shows the receipt time, never "未处理".
+    skip_receipts = {
+        s.get("plan_id"): s
+        for s in (records.get("skips") or records.get("skipped") or [])
+    }
     reports = [
         r for r in records.get("reports") or []
     ]
@@ -210,6 +216,9 @@ def day_review(replay: dict, day_state: dict, records: dict) -> dict:
                     "已跳过"
                     if status == "SKIPPED"
                     else "已确认" if (linked_orders or linked_fills) else "未处理"
+                ),
+                "skip_receipt": (
+                    skip_receipts.get(plan_id) if status == "SKIPPED" else None
                 ),
                 "orders": linked_orders,
                 "fills": linked_fills,

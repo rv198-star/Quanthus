@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -383,6 +384,58 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
+    # R4 item 3: the production entry binds the frozen #737 exclusion file's
+    # bytes to its pinned digest BEFORE any bar is read.  A missing,
+    # unreadable or byte-mismatched list writes a blocking receipt and the
+    # engine never enters - it never filters against a wrong list.
+    exclusion_path = Path(
+        os.environ.get(
+            "P12_REPLAY_EXCLUSION",
+            Path(__file__).resolve().parents[3]
+            / "config/p12/replay-exclusion-737.v1.json",
+        )
+    )
+    import hashlib as _hashlib
+
+    exclusion_block = {"status": "ok"}
+    try:
+        excl_bytes = exclusion_path.read_bytes()
+        excl_sha = "sha256:" + _hashlib.sha256(excl_bytes).hexdigest()
+        exclusion_block = {
+            "status": "ok",
+            "config_path": str(exclusion_path),
+            "config_sha256": excl_sha,
+            "expected_sha256": EXPECTED_EXCLUSION_SHA256,
+            "sha_match": excl_sha == EXPECTED_EXCLUSION_SHA256,
+        }
+        if not exclusion_block["sha_match"]:
+            exclusion_block.update(
+                {
+                    "status": "blocked",
+                    "reason": "EXCLUSION_SHA_MISMATCH",
+                    "detail": (
+                        "the #737 exclusion file's bytes do not match the "
+                        "frozen digest; the replay refuses to filter against "
+                        "an unverified list and does not enter the engine"
+                    ),
+                }
+            )
+    except OSError as exc:
+        exclusion_block = {
+            "status": "blocked",
+            "reason": "EXCLUSION_UNREADABLE",
+            "config_path": str(exclusion_path),
+            "expected_sha256": EXPECTED_EXCLUSION_SHA256,
+            "detail": f"exclusion file cannot be read: {exc}",
+        }
+    if exclusion_block["status"] == "blocked":
+        args.state_dir.mkdir(parents=True, exist_ok=True)
+        (args.state_dir / "replay-exclusion-block.json").write_text(
+            json.dumps(exclusion_block, ensure_ascii=False, indent=1)
+        )
+        print(json.dumps({"exclusion_blocked": exclusion_block}, ensure_ascii=False))
+        return 2
+
     sessions, bars_by_day, reads = load_window(
         base_root=args.base_root, start=args.start, end=args.end
     )
@@ -448,8 +501,6 @@ def main(argv=None) -> int:
         # The password always comes from the environment - never a repo
         # file, a command-line literal or a doc.  --user stays available
         # for explicit extra accounts in a lab shell.
-        import os
-
         admin_pw = os.environ.get("P12_REPLAY_ADMIN_PASSWORD")
         if admin_pw:
             users["admin"] = ("operator", admin_pw)

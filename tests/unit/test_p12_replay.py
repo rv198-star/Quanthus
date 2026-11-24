@@ -405,3 +405,156 @@ class TestFillDay:
         spec_used = seen["spec"]
         assert spec_used.history["listing_sessions"]["observed_sessions"] == 188
         assert spec_used.history["event_window_sessions"]["observed_sessions"] == 188
+
+
+    def _bar(self, code, d, open_="9.79"):
+        from decimal import Decimal
+        from quanthus.p12_replay.replay_quotes import DayBar
+        return DayBar(security_code=code, trade_date=d, open=Decimal(open_),
+                      high=Decimal("9.9"), low=Decimal("9.6"),
+                      close=Decimal("9.8"), volume=1, amount=Decimal("1"))
+
+    def test_auto_advance_settles_registered_intent_at_bound_open(self, tmp_path):
+        """R4 #1: an intent registered before the bound session's open is
+        filled by the SAME advance that opens that session (auto == manual)."""
+        from datetime import date
+        from decimal import Decimal
+        sessions = [date(2026, 10, 19), date(2026, 10, 20), date(2026, 10, 21)]
+        bars_by_day = {d: {"600000": self._bar("600000", d)} for d in sessions}
+        eng, app = self._engine(tmp_path, sessions, bars_by_day)
+        self._patch_plans(eng, {
+            "plan_id": "p1", "security_code": "600000", "action_code": "BUY",
+            "side": "buy", "target_qty": 1200, "delta_qty": 1200, "price_cap": "10.0",
+        })
+        # 10-19 晚登记意图
+        eng.set_now(datetime(2026, 10, 19, 23, 0, tzinfo=TZ))
+        early = eng.confirm("p1")
+        assert early["status"] == "intent_registered"
+        bound = early["fill_day"]  # package-bound (next session here)
+        # 手动推进越过绑定开盘：advance 里 09:30 撮合已登记意图 -> 同一账本
+        eng.advance_day()
+        rec = eng._confirm_records["p1"]
+        assert rec["status"] == "filled"
+        assert rec["fill_day"] == bound
+        assert rec["session_open"] == "9.79"
+        assert len(app.reports) == 1
+
+    def test_late_confirm_after_bound_open_expires(self, tmp_path):
+        """R4 #1: a confirm arriving AFTER the bound open, with no registered
+        intent, is refused EXPIRED - never back-filled to the past open."""
+        from datetime import date
+        sessions = [date(2026, 10, 19), date(2026, 10, 20), date(2026, 10, 21)]
+        bars_by_day = {d: {"600000": self._bar("600000", d)} for d in sessions}
+        eng, app = self._engine(tmp_path, sessions, bars_by_day)
+        self._patch_plans(eng, {
+            "plan_id": "p1", "security_code": "600000", "action_code": "BUY",
+            "side": "buy", "target_qty": 100, "delta_qty": 100, "price_cap": "10.0",
+        })
+        # 真实过期：放出意图、推进越过绑定开盘但未确认就推进到再下一天
+        # -> 意图已过期。先把 10-19 晚意图挂起，推进到 10-20（成交窗口到
+        # 达但未确认，10-20 该意图本应在开盘成交：先验同一账本），再单独
+        # 验证「从未登记的确认在绑定开盘后来到时过期拒绝」。
+        eng3, app3 = self._engine(tmp_path / "c", sessions, bars_by_day)
+        self._patch_plans(eng3, {
+            "plan_id": "p3", "security_code": "600000", "action_code": "BUY",
+            "side": "buy", "target_qty": 100, "delta_qty": 100, "price_cap": "10.0",
+        })
+        eng3.set_now(datetime(2026, 10, 19, 23, 0, tzinfo=TZ))
+        e3 = eng3.confirm("p3")
+        assert e3["status"] == "intent_registered"
+        bound3 = e3["fill_day"]
+        # 推进到绑定日 -> 已登记意图在开盘成交（自动/手动同账）
+        eng3.advance_day()
+        assert eng3._confirm_records["p3"]["status"] == "filled"
+        assert len(app3.reports) == 1
+        # 另一条：从未登记的计划在绑定开盘后来确认 -> 过期拒绝
+        eng4, app4 = self._engine(tmp_path / "d", sessions, bars_by_day)
+        self._patch_plans(eng4, {
+            "plan_id": "p4", "security_code": "600000", "action_code": "BUY",
+            "side": "buy", "target_qty": 100, "delta_qty": 100, "price_cap": "10.0",
+        })
+        # 计划在 10-19 的 publish_day 先落档（模拟当日已放出但不确认）
+        eng4.set_now(datetime(2026, 10, 19, 23, 0, tzinfo=TZ))
+        eng4._plan_publish_day["p4"] = "2026-10-19"
+        eng4._save_records("publish-day")
+        # 不调用 confirm，直接推进越过绑定开盘
+        eng4.advance_day()  # opens 10-20
+        eng4.advance_day()  # opens 10-21
+        eng4.set_now(datetime(2026, 10, 21, 22, 0, tzinfo=TZ))
+        out4 = eng4.confirm("p4")
+        assert out4["status"] == "expired"
+        assert out4["reason"] == "BOUND_SESSION_OPEN_PASSED_UNCONFIRMED"
+        assert out4["bound_fill_day"] == "2026-10-20"
+        assert len(app4.reports) == 0
+        # 用一条更真实的：放出 10-19 意图、推进到 10-20 让它成交，再试图
+        # 对同一计划重复确认 -> 幂等回执，不会二次成交
+        eng2, app2 = self._engine(tmp_path / "b", sessions, bars_by_day)
+        self._patch_plans(eng2, {
+            "plan_id": "p2", "security_code": "600000", "action_code": "BUY",
+            "side": "buy", "target_qty": 100, "delta_qty": 100, "price_cap": "10.0",
+        })
+        eng2.set_now(datetime(2026, 10, 19, 23, 0, tzinfo=TZ))
+        e2 = eng2.confirm("p2")
+        assert e2["status"] == "intent_registered"
+        eng2.advance_day()
+        assert eng2._confirm_records["p2"]["status"] == "filled"
+        again = eng2.confirm("p2")
+        assert again.get("idempotent_replay") is True
+        assert len(app2.reports) == 1
+
+    def test_day_review_surfaces_skip_receipt(self, tmp_path):
+        """R4 #2: a skipped plan's review shows the real skip receipt + time,
+        never a bare 未处理."""
+        from datetime import date
+        sessions = [date(2026, 10, 19), date(2026, 10, 20)]
+        bars_by_day = {d: {"600000": self._bar("600000", d)} for d in sessions}
+        eng, app = self._engine(tmp_path, sessions, bars_by_day)
+
+        class _Rec(dict):
+            pass
+        # records_view returns skips; day_review binds them by plan_id
+        recs = {
+            "reports": [], "orders": [], "events": [],
+            "plans": [{"plan_id": "p1", "status": "SKIPPED"}],
+            "skips": [{"plan_id": "p1", "skipped_at": "2026-10-19T23:05:00+08:00",
+                       "reason": "manual", "actor": "desktop:SYN-PAPER-A"}],
+        }
+        eng.records_view = lambda: recs
+        eng.day_state = lambda: {
+            "workbench": {"opportunities": [{
+                "plan": {"plan_id": "p1"}, "security_code": "600000",
+                "action_code": "BUY", "status_code": "SKIPPED",
+            }]},
+            "account": {},
+        }
+        review = eng.day_review()
+        adv = review["advice"][0]
+        assert adv["owner_action"] == "已跳过"
+        assert adv["skip_receipt"]["skipped_at"] == "2026-10-19T23:05:00+08:00"
+        assert adv["skip_receipt"]["plan_id"] == "p1"
+
+    def test_driver_blocks_on_exclusion_sha_mismatch(self, tmp_path, capsys):
+        """R4 #3: the production entry refuses to enter the engine when the
+        #737 file's bytes do not match the pinned digest, and writes a
+        blocking receipt."""
+        from datetime import date
+        from quanthus.p12_replay import driver
+        bad = tmp_path / "excl.json"
+        bad.write_text('{"securities": ["600000"], "excluded_dates": ["2026-10-20"]}')
+        state = tmp_path / "st"
+        rc = driver.main([
+            "--state-dir", str(state), "--start", "2026-10-19",
+            "--end", "2026-10-21",
+        ]) if False else None  # exercise the pre-read block directly
+        # Call the block via the patched env path
+        import os, json
+        os.environ["P12_REPLAY_EXCLUSION"] = str(bad)
+        try:
+            rc = driver.main(["--state-dir", str(state),
+                              "--start", "2026-10-19", "--end", "2026-10-21"])
+        finally:
+            os.environ.pop("P12_REPLAY_EXCLUSION", None)
+        assert rc == 2
+        block = json.loads((state / "replay-exclusion-block.json").read_text())
+        assert block["status"] == "blocked"
+        assert block["reason"] == "EXCLUSION_SHA_MISMATCH"

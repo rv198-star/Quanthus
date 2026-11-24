@@ -140,6 +140,9 @@ class ReplayEngine:
     # runtime state, not a ctor arg - loaded in __post_init__.
     _confirm_records: dict = field(default=None, repr=False)
     _skip_records: dict = field(default=None, repr=False)
+    # plan_id -> the replay day it first appeared open (its publish day),
+    # for bound-session expiry; persisted alongside the confirm/skip logs.
+    _plan_publish_day: dict = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         self.state_dir = Path(self.state_dir)
@@ -157,6 +160,8 @@ class ReplayEngine:
             self._confirm_records = self._load_records("confirm")
         if self._skip_records is None:
             self._skip_records = self._load_records("skip")
+        if self._plan_publish_day is None:
+            self._plan_publish_day = self._load_records("publish-day")
         self._restore_position()
 
     # ---- clock -------------------------------------------------------------------
@@ -386,7 +391,11 @@ class ReplayEngine:
 
     def _save_records(self, kind: str) -> None:
         path = self._records_path(kind)
-        data = self._confirm_records if kind == "confirm" else self._skip_records
+        data = (
+            self._confirm_records if kind == "confirm"
+            else self._plan_publish_day if kind == "publish-day"
+            else self._skip_records
+        )
         path.write_text(json.dumps(data, ensure_ascii=False, sort_keys=True, indent=1))
 
     def _restore_position(self) -> None:
@@ -542,9 +551,13 @@ class ReplayEngine:
             if (item.get("action_code") or "").upper() in ("BUY", "SELL") or plan.get(
                 "delta_qty"
             ):
+                pid = plan.get("plan_id")
+                if pid and pid not in self._plan_publish_day:
+                    self._plan_publish_day[pid] = self.current_day.isoformat()
+                    self._save_records("publish-day")
                 plans.append(
                     {
-                        "plan_id": plan.get("plan_id"),
+                        "plan_id": pid,
                         "security_code": item.get("security_code"),
                         "action_code": item.get("action_code"),
                         "side": plan.get("side"),
@@ -609,7 +622,7 @@ class ReplayEngine:
         # once the execution clock is reached (R3 items 1-2).
         prior = self._confirm_records.get(plan_id)
         if prior is not None and prior.get("status") in (
-            "filled", "rejected", "not_marketable",
+            "filled", "rejected", "not_marketable", "expired",
         ):
             return dict(prior, idempotent_replay=True)
 
@@ -624,6 +637,9 @@ class ReplayEngine:
         )
         if plan is None:
             return {"plan_id": plan_id, "status": "rejected", "reason": "PLAN_NOT_FOUND"}
+        if plan_id not in self._plan_publish_day:
+            self._plan_publish_day[plan_id] = self.current_day.isoformat()
+            self._save_records("publish-day")
         # REVIEW / non-actionable advice never executes (R3 item 1): the
         # plan keeps its original state; a confirm attempt records the
         # intent only, never posts a fill.  The workbench marks it with
@@ -652,15 +668,72 @@ class ReplayEngine:
         # never a recomputed "next index".  The package is the authority for
         # which session the advice may execute on.
         pkg_day, bound_next, eligible_at, pkg_stage = self._bound_package(plan_id)
-        publish_day = pkg_day if pkg_day is not None else self.current_day
+        # publish_day is the day this advice was issued - for a stored package
+        # its market_date, else the replay day it was first offered (kept
+        # stable by the workbench, never re-read off the current index so a
+        # stale plan cannot re-target a newer session).
+        publish_day = (
+            pkg_day if pkg_day is not None
+            else (
+                date.fromisoformat(self._plan_publish_day[plan_id])
+                if plan_id in self._plan_publish_day
+                else self.current_day
+            )
+        )
         # When no package binds this plan (a synthetic/unit engine without
         # a stored package), the fill still binds the next session - the
         # real replay always carries the package's own next_session.
-        fill_day = bound_next if bound_next is not None else (
-            self.sessions[self.day_index + 1]
-            if self.day_index + 1 < len(self.sessions)
+        # The advice's execution day is the PACKAGE's own bound next_session.
+        # When no package binds this plan (a synthetic/unit engine), the
+        # publish day's immediate next session owns the fill - the replay
+        # never silently retargets a stale plan to a still-later session.
+        publish_index = (
+            self.sessions.index(publish_day)
+            if publish_day in self.sessions
+            else self.day_index
+        )
+        bound_day = bound_next if bound_next is not None else (
+            self.sessions[publish_index + 1]
+            if publish_index + 1 < len(self.sessions)
             else None
         )
+        # A first-time confirm arriving after that bound session's open is
+        # already expired at the open (R4 #1) - refuse, never back-fill.
+        if bound_day is not None:
+            bound_exec_probe = (
+                eligible_at.astimezone(EXCHANGE_TZ)
+                if eligible_at is not None
+                else _sh_now(bound_day, time(9, 30))
+            )
+            if self.now() > bound_exec_probe and prior is None and (
+                publish_day < bound_day
+            ):
+                # The plan was offered on an earlier day and its bound
+                # session's open has already passed - it expired there.
+                # The refusal is an explicit expired receipt, never a
+                # back-dated fill.  A plan first confirmed on the bound
+                # open's own day still fills.
+                expired = self._expire_unconfirmed(plan_id)
+                if expired is not None:
+                    return expired
+                # _expire_unconfirmed could not bind (no package edge) -
+                # still refuse the back-dated fill with a named expiry.
+                outcome = {
+                    "plan_id": plan_id,
+                    "status": "expired",
+                    "reason": "BOUND_SESSION_OPEN_PASSED_UNCONFIRMED",
+                    "detail": (
+                        f"advice published on {publish_day.isoformat()} was "
+                        f"bound to fill at {bound_exec_probe.isoformat()}; "
+                        "that open passed with no confirmed intent"
+                    ),
+                    "bound_fill_day": bound_day.isoformat(),
+                    "exec_clock": bound_exec_probe.isoformat(),
+                }
+                self._log("expired", market_date=bound_day.isoformat(),
+                          plan_id=plan_id, outcome=outcome)
+                return _ret(outcome)
+        fill_day = bound_day
         if fill_day is None:
             outcome = {
                 "plan_id": plan_id,
@@ -674,6 +747,146 @@ class ReplayEngine:
             self._log("confirm", market_date=publish_day.isoformat(),
                       plan_id=plan_id, outcome=outcome)
             return _ret(outcome)
+        # A prior registered intent whose bound open already arrived is
+        # re-settled at ITS recorded exec_clock - the intent is immutable.
+        # Recomputing the fill day off the current index would retarget a
+        # past-due intent to a NEW session open and back-fill it; instead
+        # the settle path fills at the recorded clock or expires the intent.
+        if prior is not None and prior.get("status") == "intent_registered":
+            bound_exec = prior.get("exec_clock") or prior.get("fill_day")
+            prior_day = prior.get("fill_day")
+            if prior_day is not None and self.now() >= (
+                datetime.fromisoformat(str(prior.get("exec_clock")))
+                if prior.get("exec_clock")
+                else _sh_now(date.fromisoformat(str(prior_day)), time(9, 30))
+            ):
+                # Fill at the recorded bound open: use the recorded bar day
+                # and its session open, never a recomputed next index.
+                fill_day = date.fromisoformat(str(prior_day))
+                bar = (self.bars_by_day.get(fill_day) or {}).get(code)
+                if bar is None:
+                    outcome = {
+                        "plan_id": plan_id,
+                        "status": "rejected",
+                        "reason": "QUOTE_UNAVAILABLE",
+                        "detail": f"no 1d bar for {code} on {fill_day.isoformat()}",
+                    }
+                    self._log("confirm", market_date=fill_day.isoformat(),
+                              plan_id=plan_id, outcome=outcome)
+                    return _ret(outcome)
+                from quanthus.p12_replay.replay_quotes import match_limit
+                fill_price = match_limit(side, Decimal(str(plan["price_cap"])), bar)
+                if fill_price is None:
+                    outcome = {
+                        "plan_id": plan_id,
+                        "status": "not_marketable",
+                        "reason": "OPEN_BEYOND_LIMIT",
+                        "session_open": str(bar.open),
+                        "limit": str(plan["price_cap"]),
+                        "fill_day": fill_day.isoformat(),
+                    }
+                    self._log("confirm", market_date=fill_day.isoformat(),
+                              plan_id=plan_id, outcome=outcome)
+                    return _ret(outcome)
+                # Post the fill at the recorded bound open clock.
+                fill_clock = (
+                    datetime.fromisoformat(str(prior.get("exec_clock")))
+                    if prior.get("exec_clock")
+                    else _sh_now(fill_day, time(9, 30))
+                )
+                decision_clock = self.now()
+                self._order_seq += 1
+                order_id = f"plan:{plan_id}"
+                from quanthus.capabilities.execution import OrderObservation, ExecutionReport
+                qty = int(plan.get("delta_qty") or plan.get("target_qty") or 0)
+                try:
+                    app.paper_submit_order_observation(
+                        OrderObservation(
+                            observation_id=f"{order_id}:accepted",
+                            order_id=order_id,
+                            status="in_progress",
+                            observed_at=fill_clock,
+                            source_id="p12-replay-open-match",
+                            source_sequence=f"{order_id}:accepted",
+                            order_revision=1,
+                        ),
+                        accepted_total_qty=qty,
+                        side=side,
+                        security_code=code,
+                        price_bound=Decimal(str(plan["price_cap"])),
+                        estimated_fee_upper=Decimal("0.00"),
+                    )
+                    report = ExecutionReport(
+                        report_id=f"replay-fill-{fill_day.strftime('%Y%m%d')}-{self._order_seq:04d}",
+                        security_code=code,
+                        side=side,
+                        quantity=qty,
+                        price=fill_price,
+                        confirmed_fee=Decimal("0.00"),
+                        occurred_at=fill_clock,
+                        source_id="p12-replay-open-match",
+                        source_sequence=f"{plan_id}:open:{fill_day.isoformat()}",
+                        intended_quantity=qty,
+                        intended_price_cap=Decimal(str(plan["price_cap"])),
+                        order_id=order_id,
+                        suggestion_id=plan_id,
+                    )
+                    app.paper_submit_report(report)
+                    app.paper_submit_order_observation(
+                        OrderObservation(
+                            observation_id=f"{order_id}:terminal",
+                            order_id=order_id,
+                            status="terminal",
+                            observed_at=fill_clock,
+                            source_id="p12-replay-open-match",
+                            source_sequence=f"{order_id}:terminal:{qty}:0",
+                            final_cumulative_fill_qty=qty,
+                            cancelled_qty=0,
+                            order_revision=2,
+                        ),
+                        accepted_total_qty=qty,
+                        side=side,
+                        security_code=code,
+                        price_bound=Decimal(str(plan["price_cap"])),
+                        estimated_fee_upper=Decimal("0.00"),
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    outcome = {
+                        "plan_id": plan_id,
+                        "status": "rejected",
+                        "reason": getattr(exc, "reason_code", type(exc).__name__),
+                        "detail": str(exc),
+                        "session_open": str(bar.open),
+                    }
+                    self._log("confirm", market_date=fill_day.isoformat(),
+                              plan_id=plan_id, outcome=outcome)
+                    return _ret(outcome)
+                outcome = {
+                    "plan_id": plan_id,
+                    "status": "filled",
+                    "fill_price": str(fill_price),
+                    "session_open": str(bar.open),
+                    "quantity": qty,
+                    "report_id": report.report_id,
+                    "post_status": "POSTED",
+                    "publish_day": publish_day.isoformat(),
+                    "fill_day": fill_day.isoformat(),
+                    "engineering_replay_as_observed": True,
+                    "settled_from_registered_intent": True,
+                }
+                self._confirm_records[plan_id] = outcome
+                self._save_records("confirm")
+                self._log("confirm", market_date=fill_day.isoformat(),
+                          plan_id=plan_id, outcome=outcome)
+                return outcome
+        # The bound open has arrived.  Only an already-registered intent may
+        # fill; a confirm arriving now WITHOUT a prior registered intent is
+        # late - the plan expired at the open and is refused, never
+        # back-filled to a past session.
+        if prior is None:
+            expired = self._expire_unconfirmed(plan_id)
+            if expired is not None:
+                return expired
         # The replay clock must reach the execution instant (the package's
         # eligible_at, or that session's 09:30 open) before any fill posts.
         # Confirming early registers the intent only - the fill posts when
@@ -865,6 +1078,77 @@ class ReplayEngine:
                   plan_id=plan_id, outcome=outcome)
         return outcome
 
+    def _settle_open_intents(self) -> None:
+        """Settle every registered intent bound to the CURRENT session's open."""
+        today = self.current_day
+        today_iso = today.isoformat()
+        for plan_id, rec in list(self._confirm_records.items()):
+            if rec.get("status") != "intent_registered":
+                continue
+            # An intent fills only when the clock reaches the session its
+            # record bound.  When that bound day already IS today, fill
+            # through the identical confirm code path - the ledger never
+            # sees a second implementation.  When the record's bound day
+            # has slipped past today (a late replay that skipped a session
+            # open), the intent missed its open and expires here - a late
+            # confirm is then refused, never re-targeted to a new session.
+            fill_day = rec.get("fill_day")
+            if fill_day == today_iso:
+                self.confirm(plan_id)
+            elif fill_day is not None and fill_day < today_iso:
+                rec["status"] = "expired"
+                rec["reason"] = "BOUND_SESSION_OPEN_PASSED_UNCONFIRMED"
+                rec["detail"] = (
+                    f"the bound open {fill_day} passed while the replay "
+                    "was ahead - the intent expired without a fill"
+                )
+                self._save_records("confirm")
+                self._log(
+                    "expired",
+                    market_date=today_iso,
+                    plan_id=plan_id,
+                    bound_fill_day=fill_day,
+                    outcome=rec,
+                )
+
+    def _expire_unconfirmed(self, plan_id: str) -> dict | None:
+        """When the bound session open has passed and the intent was never
+        confirmed, expire it.  Returns the expiry receipt, or None when the
+        plan is not yet past its bound open."""
+        pkg_day, bound_next, eligible_at, _stage = self._bound_package(plan_id)
+        if bound_next is None:
+            return None
+        exec_clock = (
+            eligible_at.astimezone(EXCHANGE_TZ)
+            if eligible_at is not None
+            else _sh_now(bound_next, time(9, 30))
+        )
+        if self.now() < exec_clock:
+            return None
+        rec = self._confirm_records.get(plan_id) or {}
+        outcome = {
+            "plan_id": plan_id,
+            "status": "expired",
+            "reason": "BOUND_SESSION_OPEN_PASSED_UNCONFIRMED",
+            "detail": (
+                f"advice published on {pkg_day} was bound to fill at "
+                f"{exec_clock.isoformat()}; that open passed with no "
+                "confirmed intent - the replay refuses a back-dated fill"
+            ),
+            "bound_fill_day": bound_next.isoformat(),
+            "exec_clock": exec_clock.isoformat(),
+            "prior_status": rec.get("status"),
+        }
+        self._confirm_records[plan_id] = outcome
+        self._save_records("confirm")
+        self._log(
+            "expired",
+            market_date=bound_next.isoformat(),
+            plan_id=plan_id,
+            outcome=outcome,
+        )
+        return outcome
+
     def skip(self, plan_id: str) -> dict:
         """Skip one published plan (the append-only skip record; the plan
         can no longer confirm).  Idempotent: a repeated skip reuses the
@@ -900,6 +1184,14 @@ class ReplayEngine:
         self.day_index += 1
         day = self.current_day
         self.set_now(_sh_now(day, time(9, 25)))
+        # R4 item 1: intents registered on the package's bound session open
+        # must be swept by the SAME engine step that advances the day, so
+        # manual advance and auto_advance reach the identical ledger.  The
+        # clock first reaches 09:30 (the bound open) - qualifying intents
+        # fill; intents still unconfirmed after the bound open has passed
+        # expire and their confirm is refused forever after.
+        self.set_now(_sh_now(day, time(9, 30)))
+        self._settle_open_intents()
         self._log(
             "advance_day",
             market_date=day.isoformat(),
@@ -1033,6 +1325,19 @@ class ReplayEngine:
             {"plan_id": p.plan_id, "status": p.status}
             for p in view.plans
         ]
+        # Real skip receipts from the store's own skip log: the day review
+        # binds a SKIPPED plan to its skipped_at instant + reason, never to
+        # a bare "未处理" label.
+        store = self._store
+        skips = [
+            {
+                "plan_id": rec.get("plan_id"),
+                "skipped_at": rec.get("skipped_at"),
+                "reason": rec.get("reason"),
+                "actor": rec.get("actor"),
+            }
+            for rec in (store.skipped_plans().values() if hasattr(store, "skipped_plans") else ())
+        ]
         events = [
             {
                 "event_id": e.event_id,
@@ -1049,6 +1354,7 @@ class ReplayEngine:
             "orders": orders,
             "plans": plans,
             "events": events,
+            "skips": skips,
             "outbox_pending": history.outbox_pending,
         }
 

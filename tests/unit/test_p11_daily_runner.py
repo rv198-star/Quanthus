@@ -1078,3 +1078,128 @@ def test_date_context_held_member_uses_t_row(runner, resources):
     assert held, "a held member must produce a held review"
     named = out.source_closure["consumption_evidence"]["date_context_rows"]
     assert len(named) == 42
+
+
+# --- oct08-scan-calendar: bounded scan calendar vs full listing-age union -------
+
+
+def _bounded_scan_dates(raw: RawSecurityInput, market_date: date, next_session: date):
+    from quanthus.product_daily.recommendation.paper_replay import bar_context_window
+
+    open_sessions = tuple(sorted({d for d in raw.universe_membership if d <= market_date}))
+    window = bar_context_window(open_sessions, market_date)
+    return tuple(sorted(set(window) | {next_session}))
+
+
+def test_scan_calendar_bounds_1991_listing_age(runner, resources):
+    """A 1991 listing-age membership no longer drags pre-scope sessions into
+    require_scan_date: under the as-observed token the scan runs over the
+    bounded bar_context_window + next_session, while features/membership keep
+    the full listing age (listing_sessions row_number preserved)."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    base = _trend_raw("600000")
+    # A security listed back to ~1991: the full membership is kept complete
+    # (the listing_sessions gate still row_numbers the whole sequence).
+    old_days = _weekdays_ending(date(1991, 12, 31), 260)
+    membership = tuple(sorted(set(old_days) | set(base.universe_membership)))
+    raw = _replace(base, universe_membership=membership)
+    assert raw.universe_membership[0].year <= 1991
+
+    scan_dates = _bounded_scan_dates(raw, facts.market_date, facts.next_session)
+
+    # Strict/forward (no token): the full membership union still fails scope.
+    with pytest.raises(Exception) as exc:
+        _run(runner, resources, [raw])
+    assert "p6_base24_scan_scope" in str(exc.value)
+
+    # Token alone (no bounded calendar): still the membership union -> scope.
+    with pytest.raises(Exception) as exc2:
+        _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    assert "p6_base24_scan_scope" in str(exc2.value)
+
+    # Token + bounded scan calendar: the scan window is in-scope and runs.
+    # Capture features_by_security via the panel factory to prove the full
+    # listing age is preserved (row_number over complete membership).
+    captured = {}
+
+    def _capture(features_by_security):
+        captured.update(features_by_security)
+        return resources.panel_report
+
+    out = _run_context(
+        runner,
+        resources,
+        [raw],
+        context="october_replay_as_observed",
+        scan_trading_dates=scan_dates,
+        panel_report_factory=_capture,
+    )
+    assert out.result.publishable
+    # The scan calendar, not the full membership, bounded the scan: every
+    # trading date is within [window_start, next_session], none before 2026.
+    assert all(d >= date(2026, 1, 1) for d in scan_dates)
+    # The full listing age is preserved inside features (row_number over the
+    # complete membership, not the 61-session scan window).
+    assert captured["600000"].listing_sessions == len(membership)
+
+
+def test_scan_calendar_requires_context(runner, resources):
+    """scan_trading_dates without the private token is a contract breach."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    base = _trend_raw("600000")
+    old_days = _weekdays_ending(date(1991, 12, 31), 260)
+    raw = _replace(
+        base, universe_membership=tuple(sorted(set(old_days) | set(base.universe_membership)))
+    )
+    scan_dates = _bounded_scan_dates(raw, facts.market_date, facts.next_session)
+    with pytest.raises(ProductDailyError) as exc:
+        _run(runner, resources, [raw], scan_trading_dates=scan_dates)
+    assert "scan_calendar_requires_replay_context" in str(exc.value)
+
+
+def test_scan_calendar_missing_one_bar_not_triggered(runner, resources):
+    """Missing-one-bar control: a gap inside the bounded scan window must
+    still leave the security unevaluated/qualified-no-signal - the bounded
+    calendar is derived from the named open sessions, never narrowed by which
+    bars exist, so a missing bar stays an observation gap, not a trigger."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    base = _trend_raw("600000")
+    old_days = _weekdays_ending(date(1991, 12, 31), 260)
+    membership = tuple(sorted(set(old_days) | set(base.universe_membership)))
+    # Drop one mid-window bar (keep it in membership + clock maps): an
+    # observation gap the bounded calendar must not paper over.
+    bars = list(base.bars)
+    removed = bars[-3].session_date
+    bars = [b for b in bars if b.session_date != removed]
+    raw = _replace(base, bars=tuple(bars), universe_membership=membership)
+
+    scan_dates = _bounded_scan_dates(raw, facts.market_date, facts.next_session)
+    # The dropped session is still a named open session in the calendar.
+    assert removed in scan_dates
+    out = _run_context(
+        runner,
+        resources,
+        [raw],
+        context="october_replay_as_observed",
+        scan_trading_dates=scan_dates,
+    )
+    # No new entry fires on a gapped window.
+    assert not any(d.event_id is not None for d in out.seam.decisions)
+    # The scan named the gap rather than treating the day as a clean window.
+    receipt = [
+        r
+        for r in (out.source_closure.get("history_receipts") or [])
+        if r.get("security_code") == "600000"
+    ]
+    if receipt:
+        ev = (receipt[0].get("gates") or {}).get("events", {})
+        assert ev.get("status") != "satisfied" or "transition" in (ev.get("reason") or "")

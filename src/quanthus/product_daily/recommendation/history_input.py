@@ -1452,18 +1452,36 @@ def run_daily_advice_from_history(
             "numeric_context requires the versioned as-observed replay mode",
         )
     replay_token = None
+    scan_trading_dates = None
     if numeric_context is not None:
         from quanthus.product_daily.recommendation.daily_runner import (
             _new_october_context,
         )
+        from quanthus.product_daily.recommendation.paper_replay import (
+            bar_context_window,
+        )
 
         replay_token = _new_october_context(numeric_context)
+        # Bounded scan calendar for the as-observed single-T replay: the scan
+        # window runs over the NAMED venue open sessions of the current
+        # bar_context_window (the last <=61 contiguous open sessions ending at
+        # T) plus facts.next_session - never the full universe_membership union
+        # (a 1991 listing must not drag pre-scope sessions into
+        # require_scan_date) and never narrowed by which bars exist (gaps and
+        # short windows stay visible).  Derived from the bound calendar_rows'
+        # is_open sessions <= T, the same calendar the replay envelope sliced.
+        open_sessions = tuple(
+            sorted({row.session_date for row in history.calendar_rows if row.is_open})
+        )
+        window = bar_context_window(open_sessions, history.market_date)
+        scan_trading_dates = tuple(sorted({*window, facts.next_session}))
     output = run_daily_advice_from_raw(
         raw=inputs,
         history_receipts=bound_receipts,
         caller_input_exclusions=runner_exclusions,
         consumption_evidence=kwargs.pop("consumption_evidence", None),
         numeric_context=replay_token,
+        scan_trading_dates=scan_trading_dates,
         **kwargs,
     )
     # The issued receipt's digest must match the closure actually carried on the

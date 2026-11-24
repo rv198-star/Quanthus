@@ -414,6 +414,75 @@ def _feature_row_dict(facts: Any) -> dict[str, Any]:
     return out
 
 
+def _package_instant(value: Any) -> datetime:
+    try:
+        instant = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        _fail("replay_package_clock_mismatch", "missing or invalid receipt timestamp")
+    if instant.utcoffset() is None:
+        _fail("replay_package_clock_mismatch", "receipt timestamp has no UTC offset")
+    return instant
+
+
+def _october_package_clock(
+    request: Any,
+    evidence: Mapping[str, Any],
+    source_read: datetime,
+    observed: datetime,
+    cutoff: datetime,
+    envelope_digest: str,
+    calendar: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Verify the producer's intake clocks against the reader's same-day receipt."""
+    consumption = evidence.get("member_consumption") or {}
+    envelope = evidence.get("envelope") or {}
+    stated_cutoff = (evidence.get("source_clocks") or {}).get("logical_decision_cutoff")
+    stated_hash = str(envelope.get("sha256", "")).removeprefix("sha256:")
+    if (
+        stated_hash != envelope_digest.removeprefix("sha256:")
+        or _package_instant(stated_cutoff) != cutoff
+        or _package_instant(consumption.get("run_read_at")) != source_read
+        or calendar.get("consumer_rule_version") is None
+    ):
+        _fail("replay_package_clock_mismatch", "envelope, bound day or calendar rule differs")
+    rows = consumption.get("members") or ()
+    if not all(isinstance(row, Mapping) for row in rows):
+        _fail("replay_package_clock_mismatch", "invalid member receipt")
+    by_id = {r.get("member_id"): r for r in rows}
+    if len(by_id) != len(rows):
+        _fail("replay_package_clock_mismatch", "duplicate member receipt")
+    used = {r.get("member_id") for r in rows if r.get("relevant_for_T") is True}
+    if not used or used != set(request.required_member_ids):
+        _fail("replay_package_clock_mismatch", "required members differ from the used receipt rows")
+    verified = []
+    for member in request.member_evidence:
+        row = by_id.get(member.member_id)
+        if row is None or row.get("sha_match") is not True or member.digest != row.get("sha256"):
+            _fail("replay_package_clock_mismatch", f"unverified intake member {member.member_id}")
+        when = _package_instant(row.get("verify_at"))
+        if not source_read <= when <= observed or member.available_at != when:
+            _fail("replay_package_clock_mismatch", f"verify_at differs: {member.member_id}")
+        verified.append(when)
+    facts = request.facts_template
+    received = _package_instant(facts.get("intake_received_at"))
+    first = _package_instant(facts.get("intake_first_read_at"))
+    last = _package_instant(facts.get("intake_verified_at"))
+    if not verified or not received <= first == source_read <= last or last != max(verified):
+        _fail("replay_package_clock_mismatch", "intake differs from the read/hash receipts")
+    return {
+        "schema_version": "p11.october-replay-package-clock.v1",
+        "market_date": cutoff.date().isoformat(),
+        "logical_cutoff": cutoff.isoformat(),
+        "source_read_at": source_read.isoformat(),
+        "intake_verified_at": last.isoformat(),
+        "evaluation_observed_at": observed.isoformat(),
+        "envelope_sha256": envelope_digest,
+        "member_consumption_digest": sha256_digest(consumption),
+        "calendar_rule_version": calendar["consumer_rule_version"],
+        "calendar_evidence_digest": sha256_digest(calendar),
+    }
+
+
 def _envelope_read_at(evidence: Mapping[str, Any] | None, observed: datetime) -> datetime:
     """Use the original input read when replaying a previously sealed envelope."""
     if not evidence:
@@ -631,6 +700,14 @@ def run_e1_replay_day(
         }
     )
 
+    # Native archive reads can finish weeks after the replay date. Authorize
+    # their physical clock only for a verified receipt for this exact day.
+    logical_cutoff = paper_replay.replay_decision_at(market_date)
+    if p12_evidence and _package_instant(req.facts_template["intake_verified_at"]) > logical_cutoff:
+        consumption_evidence["package_clock"] = _october_package_clock(
+            req, p12_evidence, source_read_at, observed_at, logical_cutoff,
+            snapshot_manifest_digest, consumption_evidence["calendar_schedule_evidence"],
+        )
     receipt = paper_replay.run_replay_day(
         projected_req,
         market_date,

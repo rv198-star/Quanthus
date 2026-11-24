@@ -147,9 +147,10 @@ def read_history(
     # Actual consumption closure (P11 裁定): only members actually opened
     # this run count for formal use.  Each reads[] entry already carries
     # sha_match from verify_member; here we re-resolve the member_id to
-    # pin its package_kind (base / daily-core), absolute path and read
-    # clock so the receipt is independently recomputable.  Members named
-    # in the envelope but never opened are NOT counted as consumed.
+    # pin its package_kind (base / daily-core), absolute path, version,
+    # composite key and the rows this T used.  November daily partitions
+    # registered in the envelope are named "not consumed for this T" -
+    # their sealed October evidence and original clocks stay verbatim.
     consumed = {}
 
     def _collect(section, key):
@@ -166,12 +167,17 @@ def read_history(
             consumed[mid] = {
                 "member_id": mid,
                 "package_id": (resolved.package_id if resolved else rec.get("package_id")),
+                "package_key": (
+                    f"{(resolved.package_id if resolved else rec.get('package_id'))}::{mid}"
+                ),
                 "package_kind": (resolved.package_kind if resolved else "unresolved"),
                 "version": (resolved.version if resolved else None),
                 "abs_path": (str(resolved.abs_path) if resolved else rec.get("path")),
                 "sha256": rec.get("sha256"),
                 "sha_match": bool(rec.get("sha_match")),
                 "rows": rec.get("rows"),
+                "kept": rec.get("kept"),
+                "admitted": rec.get("admitted"),
                 "status": rec.get("status"),
                 "verify_at": read_at,
                 "uses": [key],
@@ -186,8 +192,24 @@ def read_history(
     _collect(exc_cov, "reads")
     _collect(lim_cov, "reads")
 
+    # A member is "relevant for this T" unless it is a November daily-core
+    # partition - those post-date T and are registered for sealed-October
+    # evidence only, never consumed as this T's fact.
+    def _november(mid, pkg):
+        return "market_date=2026-11" in mid or "dwd-daily-2026-11" in str(pkg or "")
+
+    for mid, v in consumed.items():
+        v["relevant_for_T"] = not _november(mid, v.get("package_id"))
+    relevant = [v for v in consumed.values() if v["relevant_for_T"]]
+    november_not_used = sorted(
+        v["member_id"] for v in consumed.values() if not v["relevant_for_T"]
+    )
+    registered_ids = {m["member_id"] for m in source_member_entries}
+    not_read = sorted(registered_ids - set(consumed))
+
     member_consumption = {
         "consumed_member_count": len(consumed),
+        "consumed_for_T_count": len(relevant),
         "base_member_count": sum(1 for v in consumed.values() if v["package_kind"] == "base"),
         "daily_member_count": sum(
             1 for v in consumed.values() if v["package_kind"] == "daily-core"
@@ -195,10 +217,14 @@ def read_history(
         "sha_all_match": all(v["sha_match"] for v in consumed.values()),
         "members": sorted(consumed.values(), key=lambda v: v["member_id"]),
         "registered_member_count": len(source_member_entries),
+        "registered_not_read": not_read,
+        "november_partitions_not_used": november_not_used,
         "note": (
             "Members actually opened and sha-verified this run. Registered "
             "envelope source_members may exceed consumed members; formal use "
-            "counts only the consumed set."
+            "counts only the consumed set. November daily partitions are "
+            "named not-used for this T; their sealed evidence and clocks "
+            "stay verbatim in the envelope."
         ),
     }
 

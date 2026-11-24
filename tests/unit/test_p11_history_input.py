@@ -774,7 +774,9 @@ def test_r3_listing_timestamp_effective_at_session_open_included():
     bound effective_from <= observation_start -> that session IS a member."""
     raw = _trend_raw("600000")
     cal_days = _weekdays_ending(TARGET, 200)
-    at_open = datetime.combine(cal_days[0], datetime.min.time()).replace(hour=9, minute=30, tzinfo=SHANGHAI)
+    at_open = datetime.combine(cal_days[0], datetime.min.time()).replace(
+        hour=9, minute=30, tzinfo=SHANGHAI
+    )
     env = _envelope(
         [_security_entry(raw)],
         calendar=_calendar(days=cal_days),
@@ -813,13 +815,9 @@ def test_r3_listing_effective_to_at_session_start_excludes_T():
     member even though the date matches.  Baseline: anchor < effective_to."""
     raw = _trend_raw("600000")
     cal_days = _weekdays_ending(TARGET, 200)
-    listing = _listing(
-        raw.identity.security_id, effective_from=cal_days[0].isoformat()
-    )
+    listing = _listing(raw.identity.security_id, effective_from=cal_days[0].isoformat())
     listing["effective_to"] = f"{TARGET.isoformat()}T00:00:00+08:00"
-    env = _envelope(
-        [_security_entry(raw)], calendar=_calendar(days=cal_days), listing=[listing]
-    )
+    env = _envelope([_security_entry(raw)], calendar=_calendar(days=cal_days), listing=[listing])
     inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
     membership = inputs[0].universe_membership
     assert TARGET not in membership
@@ -833,9 +831,7 @@ def test_r3_listing_effective_from_after_close_excludes_T():
     cal_days = _weekdays_ending(TARGET, 200)
     listing = _listing(raw.identity.security_id, effective_from=cal_days[0].isoformat())
     listing["effective_from"] = f"{TARGET.isoformat()}T20:00:00+08:00"
-    env = _envelope(
-        [_security_entry(raw)], calendar=_calendar(days=cal_days), listing=[listing]
-    )
+    env = _envelope([_security_entry(raw)], calendar=_calendar(days=cal_days), listing=[listing])
     inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
     membership = inputs[0].universe_membership
     assert membership == ()  # no session's anchor is at/after 20:00 yet

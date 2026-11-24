@@ -425,9 +425,7 @@ def derive_universe_membership(
     # Coverage is asserted on the session DAY the listing began: the first
     # delivered open session must be on or before the listing's start session.
     # (The instant comparison belongs to membership inclusion, not coverage.)
-    earliest_start_day = earliest_start.astimezone(
-        _venue_tz(venue_id)
-    ).date()
+    earliest_start_day = earliest_start.astimezone(_venue_tz(venue_id)).date()
     if not venue_sessions or venue_sessions[0][0] > earliest_start_day:
         _fail(
             "calendar_coverage_incomplete",

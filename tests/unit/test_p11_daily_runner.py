@@ -975,7 +975,12 @@ def _source_clock_raw(code: str, gap_days: int = 42, *, matched: bool = True) ->
     equals the same venue+session_date source calendar knowledge_from, so the
     PIT coordinate moves to the business fact instant.  matched=False leaves
     the role declared but unproven - the rows keep their original cutoff
-    identity (the un-matched r4 path)."""
+    identity (the un-matched r4 path).
+
+    Only the close-missing warm-up rows are source-matched: a close-bearing
+    row's cutoff is its ordinary availability instant, not the archive version
+    stamp, so it is NOT a matched date (its PIT coordinate is the native
+    close)."""
 
     from dataclasses import replace as _replace
     from datetime import datetime
@@ -983,13 +988,16 @@ def _source_clock_raw(code: str, gap_days: int = 42, *, matched: bool = True) ->
     raw = _gap_clocked_raw(code, gap_days)
     stamp = datetime.fromisoformat("2026-10-14T16:28:52.274625+00:00")
     cutoff = {d: (stamp if v is None else v) for d, v in raw.knowledge_cutoff_by_date.items()}
+    # A matched date is a close-missing warm-up row whose envelope cutoff was
+    # proven equal to the same venue+date source calendar knowledge_from.
+    matched_days = frozenset(
+        d for d, v in cutoff.items() if v is not None and raw.close_at_by_date.get(d) is None
+    )
     return _replace(
         raw,
         knowledge_clock_role="calendar_source_knowledge_from",
         knowledge_cutoff_by_date=cutoff,
-        source_calendar_matched_dates=(
-            frozenset(d for d, v in cutoff.items() if v is not None) if matched else None
-        ),
+        source_calendar_matched_dates=(matched_days if matched else None),
     )
 
 
@@ -1018,8 +1026,10 @@ def test_source_clock_role_admits_real_clocked_rows(runner, resources):
     assert all(r["knowledge_clock_role"] == "calendar_source_knowledge_from" for r in role_named)
     assert all(r["source_knowledge_from"] for r in role_named)
     assert all(r["actual_read_at"] for r in role_named)
-    # The remaining close-bearing rows carry their own archive version clock.
-    assert archive_named
+    # Only the close-missing warm-up rows are source-matched: a close-bearing
+    # row's PIT coordinate is its native close (an ordinary availability
+    # instant), so it carries no archive-version clock row.
+    assert not archive_named
     # Not a date-context row - date_context_rows stays empty under this shape.
     assert not out.source_closure["consumption_evidence"].get("date_context_rows")
 
@@ -1043,6 +1053,59 @@ def test_source_clock_role_refused_on_bare_string(runner, resources):
     with pytest.raises(ProductDailyError) as exc:
         _run(runner, resources, [raw], numeric_context="october_replay_as_observed")
     assert "unknown_numeric_context" in str(exc.value)
+
+
+def test_source_clock_role_after_real_read_isolated(runner, resources):
+    """A USED source version whose archive knowledge_from is later than this
+    run's actual read was not yet acquired - the row is isolated by
+    dependency, never let a later rerun flatten the gap.  With a clean
+    neighbour the late-version security is isolated (named exclusion) while
+    the neighbour still produces its entry; alone it blocks the day."""
+    from dataclasses import replace as _replace
+    from datetime import timezone
+
+    late = datetime(2026, 12, 1, 16, 28, 52, tzinfo=timezone.utc)
+
+    def _late(raw):
+        matched = raw.source_calendar_matched_dates or frozenset()
+        return _replace(
+            raw,
+            knowledge_cutoff_by_date={
+                d: (late if d in matched else v) for d, v in raw.knowledge_cutoff_by_date.items()
+            },
+        )
+
+    # Two-security: the late-version security is named-isolated while the
+    # clean neighbour still evaluates (per-security blast radius).
+    good = _gap_clocked_raw("600000")
+    bad = _late(_source_clock_raw("600001"))
+    out = _run_context(
+        runner,
+        resources,
+        [good, bad],
+        context="october_replay_as_observed",
+        source_policy=_replay_source(),
+    )
+    excl = out.source_closure["exclusions"]
+    assert any(
+        e["security_code"] == "600001" and "source_version_after_actual_read" in str(e)
+        for e in excl
+    ), excl
+    # The neighbour kept its own entry; the late-version security did not run.
+    assert out.result.publishable is True
+
+    # Single-security: the same late version blocks the whole day (no
+    # qualified input remains), never silently admitted.
+    only = _late(_source_clock_raw("600000"))
+    with pytest.raises(ProductDailyError) as exc:
+        _run_context(
+            runner,
+            resources,
+            [only],
+            context="october_replay_as_observed",
+            source_policy=_replay_source(),
+        )
+    assert "missing_raw_inputs" in str(exc.value)
 
 
 def test_date_context_warmup_rows_equivalent(runner, resources):

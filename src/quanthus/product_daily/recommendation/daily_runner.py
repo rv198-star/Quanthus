@@ -606,6 +606,18 @@ def run_daily_advice_from_raw(
                     # is bound verbatim below (source_knowledge_clock_rows), the
                     # member-level readability verdict is unchanged.
                     if source_cutoff is not None:
+                        # Readability: a USED source version must already have
+                        # been obtainable by THIS run's real read.  A version
+                        # whose archive knowledge_from is later than the actual
+                        # read instant was not yet acquired -- isolate it by
+                        # dependency, never let a later rerun flatten the gap.
+                        if source_cutoff > as_observed_at:
+                            raise ProductDailyError(
+                                "source_version_after_actual_read",
+                                f"{code}: {day} source knowledge_from "
+                                f"{source_cutoff.isoformat()} is later than the "
+                                f"actual read {as_observed_at.isoformat()}",
+                            )
                         kind = (
                             "source_knowledge_clock_row"
                             if close_at is None

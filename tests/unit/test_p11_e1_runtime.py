@@ -446,58 +446,73 @@ def test_r5_p12_evidence_folded_into_closure(assets):
 
 
 def test_r6_calendar_schedule_evidence_bound(assets):
-    """R6: the proven P10 #747 exchange-schedule evidence is bound into the
-    signed closure under a named consumer rule -- schedule basis + named
-    source digests + UNKNOWN publication instants, never a T-known claim."""
+    """R6: a caller may only REQUEST sessions; the pinned consumer rule
+    supplies the trusted basis/digests (a projection of P10 RESULT 722c75b2).
+    The bound closure carries the rule's own identity, the proven per-session
+    basis, named source-document digests and UNKNOWN instants -- never a
+    caller-supplied basis or a T-known claim."""
     from tests.unit import test_p11_paper_replay as f
 
     req = _sealed_member_request()
+    # Caller supplies ONLY venue+session_date requests; a claimed basis or
+    # source doc is ignored/proven by the pinned rule, not trusted.
     ev = {
-        "consumer_rule_id": "p11.e1-october-calendar-consume",
-        "consumer_rule_version": "1.0.0",
         "sessions": [
-            {
-                "venue_id": "SSE",
-                "session_date": "2026-10-08",
-                "schedule_basis": "EXPLICIT_EXCHANGE_SCHEDULE",
-                "source_documents": [
-                    {
-                        "notice_id": "上证公告〔2025〕45号",
-                        "rule_clause": "annual-closures",
-                        "publication_date": "2025-12-22",
-                        "sha256": "6414ab8f" + "4" * 56,
-                        "source_receipt_sha256": "342164f9" + "5" * 56,
-                        "published_at": None,
-                        "published_at_grade": "UNKNOWN_EXACT_INSTANT",
-                    }
-                ],
-                "source_published_at": None,
-                "source_published_at_state": "UNKNOWN_EXACT_INSTANT",
-                "historical_channel_available_at": None,
-            },
-            {
-                "venue_id": "SSE",
-                "session_date": "2026-09-30",
-                "schedule_basis": "RULE_DERIVED_SCHEDULE",
-                "source_documents": [],
-                "source_published_at": None,
-                "source_published_at_state": "UNKNOWN_EXACT_INSTANT",
-                "historical_channel_available_at": None,
-            },
+            {"venue_id": "SSE", "session_date": "2026-10-08"},
+            {"venue_id": "SSE", "session_date": "2026-09-30"},
         ],
     }
     out = e_run_e1_replay(req, f.T1, assets, calendar_schedule_evidence=ev)
-    cl = out["source_closure"].get("consumption_evidence", {})
-    block = cl.get("calendar_schedule_evidence", {})
+    block = out["source_closure"]["consumption_evidence"]["calendar_schedule_evidence"]
+    # The rule's own identity, never the caller's.
     assert block["consumer_rule_id"] == "p11.e1-october-calendar-consume"
-    # Only proven exchange publication writes announced_before_T; a bare
-    # caller timestamp is not that, so it stays False.
+    assert block["consumer_rule_version"] == "1.0.0"
+    assert block["p10_result_ref"]["sha256"].startswith("sha256:722c75b2")
     assert block["announced_before_T"] is False
     sessions = {s["session_date"]: s for s in block["sessions"]}
     assert sessions["2026-10-08"]["schedule_basis"] == "EXPLICIT_EXCHANGE_SCHEDULE"
     assert sessions["2026-10-08"]["source_published_at_state"] == "UNKNOWN_EXACT_INSTANT"
     assert sessions["2026-10-08"]["source_documents"][0]["notice_id"] == "上证公告〔2025〕45号"
     assert sessions["2026-09-30"]["schedule_basis"] == "RULE_DERIVED_SCHEDULE"
+
+
+def test_r6_calendar_schedule_evidence_conflict_refused(assets):
+    """R6 fail-first: a caller-supplied basis that conflicts with the trusted
+    rule is refused; so is a caller-named rule id/version (ignored in favour
+    of the rule's own identity)."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    ev = {
+        "consumer_rule_id": "invented-rule",
+        "consumer_rule_version": "99",
+        "sessions": [
+            {
+                "venue_id": "SSE",
+                "session_date": "2026-10-08",
+                "schedule_basis": "not_an_exchange_basis",
+                "source_documents": [
+                    {"notice_id": "invented", "sha256": "0" * 64, "publication_date": "2026-12-01"}
+                ],
+            }
+        ],
+    }
+    with pytest.raises(ProductDailyError) as ei:
+        e_run_e1_replay(req, f.T1, assets, calendar_schedule_evidence=ev)
+    assert "calendar_schedule_evidence_conflict" in str(ei.value)
+
+
+def test_r6_calendar_schedule_evidence_unproven_session_refused(assets):
+    """R6 fail-first: a session the bound calendar carries but the trusted
+    rule does NOT prove (e.g. a date outside the pinned P10 scope) is a named
+    refusal, never a silently-adopted basis."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    ev = {"sessions": [{"venue_id": "SSE", "session_date": "2026-10-07"}]}
+    with pytest.raises(ProductDailyError) as ei:
+        e_run_e1_replay(req, f.T1, assets, calendar_schedule_evidence=ev)
+    assert "calendar_schedule_evidence_unproven" in str(ei.value)
 
 
 def test_r6_calendar_schedule_evidence_unbound_session_refused(assets):
@@ -507,15 +522,8 @@ def test_r6_calendar_schedule_evidence_unbound_session_refused(assets):
 
     req = _sealed_member_request()
     ev = {
-        "consumer_rule_id": "p11.e1-october-calendar-consume",
-        "consumer_rule_version": "1.0.0",
         "sessions": [
-            {
-                "venue_id": "SSE",
-                "session_date": "2031-01-01",  # not a bound calendar_row
-                "schedule_basis": "EXPLICIT_EXCHANGE_SCHEDULE",
-                "source_documents": [],
-            }
+            {"venue_id": "SSE", "session_date": "2031-01-01"}  # not a bound calendar_row
         ],
     }
     with pytest.raises(ProductDailyError) as ei:

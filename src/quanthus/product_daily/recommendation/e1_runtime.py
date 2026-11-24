@@ -75,6 +75,10 @@ from quanthus.product_daily.recommendation.rule_seam import (
 _CANDIDATE_CARD = "config/p4-candidate-price-volume-transition.research.v1.json"
 _FEATURE_REGISTRY = "config/p3-baseline-features.research.v1.json"
 _TREND_CONFIG = "config/expert-evaluations/experts/trend-stability.v1.json"
+# The pinned consumer rule for the October calendar consume: a trusted
+# projection of the P10 #747 RESULT (its own identity + per-venue/date proven
+# basis).  Loaded from the release-verified repository root, never caller bytes.
+_OCTOBER_CALENDAR_RULE = "config/research/r11/d1b-20261124/october-calendar-consume-rule.v1.json"
 _TREND_SPEC = "config/expert-evaluations/specs/trend-stability-p4-first-passage.evaluation.v1.json"
 
 # The E1 production panel evaluator identity, bound to the frozen registry.
@@ -111,6 +115,10 @@ class E1RuleAssets:
     card_digest: str
     registry_digest: str
     topology_digest: str
+    # The release-verified repository root: trusted consumer rules (e.g. the
+    # October calendar-consume rule) are read from it so a caller can never
+    # inject an unproven schedule basis.
+    repository: Path | None = None
 
 
 def load_e1_rule_assets(
@@ -177,6 +185,7 @@ def load_e1_rule_assets(
         card_digest=card_digest,
         registry_digest=registry_digest,
         topology_digest=registry.topology_manifest.digest,
+        repository=repository,
     )
 
 
@@ -590,7 +599,10 @@ def run_e1_replay_day(
             # exchange publication/revision version can.  Unknown publication
             # instants stay UNKNOWN_EXACT_INSTANT verbatim.
             "calendar_schedule_evidence": _calendar_schedule_evidence(
-                req, market_date, calendar_schedule_evidence
+                req,
+                market_date,
+                calendar_schedule_evidence,
+                _load_calendar_consume_rule(assets),
             ),
             "anchor_mode": "equivalent_day",
             "pit_disguise": False,
@@ -701,10 +713,37 @@ def _text_of(row: Any, field: str) -> Any:
     return row.get(field) if isinstance(row, Mapping) else getattr(row, field, None)
 
 
+def _load_calendar_consume_rule(assets: E1RuleAssets) -> Mapping[str, Any] | None:
+    """Load the pinned October calendar-consume rule from the release-verified
+    repository root (a trusted projection of the P10 #747 RESULT).
+
+    The rule declares its own identity; it is never read from caller bytes.
+    A missing repository root or a malformed rule fails closed (the replay
+    keeps reading the calendar through the consumer rule but records no proven
+    publication version).
+    """
+    import json
+
+    root = getattr(assets, "repository", None)
+    if root is None:
+        return None
+    path = Path(root) / _OCTOBER_CALENDAR_RULE
+    if not path.is_file():
+        return None
+    rule = json.loads(path.read_text())
+    if rule.get("schema_version") != "quanthus.p11.calendar-consume-rule.v1":
+        _fail(
+            "calendar_consume_rule_invalid",
+            f"{_OCTOBER_CALENDAR_RULE} schema_version is not the pinned v1 rule",
+        )
+    return rule
+
+
 def _calendar_schedule_evidence(
     request: Any,
     market_date: date,
     evidence: Mapping[str, Any] | None,
+    rule: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """Bind the PROVEN exchange-schedule evidence into the signed closure.
 
@@ -749,14 +788,25 @@ def _calendar_schedule_evidence(
         "announced_before_T": False,
         "sessions": [],
     }
-    if evidence is None:
-        return block
-    block["consumer_rule_id"] = evidence.get("consumer_rule_id")
-    block["consumer_rule_version"] = evidence.get("consumer_rule_version")
+    # The consumer rule declares its OWN identity; a caller may only ASK for
+    # sessions, never name the rule or the basis.  Trusted facts come from the
+    # pinned rule (a projection of the verified P10 #747 RESULT), never from
+    # caller bytes: the rule's proven basis, named source-document digests and
+    # UNKNOWN instants are what the closure binds.
+    if rule is not None:
+        block["consumer_rule_id"] = rule.get("consumer_rule_id")
+        block["consumer_rule_version"] = rule.get("consumer_rule_version")
+        block["p10_result_ref"] = rule.get("p10_result_ref")
+    trusted = {
+        (_text_of(t, "venue_id"), str(_text_of(t, "session_date"))): t
+        for t in (rule or {}).get("sessions", ()) or ()
+    }
+    requested = [
+        (str(_text_of(e, "session_date")), _text_of(e, "venue_id"))
+        for e in (evidence or {}).get("sessions", ()) or ()
+    ]
     sessions = []
-    for entry in evidence.get("sessions", ()) or ():
-        venue = _text_of(entry, "venue_id")
-        sess = str(_text_of(entry, "session_date"))
+    for sess, venue in requested:
         key = (venue, sess)
         if key not in bound_rows:
             _fail(
@@ -764,14 +814,42 @@ def _calendar_schedule_evidence(
                 f"schedule evidence claims {venue} {sess} but no bound "
                 "calendar_row carries that venue/session_date",
             )
+        t = trusted.get(key)
+        if t is None:
+            # A claim for a session the trusted rule does not prove is a named
+            # refusal, never a silently-adopted basis.
+            _fail(
+                "calendar_schedule_evidence_unproven",
+                f"schedule claim for {venue} {sess} has no proven basis in the "
+                "pinned consumer rule",
+            )
+        # Emit the TRUSTED basis + named digests + UNKNOWN instants, not the
+        # caller's.  A caller-supplied basis/notice that conflicts with the
+        # trusted fact is refused.
+        for field in ("schedule_basis",):
+            want = _text_of(
+                next(
+                    x
+                    for x in (evidence or {}).get("sessions", ()) or ()
+                    if _text_of(x, "session_date") == sess and _text_of(x, "venue_id") == venue
+                ),
+                field,
+            )
+            if want is not None and want != _text_of(t, field):
+                _fail(
+                    "calendar_schedule_evidence_conflict",
+                    f"caller schedule_basis {want!r} for {venue} {sess} "
+                    f"conflicts with the trusted {_text_of(t, field)!r}",
+                )
         sessions.append(
             {
                 "venue_id": venue,
                 "session_date": sess,
                 "is_open": bound_rows[key],
-                "schedule_basis": _text_of(entry, "schedule_basis"),
+                "schedule_basis": _text_of(t, "schedule_basis"),
                 "source_documents": [
                     {
+                        "kind": _text_of(d, "kind"),
                         "notice_id": _text_of(d, "notice_id"),
                         "rule_clause": _text_of(d, "rule_clause"),
                         "publication_date": _text_of(d, "publication_date"),
@@ -780,13 +858,11 @@ def _calendar_schedule_evidence(
                         "published_at": _text_of(d, "published_at"),
                         "published_at_grade": _text_of(d, "published_at_grade"),
                     }
-                    for d in entry.get("source_documents", ()) or ()
+                    for d in _text_of(t, "source_documents") or ()
                 ],
-                "source_published_at": _text_of(entry, "source_published_at"),
-                "source_published_at_state": _text_of(entry, "source_published_at_state"),
-                "historical_channel_available_at": _text_of(
-                    entry, "historical_channel_available_at"
-                ),
+                "source_published_at": _text_of(t, "source_published_at"),
+                "source_published_at_state": _text_of(t, "source_published_at_state"),
+                "historical_channel_available_at": _text_of(t, "historical_channel_available_at"),
             }
         )
     block["sessions"] = sessions

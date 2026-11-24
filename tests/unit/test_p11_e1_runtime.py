@@ -344,6 +344,49 @@ def test_asobserved_late_partition_projected_out_of_envelope(assets):
     assert "nov-daily-1d" not in ids
 
 
+def test_r4_read_instant_is_signed_into_source_closure(assets):
+    """R4: this run's actual read instant is bound INTO source_closure, not
+    only the outer receipt -- two read instants on identical input must give
+    different source_closure digests."""
+    from tests.unit import test_p11_paper_replay as f
+
+    base = _sealed_member_request()
+    base["source_members"][0]["knowledge_at"] = "2026-11-01T00:00:00+08:00"
+    base["source_members"][0]["visible_at"] = "2026-11-01T00:00:00+08:00"
+    a = e_run_e1_replay(base, f.T1, assets, observed_at="2026-11-25T03:00:00+08:00")
+    b = e_run_e1_replay(base, f.T1, assets, observed_at="2026-11-25T03:01:00+08:00")
+    da = a["source_closure_digest"] if "source_closure_digest" in a else a.get("receipt", {}).get("source_closure_digest")
+    db = b["source_closure_digest"] if "source_closure_digest" in b else b.get("receipt", {}).get("source_closure_digest")
+    assert da and db and da != db
+    ev = a["source_closure"].get("consumption_evidence")
+    assert ev and ev["actual_read_at"] == "2026-11-25T03:00:00+08:00"
+
+
+def test_r4_unused_member_sealed_after_read_not_a_block(assets):
+    """R4: an UNUSED member sealed after the actual read cannot block the day;
+    it is named but does not refuse, unlike a USED member sealed late."""
+    from tests.unit import test_p11_paper_replay as f
+
+    req = _sealed_member_request()
+    req["source_members"][0]["knowledge_at"] = "2026-11-01T00:00:00+08:00"
+    req["source_members"][0]["visible_at"] = "2026-11-01T00:00:00+08:00"
+    req["source_members"].append(
+        {
+            "member_id": "unconsumed-december",
+            "package_id": "standard-base-2.5.1-8cd966be87fc",
+            "version": "synthetic.v1",
+            "member_path": "dec/daily.parquet",
+            "sha256": "sha256:" + "3" * 64,
+            "date_from": "2026-12-01",
+            "date_to": "2026-12-31",
+            "knowledge_at": "2026-12-01T00:00:00+08:00",
+            "visible_at": "2026-12-01T00:00:00+08:00",
+        }
+    )
+    out = e_run_e1_replay(req, f.T1, assets, observed_at="2026-11-25T03:00:00+08:00")
+    assert out.get("disposition") == "publishable"
+
+
 def test_strict_still_rejects_sealed_member(assets):
     """The strict H1 path is unchanged: a post-cutoff member still fails the
     visibility gate when as_observed is not requested."""

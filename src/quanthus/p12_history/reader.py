@@ -78,7 +78,10 @@ def read_history(
         try:
             manifest_chain = chain_fn()
         except Exception as exc:  # noqa: BLE001
-            manifest_chain = [{"artifact": "manifest_chain", "status": "ERROR",
+            # A map that cannot expose the chain (e.g. a stub without
+            # manifest fields) degrades to a named note, never a block -
+            # the members' own sha verification still governs reads.
+            manifest_chain = [{"artifact": "manifest_chain", "status": "UNAVAILABLE",
                                "error": f"{type(exc).__name__}: {exc}"}]
 
     calendar_rows, cal_cov = cal_mod.read_calendar_rows(smap, market_date)
@@ -403,7 +406,7 @@ def read_history(
             "disposition": "block_new_entries",
         }
     coverage["manifest_chain"] = manifest_chain
-    chain_faults = [c for c in manifest_chain if c.get("status") not in ("MATCH", "NO_PATH")]
+    chain_faults = [c for c in manifest_chain if c.get("status") not in ("MATCH", "NO_PATH", "UNAVAILABLE")]
     if chain_faults and day_block is None:
         day_block = {
             "reason_code": "SUMMARY_CHAIN_FAULT",

@@ -358,3 +358,56 @@ class TestActionAuthorityHandoff:
         assert any("batch-02-spdb-r2/RESULT.json" in x for x in members_read)
         assert any("WINDOW-USE.json" in x for x in members_read)
         assert out["action_coverage"]["action_coverage"] == "REBUILT"
+
+
+def test_shared_calendar_missing_yields_day_block_not_crash(tmp_path):
+    # A shared hard dependency (venue calendar) whose bytes are unreadable
+    # must emit a named whole-day block receipt, not FileNotFoundError and
+    # not a silent READ.
+    smap = _build_map(tmp_path, n_sessions=130)
+    (tmp_path / "cal.parquet").unlink()
+    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap)
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block["reason_code"] == "SHARED_CALENDAR_UNAVAILABLE"
+    assert block["affected_scope"] == "whole_day"
+    assert "cal.parquet" in block["failed_members"]
+
+
+def test_shared_calendar_bad_sha_yields_day_block(tmp_path):
+    # A shared calendar member whose declared sha is wrong is a hard
+    # fault -> named whole-day block, never silently READ with 0 rows.
+    smap = _build_map(tmp_path, n_sessions=130)
+    bad = _member(tmp_path, "cal.parquet", declared_sha256="sha256:" + "b" * 64)
+    smap._members_by_table["dwd_trading_calendar"] = [bad]
+    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_CALENDAR_UNAVAILABLE"
+
+
+def test_bars_carry_member_and_source_provenance(tmp_path):
+    smap = _build_map(tmp_path, n_sessions=130)
+    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap)
+    bar = res.raw_history["securities"][0]["bars"][0]
+    assert bar["member_id"] == (
+        "payload/dwd_security_bar/interval_size=1d/"
+        "observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    )
+    assert bar["package_id"] == "test-base"
+    assert bar["source_record_id"].startswith("src/code=600000/")
+
+
+def test_account_roles_separated_on_universe(tmp_path):
+    smap = _build_map(tmp_path, n_sessions=130)
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=smap,
+        holdings=[{"security_id": "security-600000", "quantity": 100},
+                  {"security_id": "outside-held", "quantity": None}],
+        pending=[{"security_id": "outside-pending", "pending_kind": "sell",
+                  "pending_quantity": 20}],
+    )
+    uni = res.coverage["universe"]
+    assert "security-600000" in uni["held_in_pool"]
+    assert "outside-held" in uni["held_unknown_quantity"]
+    assert "outside-pending" in uni["pending_only"]
+    assert uni["pending_typed"][0]["pending_kind"] == "sell"

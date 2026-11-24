@@ -338,7 +338,6 @@ def resolve_pinned_v2_loader(
         return load(
             raw,
             expected_schema=PINNED_V2_SCHEMA,
-            mode=binding["mode"],
         )
 
     return _loader

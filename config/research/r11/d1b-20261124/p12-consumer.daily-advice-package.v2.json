@@ -1,30 +1,30 @@
 {
   "schema_version": "quanthus.p11.p12-consumer-binding.v1",
   "binding_id": "p11-p12-daily-advice-package-v2",
-  "binding_version": "2.0.0-93948784",
+  "binding_version": "2.0.0-b756c63c",
   "use_grade": "PINNED_REAL_CONSUMER",
   "purpose": "historical_replay",
   "mode": "simulation",
   "consumer_schema": "p12.decision-set.v2",
   "loader_entry": "quanthus.p12_daily.decision_loader.load_decision_set",
-  "loader_contract": "load_decision_set(raw, *, expected_schema=\"p12.decision-set.v2\", mode=\"simulation\") -> (MarketDecisionSet, wire_digest)",
-  "source_commit": "93948784c2384985d675e6448219d21be010d3ab",
-  "source_tree": "e560a54383dab4735a7c12571afd18a68e702076",
+  "loader_contract": "load_decision_set(raw, *, expected_schema=\"p12.decision-set.v2\") -> (MarketDecisionSet, wire_digest); mode optional at the frozen signature, simulation bound at the package-source read",
+  "source_commit": "b756c63c904544909cc2c2195533808b299daf2c",
+  "source_tree": "2327912269a26f8133a6b7d3554d9e05ba38af79",
   "source_files_sha256": {
-    "src/quanthus/p12_daily/decision_loader.py": "d8d00b2cda614d14eb0669255569f4b1be55646606108a104131a32f2f7a6091",
+    "src/quanthus/p12_daily/decision_loader.py": "2f35b86136da4f4b15d87289f768c2f80d04ab23c74b934e1c42eb1320649c80",
     "src/quanthus/capabilities/decision_access/__init__.py": "f487db68ef500bbb6264a4c08207a60bdca9bdacae30d993eea170f0589d2d6d",
     "src/quanthus/shared/fact_contracts.py": "54ba64674c76e3392bb6d649ab52db35d96f9eae8caa1e19f5c4635e6ee6f07e",
     "src/quanthus/shared/values.py": "6059bfd2f55102fe5b5a8a3effbab852c736a4f6618f44435fb02aa21c5ef8d9",
     "src/quanthus/shared/__init__.py": "c22cda22c0fe906de76189a95e1b9a97348159ea42e23e432b9c0db2d9cae2e8",
     "src/quanthus/capabilities/__init__.py": "698c9ebdf2ca5eab3ff1c27929fddf1916082cd6bcd94aa646f9c2750293e66b",
     "src/quanthus/p12_daily/__init__.py": "c21a6914d6bd6b88811b9f0facd6042173b421544b85adee5ca40667a98d3b5b",
-    "schemas/p12/v2/decision-set.v2.json": "8cee5544a58436eb647980798bef6d216293a531f03a9cd6b8918dac48d24d00"
+    "schemas/p12/v2/decision-set.v2.json": "5054de818c25db70927f043eed525e42e5fea10d6776296306fd08cf234da57e"
   },
   "pin_state": "bound",
   "production_adoption": "NOT_REGISTERED",
   "capabilities": {
     "supports_held_reduction_v2": true,
-    "note": "pinned to P12 commit 93948784 (codex/p12-d1b-step1-v2, #723 step-1); mode is the account-side simulation admission and purpose is historical_replay - the wire never declares the mode"
+    "note": "pinned to P12 commit b756c63c (codex/p12-d1b-step1-v2 r2, #723); mode resolved by the frozen signature - caller omits it and the loader binds wire-mode-or-simulation; account admission stays at the package-source read. purpose=historical_replay on this binding only."
   },
-  "note": "Bound real pin. source_commit/source_tree identify the fixed consumer revision; source_files_sha256 covers the loader, its decision_access/fact_contracts/values closure and the generated v2 schema, each verified byte-for-byte before the module is imported. The loader returns (MarketDecisionSet, wire_digest); the wire digest over the raw bytes is the binding digest surface, distinct from the file sha256."
+  "note": "Bound real pin. source_commit/tree identify the fixed consumer revision; source_files_sha256 covers the loader, its decision_access/fact_contracts/values closure and the generated v2 schema, each verified byte-for-byte before the module is imported. The loader returns (MarketDecisionSet, wire_digest); the wire digest over the raw bytes is the binding digest surface, distinct from the file sha256."
 }

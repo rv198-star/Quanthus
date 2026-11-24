@@ -239,6 +239,10 @@ def _normalize_account_inputs(
         ):
             if quantity is not None and (type(quantity) is not int or quantity < 0):
                 raise ProductDailyError("invalid_account_quantity", f"{code}: {label}")
+        # Validate the legacy fact itself before any account hint or canonical
+        # descriptor can make the security pending and mask an incomplete pair.
+        if item.pending_quantity is not None and item.pending_kind is None:
+            raise ProductDailyError("pending_kind_unavailable", code)
         has_facts = item.position_facts is not None
         positive_quantity = item.held_quantity is not None and item.held_quantity > 0
         if (item.held_membership is False and (has_facts or positive_quantity)) or (
@@ -249,12 +253,14 @@ def _normalize_account_inputs(
         is_pending = (
             item.pending_kind is not None or code in pending or (code in hints and not is_held)
         )
-        if item.pending_quantity is not None and not is_pending:
-            raise ProductDailyError("pending_kind_unavailable", code)
         if is_pending:
             pending.add(code)
         if item.pending_kind is not None:
             detail = {"kind": item.pending_kind, "quantity": item.pending_quantity}
+            # When typed records exist, legacy fields are only a projection of an
+            # exact canonical record, not an additional or aggregated pending order.
+            if pending_details.get(code) and detail not in pending_details[code]:
+                raise ProductDailyError("pending_metadata_conflict", code)
             if detail not in pending_details.setdefault(code, []):
                 pending_details[code].append(detail)
         details = sorted(

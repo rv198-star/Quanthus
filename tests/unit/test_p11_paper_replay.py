@@ -817,9 +817,10 @@ def test_replay_day_runs_real_chain_positive(runner, resources):
 def test_qualified_quiet_package_explains_each_scanned_security(runner, resources):
     days = tuple(d for d in SESSION_DAYS if d <= T1)
     securities = [_security(code, days) for code in ("600000", "600001")]
-    for security in securities:
-        bar = security["bars"][-1]
-        bar.update(high_price=bar["close_price"], low_price=bar["close_price"], amount="100")
+    # Two different causes of a real non-trigger in the same scan.
+    bar = securities[0]["bars"][-1]
+    bar.update(high_price=bar["close_price"], low_price=bar["close_price"], amount="100")
+    securities[1]["bars"][-2]["amount"] = "100"
     raw = _request(market_dates=(T1,), securities=securities)
     raw["listing_rows"].append(_listing("security-600001"))
     day = _run(load_replay_request(raw), T1, runner, resources)
@@ -833,6 +834,27 @@ def test_qualified_quiet_package_explains_each_scanned_security(runner, resource
     assert summary["message"] == ds["decisions"][0]["explanations"][0]["text"] == "今日无操作"
     assert {s["security_code"] for s in summary["scans"]} == {"600000", "600001"}
     for scan in summary["scans"]:
+        trans = scan["transition"]
+        checks = trans["checks"]
+        assert trans["signal_date"] == T1.isoformat()
+        assert trans["prior_session"] == days[-2].isoformat()
+        assert len(trans["source_evidence_digests"]) == 22
+        if scan["security_code"] == "600000":
+            assert trans["prior_quiet"] and not trans["current_active"]
+            assert checks["active_range_ratio_min"] == {
+                "actual": "0/1",
+                "op": ">=",
+                "threshold": "3/2",
+                "passed": False,
+            }
+        else:
+            assert not trans["prior_quiet"] and trans["current_active"]
+            assert checks["quiet_turnover_ratio_max"] == {
+                "actual": "1/1",
+                "op": "<=",
+                "threshold": "4/5",
+                "passed": False,
+            }
         assert scan["verdict"] == "not_triggered"
         assert scan["gates"]["events"]["required"] == 22
         assert scan["gates"]["features"]["observed"] == 61

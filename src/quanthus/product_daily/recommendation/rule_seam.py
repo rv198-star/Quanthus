@@ -721,6 +721,7 @@ def evaluate_day(
     scan_result = (
         scan_forward_candidates(
             rows,
+            explain_date=knowledge_cutoff.date(),
             trading_dates=trading_dates,
             snapshot_id=snapshot_id,
             snapshot_manifest_digest=snapshot_manifest_digest,

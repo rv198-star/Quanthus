@@ -284,6 +284,29 @@ def _prospective_split():
     )
 
 
+def _replay_source():
+    """as-observed replay source policy: observation end = T close (the bound
+    calendar's own close instant), decision = T 21:30 - the real
+    _source_policy_for_day shape, never a forward 18:01 availability."""
+
+    from quanthus.forward_validation.base24_runtime import (
+        AfterCloseDecisionClock,
+        P6Base24CandidatePolicy,
+    )
+
+    clock = AfterCloseDecisionClock(
+        market_date=TARGET,
+        source_available_at=datetime(2026, 11, 24, 15, 0, tzinfo=SHANGHAI),
+        decision_at=datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI),
+        next_session_open=NEXT_OPEN,
+    )
+    return P6Base24CandidatePolicy(
+        clock=clock,
+        history_start=date(2026, 1, 1),
+        inputs_manifest_sha256="sha256:" + "a" * 64,
+    )
+
+
 def test_raw_to_p12_package_positive(runner, resources):
     """Real raw bars -> original panel -> run_daily_advice -> a package with a real entry."""
 
@@ -885,9 +908,15 @@ def _gap_clocked_raw(code: str, gap_days: int = 42) -> RawSecurityInput:
 
 
 def _run_context(runner, resources, raws, context=None, **kw):
+    from datetime import timezone
+
     from quanthus.product_daily.recommendation.daily_runner import _new_october_context
 
     token = _new_october_context(context) if context is not None else None
+    # The as-observed replay requires the actual-read instant so a sealed
+    # source version's readability is judged; the fixture's real read was
+    # 2026-11-24 (later than the Oct version stamps), overridable via kwarg.
+    kw.setdefault("as_observed_at", datetime(2026, 11, 24, 10, 0, tzinfo=timezone.utc))
     return _run(
         runner,
         resources,
@@ -937,22 +966,30 @@ def test_date_context_token_not_constructible_publicly(runner, resources):
     assert "replay_context_not_constructible" in str(exc.value)
 
 
-def _source_clock_raw(code: str, gap_days: int = 42) -> RawSecurityInput:
+def _source_clock_raw(code: str, gap_days: int = 42, *, matched: bool = True) -> RawSecurityInput:
     """The #749 v4 shape: knowledge_clock_role=calendar_source_knowledge_from,
     warm-up rows keep close_at=None (original) while knowledge_cutoff carries
-    the source calendar knowledge_from as the decision coordinate."""
+    the source calendar knowledge_from as the decision coordinate.
+
+    matched=True mirrors the versioned as-observed entry's proof: each cutoff
+    equals the same venue+session_date source calendar knowledge_from, so the
+    PIT coordinate moves to the business fact instant.  matched=False leaves
+    the role declared but unproven - the rows keep their original cutoff
+    identity (the un-matched r4 path)."""
 
     from dataclasses import replace as _replace
     from datetime import datetime
 
     raw = _gap_clocked_raw(code, gap_days)
     stamp = datetime.fromisoformat("2026-10-14T16:28:52.274625+00:00")
+    cutoff = {d: (stamp if v is None else v) for d, v in raw.knowledge_cutoff_by_date.items()}
     return _replace(
         raw,
         knowledge_clock_role="calendar_source_knowledge_from",
-        knowledge_cutoff_by_date={
-            d: (stamp if v is None else v) for d, v in raw.knowledge_cutoff_by_date.items()
-        },
+        knowledge_cutoff_by_date=cutoff,
+        source_calendar_matched_dates=(
+            frozenset(d for d, v in cutoff.items() if v is not None) if matched else None
+        ),
     )
 
 
@@ -961,14 +998,28 @@ def test_source_clock_role_admits_real_clocked_rows(runner, resources):
     source knowledge_from is a clocked row (not date-context, not fail-closed)."""
 
     raw = _source_clock_raw("600000")
-    out = _run_context(runner, resources, [raw], context="october_replay_as_observed")
+    out = _run_context(
+        runner,
+        resources,
+        [raw],
+        context="october_replay_as_observed",
+        source_policy=_replay_source(),
+    )
     assert out.result.publishable is True
-    named = out.source_closure["consumption_evidence"]["source_knowledge_clock_rows"]
-    assert len(named) == 42
-    assert all(r["kind"] == "source_knowledge_clock_row" for r in named)
-    assert all(r["knowledge_clock_role"] == "calendar_source_knowledge_from" for r in named)
-    # close stays the original null; the source knowledge_from is the coordinate.
-    assert all(r["source_knowledge_from"] for r in named)
+    rows = out.source_closure["consumption_evidence"]["source_knowledge_clock_rows"]
+    # The close-missing warm-up rows under the named role keep their
+    # source_knowledge_clock_row kind (a real source-version coordinate, never
+    # a date-context row); every OTHER row's version stamp is bound as a
+    # generic source_archive_version_clock so the archive-vs-fact separation
+    # is recomputable for the whole window.
+    role_named = [r for r in rows if r["kind"] == "source_knowledge_clock_row"]
+    archive_named = [r for r in rows if r["kind"] == "source_archive_version_clock"]
+    assert len(role_named) == 42
+    assert all(r["knowledge_clock_role"] == "calendar_source_knowledge_from" for r in role_named)
+    assert all(r["source_knowledge_from"] for r in role_named)
+    assert all(r["actual_read_at"] for r in role_named)
+    # The remaining close-bearing rows carry their own archive version clock.
+    assert archive_named
     # Not a date-context row - date_context_rows stays empty under this shape.
     assert not out.source_closure["consumption_evidence"].get("date_context_rows")
 
@@ -1014,11 +1065,11 @@ def test_date_context_warmup_rows_equivalent(runner, resources):
     assert [d.entry_allowed for d in out_ctx.seam.decisions] == [
         d.entry_allowed for d in out_full.seam.decisions
     ]
-    # The emitted candidate's four real scan ratios are identical (the
-    # numeric evidence digests match on the same bars).
-    # The four real scan ratios are identical: the emitted entry decision's
-    # canonical bytes bind the feature-evidence digest computed from the
-    # 22-session window, so equal digests prove equal ratios on equal bars.
+    # The emitted candidate's four real scan ratios are identical: the emitted
+    # entry decision's canonical bytes bind the feature-evidence digest
+    # computed from the 22-session window, so equal digests prove equal ratios
+    # on equal bars.  Both sides keep their own un-matched cutoffs, so the
+    # whole decision envelope is identical.
     ctx_decs = [d.decision.to_dict() for d in out_ctx.seam.entries]
     full_decs = [d.decision.to_dict() for d in out_full.seam.entries]
     assert ctx_decs == full_decs

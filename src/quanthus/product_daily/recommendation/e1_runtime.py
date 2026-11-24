@@ -75,10 +75,7 @@ from quanthus.product_daily.recommendation.rule_seam import (
 _CANDIDATE_CARD = "config/p4-candidate-price-volume-transition.research.v1.json"
 _FEATURE_REGISTRY = "config/p3-baseline-features.research.v1.json"
 _TREND_CONFIG = "config/expert-evaluations/experts/trend-stability.v1.json"
-_TREND_SPEC = (
-    "config/expert-evaluations/specs/"
-    "trend-stability-p4-first-passage.evaluation.v1.json"
-)
+_TREND_SPEC = "config/expert-evaluations/specs/trend-stability-p4-first-passage.evaluation.v1.json"
 
 # The E1 production panel evaluator identity, bound to the frozen registry.
 _E1_EVALUATOR_VERSION = "p11-e1-runtime-v1"
@@ -257,9 +254,7 @@ def run_e1_from_history(
         decision_at = policy.decision_cutoff
         clock = lambda: decision_at  # noqa: E731
     if source_policy is None:
-        source_policy = _default_source_policy(
-            facts=facts, policy=policy, market_date=signal
-        )
+        source_policy = _default_source_policy(facts=facts, policy=policy, market_date=signal)
 
     # The panel report is built ONCE inside the job from the features the chain
     # computes; the factory is invoked with the actual features_by_security so
@@ -334,8 +329,7 @@ def _default_source_policy(
     return P6Base24CandidatePolicy(
         clock=clock,
         history_start=date(2026, 1, 1),
-        inputs_manifest_sha256=getattr(facts, "manifest_sha256", None)
-        or "sha256:" + "0" * 64,
+        inputs_manifest_sha256=getattr(facts, "manifest_sha256", None) or "sha256:" + "0" * 64,
     )
 
 
@@ -354,9 +348,7 @@ def _panel_report_for(
     re-checkable against the job's inputs.
     """
     ready = sum(1 for f in features_by_security.values() if getattr(f, "feature_ready", False))
-    eligible = sum(
-        1 for f in features_by_security.values() if getattr(f, "entry_eligible", False)
-    )
+    eligible = sum(1 for f in features_by_security.values() if getattr(f, "entry_eligible", False))
     exceptions = sum(
         1 for f in features_by_security.values() if getattr(f, "exception_active", False)
     )
@@ -370,9 +362,7 @@ def _panel_report_for(
         if getattr(f, "unexplained_price_transition", False)
     )
     continuity_excluded = sum(
-        1
-        for f in features_by_security.values()
-        if getattr(f, "scope_continuity_excluded", False)
+        1 for f in features_by_security.values() if getattr(f, "scope_continuity_excluded", False)
     )
     scope_start = min(
         (f.signal_date for f in features_by_security.values() if getattr(f, "signal_date", None)),
@@ -393,10 +383,7 @@ def _panel_report_for(
         unexplained_transition_count=unexplained,
         continuity_excluded_security_count=continuity_excluded,
         data_content_digest=sha256_digest(
-            {
-                code: _feature_row_dict(f)
-                for code, f in sorted(features_by_security.items())
-            }
+            {code: _feature_row_dict(f) for code, f in sorted(features_by_security.items())}
         ),
     )
 
@@ -428,6 +415,7 @@ def run_e1_replay_day(
     clock: Callable[[], datetime] | None = None,
     observed_clock: Callable[[], datetime] | None = None,
     p12_evidence: Mapping[str, Any] | None = None,
+    calendar_schedule_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """P12-facing replay entry: run one T through the signed replay path.
 
@@ -530,9 +518,7 @@ def run_e1_replay_day(
     # reminder from independently-available facts).  Neighbours keep
     # evaluating.  Isolated securities are named in the closure with reason,
     # original instant and scope.
-    excluded_ids = {
-        str(m["member_id"]) for m in member_use["excluded_late_partitions"]
-    }
+    excluded_ids = {str(m["member_id"]) for m in member_use["excluded_late_partitions"]}
     isolated_securities = set(member_use["isolated_by_security"])
     demoted = []
     for s in req.securities:
@@ -554,16 +540,13 @@ def run_e1_replay_day(
         iso["close_at_by_date"] = {}
         iso["knowledge_cutoff_by_date"] = {}
         iso["entry_isolated_reason"] = "member_unavailable_at_read"
-        iso["entry_isolated_member_ids"] = sorted(
-            member_use["isolated_by_security"][code]
-        )
+        iso["entry_isolated_member_ids"] = sorted(member_use["isolated_by_security"][code])
         demoted.append(iso)
     projected_req = (
         replace(
             req,
             source_members=tuple(
-                m for m in req.source_members
-                if str(_member_id_of(m)) not in excluded_ids
+                m for m in req.source_members if str(_member_id_of(m)) not in excluded_ids
             ),
             securities=tuple(demoted),
         )
@@ -599,6 +582,16 @@ def run_e1_replay_day(
             # same-day scenario-ledger digest.  Folded into the closure under
             # the caller's own keys; never back-filled from the run's now.
             "p12": dict(p12_evidence or {}),
+            # The named consumer rule by which this replay reads the exchange
+            # calendar plus the PROVEN schedule evidence for the venue sessions
+            # it actually relies on (P10 #747).  Each claimed session must
+            # match a bound calendar_row's venue/date/is_open; a bare caller
+            # timestamp never writes announced_before_T -- only a proven
+            # exchange publication/revision version can.  Unknown publication
+            # instants stay UNKNOWN_EXACT_INSTANT verbatim.
+            "calendar_schedule_evidence": _calendar_schedule_evidence(
+                req, market_date, calendar_schedule_evidence
+            ),
             "anchor_mode": "equivalent_day",
             "pit_disguise": False,
         }
@@ -704,6 +697,102 @@ def _member_id_of(m: Any) -> Any:
     return m.get("member_id") if isinstance(m, Mapping) else getattr(m, "member_id", None)
 
 
+def _text_of(row: Any, field: str) -> Any:
+    return row.get(field) if isinstance(row, Mapping) else getattr(row, field, None)
+
+
+def _calendar_schedule_evidence(
+    request: Any,
+    market_date: date,
+    evidence: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Bind the PROVEN exchange-schedule evidence into the signed closure.
+
+    The replay reads the venue trading calendar through a NAMED consumer rule
+    (consumer_rule_id/consumer_rule_version).  A caller may supply the P10
+    #747 publication evidence: per venue+session_date the schedule basis
+    (EXPLICIT_EXCHANGE_SCHEDULE / RULE_DERIVED_SCHEDULE), the named source
+    documents (notice id / rule clause + sha256 originals) and the
+    publication instants.
+
+    Hard rules (P10 #747 contract):
+      * only PROVEN exchange calendar facts are consumed -- every claimed
+        session must match a bound calendar_row on venue_id + session_date;
+        a claim for a session the envelope does not carry is refused, never
+        silently adopted;
+      * source_published_at / historical_channel_available_at keep their
+        source grade verbatim (UNKNOWN_EXACT_INSTANT when the official page
+        carries only a date); a bare caller timestamp never writes
+        announced_before_T -- only a proven exchange publication/revision
+        version can, and none is proven here;
+      * a session's schedule basis is a fact ABOUT that session's calendar
+        row; it never back-dates the source calendar's own archive
+        knowledge_from (which stays bound verbatim elsewhere).
+
+    Absent evidence yields a declared-empty block (the run still reads the
+    calendar through the consumer rule; it just has no proven publication
+    version to record), never a guessed label.
+    """
+    bound_rows = {
+        (
+            _text_of(row, "venue_id"),
+            str(_text_of(row, "session_date")),
+        ): (row.get("is_open") if isinstance(row, Mapping) else getattr(row, "is_open", None))
+        for row in getattr(request, "calendar_rows", ()) or ()
+    }
+    block: dict[str, Any] = {
+        "schema_version": "p11.calendar-schedule-evidence.v1",
+        "consumer_rule_id": None,
+        "consumer_rule_version": None,
+        # The run never asserts T-known: a caller's lone timestamp is not a
+        # proven exchange publication, so announced_before_T stays False.
+        "announced_before_T": False,
+        "sessions": [],
+    }
+    if evidence is None:
+        return block
+    block["consumer_rule_id"] = evidence.get("consumer_rule_id")
+    block["consumer_rule_version"] = evidence.get("consumer_rule_version")
+    sessions = []
+    for entry in evidence.get("sessions", ()) or ():
+        venue = _text_of(entry, "venue_id")
+        sess = str(_text_of(entry, "session_date"))
+        key = (venue, sess)
+        if key not in bound_rows:
+            _fail(
+                "calendar_schedule_evidence_unbound",
+                f"schedule evidence claims {venue} {sess} but no bound "
+                "calendar_row carries that venue/session_date",
+            )
+        sessions.append(
+            {
+                "venue_id": venue,
+                "session_date": sess,
+                "is_open": bound_rows[key],
+                "schedule_basis": _text_of(entry, "schedule_basis"),
+                "source_documents": [
+                    {
+                        "notice_id": _text_of(d, "notice_id"),
+                        "rule_clause": _text_of(d, "rule_clause"),
+                        "publication_date": _text_of(d, "publication_date"),
+                        "sha256": _text_of(d, "sha256"),
+                        "source_receipt_sha256": _text_of(d, "source_receipt_sha256"),
+                        "published_at": _text_of(d, "published_at"),
+                        "published_at_grade": _text_of(d, "published_at_grade"),
+                    }
+                    for d in entry.get("source_documents", ()) or ()
+                ],
+                "source_published_at": _text_of(entry, "source_published_at"),
+                "source_published_at_state": _text_of(entry, "source_published_at_state"),
+                "historical_channel_available_at": _text_of(
+                    entry, "historical_channel_available_at"
+                ),
+            }
+        )
+    block["sessions"] = sessions
+    return block
+
+
 def _date_to_of(m: Any) -> date | None:
     date_to = m.get("date_to") if isinstance(m, Mapping) else getattr(m, "date_to", None)
     if date_to is None:
@@ -734,8 +823,7 @@ def _member_available_at(m: Any) -> datetime | None:
     unavailable at read and its dependent is refused by dependency.
     """
     instants = [
-        x for x in (_instant_of(m, "visible_at"), _instant_of(m, "knowledge_at"))
-        if x is not None
+        x for x in (_instant_of(m, "visible_at"), _instant_of(m, "knowledge_at")) if x is not None
     ]
     return max(instants) if instants else None
 
@@ -799,7 +887,11 @@ def _used_member_ids(request: Any) -> dict[str, dict[str, Any]]:
         # shared evidence, not a same-T content dependency - it must not be
         # inflated into the shared required set and must not block neighbours.
         if me_id is not None and me_id not in used:
-            add(me_id, "member_evidence_opened_not_used" if not me_required else "member_evidence", None)
+            add(
+                me_id,
+                "member_evidence_opened_not_used" if not me_required else "member_evidence",
+                None,
+            )
     for mid in getattr(request, "required_member_ids", ()) or ():
         add(mid, "required", None)
     return used
@@ -839,9 +931,11 @@ def _analyze_member_use(
         d_to = _date_to_of(m)
         d_from = _date_from_of(m)
         avail = _member_available_at(m)
-        u = used.get(str(mid), {"shared": set(), "securities": set()}) if mid is not None else {
-            "shared": set(), "securities": set()
-        }
+        u = (
+            used.get(str(mid), {"shared": set(), "securities": set()})
+            if mid is not None
+            else {"shared": set(), "securities": set()}
+        )
         shared = sorted(u["shared"])
         secs = sorted(u["securities"])
         is_used = bool(shared or secs)
@@ -942,8 +1036,7 @@ def _analyze_member_use(
             1
             for m in members
             if m.get("is_used")
-            and m.get("dependency_tier")
-            in ("shared", "per_security", "multi_security")
+            and m.get("dependency_tier") in ("shared", "per_security", "multi_security")
         ),
         "opened_not_used_count": sum(
             1 for m in members if m.get("dependency_tier") == "opened_not_used"

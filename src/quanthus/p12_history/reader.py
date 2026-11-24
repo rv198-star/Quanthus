@@ -85,7 +85,14 @@ def read_history(
                 visible_at if visible_at is not None else knowledge_at,
                 date_from, date_to,
             )
+    # P11 裁定: a member whose own business clock is later than the
+    # declared decision_cutoff is registered with its real knowledge_at
+    # but its visible_at is bounded by the cutoff - the member is
+    # visible for the replay only up to the frozen point.  The
+    # truncated members are named on the coverage receipt so P11 can
+    # decide which uses are affected ("按真实可用性处理受影响动作").
     base_knowledge = datetime.fromisoformat(BASE_BUSINESS_THROUGH + "T16:00:00+00:00")
+    bounded_members = []
     for table in (
         "dwd_trading_calendar", "dwd_listing", "dwd_security",
         "dwd_security_identifier", "dwd_trading_venue", "dwd_listed_company",
@@ -96,14 +103,22 @@ def read_history(
         "dwd_tradability_state", "dwd_security_bar",
     ):
         for m in smap.base_members(table):
-            _reg(m, base_knowledge)
+            vis = min(base_knowledge, decision_cutoff)
+            if base_knowledge > decision_cutoff:
+                bounded_members.append(m.member_id)
+            _reg(m, base_knowledge, visible_at=vis)
     for day in smap.daily_open_days():
+        if day > market_date.isoformat():
+            continue
         pkg = smap.daily_core(day)
         if pkg is None:
             continue
         day_dt = datetime.fromisoformat(day + "T16:00:00+00:00")
         for m in pkg.members:
-            _reg(m, day_dt, date_from=day, date_to=day)
+            vis = min(day_dt, decision_cutoff)
+            if day_dt > decision_cutoff:
+                bounded_members.append(m.member_id)
+            _reg(m, day_dt, date_from=day, date_to=day, visible_at=vis)
     source_member_entries = list(member_entries.values())
 
     # ---- per-security entries ----
@@ -144,6 +159,7 @@ def read_history(
         "security_count": len(securities),
         "bar_sessions": BAR_SESSIONS,
         "listing_proof_sessions": LISTING_PROOF_SESSIONS,
+        "bounded_members": bounded_members,
         "note": (
             "Corporate-action/exception completeness for the covered window is "
             "UNKNOWN (0 securities proven; 2026-11 deltas SOURCE_NOT_REFRESHED). "

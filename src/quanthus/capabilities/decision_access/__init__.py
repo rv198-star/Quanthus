@@ -107,6 +107,12 @@ class MarketDecision:
     chart: ChartEvidence | None
     entry: EntryIntent | None
     component_ref: VersionRef
+    # p12.decision-set.v2 (issue #723): an EXIT_PLAN decision declares its
+    # exit kind ("full" | "reduce") and, for a reduce, the target position
+    # fraction it leaves behind.  Both are optional so v1 packages still
+    # validate unchanged; on v1 they stay None.
+    exit_kind: str | None = None
+    target_position_fraction: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -178,6 +184,29 @@ def validate_decision_set(value: MarketDecisionSet) -> MarketDecisionSet:
             and "INPUT_UNAVAILABLE" not in item.reason_codes
         ):
             raise FactError("INVALID_DECISION", "blocked input requires a named input reason")
+        # p12.decision-set.v2 exit-kind integrity.  exit_kind only has meaning on
+        # an EXIT_PLAN; carrying it on any other stage is a version breach.
+        if item.exit_kind is not None:
+            if item.exit_kind not in ("full", "reduce"):
+                raise FactError(
+                    "INVALID_DECISION", "exit_kind must be full or reduce"
+                )
+            if item.stage is not OpportunityStage.EXIT_PLAN:
+                raise FactError(
+                    "INVALID_DECISION",
+                    "exit_kind may only accompany an exit_plan decision",
+                )
+        if item.target_position_fraction is not None:
+            if item.exit_kind != "reduce":
+                raise FactError(
+                    "INVALID_DECISION",
+                    "target_position_fraction is only set on a reduce exit",
+                )
+            if not (Decimal("0") <= item.target_position_fraction < Decimal("1")):
+                raise FactError(
+                    "INVALID_DECISION",
+                    "target_position_fraction must be in [0, 1)",
+                )
     return value
 
 

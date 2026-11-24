@@ -30,7 +30,12 @@ RETRACTIONS_FILE = "retractions.jsonl"
 SKIPS_FILE = "skipped-plans.jsonl"
 RUNS_DIR = "daily-runs"
 PUBLISHER_REGISTRY_FILE = "publisher-registry.json"
-PACKAGE_SCHEMA = "quanthus.p12.daily-package.v1"
+# P12 publish envelope.  v2 (issue #723 first step) carries the same fields as
+# v1 plus room for the v2 decision_set; readers admit both so existing v1
+# packages keep loading with unchanged bytes and digest.
+PACKAGE_SCHEMA = "quanthus.p12.daily-package.v2"
+PACKAGE_SCHEMA_V1 = "quanthus.p12.daily-package.v1"
+READABLE_PACKAGE_SCHEMAS = frozenset({PACKAGE_SCHEMA, PACKAGE_SCHEMA_V1})
 RETRACTION_SCHEMA = "quanthus.p12.package-retraction.v1"
 RUN_SCHEMA = "quanthus.p12.daily-run.v1"
 
@@ -246,7 +251,7 @@ class DailyPackageStore:
 
     def _load_package_file(self, path: Path) -> StoredPackage:
         raw = _read_json(path)
-        if raw.get("schema_version") != PACKAGE_SCHEMA:
+        if raw.get("schema_version") not in READABLE_PACKAGE_SCHEMAS:
             raise FactError("INVALID_PACKAGE", "daily package schema differs")
         market_date = date.fromisoformat(str(raw["market_date"]))
         retraction = self.retraction_for(market_date)

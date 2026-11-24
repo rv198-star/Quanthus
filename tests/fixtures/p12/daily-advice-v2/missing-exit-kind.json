@@ -1,0 +1,25 @@
+{
+ "decision_set_schema": "p12.decision-set.v2",
+ "source_id": "p11-g1-synthetic",
+ "version": "m2-v2",
+ "market_date": "2026-11-24",
+ "knowledge_cutoff": "2026-11-24T22:30:00+08:00",
+ "published_at": "2026-11-24T22:35:00+08:00",
+ "next_session": "2026-11-25",
+ "decisions": [
+  {
+   "opportunity_id": "held-601398",
+   "security_code": "601398",
+   "security_name": "ICBC",
+   "stage": "exit_plan",
+   "component": {"ref_id": "p11-g1", "version": "m2-v2"},
+   "reason_codes": ["EXIT_SIGNAL"],
+   "explanations": [
+    {"code": "EXIT_SIGNAL", "use": "action", "component_ref": "p11-g1", "text": "missing kind"}
+   ],
+   "next_observation": null,
+   "chart": null,
+   "entry": null
+  }
+ ]
+}

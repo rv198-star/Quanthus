@@ -1,0 +1,95 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://quanthus/schemas/p12/v2/decision-set.v2.json",
+ "title": "P12 decision_set wire contract v2",
+ "description": "Raw decision_set carried inside the P12 daily-package envelope (issue #723 first step). Identified by decision_set_schema=\"p12.decision-set.v2\". Adds MarketDecision.exit_kind (full|reduce) and target_position_fraction (Decimal string, null on a full exit) to the v1 shape. A set without decision_set_schema is v1 and must not carry the v2-only fields. The reduce denominator is the entry-time locked bucket budget (locked_cycle_budget); a reduce that rounds to 0 whole shares emits no sell order. Both rules are consumed by E8 in batch B; until then reduce is display-only.",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "decision_set_schema",
+  "source_id",
+  "version",
+  "market_date",
+  "knowledge_cutoff",
+  "published_at",
+  "next_session",
+  "decisions"
+ ],
+ "properties": {
+  "decision_set_schema": {"const": "p12.decision-set.v2"},
+  "source_id": {"type": "string", "minLength": 1},
+  "version": {"type": "string", "minLength": 1},
+  "market_date": {"type": "string", "format": "date"},
+  "knowledge_cutoff": {"type": "string", "format": "date-time"},
+  "published_at": {"type": "string", "format": "date-time"},
+  "next_session": {"type": "string", "format": "date"},
+  "mode": {"type": "string"},
+  "decisions": {
+   "type": "array",
+   "items": {"$ref": "#/$defs/decision"}
+  }
+ },
+ "$defs": {
+  "decision": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "opportunity_id",
+    "security_code",
+    "security_name",
+    "stage",
+    "component",
+    "reason_codes",
+    "explanations"
+   ],
+   "properties": {
+    "opportunity_id": {"type": "string", "minLength": 1},
+    "security_code": {"type": "string", "minLength": 1},
+    "security_name": {"type": "string", "minLength": 1},
+    "stage": {
+     "type": "string",
+     "enum": ["entry_plan", "waiting", "holding", "exit_plan", "input_blocked", "ended"]
+    },
+    "component": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": ["ref_id", "version"],
+     "properties": {
+      "ref_id": {"type": "string", "minLength": 1},
+      "version": {"type": "string", "minLength": 1}
+     }
+    },
+    "reason_codes": {"type": "array", "items": {"type": "string"}},
+    "explanations": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "use", "component_ref", "text"],
+      "properties": {
+       "code": {"type": "string"},
+       "use": {"type": "string", "enum": ["action", "explanation"]},
+       "component_ref": {"type": "string"},
+       "text": {"type": "string"}
+      }
+     }
+    },
+    "next_observation": {"type": ["string", "null"]},
+    "chart": {"type": ["object", "null"]},
+    "entry": {"type": ["object", "null"]},
+    "exit_kind": {
+     "type": ["string", "null"],
+     "enum": ["full", "reduce", null],
+     "description": "Required on an exit_plan decision; full or reduce. Absent on non-exit stages."
+    },
+    "target_position_fraction": {
+     "type": ["string", "null"],
+     "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+     "description": "Decimal string in [0,1); set only on a reduce exit, null on full. Denominator is locked_cycle_budget; 0-share rounds emit no order (E8)."
+    }
+   },
+   "if": {"properties": {"stage": {"const": "exit_plan"}}},
+   "then": {"required": ["exit_kind"]}
+  }
+ }
+}

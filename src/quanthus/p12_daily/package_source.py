@@ -18,7 +18,11 @@ from quanthus.capabilities.decision_access import (
     MarketDecisionSet,
     validate_decision_set,
 )
-from quanthus.p12_daily.decision_loader import load_decision_set_dict
+from quanthus.p12_daily.decision_loader import (
+    DECISION_SET_SCHEMA_V1,
+    DECISION_SET_SCHEMA_V2,
+    load_decision_set,
+)
 from quanthus.p12_daily.package_store import DailyPackageStore, StoredPackage
 from quanthus.shared.fact_contracts import FactError, digest
 from quanthus.shared.values import AccountScope, VersionRef
@@ -91,12 +95,21 @@ class PublishedPackageSource:
         next_session_provider=None,
         publish_time: time = DEFAULT_PUBLISH_TIME,
         publish_slots: tuple[time, ...] = DEFAULT_PUBLISH_SLOTS,
+        decision_set_schemas: frozenset[str] | None = None,
     ) -> None:
         self._store = DailyPackageStore(Path(state_dir))
         self._clock = clock
         self._mode = mode
         self._accounts = account_ids
         self._cache: dict[str, MarketDecisionSet] = {}
+        # Consumer pin (issue #723 first step): the schemas this reader admits.
+        # Default admits v1 and v2 so existing v1 packages keep reading while
+        # v2 lands; a consumer pins a subset to reject a version up front.
+        self._decision_set_schemas = (
+            frozenset({DECISION_SET_SCHEMA_V1, DECISION_SET_SCHEMA_V2})
+            if decision_set_schemas is None
+            else frozenset(decision_set_schemas)
+        )
         # M2 F2 / audit R6: the pending placeholder's next_session comes from
         # the governed calendar via this provider, never a calendar-day-plus-one
         # guess.  When no authoritative session is resolvable the placeholder
@@ -156,7 +169,23 @@ class PublishedPackageSource:
                 "package digest does not match the publisher registry for "
                 + repr(source_id) + " " + stored.market_date.isoformat(),
             )
-        value = load_decision_set_dict(stored.decision_set, mode=self._mode)
+        # Version-pinned read (issue #723): the declared schema is checked
+        # against this consumer's pin.  A bare set is v1; a v2 set needs the
+        # v2 pin.  The reader returns (set, digest); the digest covers the raw
+        # bytes including the new fields.
+        declared = stored.decision_set.get("decision_set_schema")
+        expected = (
+            DECISION_SET_SCHEMA_V1 if declared is None else str(declared)
+        )
+        if expected not in self._decision_set_schemas:
+            raise FactError(
+                "POLICY_NOT_ADOPTED",
+                f"decision_set_schema {expected!r} is not admitted by this "
+                "consumer pin",
+            )
+        value, _set_digest = load_decision_set(
+            stored.decision_set, expected_schema=expected, mode=self._mode
+        )
         self._cache[stored.market_date.isoformat()] = (stored.file_sha256, value)
         return value
 

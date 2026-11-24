@@ -718,6 +718,17 @@ def build_replay_envelope(
             key=lambda b: _isodate(_obj(b, "bar").get("session_date"), "bar.session_date"),
         )
         filtered = {**sec_o, "bars": bars}
+        # October as-observed action projection (P11-side single conversion):
+        # the raw typed rows P12 assembles (action_status/ex_date/terms.
+        # amount_per_share) become panel feature actions bound to the signed
+        # register's proven terms; competing units/revisions are kept as
+        # evidence, non-implemented rows never bypass the negative check.
+        projected_actions, action_aside = project_signed_actions(
+            sec_o.get("actions"), identity, request.action_coverage
+        )
+        filtered["actions"] = projected_actions
+        if action_aside:
+            filtered["action_aside"] = action_aside
         for map_key in ("close_at_by_date", "knowledge_cutoff_by_date"):
             raw_map = sec_o.get(map_key) or {}
             filtered[map_key] = {
@@ -732,7 +743,9 @@ def build_replay_envelope(
                 if _isodate(_obj(lim, "limit").get("session_date"), "limit.session_date")
                 in window_set
             ]
-        if not held_member and not _action_coverage_ok(request, sec_o, code, market_date):
+        # The coverage gate consumes the PROJECTED feature actions (filtered),
+        # not the raw wire rows (sec_o) - same identity, projected shape.
+        if not held_member and not _action_coverage_ok(request, filtered, code, market_date):
             coverage_exclusions.append(
                 {
                     "security_code": code,
@@ -1438,9 +1451,13 @@ def build_signed_action_authority(
             "currency": _text(e.get("currency"), "events[].currency"),
             "implementation_sha256": impl,
             "notice": _text(e.get("notice_id") or e.get("notice"), "events[].notice_id"),
-            "security_id": str(e.get("security_id")),
-            "listing_id": str(e.get("listing_id")),
-            "venue_id": str(e.get("venue_id")),
+            # Index-sourced rows do not repeat the identity the window already
+            # bound (security/listing/venue were verified equal above); fall
+            # back to the function's own verified identity so the catalogue row
+            # binds the real security, never a literal "None" string.
+            "security_id": str(e.get("security_id") or security_id),
+            "listing_id": str(e.get("listing_id") or listing_id),
+            "venue_id": str(e.get("venue_id") or venue_id),
             "stock_code": stock_code,
         }
         cat_rows[reg_row] = row
@@ -1565,6 +1582,260 @@ def build_signed_action_authority(
             "MANIFEST; caller-copied fields are not independently qualifying"
         ),
     }
+
+
+def _feature_action_rows(actions: Any) -> list[Mapping[str, Any]]:
+    """Rows already in the panel feature-action shape pass through verbatim."""
+    out: list[Mapping[str, Any]] = []
+    if not isinstance(actions, Sequence) or isinstance(actions, str):
+        return out
+    for a in actions:
+        if (
+            isinstance(a, Mapping)
+            and a.get("security_code") is not None
+            and a.get("effective_date") is not None
+            and a.get("cash_dividend_per_share") is not None
+        ):
+            out.append(a)
+    return out
+
+
+def _raw_term_number(term: Any) -> Decimal | None:
+    """Best-effort numeric from one raw term cell (amount or numerator/denominator)."""
+    if not isinstance(term, Mapping):
+        return None
+    for key in ("amount_per_share",):
+        v = term.get(key)
+        if v is not None:
+            try:
+                return Decimal(str(v))
+            except Exception:
+                return None
+    num = term.get("ratio_numerator")
+    den = term.get("ratio_denominator")
+    if num is not None and den is not None:
+        try:
+            d = Decimal(str(den))
+            if d == 0:
+                return None
+            return Decimal(str(num)) / d
+        except Exception:
+            return None
+    return None
+
+
+def _signed_action_terms(
+    action_coverage: Mapping[str, Any] | None,
+    *,
+    security_id: str,
+    ex_iso: str,
+) -> tuple[Decimal | None, Decimal | None, str | None, Mapping[str, Any] | None]:
+    """Look up the proven terms for (security, ex_date) in the signed register.
+
+    Returns (cash_gross_per_share, bonus_share_ratio_incl_transfer, known_at_or_none,
+    the matched catalogue row) when the verified-artifact catalogue binds an
+    event for this ex_date, else (None, None, None, None).  The signed register
+    is the frozen P11/P10 ruling that already resolved competing units/revisions
+    (per-share vs per-10) - the projection uses its terms, not a raw row's.
+    """
+    if not isinstance(action_coverage, Mapping):
+        return None, None, None, None
+    artifacts = action_coverage.get("verified_artifacts") or ()
+    # verified_artifacts is emitted as a list of catalogues (each with a
+    # coverage_id + rows); tolerate a mapping keyed by coverage_id too.
+    if isinstance(artifacts, Mapping):
+        catalogues = list(artifacts.values())
+    elif isinstance(artifacts, Sequence) and not isinstance(artifacts, str):
+        catalogues = list(artifacts)
+    else:
+        return None, None, None, None
+
+    def _dec(v: Any) -> Decimal | None:
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return None
+
+    for cat in catalogues:
+        rows = cat.get("rows", cat) if isinstance(cat, Mapping) else cat
+        seq = rows.values() if isinstance(rows, Mapping) else rows
+        for row in seq or ():
+            if not isinstance(row, Mapping):
+                continue
+            if str(row.get("security_id")) != str(security_id):
+                continue
+            ex = row.get("ex_date")
+            ex_row = ex.isoformat() if isinstance(ex, date) else str(ex)
+            if ex_row != ex_iso:
+                continue
+            cash = _dec(row.get("cash_gross_per_share"))
+            bonus = _dec(row.get("bonus_share_ratio"))
+            transfer = _dec(row.get("transfer_share_ratio"))
+            if cash is None or bonus is None or transfer is None:
+                continue
+            # known_at: the row's day-level source publication date (the
+            # implementation-notice business day) when present, within the
+            # signed October replay's business-day semantics; never a
+            # back-filled historical instant.
+            known: str | None = None
+            oc = row.get("original_clocks")
+            if isinstance(oc, Mapping):
+                spd = oc.get("source_publication_date")
+                if isinstance(spd, str) and spd:
+                    known = spd[:10]
+            if known is None:
+                spd = row.get("source_publication_date") or row.get("announce_date")
+                if isinstance(spd, str) and spd:
+                    known = spd[:10]
+                elif isinstance(spd, date):
+                    known = spd.isoformat()
+            return cash, bonus + transfer, known, row
+    return None, None, None, None
+
+
+def project_signed_actions(
+    actions: Any,
+    identity: Mapping[str, Any],
+    action_coverage: Mapping[str, Any] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Project raw-wire action rows to the panel feature-action shape.
+
+    The single P11-side conversion for the October as-observed replay.  P12
+    delivers the original typed rows (action_status/ex_date/terms.amount_per_share/
+    record_source); the panel consumes security_code/effective_date/
+    cash_dividend_per_share/bonus_share_ratio/known_at.
+
+    - Rows already in feature shape pass through unchanged.
+    - Only IMPLEMENTED rows project; PROPOSED / NO_DISTRIBUTION / other
+      statuses are kept-aside evidence (they are not adjustments and must not
+      bypass the verified_none negative check by being silently dropped NOR
+      emitted as phantom actions).
+    - One feature row per ex_date: the signed register's proven per-share terms
+      (the frozen ruling that resolved competing unit/revision versions) win;
+      the raw rows' competing terms are recorded as audit evidence.  When the
+      register binds no event for that ex_date the raw row's own normalized
+      terms project so the coverage join's verified_none / multiplicity checks
+      still see the unproven adjustment and isolate it.
+    - known_at is the day-level source-publication date (the implementation
+      notice's business day) inside signed replay semantics; never a
+      back-filled historical instant.
+    Returns (feature_actions, kept_aside_evidence).
+    """
+    feature = [dict(a) for a in _feature_action_rows(actions)]
+    aside: list[dict[str, Any]] = []
+    if not isinstance(actions, Sequence) or isinstance(actions, str):
+        return feature, aside
+
+    def _dec(v: Any) -> Decimal | None:
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return None
+
+    stock_code = str(identity.get("stock_code") or identity.get("listing_code") or "")
+    security_id = str(identity.get("security_id") or "")
+    # Group raw IMPLEMENTED rows by ex_date.
+    implemented: dict[str, list[Mapping[str, Any]]] = {}
+    for a in actions:
+        if not isinstance(a, Mapping) or a.get("action_status") is None:
+            continue
+        status = str(a.get("action_status"))
+        ex = a.get("ex_date")
+        ex_iso = ex.isoformat() if isinstance(ex, date) else (str(ex) if ex else None)
+        if status != "IMPLEMENTED":
+            # NO_DISTRIBUTION / PROPOSED / withdrawn: not an adjustment.  Kept
+            # as evidence so a raw row never silently skips the negative check.
+            aside.append(
+                {
+                    "corporate_action_id": a.get("corporate_action_id"),
+                    "action_status": status,
+                    "ex_date": ex_iso,
+                    "disposition": "not_implemented_no_adjustment",
+                }
+            )
+            continue
+        if ex_iso is None:
+            aside.append(
+                {
+                    "corporate_action_id": a.get("corporate_action_id"),
+                    "action_status": status,
+                    "disposition": "implemented_no_ex_date",
+                }
+            )
+            continue
+        implemented.setdefault(ex_iso, []).append(a)
+
+    for ex_iso, rows in implemented.items():
+        signed_cash, signed_bonus, signed_known, matched = _signed_action_terms(
+            action_coverage, security_id=security_id, ex_iso=ex_iso
+        )
+        # Normalize each raw row's own terms for evidence + fallback.
+        raw_terms = []
+        for a in rows:
+            terms = a.get("terms") or {}
+            rt_cash = _raw_term_number(terms.get("CASH_AMOUNT_PER_SHARE"))
+            rt_bonus = _raw_term_number(terms.get("BONUS_SHARES_PER_SHARE"))
+            rt_transfer = _raw_term_number(terms.get("TRANSFER_SHARES_PER_SHARE"))
+            shares: Decimal | None = None
+            parts = [b for b in (rt_bonus, rt_transfer) if b is not None]
+            if parts:
+                shares = Decimal(sum(parts))
+            raw_terms.append(
+                {
+                    "corporate_action_id": a.get("corporate_action_id"),
+                    "record_source": a.get("record_source"),
+                    "source_revision": a.get("source_revision"),
+                    "cash_dividend_per_share": rt_cash,
+                    "bonus_share_ratio": shares,
+                    "announced_at": a.get("announced_at"),
+                }
+            )
+        cash: Decimal | None
+        bonus: Decimal | None
+        if matched is not None and signed_cash is not None:
+            cash, bonus = signed_cash, signed_bonus
+            provenance = "signed_register"
+        else:
+            # No signed event for this ex_date: use the raw row's own terms so
+            # the coverage join's negative check can still isolate the unproven
+            # adjustment (never dropped).  Distinct competing raw terms on the
+            # same date stay a multiplicity conflict downstream.
+            cash = raw_terms[0]["cash_dividend_per_share"]
+            bonus = raw_terms[0]["bonus_share_ratio"]
+            provenance = "raw_row_unsigned"
+        # known_at: signed source-publication date first, else the matching raw
+        # IMPLEMENTED row's announced_at business date; must precede ex_date.
+        known = signed_known
+        if known is None:
+            for rt in raw_terms:
+                ann = rt.get("announced_at")
+                if isinstance(ann, str) and ann:
+                    known = ann[:10]
+                    break
+                if isinstance(ann, (date, datetime)):
+                    known = ann.date().isoformat() if isinstance(ann, datetime) else ann.isoformat()
+                    break
+        if cash is None and bonus is None:
+            aside.append(
+                {
+                    "ex_date": ex_iso,
+                    "disposition": "implemented_no_terms",
+                    "raw": raw_terms,
+                }
+            )
+            continue
+        feature.append(
+            {
+                "security_code": stock_code,
+                "effective_date": ex_iso,
+                "cash_dividend_per_share": str(cash if cash is not None else Decimal(0)),
+                "bonus_share_ratio": str(bonus if bonus is not None else Decimal(0)),
+                "known_at": known,
+                "projection_provenance": provenance,
+                "competing_terms": raw_terms if len(raw_terms) > 1 else [],
+            }
+        )
+    return feature, aside
 
 
 def _dedupe_action_rows(actions: Any) -> list[Any]:

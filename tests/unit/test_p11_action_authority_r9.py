@@ -22,6 +22,7 @@ from quanthus.product_daily.recommendation.paper_replay import (
     build_replay_envelope,
     build_signed_action_authority,
     load_replay_request,
+    project_signed_actions,
 )
 from tests.unit.test_p11_paper_replay import (
     _request,
@@ -446,3 +447,71 @@ def test_r9c_manifest_pin_mismatch_fail_closed():
     with pytest.raises(ProductDailyError) as exc:
         bind_signed_manifest(b"{}", "sha256:" + "0" * 64)
     assert str(exc.value.args[0]).startswith("action_authority_manifest_pin_mismatch")
+
+
+# --- oct08-action-projection-0043: raw-wire actions -> feature projection ------
+
+
+def _raw_action(
+    code, ex, cash, status="IMPLEMENTED", source="base22_f10/dividend_implemented", ann="2026-07-10"
+):
+    return {
+        "corporate_action_id": f"ca_{code}_{ex}_{cash}",
+        "security_id": None,
+        "action_type": "CASH_DIVIDEND",
+        "action_status": status,
+        "ex_date": ex,
+        "announced_at": ann,
+        "record_source": source,
+        "terms": {
+            "CASH_AMOUNT_PER_SHARE": {"amount_per_share": cash, "currency": "CNY"},
+            "BONUS_SHARES_PER_SHARE": {"ratio_numerator": "0", "ratio_denominator": "1"},
+            "TRANSFER_SHARES_PER_SHARE": {"ratio_numerator": "0", "ratio_denominator": "1"},
+        },
+    }
+
+
+def _index_002040_authority():
+    return _authority(
+        "b10", SZSE_BATCH, SZSE_002040, "2026-10-08", index_member=WINDOW_INDEX_MEMBER
+    )
+
+
+def test_r9d_projection_signed_terms_win_competing_units():
+    # 002040@10-08: raw has IMPLEMENTED base22_f10 0.116 + dividend_history 1.160
+    # (per-10) + PROPOSED.  The signed register proved 0.116 -> ONE feature row
+    # with signed terms + competing versions kept as evidence.
+    cov = _index_002040_authority()
+    raw = [
+        _raw_action("002040", "2026-07-28", "1.1600000000", source="dividend_history"),
+        _raw_action("002040", "2026-07-28", "0.1160000000"),
+        _raw_action("002040", None, "0", status="PROPOSED"),
+    ]
+    feats, aside = project_signed_actions(raw, SZSE_002040 | {"stock_code": "sz.002040"}, cov)
+    assert len(feats) == 1
+    assert feats[0]["effective_date"] == "2026-07-28"
+    assert feats[0]["cash_dividend_per_share"] == "0.116"
+    assert feats[0]["projection_provenance"] == "signed_register"
+    assert feats[0]["security_code"] == "sz.002040"
+    assert len(feats[0]["competing_terms"]) == 2
+    # PROPOSED kept aside (not an adjustment; never bypasses negative check).
+    assert any(a["disposition"] == "not_implemented_no_adjustment" for a in aside)
+
+
+def test_r9d_projection_index_catalogue_row_binds_real_identity():
+    # Index-derived catalogue rows must bind the real security/listing/venue,
+    # not a literal "None" string (which broke _action_row_identity_matches).
+    out = _index_002040_authority()
+    rows = out["verified_artifacts"][0]["rows"]
+    assert rows[0]["security_id"] == SZSE_002040["security_id"]
+    assert rows[0]["listing_id"] == SZSE_002040["listing_id"]
+    assert rows[0]["venue_id"] == SZSE_002040["venue_id"]
+
+
+def test_r9d_projection_no_signed_match_uses_raw_terms_for_isolation():
+    # No action_coverage: an IMPLEMENTED raw row still projects (its own terms)
+    # so the verified_none negative check sees the unproven adjustment.
+    raw = [_raw_action("600000", "2026-07-16", "0.4200000000")]
+    feats, _ = project_signed_actions(raw, SSE_ID, None)
+    assert len(feats) == 1 and feats[0]["projection_provenance"] == "raw_row_unsigned"
+    assert feats[0]["cash_dividend_per_share"] == "0.4200000000"

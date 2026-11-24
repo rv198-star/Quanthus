@@ -60,7 +60,8 @@
         "quanthus.capabilities",
         "quanthus.product_daily.application",
         "quanthus.platform.adapters",
-        "quanthus.p12_daily"
+        "quanthus.p12_daily",
+        "quanthus.product_daily.recommendation"
       ],
       "note": "Daily advice runtime orchestration: input qualification, the rule-execution port, the immutable package store, retraction append, the PublishedPackageSource reader and migration rehearsal. It reads the paper ledger through the platform adapter only to know current holdings when running rules; it never writes ledger facts."
     },
@@ -77,7 +78,14 @@
         "quanthus.capabilities.funding",
         "quanthus.p12_paper",
         "quanthus.p12_daily",
-        "quanthus.capabilities.decision_access"
+        "quanthus.capabilities.decision_access",
+        "quanthus.product_daily.recommendation",
+        "quanthus.event_library",
+        "quanthus.expert_evaluation",
+        "quanthus.expert_strategy",
+        "quanthus.feature_registry",
+        "quanthus.backtest",
+        "quanthus.forward_validation"
       ],
       "note": "HTTP/CLI/assembly translate the contract; capabilities.execution is admitted only for the trusted assembly context (see platform-domain-imports exception). p12_paper and capabilities.funding are admitted for the paper-trading assembly and the funding write path (R1)."
     }

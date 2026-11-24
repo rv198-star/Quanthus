@@ -24,6 +24,7 @@ import dataclasses
 import json
 import math
 import os
+import sys
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -507,6 +508,86 @@ def _blocked_receipt(
     return receipt
 
 
+def write_input_blocked_receipt(
+    state_dir: Path,
+    *,
+    account_id: str,
+    detail: str,
+    runner_ref: tuple[str, str, str],
+    market_date: date | None = None,
+    missing_members: tuple[str, ...] = (),
+    reason_code: str = "INPUT_UNAVAILABLE",
+    now: datetime | None = None,
+) -> dict:
+    """Write one INPUT_BLOCKED run receipt for an input fault that never
+    reached the daily job (issue #722 r8-2 / product directive).
+
+    Every input-read failure that escapes before or outside ``run_daily`` -
+    the wrapper's unreadable/unparseable DATES index, or the CLI's own
+    argument rejection - lands here, in one shared writer, instead of
+    exiting with no receipt.  ``runner_ref`` is a fixed
+    ``(ref_id, version, sha256-digest)`` identity for the producing entry
+    point (the wrapper file's own sha256, or the job module's code digest),
+    so the workbench reads a contract-conformant receipt whose source is
+    traceable.  Returns the written receipt dict.
+    """
+
+    ref_id, version, runner_digest = runner_ref
+    if not (
+        isinstance(runner_digest, str)
+        and runner_digest.startswith("sha256:")
+        and len(runner_digest) == len("sha256:") + 64
+    ):
+        raise FactError(
+            "INVALID_PACKAGE",
+            "runner_digest must be a sha256:<64-hex> digest, got "
+            f"{runner_digest!r}",
+        )
+    moment = (now or datetime.now(EXCHANGE_TZ)).astimezone(EXCHANGE_TZ)
+    md = market_date.isoformat() if market_date else moment.date().isoformat()
+    receipt: dict[str, Any] = {
+        "schema_version": RUN_SCHEMA,
+        "run_id": _run_id(moment),
+        "market_date": md,
+        "next_session": None,
+        "decision_cutoff": None,
+        "account_id": account_id,
+        "runner": {
+            "ref_id": ref_id,
+            "version": version,
+            "digest": runner_digest,
+        },
+        "started_at": moment.isoformat(),
+        "stages": [
+            {
+                "stage": "input",
+                "elapsed_ms": 0,
+                "result": "blocked",
+                "reason_code": reason_code,
+            }
+        ],
+        "status": STATUS_INPUT_BLOCKED,
+        "input_block": {
+            "reason_code": reason_code,
+            "detail": detail,
+            "checked_at": moment.isoformat(),
+            "expected_market_date": (
+                market_date.isoformat() if market_date else None
+            ),
+            "observed_market_date": None,
+            "affected_scope": "new_entries",
+            "missing_members": list(missing_members),
+            "recovery_condition": (
+                "restore a readable, qualified input; the next scheduled run "
+                "then proceeds"
+            ),
+        },
+        "elapsed_ms": 0,
+    }
+    DailyPackageStore(state_dir).write_run(receipt)
+    return receipt
+
+
 def run_daily(
     *,
     state_dir: Path,
@@ -551,6 +632,7 @@ def run_daily(
             decision_cutoff=decision_cutoff,
             publish_gate_config=publish_gate_config,
             calendar_root=calendar_root,
+            raw_history=raw_history,
         )
     except Exception as exc:  # noqa: BLE001 - last line: still leave a receipt
         receipt: dict[str, Any] = {
@@ -622,6 +704,7 @@ def _run_daily_inner(
     decision_cutoff: datetime | None = None,
     publish_gate_config: Path | None = None,
     calendar_root: Path | None = None,
+    raw_history: dict | None = None,
 ) -> dict:
     '''Execute one daily run and persist its receipt; returns the receipt.'''
 
@@ -658,6 +741,25 @@ def _run_daily_inner(
         return time.monotonic()
 
     t = time.monotonic()
+
+    def _bind_day_receipt() -> None:
+        # Issue #748 unified carrier: when the runner produced a
+        # p11.paper-replay-day.v1 day receipt inside this same run, persist
+        # it as its own immutable file and record the binding on the run
+        # record - the page and the workbench read ONLY the current run
+        # binding (path + sha256 + scenario identity), never a
+        # date-enumerated sidecar that could mis-bind an earlier run.
+        payload = getattr(output, "p11_day_receipt", None) or getattr(
+            output, "evaluation_receipt", None
+        )
+        if not isinstance(payload, dict):
+            return
+        if payload.get("schema_version") != "p11.paper-replay-day.v1":
+            return
+        ref = store.write_day_receipt(
+            run_id=receipt["run_id"], payload=payload
+        )
+        receipt["p11_replay_day_receipt_ref"] = ref
 
     # The decision cutoff is configured per use (e.g. forward-day-1 22:30+08),
     # carried with its timezone.  A run without it cannot fix the package
@@ -938,6 +1040,12 @@ def _run_daily_inner(
     raw_history_marker = None
     if isinstance(raw_history, dict):
         raw_history_marker = raw_history.get("schema_version")
+    # Record the declared marker on every receipt (merged contract field).
+    receipt["history_input"] = {
+        "declared_schema": raw_history_marker,
+        "expected_schema": "p11.raw-history-input.v1",
+        "present": isinstance(raw_history, dict),
+    }
     if raw_history is None or raw_history_marker != "p11.raw-history-input.v1":
         detail = (
             "raw history input unavailable: the H1 raw-history reader supplied "
@@ -970,6 +1078,7 @@ def _run_daily_inner(
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt
+    t = stage("history", t, result="carried", schema=raw_history_marker)
 
     # M2 F11 / audit R7: each declared corporate-action / adjustment field is
     # checked individually against the input - never trusted by the
@@ -1259,6 +1368,62 @@ def _run_daily_inner(
         store.write_run(receipt)
         return receipt
     decisions = output.decision_set
+    if decisions is None:
+        t = stage(
+            "rule",
+            t,
+            result="blocked",
+            reason_code=str(output.disposition or "runner_blocked"),
+            diagnostics=output.diagnostics,
+        )
+        _blocked_receipt(
+            receipt,
+            InputBlock(
+                reason_code="INPUT_UNAVAILABLE",
+                detail=(
+                    "runner blocked the day inside its seam: "
+                    + str(output.disposition or "no decision_set")
+                ),
+                checked_at=moment,
+                expected_market_date=market_date,
+                observed_market_date=snapshot.market_date,
+            ),
+            market_date=market_date,
+            missing_members=["decision_set"],
+        )
+        if output.disposition is not None:
+            receipt["disposition"] = output.disposition
+        if output.diagnostics is not None:
+            receipt["diagnostics"] = output.diagnostics
+        receipt["evaluation_receipt"] = output.evaluation_receipt
+        receipt["source_closure"] = output.source_closure
+        _bind_day_receipt()
+        if output.exclusions:
+            receipt["exclusions"] = [
+                {
+                    "security_code": i.security_code,
+                    "reason_code": i.reason_code,
+                    "detail": i.detail,
+                    "metric": i.metric,
+                    "window_start": i.window_start,
+                    "window_end": i.window_end,
+                    "regime_version": i.regime_version,
+                }
+                for i in output.exclusions
+            ]
+        if output.held_signals:
+            receipt["held_signals"] = [
+                {
+                    "security_code": i.security_code,
+                    "opportunity_id": i.opportunity_id,
+                    "action": i.action,
+                    "target_maximum_position": i.target_maximum_position,
+                }
+                for i in output.held_signals
+            ]
+        receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        store.write_run(receipt)
+        return receipt
     t = stage(
         "rule",
         t,
@@ -1342,6 +1507,9 @@ def _run_daily_inner(
             receipt["disposition"] = output.disposition
         if output.diagnostics is not None:
             receipt["diagnostics"] = output.diagnostics
+        receipt["evaluation_receipt"] = output.evaluation_receipt
+        receipt["source_closure"] = output.source_closure
+        _bind_day_receipt()
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt
@@ -1350,6 +1518,7 @@ def _run_daily_inner(
     # rewrites them; the client never rebuilds them either.
     receipt["evaluation_receipt"] = output.evaluation_receipt
     receipt["source_closure"] = output.source_closure
+    _bind_day_receipt()
 
     outcome = store.publish(
         decision_set=decision_set,
@@ -1443,6 +1612,16 @@ def _load_runner(spec: str | None, candidates_path: Path | None) -> StrategyRule
             "RULE_VERSION_REJECTED",
             f"rule runner {spec!r} is not an admitted batch-A version",
         )
+    if candidates_path is not None:
+        # Issue #722 r9-2: --candidates is a test/debug knob, never part of
+        # the systemd -> wrapper -> CLI production path (the wrapper never
+        # passes it).  Mark the run's startup so an operator-supplied file
+        # is visibly non-production on the receipt/log.
+        print(
+            "p12-daily-job: --candidates is TEST-ONLY (manual/debug); "
+            "it is not part of the production daily run.",
+            file=sys.stderr,
+        )
     path = candidates_path or Path(__file__).resolve().parents[3] / (
         "config/p12/daily-synthetic-candidates.v1.json"
     )
@@ -1450,6 +1629,18 @@ def _load_runner(spec: str | None, candidates_path: Path | None) -> StrategyRule
     if not isinstance(raw, dict) or not isinstance(raw.get("candidates"), list):
         raise FactError("INVALID_FIXTURE", "candidates file must carry a candidates list")
     return SyntheticRuleRunner(candidates=tuple(raw["candidates"]))
+
+
+def _cli_runner_ref() -> tuple[str, str, str]:
+    """Fixed runner identity for CLI input faults.
+
+    Covers a bad ``--market-date`` / ``--next-session`` / ``--decision-cutoff``
+    parsed before a strategy runner exists.  The digest is this module file's
+    sha256 so the receipt runner is traceable (issue #722 r8-2).
+    """
+    import hashlib
+    file_sha = hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest()
+    return ("quanthus.p12_daily.daily_job", "cli", "sha256:" + file_sha)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1466,18 +1657,22 @@ def main(argv: list[str] | None = None) -> int:
         default="synthetic",
         help="account mode binding the trusted producer list (synthetic|simulation|live)",
     )
-    parser.add_argument("--market-date", type=date.fromisoformat, required=True)
+    parser.add_argument("--market-date", required=True)
     parser.add_argument(
         "--next-session",
-        type=date.fromisoformat,
         default=None,
         help="optional; the governed calendar decides next_session (M2 F2)",
     )
     parser.add_argument("--runner", default="synthetic-replay")
-    parser.add_argument("--candidates", type=Path)
+    parser.add_argument(
+        "--candidates",
+        type=Path,
+        help="TEST-ONLY: explicit synthetic candidates file for the labelled "
+        "synthetic runner; not part of the daily production run (which uses "
+        "the bundled config fixture).  For tests and manual debugging only.",
+    )
     parser.add_argument(
         "--decision-cutoff",
-        type=lambda v: datetime.fromisoformat(v),
         default=None,
         help="configured tz-aware decision cutoff, e.g. 2026-11-20T22:30:00+08:00",
     )
@@ -1503,12 +1698,43 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--retract-reason", default=None)
     args = parser.parse_args(argv)
 
+    def _input_fault(field, raw, exc):
+        write_input_blocked_receipt(
+            args.state_dir,
+            account_id=args.account,
+            market_date=None,
+            detail=(
+                "daily-job CLI could not parse --" + field + " " + repr(raw)
+                + ": " + type(exc).__name__ + ": " + str(exc)
+            ),
+            runner_ref=_cli_runner_ref(),
+            missing_members=("--" + field,),
+        )
+        return 2
+
+    try:
+        market_date = date.fromisoformat(str(args.market_date))
+    except (TypeError, ValueError) as exc:
+        return _input_fault("market-date", str(args.market_date), exc)
+    next_session = None
+    if args.next_session is not None:
+        try:
+            next_session = date.fromisoformat(str(args.next_session))
+        except (TypeError, ValueError) as exc:
+            return _input_fault("next-session", str(args.next_session), exc)
+    decision_cutoff = None
+    if args.decision_cutoff is not None:
+        try:
+            decision_cutoff = datetime.fromisoformat(str(args.decision_cutoff))
+        except (TypeError, ValueError) as exc:
+            return _input_fault("decision-cutoff", str(args.decision_cutoff), exc)
+
     store = DailyPackageStore(args.state_dir)
     if args.retract:
         if not args.retract_reason:
             parser.error("--retract requires --retract-reason")
         record = store.retract(
-            market_date=args.market_date,
+            market_date=market_date,
             reason=args.retract_reason,
             retracted_at=datetime.now(EXCHANGE_TZ),
             actor="operator-cli",
@@ -1521,12 +1747,12 @@ def main(argv: list[str] | None = None) -> int:
         state_dir=args.state_dir,
         job_root=args.job_root,
         runner=runner,
-        market_date=args.market_date,
-        next_session=args.next_session,
+        market_date=market_date,
+        next_session=next_session,
         account_id=args.account,
         account_mode=args.account_mode,
         sidecar_path=args.sidecar,
-        decision_cutoff=args.decision_cutoff,
+        decision_cutoff=decision_cutoff,
         calendar_root=args.calendar_root,
     )
     print(json.dumps(receipt, ensure_ascii=False, indent=2))

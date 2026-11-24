@@ -18,8 +18,8 @@
     "entry_seam": "src/quanthus/product_daily/risk.py",
     "trend_producer": "src/quanthus/expert_evaluation/experts/trend_stability.py",
     "context_builder": "src/quanthus/expert_strategy/runner.py:build_formal_expert_context",
-    "code_commit": "c2165ab71d37629a3810b8d0af9ec37b5ac5fff4",
-    "code_tree": "79a367b8b94b75e1d0d05c83d8dbaa9908248ed4",
+    "code_commit": "ab988132fb04014728c09de0de5f6f6b5318c6c9",
+    "code_tree": "8b8f43e506529fb5ac36d448a9c1e280fcd6a9db",
     "publish_path": "src/quanthus/product_daily/recommendation/publish.py",
     "contracts_path": "src/quanthus/product_daily/recommendation/contracts.py",
     "runtime_identity": "src/quanthus/product_daily/recommendation/runtime_identity.py",
@@ -90,9 +90,9 @@
   "held_reduction_wire": {
     "wire_version": "p12.decision-set.v2",
     "reduce_denominator": "locked_cycle_budget",
-    "consumer_capability": "versioned p12-consumer-binding.v1 object: consumer_schema=p12.decision-set.v2 + real source_commit/tree/file-hash pin + capabilities.supports_held_reduction_v2 + single-call field-preserving validated object",
+    "consumer_capability": "versioned p12-consumer-binding.v1 object bound to P12 commit a676de97: consumer_schema=p12.decision-set.v2 + real source_commit/tree + per-file sha256 pin + capabilities.supports_held_reduction_v2 + single-call (MarketDecisionSet, wire_digest) with the seam account_digest carried out",
     "missing_consumer_disposition": "refused or display_only",
-    "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set(raw,*,expected_schema=p12.decision-set.v2)); caller bools/dicts, unpinned bindings and old field-dropping loaders are all refused before write; real pin pending -> refused/display_only"
+    "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set, bound at commit a676de97); caller bools/dicts, unpinned bindings, stale-commit trees and old field-dropping loaders are all refused before write. mode=simulation with purpose=historical_replay; the binding digest is p12_package_digests=digest(_package_content(validated)) - the account ConfigurationBinding identity - while the raw-byte wire digest is kept separately on p12_wire_digests."
   },
   "release_bindings": {
     "machine_policy": {
@@ -105,7 +105,7 @@
     },
     "consumer": {
       "path": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json",
-      "sha256": "sha256:09aaf05f4468471b2bf5df6765c342f8ab18ade4ec32190a42af0de8974caa0d"
+      "sha256": "sha256:ba7bbd0930d77a7f23d30858b985343d3bc48d789bbbc4d77330aa1ce827a0c0"
     }
   }
 }

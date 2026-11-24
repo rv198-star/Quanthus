@@ -1,27 +1,37 @@
 {
- "decision_set_schema": "p12.decision-set.v2",
- "source_id": "p11-g1-synthetic",
- "version": "m2-v2",
- "market_date": "2026-11-24",
- "knowledge_cutoff": "2026-11-24T22:30:00+08:00",
- "published_at": "2026-11-24T22:35:00+08:00",
- "next_session": "2026-11-25",
- "decisions": [
-  {
-   "opportunity_id": "held-600000",
-   "security_code": "600000",
-   "security_name": "浦发银行",
-   "stage": "exit_plan",
-   "exit_kind": "reduce",
-   "target_position_fraction": "0.50",
-   "component": {"ref_id": "p11-g1", "version": "m2-v2"},
-   "reason_codes": ["EXIT_SIGNAL"],
-   "explanations": [
-    {"code": "EXIT_SIGNAL", "use": "action", "component_ref": "p11-g1", "text": "reduce"}
-   ],
-   "next_observation": null,
-   "chart": null,
-   "entry": null
-  }
- ]
+  "decision_set_schema": "p12.decision-set.v2",
+  "source_id": "p11-g1-synthetic",
+  "version": "m2-v2",
+  "market_date": "2026-11-24",
+  "knowledge_cutoff": "2026-11-24T22:30:00+08:00",
+  "published_at": "2026-11-24T22:35:00+08:00",
+  "next_session": "2026-11-25",
+  "decisions": [
+    {
+      "opportunity_id": "held-600000",
+      "security_code": "600000",
+      "security_name": "\u6d66\u53d1\u94f6\u884c",
+      "stage": "exit_plan",
+      "exit_kind": "reduce",
+      "target_position_fraction": "0.5",
+      "component": {
+        "ref_id": "p11-g1",
+        "version": "m2-v2"
+      },
+      "reason_codes": [
+        "EXIT_SIGNAL"
+      ],
+      "explanations": [
+        {
+          "code": "EXIT_SIGNAL",
+          "use": "action",
+          "component_ref": "p11-g1",
+          "text": "reduce"
+        }
+      ],
+      "next_observation": null,
+      "chart": null,
+      "entry": null
+    }
+  ]
 }

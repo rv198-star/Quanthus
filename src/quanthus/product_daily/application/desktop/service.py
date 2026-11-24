@@ -18,6 +18,8 @@ from decimal import Decimal, InvalidOperation
 
 from quanthus.capabilities.accounting import AccountProjection, Position, value_account
 from quanthus.capabilities.decision_access import (
+    Explanation,
+    ExplanationUse,
     MarketDecision,
     MarketDecisionSet,
     OpportunityStage,
@@ -1109,6 +1111,7 @@ class P12DesktopApplication:
         ):
             changes.append("FACT_CORRECTED")
         stage = item.stage
+        wire_stage = item.stage
         reasons = list(item.reason_codes)
         primary = plan.primary_constraint if plan else None
         next_observation_override: str | None = None
@@ -1204,9 +1207,20 @@ class P12DesktopApplication:
                 )
             else:
                 is_reduce = item.opportunity_id in reduce_exit_ids
-                action, status = (
-                    ("HOLD", "READY") if is_reduce else ("SELL", "READY")
-                )
+                if is_reduce:
+                    # Issue #722 r9-1: a held reduction resolves to a held
+                    # disposition - stage, exit_kind and the sell reason are
+                    # cleared, the row reads stage=holding with a registered
+                    # hold reason, and the reduce note rides the explanation
+                    # (held_exit below), never a sell action or sell copy.
+                    stage = OpportunityStage.HOLDING
+                    action, status = "HOLD", "READY"
+                    reasons = [r for r in reasons if r != "EXIT_SIGNAL"]
+                    if "HOLD_AND_ALERT" not in reasons:
+                        reasons.append("HOLD_AND_ALERT")
+                    primary = "HOLD_AND_ALERT"
+                else:
+                    action, status = "SELL", "READY"
             # Once the position is flat the exit is complete: it no longer
             # prompts a sell.  An exit plan is sized for the whole held
             # quantity, so quantity 0 after its report marks it done — but only
@@ -1256,6 +1270,27 @@ class P12DesktopApplication:
             exit_kind = (
                 "reduce" if item.opportunity_id in reduce_exit_ids else "full"
             )
+        # Issue #722 r8-1 / product directive: explanations follow the FINAL
+        # disposition, never the wire.  A sell/reduce/liquidation note may only
+        # ship with a real sell plan.  Whenever an exit_plan decision resolves
+        # to a held disposition (unverifiable type, missing input, reduce kept
+        # held, or any other reason) the producer's exit explanation is dropped
+        # and replaced by a single held note - the queue row and the expanded
+        # analysis chain read identically as held.
+        held_exit = wire_stage is OpportunityStage.EXIT_PLAN and action != "SELL"
+        if held_exit:
+            explanations = (
+                Explanation(
+                    primary if primary else "EXIT_SIGNAL",
+                    ExplanationUse.EXPLANATION,
+                    "p12.desktop",
+                    "退出类型无法核实，暂按持有处理，不生成委托。"
+                    if status == "MISSING_INPUT"
+                    else "减仓建议（执行将在批次 B 接入）；持仓继续持有。",
+                ),
+            )
+        else:
+            explanations = item.explanations
         return OpportunityView(
             opportunity_id=item.opportunity_id,
             security_code=item.security_code,
@@ -1267,7 +1302,7 @@ class P12DesktopApplication:
             reason_codes=tuple(dict.fromkeys(reasons)),
             primary_constraint=primary,
             changes=tuple(changes),
-            explanations=item.explanations,
+            explanations=explanations,
             next_observation=(
                 next_observation_override
                 if next_observation_override is not None
@@ -2145,7 +2180,7 @@ class P12DesktopApplication:
                 return
             if sum(realized.values(), Decimal("0.00")) != missing:
                 return
-            for (bucket, (sec, _cash)) in zip(empties, sorted(realized.items())):
+            for (bucket, (sec, _cash)) in zip(empties, sorted(realized.items()), strict=False):
                 cycle_id = f"paper:{sec}:{bucket.bucket_id}"
                 # One atomic upgrade: open the cycle on the empty bucket,
                 # attribute it to the security, and anchor the floor at the

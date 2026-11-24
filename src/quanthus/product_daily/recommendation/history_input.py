@@ -48,6 +48,32 @@ def _fail(code: str, message: str) -> NoReturn:
     raise ProductDailyError(code, message)
 
 
+def _note_sealed_member(
+    observed_sink: dict[str, Any],
+    member_id: str,
+    *,
+    knowledge_at: datetime,
+    visible_at: datetime | None,
+    date_to: Any,
+) -> None:
+    """Record a post-cutoff sealed member once, keeping BOTH original clocks."""
+    sealed = observed_sink.setdefault("sealed_members", [])
+    existing = next((x for x in sealed if x.get("member_id") == member_id), None)
+    record = {
+        "member_id": member_id,
+        "knowledge_at": knowledge_at.isoformat(),
+        "visible_at": visible_at.isoformat() if visible_at is not None else None,
+        "date_to": date_to,
+        "kind": "sealed_post_cutoff_archive",
+    }
+    if existing is None:
+        sealed.append(record)
+    else:
+        for k in ("knowledge_at", "visible_at", "date_to"):
+            if existing.get(k) is None:
+                existing[k] = record[k]
+
+
 def _obj(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         _fail("invalid_raw_history", f"{label} must be an object")
@@ -252,7 +278,12 @@ class RawHistory:
 # --- strict loader ------------------------------------------------------------------
 
 
-def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
+def load_raw_history(
+    raw: Mapping[str, Any],
+    *,
+    as_observed: bool = False,
+    observed_sink: dict[str, Any] | None = None,
+) -> RawHistory:
     """Validate a p11.raw-history-input.v1 envelope; raise on any contract breach."""
     envelope = _obj(raw, "raw_history")
     if envelope.get("schema_version") != RAW_HISTORY_SCHEMA:
@@ -275,12 +306,23 @@ def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
         knowledge_at = _isodatetime(mo.get("knowledge_at"), f"source_members[{index}].knowledge_at")
         visible_at = _isodatetime(mo.get("visible_at"), f"source_members[{index}].visible_at")
         # A member the consumer could not have seen before the decision cutoff is not
-        # admissible knowledge for this batch.
+        # admissible knowledge for this batch.  Under the versioned as-observed
+        # replay mode it is kept and NAMED on the sink (never a relabelled
+        # October-known input); strict still fails it.
         if visible_at > decision_cutoff:
-            _fail(
-                "source_visibility_after_cutoff",
-                f"source_member {member_id} visible_at after decision_cutoff",
-            )
+            if not as_observed:
+                _fail(
+                    "source_visibility_after_cutoff",
+                    f"source_member {member_id} visible_at after decision_cutoff",
+                )
+            if observed_sink is not None:
+                _note_sealed_member(
+                    observed_sink,
+                    member_id,
+                    knowledge_at=knowledge_at,
+                    visible_at=visible_at,
+                    date_to=mo.get("date_to"),
+                )
         members.append(
             SourceMember(
                 package_id=_text(mo.get("package_id"), f"source_members[{index}].package_id"),
@@ -1050,6 +1092,8 @@ def bind_raw_history_to_run(
     *,
     facts: Any,
     policy: Any,
+    as_observed: bool = False,
+    observed_sink: dict[str, Any] | None = None,
 ) -> None:
     """Assert the envelope is the declared batch for THIS run, fail closed.
 
@@ -1076,11 +1120,20 @@ def bind_raw_history_to_run(
         )
     for m in history.source_members:
         if m.knowledge_at > policy.decision_cutoff:
-            _fail(
-                "source_knowledge_after_cutoff",
-                f"source_member {m.member_id} knowledge_at {m.knowledge_at} exceeds "
-                f"the run decision_cutoff {policy.decision_cutoff}",
-            )
+            if not as_observed:
+                _fail(
+                    "source_knowledge_after_cutoff",
+                    f"source_member {m.member_id} knowledge_at {m.knowledge_at} exceeds "
+                    f"the run decision_cutoff {policy.decision_cutoff}",
+                )
+            if observed_sink is not None:
+                _note_sealed_member(
+                    observed_sink,
+                    m.member_id,
+                    knowledge_at=m.knowledge_at,
+                    visible_at=m.visible_at,
+                    date_to=(m.date_to.isoformat() if m.date_to else None),
+                )
     required = set(getattr(facts, "required_member_ids", ()) or ())
     supplied = {m.member_id for m in history.source_members}
     missing = required - supplied
@@ -1091,18 +1144,38 @@ def bind_raw_history_to_run(
         )
     for row in history.calendar_rows:
         if row.knowledge_from > policy.decision_cutoff:
-            _fail(
-                "calendar_knowledge_after_cutoff",
-                f"calendar {row.venue_id} {row.session_date} knowledge_from "
-                f"{row.knowledge_from} exceeds the run decision_cutoff",
-            )
+            if not as_observed:
+                _fail(
+                    "calendar_knowledge_after_cutoff",
+                    f"calendar {row.venue_id} {row.session_date} knowledge_from "
+                    f"{row.knowledge_from} exceeds the run decision_cutoff",
+                )
+            if observed_sink is not None:
+                observed_sink.setdefault("sealed_calendar", []).append(
+                    {
+                        "venue_id": row.venue_id,
+                        "session_date": row.session_date.isoformat(),
+                        "knowledge_from": row.knowledge_from.isoformat(),
+                        "kind": "sealed_post_cutoff_archive",
+                    }
+                )
     for lrow in history.listing_rows:
         if lrow.knowledge_from > policy.decision_cutoff:
-            _fail(
-                "listing_knowledge_after_cutoff",
-                f"listing {lrow.security_id}@{lrow.venue_id} knowledge_from "
-                f"{lrow.knowledge_from} exceeds the run decision_cutoff",
-            )
+            if not as_observed:
+                _fail(
+                    "listing_knowledge_after_cutoff",
+                    f"listing {lrow.security_id}@{lrow.venue_id} knowledge_from "
+                    f"{lrow.knowledge_from} exceeds the run decision_cutoff",
+                )
+            if observed_sink is not None:
+                observed_sink.setdefault("sealed_listings", []).append(
+                    {
+                        "security_id": lrow.security_id,
+                        "venue_id": lrow.venue_id,
+                        "knowledge_from": lrow.knowledge_from.isoformat(),
+                        "kind": "sealed_post_cutoff_archive",
+                    }
+                )
 
 
 # --- runner-facing convenience -------------------------------------------------------
@@ -1125,7 +1198,16 @@ def run_daily_advice_from_history(
         run_daily_advice_from_raw,
     )
 
-    history = load_raw_history(raw_history)
+    # Versioned as-observed replay mode (explicit consumer config, strict is
+    # the default): members/calendar/listing sealed AFTER the logical decision
+    # cutoff are admitted as named post-cutoff archives on observed_sink, never
+    # relabelled October-known.  Their business content date is checked by the
+    # caller before entry; this only keeps the archival clocks honest.
+    as_observed = kwargs.pop("as_observed", False)
+    observed_sink = kwargs.pop("observed_sink", None)
+    history = load_raw_history(
+        raw_history, as_observed=as_observed, observed_sink=observed_sink
+    )
     facts = kwargs.get("facts")
     policy = kwargs.get("policy")
     if facts is None or policy is None:
@@ -1133,7 +1215,13 @@ def run_daily_advice_from_history(
             "invalid_raw_history",
             "run_daily_advice_from_history requires facts and policy",
         )
-    bind_raw_history_to_run(history, facts=facts, policy=policy)
+    bind_raw_history_to_run(
+        history,
+        facts=facts,
+        policy=policy,
+        as_observed=as_observed,
+        observed_sink=observed_sink,
+    )
     # Versioned anchor policy: "strict" keeps the R3/R4 stored-anchor gate;
     # "equivalent_day" additionally resolves an is_open session whose open_at
     # is absent when its whole local day is provably inside/outside the listing.
@@ -1172,6 +1260,7 @@ def run_daily_advice_from_history(
         raw=inputs,
         history_receipts=bound_receipts,
         caller_input_exclusions=runner_exclusions,
+        consumption_evidence=kwargs.pop("consumption_evidence", None),
         **kwargs,
     )
     # The issued receipt's digest must match the closure actually carried on the

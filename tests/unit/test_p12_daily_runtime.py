@@ -522,27 +522,32 @@ def test_pending_source_when_no_package(tmp_path):
     assert source.latest_run() is None
 
 
-def test_history_gate_failure_blocks(tmp_path):
-    """A history floor the input cannot prove blocks the whole day (M2 S3)."""
+def test_manifest_history_member_not_consulted(tmp_path):
+    """P11-P12-HISTORY-INPUT-v1 (issue #718 E1): the manifest history member
+    no longer feeds any gate.  A manifest whose history floors would fail
+    under the retired M2 contract still publishes - the runner owns the
+    per-security gates now, sourced from the raw-history envelope."""
     prod = tmp_path / "job"
     prod.mkdir()
     state = tmp_path / "state"
     meta = make_product(prod, MARKET_DATE.isoformat())
-    # Weaken the feature-warmup gate below its 61-session floor.
     manifest_path = meta["core"] / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
+    # Degrade every history floor below its retired M2 threshold.
     manifest["history"]["feature_warmup_sessions"] = {"observed_sessions": 40}
+    manifest["history"]["event_window_sessions"] = {"observed_sessions": 5}
+    manifest["history"]["listing_sessions"] = {"observed_sessions": 90}
     manifest_path.write_text(json.dumps(manifest, sort_keys=True))
-    # re-hash manifest into the entry/index so the pointer still verifies
     core_sha = _sha(manifest_path.read_bytes())
-    entry_dir = prod / "DATES.json"
-    index = json.loads(entry_dir.read_text())
+    index_path = prod / "DATES.json"
+    index = json.loads(index_path.read_text())
     index["dates"][MARKET_DATE.isoformat()]["core_manifest_sha256"] = core_sha
-    entry_dir.write_text(json.dumps(index, sort_keys=True))
-    pointer = json.loads((prod / "CURRENT_DAILY_CORE_BASE24.json").read_text())
-    pointer["index_sha256"] = _sha(entry_dir.read_bytes())
+    index_path.write_text(json.dumps(index, sort_keys=True))
+    pointer_path = prod / "CURRENT_DAILY_CORE_BASE24.json"
+    pointer = json.loads(pointer_path.read_text())
+    pointer["index_sha256"] = _sha(index_path.read_bytes())
     pointer["entry"]["core_manifest_sha256"] = core_sha
-    (prod / "CURRENT_DAILY_CORE_BASE24.json").write_text(json.dumps(pointer))
+    pointer_path.write_text(json.dumps(pointer))
     runner = SyntheticRuleRunner(candidates=(one_candidate(),))
     receipt = run_daily(
         state_dir=state, job_root=prod, runner=runner,
@@ -551,8 +556,12 @@ def test_history_gate_failure_blocks(tmp_path):
         decision_cutoff=CUTOFF,
         holdings=(),
     )
-    assert receipt["status"] == "INPUT_BLOCKED"
-    assert receipt["input_block"]["missing_members"] == ["history.feature_warmup_61"]
+    # The synthetic runner needs no raw history; the retired manifest floors
+    # must not block it, and no manifest-derived gate rides the receipt.
+    assert receipt["status"] == "PUBLISHED"
+    assert "history_gates" not in receipt
+    assert receipt["history_input"]["expected_schema"] == "p11.raw-history-input.v1"
+    assert receipt["history_input"]["present"] is False
 
 
 def _reshash_manifest(prod, market_date, mutate):
@@ -591,77 +600,30 @@ def _run_and_receipt(state, prod, candidates=None):
     )
 
 
-def test_history_feature_warmup_valid_bar_gap_blocks(tmp_path):
-    """R8: a 60-day warmup window missing one valid bar is explicit evidence.
-
-    The member reaches the 61-session count but carries an evidence gap reason
-    (one valid bar absent in the recent window); the gate fails closed and the
-    reason is preserved on the run receipt."""
+def test_history_envelope_marker_rides_the_receipt(tmp_path):
+    """The run receipt records the declared raw-history schema marker so the
+    audit can see whether the H1 envelope reached the runner - the job itself
+    never reads a manifest count or fabricates the gate."""
     prod = tmp_path / "job"
     prod.mkdir()
     state = tmp_path / "state"
-
-    def mutate(manifest):
-        manifest["history"]["feature_warmup_sessions"] = {
-            "observed_sessions": 80,
-            "unavailable_reason": (
-                "近 60 日特征窗口缺一条有效 bar，证据缺口未修复"
-            ),
-        }
-
-    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate)
-    receipt = _run_and_receipt(state, prod)
-    assert receipt["status"] == "INPUT_BLOCKED"
-    assert "history.feature_warmup_61" in receipt["input_block"]["missing_members"]
-    gate = next(
-        g
-        for g in receipt["history_gates"]
-        if g["gate_id"] == "history.feature_warmup_61"
+    make_product(prod, MARKET_DATE.isoformat())
+    runner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(),
+        raw_history={
+            "schema_version": "p11.raw-history-input.v1",
+            "securities": [],
+        },
     )
-    assert gate["observed_sessions"] == 80
-    assert "有效 bar" in (gate["unavailable_reason"] or "")
-
-
-def test_history_gates_are_independent(tmp_path):
-    """R8 (r2): the three history floors are independent - a corporate-action
-    anomaly belongs to the 61-day feature-warmup gate, NOT the 120-day
-    listing floor (which reads only listing facts + the trading calendar).
-    Each mutated member trips only its own gate; the other two still hold."""
-    prod = tmp_path / "job"
-    prod.mkdir()
-    state = tmp_path / "state"
-
-    # Case 1: a 61-day corporate-action anomaly trips ONLY feature_warmup_61;
-    # the listing floor (120) and event window (22) stay satisfied.
-    def mutate_warmup(manifest):
-        manifest["history"]["feature_warmup_sessions"] = {
-            "observed_sessions": 80,
-            "unavailable_reason": "近 61 日存在公司行为异常",
-        }
-        manifest["history"]["listing_sessions"] = {"observed_sessions": 200}
-
-    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate_warmup)
-    receipt = _run_and_receipt(state, prod)
-    assert receipt["status"] == "INPUT_BLOCKED"
-    gates = {g["gate_id"]: g for g in receipt["history_gates"]}
-    assert gates["history.feature_warmup_61"]["satisfied"] is False
-    assert gates["history.listing_floor_120"]["satisfied"] is True
-    assert gates["history.event_window_22"]["satisfied"] is True
-    assert "公司行为异常" in (gates["history.feature_warmup_61"]["unavailable_reason"] or "")
-
-    # Case 2: only the listing floor fails; warmup + event window hold.
-    def mutate_listing(manifest):
-        manifest["history"]["listing_sessions"] = {
-            "observed_sessions": 90,
-        }
-
-    _reshash_manifest(prod, MARKET_DATE.isoformat(), mutate_listing)
-    receipt = _run_and_receipt(tmp_path / "state2", prod)
-    assert receipt["status"] == "INPUT_BLOCKED"
-    gates = {g["gate_id"]: g for g in receipt["history_gates"]}
-    assert gates["history.listing_floor_120"]["satisfied"] is False
-    assert gates["history.feature_warmup_61"]["satisfied"] is True
-    assert gates["history.event_window_22"]["satisfied"] is True
+    assert receipt["history_input"]["declared_schema"] == (
+        "p11.raw-history-input.v1"
+    )
+    assert receipt["history_input"]["present"] is True
 
 
 def test_missing_forward_calendar_pointer_blocks(tmp_path):
@@ -1604,17 +1566,107 @@ def test_reduce_exit_plan_workbench_shows_suggestion_not_sell(tmp_path):
     )
     scope = AccountScope(PAPER_ACCOUNT_ID, "synthetic")
     bench = app.workbench(scope)
+    # Issue #722 r9-1: a held reduction resolves to a held disposition -
+    # stage=holding, exit_kind cleared, the sell reason swapped for a
+    # registered hold reason; the page shows the suggestion note, never a
+    # sell form.
     row = next(
-        o for o in bench.opportunities if o.stage == "exit_plan"
+        o for o in bench.opportunities if o.security_code == "600000"
     )
-    # A reduce exit_plan is a 减仓建议: no full-sell action, exit_kind marks
-    # it reduce so the page renders the suggestion instead of the sell form.
-    assert row.exit_kind == "reduce"
+    assert row.stage == "holding"
+    assert row.exit_kind is None
     assert row.action_code == "HOLD"
+    assert "HOLD_AND_ALERT" in row.reason_codes
+    assert "EXIT_SIGNAL" not in row.reason_codes
     assert not any(
         o.side == "sell" and o.security_code == "600000"
         for o in bench.orders
     )
+    # Issue #722 r8-1: a reduce held row drops the producer's sell
+    # explanation and shows only the held-reduction note - never a
+    # "按计划卖出 N 股" instruction.
+    texts = " ".join(e.text for e in row.explanations)
+    assert "按计划卖出" not in texts
+    assert "减仓建议" in texts
+
+
+def test_held_disposition_never_shows_a_sell_text(tmp_path):
+    """Issue #722 r8-1 / product directive comment-7139311000 suppl.: when
+    the final disposition is held, every user-facing string on the plan
+    reads held - no "卖出"/"清仓"/"减仓 N 股" instruction survives in the
+    queue row or the expanded explanations."""
+    prod = tmp_path / "job"
+    prod.mkdir()
+    make_product(prod, MARKET_DATE.isoformat())
+
+    from quanthus.platform.adapters.p12_synthetic_fixture import (
+        load_synthetic_fixture,
+    )
+    from quanthus.platform.p12.paper_fixture import (
+        PAPER_ACCOUNT_ID,
+        build_paper_application,
+    )
+    from quanthus.product_daily.application.models import (
+        SyntheticRuntimeAuthorization,
+    )
+
+    forbidden = ("按计划卖出", "清仓信号已触发", "卖出 500", "减仓 500")
+
+    def bench_rows(state, when):
+        fixture = load_synthetic_fixture(
+            Path("config/p12/synthetic-desktop.v1.json")
+        )
+        app = build_paper_application(
+            state_dir=state,
+            policy=fixture.policy,
+            now=lambda: when,
+            authorization=SyntheticRuntimeAuthorization(
+                "audit", frozenset({PAPER_ACCOUNT_ID})
+            ),
+            decision_source=PublishedPackageSource(
+                state, lambda: when, mode="synthetic"
+            ),
+        )
+        return app.workbench(AccountScope(PAPER_ACCOUNT_ID, "synthetic"))
+
+    # Case A - reduce kept held (no verifiable reduce binding needed for the
+    # held-disposition text check; a plain reduce publish reads held).
+    state = tmp_path / "state-reduce"
+    runner = SyntheticRuleRunner(
+        candidates=(one_candidate(holding_signal={"action": "REDUCE"}),)
+    )
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id="SYN-PAPER-A", now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF,
+        holdings=(HeldPositionFact(security_code="600000", quantity=500),),
+    )
+    assert receipt["status"] == "PUBLISHED"
+    bench = bench_rows(state, datetime(2026, 11, 20, 23, 0, tzinfo=TZ))
+    for row in bench.opportunities:
+        if row.action_code == "SELL":
+            continue
+        blob = " ".join(
+            [e.text for e in row.explanations]
+            + ([row.next_observation] if row.next_observation else [])
+        )
+        for bad in forbidden:
+            assert bad not in blob, (row.opportunity_id, bad, blob)
+
+    # Case B - unverifiable exit: drop receipts so the reduce cannot bind.
+    for path in DailyPackageStore(state).runs_dir.glob("*.json"):
+        path.unlink()
+    bench = bench_rows(state, datetime(2026, 11, 23, 9, 31, tzinfo=TZ))
+    unver = [o for o in bench.opportunities if o.security_code == "600000"]
+    assert unver
+    for row in unver:
+        blob = " ".join(
+            [e.text for e in row.explanations]
+            + ([row.next_observation] if row.next_observation else [])
+        )
+        for bad in forbidden + ("按计划卖出",):
+            assert bad not in blob, (row.opportunity_id, bad, blob)
 
 
 def test_pending_placeholder_publishes_at_configured_publish_time(tmp_path):
@@ -2184,6 +2236,55 @@ def test_exit_type_unverified_blocks_confirmation(tmp_path):
         )
 
 
+def test_every_input_fault_receipt_reads_on_the_workbench(tmp_path):
+    """Issue #722 r8-2: every input-fault receipt - wrapper DATES, CLI
+    argument, descriptor/pointer - lands via the shared writer with a
+    contract-conformant sha256 runner digest, and the workbench serves it
+    over the authenticated read path instead of a 500."""
+    import re
+
+    from quanthus.p12_daily.daily_job import write_input_blocked_receipt
+    from quanthus.platform.p12.transport import _run_receipt
+
+    digest_re = re.compile(r"^sha256:[0-9a-f]{64}$")
+    faults = [
+        dict(
+            detail="wrapper could not resolve the market date: bad DATES",
+            runner_ref=("p12-daily-run", "wrapper", "sha256:" + "a" * 64),
+            missing=("DATES.json",),
+        ),
+        dict(
+            detail="daily-job CLI could not parse --market-date 'broken-date'",
+            runner_ref=("quanthus.p12_daily.daily_job", "cli", "sha256:" + "b" * 64),
+            missing=("--market-date",),
+        ),
+        dict(
+            detail="core pointer descriptor unreadable",
+            runner_ref=("p12-daily-job", "input", "sha256:" + "c" * 64),
+            missing=("CURRENT_DAILY_CORE_BASE24.json",),
+        ),
+    ]
+    for index, fault in enumerate(faults):
+        state = tmp_path / ("state-" + str(index))
+        receipt = write_input_blocked_receipt(
+            state,
+            account_id="SYN-PAPER-A",
+            detail=fault["detail"],
+            runner_ref=fault["runner_ref"],
+            missing_members=fault["missing"],
+            now=datetime(2026, 11, 25, 9, 31, tzinfo=TZ),
+        )
+        assert receipt["status"] == "INPUT_BLOCKED"
+        assert digest_re.match(receipt["runner"]["digest"])
+        store_receipt = DailyPackageStore(state).latest_run()
+        assert store_receipt is not None
+        projected = _run_receipt(store_receipt)
+        assert projected is not None
+        assert projected["status"] == "INPUT_BLOCKED"
+        assert digest_re.match(projected["runner"]["digest"])
+        assert projected["input_block"]["detail"]
+
+
 def test_ledger_dangling_symlink_is_a_read_failure(env):
     """Issue #722 r4-4: a ledger path that is a dangling symlink is a read
     failure (ACCOUNT_FACTS_UNAVAILABLE), never FRESH_NO_BASELINE."""
@@ -2647,3 +2748,129 @@ def test_unhandled_inner_exception_writes_failed_receipt(tmp_path):
     assert "input_read" in receipt["input_block"]["missing_members"]
     store = DailyPackageStore(state)
     assert len(store.runs()) == 1
+
+def _replay_day_receipt(run_id: str, market_date: str = MARKET_DATE.isoformat(),
+                        scenario_id: str = 'spdb-20261008-2130') -> dict:
+    return {
+        'schema_version': 'p11.paper-replay-day.v1',
+        'scenario_id': scenario_id,
+        'ledger_namespace': 'historical-replay:spdb-20261008',
+        'market_date': market_date,
+        'input_grade': 'ENGINEERING_REPLAY_AS_OBSERVED',
+        'replay_observed_at': '2026-11-24T20:09:46+00:00',
+        'logical_decision_at': market_date + 'T21:30:00+08:00',
+        'delivered': {'600000': {'bar_rows': 61, 'window_sessions': 61,
+                               'gap_sessions': 0, 'entry_eligible': True}},
+        'seam': {'evaluated_universe': ['600000'], 'decisions': [],
+                 'excluded': []},
+        'excluded_security_codes': [],
+        'coverage_exclusions': [],
+        'source_closure': {'held_decisions': [], 'history_receipts': []},
+        'publishable': False,
+        'disposition': 'blocked',
+        'day_block': {'reason': 'history_gate_unsatisfied'},
+    }
+
+
+class _DayReceiptRunner:
+    'Stub: delegate decision_set to SyntheticRuleRunner + attach day receipt.'
+
+    def __init__(self, inner, day_receipt):
+        self._inner = inner
+        self._day = day_receipt
+
+    @property
+    def runner_ref(self):
+        return self._inner.runner_ref
+
+    def run(self, request):
+        import dataclasses as _dc
+        out = self._inner.run(request)
+        return _dc.replace(out, p11_day_receipt=dict(self._day))
+
+
+def test_p11_day_receipt_bound_and_persisted_on_publish(env):
+    prod, state, _ = env
+    inner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    day = _replay_day_receipt(run_id='placeholder')
+    runner = _DayReceiptRunner(inner, day)
+    now = datetime(2026, 11, 20, 22, 31, tzinfo=TZ)
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id='SYN-PAPER-A', now=now, decision_cutoff=CUTOFF,
+        holdings=(),
+    )
+    assert receipt['status'] == 'PUBLISHED'
+    ref = receipt['p11_replay_day_receipt_ref']
+    assert ref['run_id'] == receipt['run_id']
+    assert ref['schema_version'] == 'p11.paper-replay-day.v1'
+    assert ref['scenario_id'] == 'spdb-20261008-2130'
+    assert ref['market_date'] == MARKET_DATE.isoformat()
+    store = DailyPackageStore(state)
+    path = state / ref['path']
+    assert path.is_file()
+    assert str(receipt['run_id']) in ref['path']
+    assert 'replay-day-receipts' in ref['path']
+    import hashlib as _h
+    assert ref['sha256'] == 'sha256:' + _h.sha256(path.read_bytes()).hexdigest()
+    loaded = store.read_day_receipt(ref)
+    assert loaded['scenario_id'] == 'spdb-20261008-2130'
+    latest = store.latest_run_for_date(MARKET_DATE)
+    assert latest['p11_replay_day_receipt_ref']['sha256'] == ref['sha256']
+
+
+def test_p11_day_receipt_bound_on_runner_blocked(env):
+    prod, state, _ = env
+
+    class _Blocked:
+        @property
+        def runner_ref(self):
+            return SyntheticRuleRunner(candidates=()).runner_ref
+
+        def run(self, request):
+            from quanthus.p12_daily.rule_runner import RunnerOutput
+            return RunnerOutput(
+                decision_set=None,
+                exclusions=(),
+                publishable=False,
+                disposition='blocked',
+                diagnostics={'diagnostics': [{'reason': 'history_gate'}]},
+                evaluation_receipt={'run_id': request.run_id},
+                source_closure={'core_manifest_sha256': 'x'},
+                p11_day_receipt=_replay_day_receipt(request.run_id),
+            )
+
+    runner = _Blocked()
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id='SYN-PAPER-A',
+        now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(),
+    )
+    assert receipt['status'] == 'INPUT_BLOCKED'
+    ref = receipt['p11_replay_day_receipt_ref']
+    assert ref['run_id'] == receipt['run_id']
+    assert (state / ref['path']).is_file()
+    loaded = DailyPackageStore(state).read_day_receipt(ref)
+    assert loaded['day_block']['reason'] == 'history_gate_unsatisfied'
+
+
+def test_p11_day_receipt_ref_readback_refuses_replaced_file(env):
+    prod, state, _ = env
+    inner = SyntheticRuleRunner(candidates=(one_candidate(),))
+    runner = _DayReceiptRunner(inner, _replay_day_receipt('x'))
+    receipt = run_daily(
+        state_dir=state, job_root=prod, runner=runner,
+        market_date=MARKET_DATE, next_session=NEXT_SESSION,
+        account_id='SYN-PAPER-A',
+        now=datetime(2026, 11, 20, 22, 31, tzinfo=TZ),
+        decision_cutoff=CUTOFF, holdings=(),
+    )
+    ref = receipt['p11_replay_day_receipt_ref']
+    path = state / ref['path']
+    path.write_text('{"schema_version":"p11.paper-replay-day.v1","tampered":1}')
+    store = DailyPackageStore(state)
+    with pytest.raises(FactError):
+        store.read_day_receipt(ref)

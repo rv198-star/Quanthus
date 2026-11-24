@@ -264,6 +264,13 @@ class RunnerOutput:
     # M2 section 3: the three independent history floors evaluated for this run.
     history_gates: tuple[HistoryGateResult, ...] = ()
 
+    # The runner's own p11.paper-replay-day.v1 day receipt (the E1 replay
+    # channel): carried verbatim so the daily job can persist it as its own
+    # immutable file and bind it on the run record
+    # (``p11_replay_day_receipt_ref``) - the page and the workbench read ONLY
+    # the current run's binding, never a date-enumerated sidecar (issue #748).
+    p11_day_receipt: dict | None = None
+
 
 class StrategyRuleRunner(Protocol):
     @property

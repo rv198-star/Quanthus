@@ -11,6 +11,7 @@ backfilled.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -26,6 +27,55 @@ from quanthus.product_daily.contracts import (
 
 SCHEMA = "quanthus.r11.daily-advice.v1"
 PACKAGE_VERSION = "1.0.0"
+
+# p12.decision-set.v2 held-reduction wire contract (issue #723 comment7141061814):
+# the target_position_fraction on the wire is the unique canonical string
+# matching ^0\.[0-9]*[1-9]$ - a finite plain decimal strictly between 0 and 1
+# with a single-0 integer part, at least one fractional digit, no leading space
+# or sign, no exponent form, no trailing zero and no trailing whitespace.  A
+# full exit carries null, never a number.  The P11 writer normalizes a Decimal
+# through format(x, "f") then strips fractional trailing zeros; a value that
+# cannot be expressed in that shape is a contract error and is never written.
+# This canonical form is the P11-v2-only surface: the v1 wire, cash/price and
+# other shared decimal fields keep their own unchanged serialization.
+V2_TARGET_FRACTION_PATTERN = re.compile(r"^0\.[0-9]*[1-9]$")
+
+
+def v2_target_fraction_text(value: Decimal | None) -> str | None:
+    r"""Canonical p12.decision-set.v2 wire string for a reduce target fraction.
+
+    None stays None (a full exit).  Any other value must be finite and satisfy
+    0 < value < 1, then serialize through format(value, "f") with fractional
+    trailing zeros stripped so the result matches ^0\.[0-9]*[1-9]$ exactly and
+    reads back byte-identical.  A value that cannot be written in that shape -
+    zero, one-or-more, non-finite, or an integral value - raises a contract
+    error instead of emitting a wire the reader would reject.
+    """
+
+    if value is None:
+        return None
+    require_decimal(value, "target_position_fraction")
+    if not value.is_finite():
+        raise ProductDailyError(
+            "invalid_exit_contract",
+            "reduce target_position_fraction must be finite",
+        )
+    if not (Decimal(0) < value < Decimal(1)):
+        raise ProductDailyError(
+            "invalid_exit_contract",
+            "reduce target_position_fraction must be > 0 and < 1",
+        )
+    text = format(value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    if not V2_TARGET_FRACTION_PATTERN.match(text):
+        raise ProductDailyError(
+            "invalid_exit_contract",
+            f"reduce target_position_fraction {value!r} cannot be written on the "
+            "canonical v2 wire shape ^0\\.[0-9]*[1-9]$",
+        )
+    return text
+
 
 # Session bounds of the active daily profile (close-to-next-open-v1): the next-session
 # window may only open at/after 09:30 and close at/before 15:00 exchange time
@@ -411,11 +461,10 @@ class Decision:
         """
         out = self.to_dict()
         out["exit_kind"] = self.exit_kind
-        out["target_position_fraction"] = (
-            None
-            if self.target_position_fraction is None
-            else decimal_text(self.target_position_fraction)
-        )
+        # v2 reduce targets use the canonical wire shape ^0.[0-9]*[1-9]$
+        # (issue #723 comment7141061814); a value that cannot be written in
+        # that shape is a contract error, never a degraded wire byte.
+        out["target_position_fraction"] = v2_target_fraction_text(self.target_position_fraction)
         return out
 
 
@@ -571,12 +620,20 @@ class PublishReceipt:
     path: str
     file_sha256: str
     decision_set_digests: tuple[tuple[str, str], ...]
+    # The digest the P12 account ConfigurationBinding records for each released
+    # date: digest(_package_content(validated)) over the SAME validated object
+    # the consumer loader returned.  This is the binding-continuity identity.
     p12_package_digests: tuple[tuple[str, str], ...] | None
     decision_count: int
     entry_plan_count: int
     admission_disposition: str
     published_at: datetime
     elapsed_ms: int
+    # The pinned loader's own digest over the raw wire bytes, returned alongside
+    # the validated object on the p12.decision-set.v2 surface.  It covers the
+    # exact payload bytes - a different surface from the account binding digest
+    # above, so it is recorded separately and never substitutes for it.
+    p12_wire_digests: tuple[tuple[str, str], ...] | None = None
 
     def __post_init__(self) -> None:
         require_text(self.package_id, "package_id")
@@ -594,6 +651,9 @@ class PublishReceipt:
             "decision_set_digests": dict(self.decision_set_digests),
             "p12_package_digests": (
                 None if self.p12_package_digests is None else dict(self.p12_package_digests)
+            ),
+            "p12_wire_digests": (
+                None if self.p12_wire_digests is None else dict(self.p12_wire_digests)
             ),
             "decision_count": self.decision_count,
             "entry_plan_count": self.entry_plan_count,

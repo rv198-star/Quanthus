@@ -6,15 +6,19 @@ market dates; re-publishing the same market date with different content would be
 the consumer, so this module refuses that case up front instead of letting an unusable file
 exist on disk.
 
-Three digest surfaces are kept distinct on purpose and named explicitly:
+Four digest surfaces are kept distinct on purpose and named explicitly:
 
 - file_sha256: SHA-256 of the exact bytes written to the package file.  It is the
   identity of the on-disk artifact.
 - decision_set_digests: SHA-256 of each decision_set canonical JSON (compact,
   sort-keys, ASCII-free).  It identifies the decision_set content independent of file
   framing.
-- p12_package_digests: the digest the P12 account binding records for the same content,
-  computed through the real P12 loader so the identity is what the consumer actually binds.
+- p12_package_digests: the digest the P12 account ConfigurationBinding records for the
+  same content - digest(_package_content(validated)) over the same validated object the
+  pinned loader returned - so the identity is what the consumer actually binds.
+- p12_wire_digests: the pinned loader's own digest over the raw wire bytes.  It covers
+  the payload framing, not the account-side content, and is recorded separately so a
+  caller can never conflate wire identity with binding identity.
 
 A caller must never conflate them: binding continuity is judged on p12_package_digests,
 artifact identity on file_sha256.
@@ -231,16 +235,29 @@ def _validate_consumer_object(
     validated: Any,
     *,
     wire_version: str,
+    wire_digest: str | None = None,
+    account_digest: str | None = None,
 ) -> str:
-    """Single validated-object coordinate check + bound-package digest.
+    """Single validated-object coordinate check + account binding digest.
 
-    Internal mechanism kept for the future real integration: the consumer callable
-    is invoked exactly once per decision_set by the caller; the returned object is
-    matched on market_date, every opportunity's security_code, stage and
-    exit_kind, and each reduce's target with Decimal semantics; the binding digest
-    is computed from the SAME validated object, resolved through that object's own
-    package so a tree without the bound P12 package fails closed.  This function
-    never opens the release gate by itself - _consumer_pin_unresolved is the gate.
+    The consumer callable is invoked exactly once per decision_set by the caller;
+    the returned object is matched on market_date, every opportunity's
+    security_code, stage and exit_kind, and each reduce's target with Decimal
+    semantics.
+
+    The returned binding digest is the same surface the P12 account
+    ConfigurationBinding records: digest(_package_content(validated)).  On the
+    pinned v2 surface it is carried in as account_digest - computed inside the
+    pinned mount window from the SAME validated object through the pinned
+    tree's own fact_contracts, since once the window restores the host has no
+    quanthus.shared.fact_contracts of its own to recompute it.  On the v1
+    surface the digest is recomputed here through the validated object's own
+    package so a tree without the bound P12 package fails closed.  The loader's
+    wire_digest is the raw-byte identity, not the account binding identity, and
+    is recorded on the receipt under p12_wire_digests by the caller.
+
+    This function never opens the release gate by itself - _consumer_pin_unresolved
+    is the gate.
     """
 
     if getattr(validated, "market_date", None) is not None and (
@@ -315,6 +332,18 @@ def _validate_consumer_object(
                         f"pinned consumer dropped or altered the reduce target "
                         f"on {opportunity_id} (Decimal comparison)",
                     )
+    if wire_version == V2_DS_SCHEMA and account_digest is not None:
+        # Carried from inside the pinned mount window: the pinned tree's own
+        # fact_contracts digest of _package_content(validated), over the same
+        # validated object this call just coordinate-checked.  The host cannot
+        # recompute it - quanthus.shared.fact_contracts only exists inside the
+        # bound P12 package - so it travels out of the window with the object.
+        return account_digest
+
+    # The v1 historical surface records the same binding identity, recomputed
+    # here through the validated object's own package so a tree without the
+    # bound P12 package fails closed.  The v2 wire_digest covers the raw bytes
+    # and is never returned as the binding identity.
     import importlib
 
     top_package = type(validated).__module__.split(".", 1)[0]
@@ -420,10 +449,24 @@ def publish_package(
             "pending - no caller loader, binding dict, attribute or namespace "
             "opens a public release until the real pin is bound",
         )
-    # An executable reduce additionally can never be released without the real
-    # consumer pipeline: once a bound pin exists the loader is the resolved pinned
-    # entry; until then the pin check above has already refused.
-    if has_reduce and p12_loader is None:
+    # Once the versioned pin is bound, the consumer pipeline is resolved from the
+    # binding itself - never from a caller-supplied callable.  A caller p12_loader
+    # remains usable only on the v1 surface where no v2 release is involved; on
+    # the v2 surface it is ignored rather than trusted.
+    if needs_v2_consumer:
+        from quanthus.product_daily.recommendation.runtime_identity import (
+            resolve_pinned_v2_loader,
+        )
+
+        try:
+            pinned_loader = resolve_pinned_v2_loader(find_project_root())
+        except ProductDailyError as exc:
+            raise ProductDailyError(
+                "unpublishable_package",
+                f"the bound P12 v2 consumer could not be resolved from its versioned pin: {exc}",
+            ) from exc
+        p12_loader = pinned_loader
+    elif p12_loader is None and has_reduce:
         raise ProductDailyError(
             "unpublishable_package",
             "an executable reduce requires the pinned consumer pipeline; "
@@ -432,17 +475,18 @@ def publish_package(
 
     # Single-call consumer pipeline: the loader is invoked exactly once per
     # decision_set (with expected_schema on the v2 surface), the returned object
-    # is matched on every coordinate by _validate_consumer_object, and the binding
-    # digest comes from the SAME validated object - all before any bytes land.
+    # is matched on every coordinate by _validate_consumer_object, and the account
+    # binding digest is recomputed from the SAME validated object - all before any
+    # bytes land.  The loader's raw-byte wire digest is kept on a parallel receipt
+    # field so the two identities never collapse into one value.
     p12_digests: dict[str, str] | None = None
+    p12_wires: dict[str, str] | None = None
     if p12_loader is not None:
         p12_digests = {}
+        p12_wires = {}
         for raw in _serialize_decision_sets(package, wire_version=wire_version):
             try:
-                if wire_version == V2_DS_SCHEMA:
-                    validated = p12_loader(raw, expected_schema=wire_version)
-                else:
-                    validated = p12_loader(raw)
+                loaded = p12_loader(raw)
             except ProductDailyError:
                 raise
             except Exception as exc:
@@ -453,9 +497,38 @@ def publish_package(
                         f"{raw['market_date']}: {exc}",
                     ) from exc
                 raise
+            if wire_version == V2_DS_SCHEMA:
+                # The pinned seam returns (MarketDecisionSet, wire_digest,
+                # account_digest): the validated object feeds coordinate checks,
+                # the account digest is the binding identity recorded on the
+                # receipt, and the wire digest covers the raw bytes on its own
+                # receipt surface.  An object without the triple shape is not
+                # the pinned reader and is refused.
+                if (
+                    not isinstance(loaded, tuple)
+                    or len(loaded) != 3
+                    or not isinstance(loaded[1], str)
+                    or not loaded[1].startswith("sha256:")
+                    or not isinstance(loaded[2], str)
+                    or not loaded[2].startswith("sha256:")
+                ):
+                    raise ProductDailyError(
+                        "unpublishable_package",
+                        "the pinned v2 consumer did not return the declared "
+                        "(MarketDecisionSet, wire_digest, account_digest) triple",
+                    )
+                validated, wire_digest, account_digest = loaded
+            else:
+                validated, wire_digest, account_digest = loaded, None, None
             p12_digests[raw["market_date"]] = _validate_consumer_object(
-                raw, validated, wire_version=wire_version
+                raw,
+                validated,
+                wire_version=wire_version,
+                wire_digest=wire_digest,
+                account_digest=account_digest,
             )
+            if wire_digest is not None:
+                p12_wires[raw["market_date"]] = wire_digest
 
     target_dir = Path(directory)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -503,6 +576,9 @@ def publish_package(
         file_sha256="sha256:" + hashlib.sha256(payload).hexdigest(),
         decision_set_digests=tuple(sorted(decision_set_digests(package).items())),
         p12_package_digests=(None if p12_digests is None else tuple(sorted(p12_digests.items()))),
+        p12_wire_digests=(
+            None if p12_wires is None or not p12_wires else tuple(sorted(p12_wires.items()))
+        ),
         decision_count=decision_count,
         entry_plan_count=entry_count,
         admission_disposition=package.decision_sets[0].audit.admission_disposition

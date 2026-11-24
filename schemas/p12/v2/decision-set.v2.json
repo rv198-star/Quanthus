@@ -256,16 +256,7 @@
       "properties": {
        "target_position_fraction": {
         "type": "string",
-        "allOf": [
-         {
-          "pattern": "^0\\.[0-9]+$"
-         },
-         {
-          "not": {
-           "pattern": "^0\\.0+$"
-          }
-         }
-        ]
+        "pattern": "^0\\.[0-9]*[1-9](?![\\s\\S])$"
        }
       }
      }

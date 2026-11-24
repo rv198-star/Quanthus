@@ -365,6 +365,19 @@ def run_daily_advice_from_raw(
     # merged BEFORE the run so they are inside the issued source_closure, never
     # appended to the dict after the receipt digest was computed.
     caller_input_exclusions: Sequence[dict[str, Any]] | None = None,
+    # Optional factory: after this job computes features_by_security ONCE, it
+    # is invoked with that mapping and must return the BaselineFeaturePanelReport
+    # to bind into the resources for the receipt.  This keeps the panel the
+    # actual same-job computation (no second market pass, no caller label);
+    # when omitted the supplied resources.panel_report is used unchanged.
+    panel_report_factory: Callable[[Mapping[str, SecurityFeatureFacts]], Any] | None = None,
+    # Versioned October as-observed consumption evidence: bound into the
+    # issued source_closure before its digest so the job identity recomputes
+    # from receipt + closure together (original envelope identity, selected
+    # member/row versions, original clocks, this run's actual open/verify/
+    # observe instants, exclusions and the member catalogue).  Strict/daily
+    # callers omit it and see no field.
+    consumption_evidence: Mapping[str, Any] | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> RuleDayOutput:
     """Build real panel facts + the scan series from raw inputs, then run the core.
@@ -468,6 +481,15 @@ def run_daily_advice_from_raw(
     # facts.next_session (the calendar's next open), not invented here.
     all_trading_dates.add(facts.next_session)
 
+    if panel_report_factory is not None:
+        # Rebind only the panel_report field; feature_registry/trend_* stay the
+        # caller's real objects, so the report is this job's actual computation.
+        import dataclasses as _dc
+
+        resources = _dc.replace(
+            resources, panel_report=panel_report_factory(features_by_security)
+        )
+
     return run_daily_advice(
         runner=runner,
         resources=resources,
@@ -494,5 +516,6 @@ def run_daily_advice_from_raw(
         shared_prereq_ok=shared_prereq_ok,
         shared_prereq_reason=shared_prereq_reason,
         history_receipts=history_receipts,
+        consumption_evidence=consumption_evidence,
         clock=clock,
     )

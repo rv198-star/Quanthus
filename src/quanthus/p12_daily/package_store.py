@@ -49,6 +49,13 @@ ENVELOPE_INNER_MISMATCH = "ENVELOPE_INNER_MISMATCH"
 _V2_ONLY_FIELDS = ("exit_kind", "target_position_fraction")
 RETRACTION_SCHEMA = "quanthus.p12.package-retraction.v1"
 RUN_SCHEMA = "quanthus.p12.daily-run.v1"
+# The P11 day receipt the E1 replay runner produced inside this same run is
+# persisted as its own immutable file under the runs directory (issue #748
+# coverage handoff): both the page and the workbench read the CURRENT run's
+# binding (path + sha256 + scenario identity) rather than date-enumerating
+# sidecar files that could mis-bind an earlier run's receipt.
+DAY_RECEIPTS_DIR = "replay-day-receipts"
+DAY_RECEIPT_SCHEMA = "p11.paper-replay-day.v1"
 
 PACKAGE_EXISTS_DIFFERS = "PACKAGE_EXISTS_DIFFERS"
 
@@ -418,6 +425,59 @@ class DailyPackageStore:
         path = self._runs / (f"{run_id}.json")
         _write_atomic(path, receipt)
         return path
+    def write_day_receipt(self, *, run_id: str, payload: dict) -> dict:
+        '''Persist the runner's p11.paper-replay-day.v1 day receipt as its own
+        immutable file bound to this run id, and return the run record's
+        binding (relative path + sha256 + declared identity).  The file is
+        named by the producing run so a later run for the same date can
+        never mis-bind the earlier receipt; the binding is what the run
+        record's ``p11_replay_day_receipt_ref`` carries.'''
+
+        path = self._runs / DAY_RECEIPTS_DIR / (f"{run_id}.json")
+        if path.is_file():
+            existing = _read_json(path)
+            if existing != payload:
+                raise FactError(
+                    "PACKAGE_EXISTS_DIFFERS",
+                    "a different p11 replay-day receipt is already bound to "
+                    + run_id,
+                )
+            return self._day_receipt_ref(
+                run_id=run_id, path=path, payload=existing
+            )
+        _write_atomic(path, payload)
+        return self._day_receipt_ref(run_id=run_id, path=path, payload=payload)
+
+    def _day_receipt_ref(self, *, run_id: str, path: Path, payload: dict) -> dict:
+        return {
+            "schema_version": payload.get("schema_version"),
+            "run_id": run_id,
+            "path": path.relative_to(self._root).as_posix(),
+            "sha256": _sha256_bytes(path.read_bytes()),
+            "market_date": payload.get("market_date"),
+            "scenario_id": payload.get("scenario_id"),
+        }
+
+    def read_day_receipt(self, ref: dict) -> dict:
+        '''Load the p11.paper-replay-day receipt a run record bound via
+        ``p11_replay_day_receipt_ref``; the file bytes are re-hashed against
+        the recorded digest so a replaced file is refused, never silently
+        served.'''
+
+        path = self._root / str(ref["path"])
+        if not path.is_file():
+            raise FactError(
+                "INVALID_PACKAGE",
+                "bound p11 replay-day receipt file is missing: "
+                + str(ref["path"]),
+            )
+        if _sha256_bytes(path.read_bytes()) != ref.get("sha256"):
+            raise FactError(
+                "INVALID_PACKAGE",
+                "bound p11 replay-day receipt bytes differ from the run record",
+            )
+        return _read_json(path)
+
 
     def runs(self) -> tuple[dict, ...]:
         if not self._runs.is_dir():

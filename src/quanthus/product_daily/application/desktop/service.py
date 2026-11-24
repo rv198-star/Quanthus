@@ -3170,9 +3170,15 @@ class P12DesktopApplication:
             # delta_qty visible - the confirm card shows the NEW confirm_qty
             # beside the published number so a resized confirm is confirmed
             # at the bound-open quantity, never the stale published one.
-            return dataclasses.replace(
-                plan, delta_qty=resized, confirm_qty=resized
-            )
+            # Mark resized only when the confirm-time figure actually
+            # differs from the published delta_qty - a same-price recompute
+            # (or a published quantity already carrying the trial cap) is
+            # not a user-facing change and does not gate the confirm.
+            if resized != plan.delta_qty:
+                return dataclasses.replace(
+                    plan, delta_qty=resized, confirm_qty=resized
+                )
+            return plan
         # Fallback (no live mark): re-evaluate the still-open delta against
         # the *current* position, the same spent-suggestion check as before.
         remaining = plan.target_qty - current

@@ -2484,7 +2484,7 @@
     "type": "object"
    },
    "SchemaVersion": {
-    "const": "p12.desktop.v2",
+    "const": "p12.desktop.v3",
     "type": "string"
    },
    "Scope": {

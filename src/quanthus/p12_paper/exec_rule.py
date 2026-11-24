@@ -55,6 +55,10 @@ REJECT = {
     # registrations are display-only - the order never reaches the matcher.
     "PLAN_NOT_EXECUTABLE": "the plan is display-only in this phase; sell execution is not open",
     "ORDER_CONTEXT_MISMATCH": "the order disagrees with the plan's side or security",
+    # Issue #723 E8 r5 (buy): the confirm-time mark re-sized the plan, so
+    # the order is not written.  The user must accept the NEW quantity - a
+    # resubmit echoing that figure then binds under the same id.
+    "CONFIRM_RESIZED": "the confirm-time price re-sized this plan; confirm the new quantity to proceed",
     # Issue #719 R12: typed unavailable gates for the pre-open facts a plan's
     # conditions may depend on; never inferred from a zero-volume bar, a last
     # price or the prior session state.

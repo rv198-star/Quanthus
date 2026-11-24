@@ -12,6 +12,17 @@ from typing import Any
 
 from quanthus.platform.p12 import errors
 from quanthus.platform.p12.contract_generated import REASON_TEXTS, SCHEMA_VERSION
+
+# Issue #723 E8 r5 (compat): the frozen pre-field contract.  A request with
+# no schema_version, or one that explicitly pins p12.desktop.v2, reads the
+# v2 projection (post-frozen fields stripped, envelope and package version
+# rewritten to v2).  Only a client that explicitly selects the newer
+# contract reads next_session / confirm_qty.
+LEGACY_V2 = "p12.desktop.v2"
+
+def _effective_version(schema_version: str | None) -> str:
+    return SCHEMA_VERSION if schema_version == SCHEMA_VERSION else LEGACY_V2
+
 from quanthus.platform.p12.validation import ContractViolation, validate
 from quanthus.product_daily.application.desktop import (
     CorrectFill,
@@ -46,9 +57,12 @@ class OutboundContractError(RuntimeError):
     """The server produced a payload outside the contract; never reported as client error."""
 
 
-def _out(component: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _out(component: str, payload: dict[str, Any], schema_version: str | None = None) -> dict[str, Any]:
+    # A negotiated v2 projection rewrote the SchemaVersion const; validate it
+    # against the frozen reader's expectation, never the newer wire const.
+    override = LEGACY_V2 if _effective_version(schema_version) == LEGACY_V2 else None
     try:
-        return validate(component, payload)
+        return validate(component, payload, const_override=override)
     except ContractViolation as exc:
         raise OutboundContractError(str(exc)) from exc
 
@@ -157,21 +171,20 @@ def _plan(value: PublishedPlan, schema_version: str | None = None) -> dict[str, 
         "risk_check_ref": value.risk_check_ref,
     }
     # Issue #723 E8 r5 (buy): confirm_qty is the confirm-time re-sized
-    # figure (optional contract field).  A version-pinned p12.desktop.v2
-    # reader predates it, so it is stripped for that negotiated version.
+    # figure (optional contract field, only in the v3 projection).  A
+    # p12.desktop.v2 reader predates it, so it is stripped for v2.
     confirm = getattr(value, "confirm_qty", None)
-    if schema_version != "p12.desktop.v2" and confirm is not None:
+    if _effective_version(schema_version) != LEGACY_V2 and confirm is not None:
         plan["confirm_qty"] = confirm
     return plan
 
 
 def _package(value: PublishedPackage, schema_version: str | None = None) -> dict[str, Any]:
-    # Issue #723 E8 r5 (compat): a client that explicitly pins the original
-    # p12.desktop.v2 transport gets the v2 projection - next_session was
-    # added after that frozen contract closed the object, so it is stripped
-    # (and the schema_version rewritten) for old readers.  Newer or
-    # version-unpinned clients keep the field.
-    v2 = schema_version == "p12.desktop.v2"
+    # Issue #723 E8 r5 (compat): the p12.desktop.v2 projection predates
+    # next_session/confirm_qty - those post-frozen fields are stripped and
+    # the package.schema_version is rewritten to v2 for an old reader.
+    # A client that explicitly selects the newer contract keeps the field.
+    v2 = _effective_version(schema_version) == LEGACY_V2
     pkg = {
         "package_id": value.package_id,
         "schema_version": (
@@ -352,7 +365,7 @@ def _run_receipt(value: dict | None) -> dict | None:
 
 def workbench_dto(value: WorkbenchView, schema_version: str | None = None) -> dict[str, Any]:
     payload = {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": _effective_version(schema_version),
             "scope": _scope(value.scope),
             "package": (
                 None if value.package is None else _package(value.package, schema_version)
@@ -387,7 +400,7 @@ def workbench_dto(value: WorkbenchView, schema_version: str | None = None) -> di
     # receipt exists, so the pre-run response keeps its earlier shape.
     if value.run_receipt is not None:
         payload["run_receipt"] = _run_receipt(value.run_receipt)
-    return _out("Workbench", payload)
+    return _out("Workbench", payload, schema_version)
 
 
 def records_dto(value: RecordsView, schema_version: str | None = None) -> dict[str, Any]:
@@ -395,7 +408,7 @@ def records_dto(value: RecordsView, schema_version: str | None = None) -> dict[s
     return _out(
         "Records",
         {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": _effective_version(schema_version),
             "scope": _scope(value.scope),
             "package": (
                 None if value.package is None else _package(value.package, schema_version)
@@ -533,6 +546,7 @@ def records_dto(value: RecordsView, schema_version: str | None = None) -> dict[s
             ],
             "outbox_pending": history.outbox_pending,
         },
+        schema_version,
     )
 
 

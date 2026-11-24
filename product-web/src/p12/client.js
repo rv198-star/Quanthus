@@ -19,9 +19,10 @@ async function call (operationId, accountId, body, params) {
   for (const [key, val] of Object.entries(params || {})) {
     path = path.replace('{' + key + '}', encodeURIComponent(val || ''))
   }
-  // A version-pinned client asks the server for the projection its
-  // contract can read: p12.desktop.v2 predates package.next_session, so
-  // the server strips that field for this negotiated version.
+  // The current client declares the newer contract (p12.desktop.v3):
+  // it explicitly selects the version that carries the post-frozen
+  // package.next_session / plan.confirm_qty fields.  An unmodified legacy
+  // client sends no schema_version and reads the v2 projection instead.
   path += (path.includes('?') ? '&' : '?') + 'schema_version=' + encodeURIComponent(P12_SCHEMA_VERSION)
   const session = loadSession()
   const headers = { Accept: 'application/json' }

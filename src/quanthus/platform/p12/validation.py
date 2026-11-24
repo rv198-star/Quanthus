@@ -10,6 +10,11 @@ from quanthus.platform.p12.contract_generated import COMPONENTS
 
 T = TypeVar("T")
 
+# Issue #723 E8 r5 (compat): a negotiated legacy projection rewrites the
+# SchemaVersion const.  When set, every const check uses this value so a
+# v2 wire still validates against the frozen reader's expectation.
+_CONST_OVERRIDE: list[str | None] = [None]
+
 
 class ContractViolation(ValueError):
     """A payload outside the transport contract; carries the contract reason code."""
@@ -38,8 +43,10 @@ def _check(schema: dict[str, Any], value: Any, path: str) -> None:
             except ContractViolation as exc:
                 failures.append(str(exc))
         raise ContractViolation(path, "no admitted alternative: " + "; ".join(failures))
-    if "const" in schema and value != schema["const"]:
-        raise ContractViolation(path, f"must equal {schema['const']!r}")
+    if "const" in schema:
+        expected = _CONST_OVERRIDE[0] if _CONST_OVERRIDE[0] is not None else schema["const"]
+        if value != expected:
+            raise ContractViolation(path, f"must equal {expected!r}")
     kind = schema.get("type")
     if kind == "null":
         if value is not None:
@@ -94,8 +101,16 @@ def _check(schema: dict[str, Any], value: Any, path: str) -> None:
         raise ContractViolation(path, "not an admitted value")
 
 
-def validate(component: str, value: T) -> T:
-    """Raise ContractViolation unless ``value`` matches the named component exactly."""
+def validate(component: str, value: T, const_override: str | None = None) -> T:
+    """Raise ContractViolation unless ``value`` matches the named component exactly.
 
-    _check(COMPONENTS[component], value, component)
+    ``const_override`` re-binds every SchemaVersion const to a negotiated
+    legacy version so a version-rewritten projection still validates.
+    """
+
+    _CONST_OVERRIDE[0] = const_override
+    try:
+        _check(COMPONENTS[component], value, component)
+    finally:
+        _CONST_OVERRIDE[0] = None
     return value

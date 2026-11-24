@@ -2120,13 +2120,26 @@ export default {
           security_code: targetCode,
           // The server re-derives authoritative quantity/window server-side;
           // send the positive order quantity for a sell (delta_qty is signed).
-          // Issue #723 E8 r5 (buy): echo the confirm-time re-sized quantity
-          // the card asked the user to confirm (confirm_qty), falling back to
-          // the package delta_qty when no re-size applied.
-          quantity: plan.side === 'sell' ? Math.abs(plan.delta_qty) : (plan.confirm_qty != null ? plan.confirm_qty : plan.delta_qty),
+          // Issue #723 E8 r5 (buy): echo the quantity the card showed - the
+          // package delta_qty on the first confirm, or the server-offered
+          // confirm_qty once the user has seen and accepted the resized
+          // figure.  A stale echo returns CONFIRM_RESIZED instead of silently
+          // binding a number the user never saw.
+          quantity: plan.side === 'sell' ? Math.abs(plan.delta_qty) : (plan.accepted_qty != null ? plan.accepted_qty : plan.delta_qty),
           limit_price: plan.price_cap,
           occurred_at: nowIso
         })
+        // Issue #723 E8 r5 (buy): a confirm-time re-size comes back as a
+        // CONFIRM_RESIZED advisory carrying the new quantity.  Nothing was
+        // written - surface the new figure on the card and let the user
+        // confirm THAT number; the resubmit below binds the same id.
+        if (result && result.reason_code === 'CONFIRM_RESIZED' && result.confirm_qty != null) {
+          const sel = this.selected
+          if (sel && sel.plan) sel.plan = { ...sel.plan, accepted_qty: result.confirm_qty, confirm_qty: result.confirm_qty }
+          this.simOutcome = result
+          this.simSubmitting = false
+          return
+        }
         this.simForm.order_id = newClientId('sim')
         const [wb, paperRes, simRes] = await Promise.all([
           loadWorkbench(this.accountId),

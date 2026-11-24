@@ -453,7 +453,7 @@ export interface RunReceiptRunner {
   version: string
 }
 
-export type SchemaVersion = "p12.desktop.v2"
+export type SchemaVersion = "p12.desktop.v3"
 
 export interface Scope {
   account_id: string

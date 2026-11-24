@@ -123,9 +123,12 @@ class SubmitOutcome:
     rule_version: str
     matched_quote_time: datetime | None
     receipt_id: str | None
+    # Issue #723 E8 r5 (buy): the confirm-time re-sized quantity the server
+    # asks the user to accept.  Set only on a CONFIRM_RESIZED advisory.
+    confirm_qty: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out = {
             "order_id": self.order_id,
             "status": self.status,
             "reason_code": self.reason_code,
@@ -136,6 +139,9 @@ class SubmitOutcome:
             "matched_quote_time": None if self.matched_quote_time is None else self.matched_quote_time.isoformat(),
             "receipt_id": self.receipt_id,
         }
+        if self.confirm_qty is not None:
+            out["confirm_qty"] = self.confirm_qty
+        return out
 
 
 class PaperOrderStore:
@@ -535,6 +541,24 @@ class PaperAccount:
                 return self._reject(command, "PLAN_NOT_FOUND", None)
             if plan.side != command.side or plan.security_code != command.security_code:
                 return self._reject(command, "ORDER_CONTEXT_MISMATCH", None)
+            # Issue #723 E8 r5 (buy): the confirm-time mark may re-size the
+            # plan.  When the resolved quantity differs from the client-
+            # echoed figure the order is NOT written - the user must accept
+            # the new quantity first.  A resubmit echoing the resolved
+            # figure passes this gate and binds under the same id; until
+            # then zero orders, zero fills, cash and position unchanged.
+            # Only a real confirm-time re-size (resolver set confirm_qty)
+            # demands the explicit user re-accept; a mismatch on an
+            # otherwise unchanged plan still binds the authoritative
+            # quantity the same way it always did.
+            if getattr(plan, "confirm_qty", None) is not None and command.quantity != plan.delta_qty:
+                return self._reject(
+                    command,
+                    "CONFIRM_RESIZED",
+                    None,
+                    persist=False,
+                    resized_qty=plan.delta_qty,
+                )
             # Authoritative parameters come from the live plan, not the client.
             command = OrderCommand(
                 order_id=command.order_id,
@@ -652,6 +676,7 @@ class PaperAccount:
         quote: Quote | None,
         *,
         persist: bool = True,
+        resized_qty: int | None = None,
     ) -> SubmitOutcome:
         order = PaperOrder(
             account_id=self._account_id,
@@ -673,7 +698,7 @@ class PaperAccount:
         if persist:
             self._store.insert(order)
         return SubmitOutcome(command.order_id, "rejected", reason, REJECT[reason], 0, None, RULE_VERSION,
-                             (quote.quote_time if quote else None), None)
+                             (quote.quote_time if quote else None), None, resized_qty)
 
     def _register_order(self, order: PaperOrder) -> str | None:
         """Post the order's opening observation to the shared ledger.

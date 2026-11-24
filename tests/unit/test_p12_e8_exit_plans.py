@@ -994,11 +994,19 @@ def test_buy_confirm_resizes_on_bound_open_mark(tmp_path):
     # budget ceiling; the resolver returns the new figure.
     resolved = app.paper_current_plan(plan_id.removeprefix("plan:"), live_mark=Decimal("55.00"))
     assert resolved is not None and resolved.delta_qty == 100
-    # The submitted client-echoed 200 is bound to the server-resolved 100.
     paper = _paper(app, tmp_path, box, quote_price="55.00")
+    # First submit echoes the stale 200: the server does NOT write an
+    # order - it returns a CONFIRM_RESIZED advisory carrying the new
+    # quantity the user must accept.  Zero orders, cash/position unchanged.
     out = paper.submit(OrderCommand(plan_id, "buy", "600000", published, Decimal("10.60")))
+    assert out.status == "rejected" and out.reason_code == "CONFIRM_RESIZED"
+    assert out.confirm_qty == 100
+    assert paper._store.get(plan_id, app.scope.account_id) is None
+    # The user confirms the NEW quantity: resubmit echoing 100 binds the
+    # same id and the stored order matches what the card showed.
+    accepted = paper.submit(OrderCommand(plan_id, "buy", "600000", 100, Decimal("10.60")))
     stored = paper._store.get(plan_id, app.scope.account_id)
-    assert out.status in ("open", "filled")
+    assert accepted.status in ("open", "filled")
     assert stored is not None and stored.quantity == 100
 
 
@@ -1071,7 +1079,10 @@ def test_workbench_next_session_compatible_transport(tmp_path):
         status, resp = ep.workbench(principal, key, qs, "audit")
         pkg = resp["package"]
         seen[qs or "default"] = (status, pkg.get("next_session"), pkg["schema_version"])
-    assert seen["default"] == (200, "2026-11-20", "p12.daily-decision-package.v1")
+    # Unpinned and explicit-v2 readers get the v2 projection (no
+    # next_session, package version rewritten); a client that explicitly
+    # selects the newer contract reads the full field set.
+    assert seen["default"] == (200, None, "p12.desktop.v2")
     assert seen["schema_version=p12.desktop.v2"] == (200, None, "p12.desktop.v2")
     assert seen["schema_version=p12.desktop.v3"] == (200, "2026-11-20", "p12.daily-decision-package.v1")
 

@@ -6,8 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 GENERATOR_VERSION = 'p12-contract-codegen.v1'
-SCHEMA_VERSION = 'p12.desktop.v2'
-SCHEMA_DIGEST = 'sha256:21e9e2c0fe4ea424623cee44bd9dbe9c90578bdac0ab3e5bc840044486d10d3f'
+SCHEMA_VERSION = 'p12.desktop.v3'
+SCHEMA_DIGEST = 'sha256:e3a78a2999333af70bf14140f1e20472c77815bc42f52ce8ee3016b21e041889'
 OPERATIONS: dict[str, dict[str, Any]] = {'p12.accounts.list': {'method': 'GET',
                        'path': '/api/p12/v1/accounts',
                        'permission': 'p12:read',
@@ -1181,7 +1181,7 @@ COMPONENTS: dict[str, Any] = {'AccountEntry': {'additionalProperties': False,
                                      'version': {'minLength': 1, 'type': 'string'}},
                       'required': ['ref_id', 'version', 'digest'],
                       'type': 'object'},
- 'SchemaVersion': {'const': 'p12.desktop.v2', 'type': 'string'},
+ 'SchemaVersion': {'const': 'p12.desktop.v3', 'type': 'string'},
  'Scope': {'additionalProperties': False,
            'properties': {'account_id': {'minLength': 1, 'type': 'string'},
                           'mode': {'$ref': '#/components/schemas/Mode'}},

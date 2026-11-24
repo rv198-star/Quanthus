@@ -565,15 +565,28 @@ class PaperAccount:
 
         # Supported-session admission: a resting limit order is only accepted
         # inside continuous auction.  Orders submitted after close are refused
-        # with MARKET_CLOSED rather than parked into the next session -
-        # EXCEPT a plan-confirm order bound to the package next_session:
-        # publication lands after the T close, so that confirm registers as
-        # a pending intent and releases only inside the bound session open,
-        # never at the post-close instant and never on a disagreeing quote
-        # calendar (issue #723 E8 r2-5).  A suspended or quoteless security
-        # still refuses up front - parking it would park a never-fillable
-        # order.
-        if session["market_state"] != "trading" and bound_session_date is None:
+        # with MARKET_CLOSED rather than parked into the next session.
+        # Issue #723 E8 r4 (planning ruling): a plan-bound SELL confirms only
+        # inside the bound next_session continuous auction, so a post-close,
+        # pre-open, holiday or wrong-session confirm is refused with
+        # MARKET_CLOSED - there is no after-hours sell registration in the
+        # phase-1 slice.  The confirm then re-sizes on the live sellable,
+        # in-flight, mark and locked budget at that instant.  A plan-bound
+        # BUY keeps the pending registration from E8 r2-5 (publication lands
+        # after the T close, so its confirm rests until the bound session
+        # open).  A suspended or quoteless security still refuses up front.
+        if command.side == "sell" and bound_session_date is not None:
+            # The confirmable window is the bound session's trading day from
+            # its 09:30 open through the 15:00 close - continuous auction and
+            # the midday break both sit inside it; a resting sell simply
+            # cannot match until the afternoon resumes.
+            bound_open = (
+                session["market_state"] in ("trading", "lunch_break")
+                and session["trading_date"] == bound_session_date
+            )
+            if not bound_open:
+                return self._reject(command, "MARKET_CLOSED", quote, persist=False)
+        elif session["market_state"] != "trading" and bound_session_date is None:
             return self._reject(command, "MARKET_CLOSED", quote)
         if quote.status == "halt":
             return self._reject(command, "SECURITY_SUSPENDED", quote)
@@ -610,7 +623,14 @@ class PaperAccount:
             return SubmitOutcome(command.order_id, "open", "BELOW_LIMIT", REJECT["BELOW_LIMIT"], 0, None, RULE_VERSION, quote.quote_time, None)
         return outcome
 
-    def _reject(self, command: OrderCommand, reason: str, quote: Quote | None) -> SubmitOutcome:
+    def _reject(
+        self,
+        command: OrderCommand,
+        reason: str,
+        quote: Quote | None,
+        *,
+        persist: bool = True,
+    ) -> SubmitOutcome:
         order = PaperOrder(
             account_id=self._account_id,
             order_id=command.order_id, side=command.side,
@@ -623,7 +643,13 @@ class PaperAccount:
             avg_price=None, reject_reason=reason,
             source=SIM_MATCHED_SOURCE, receipt_id=None,
         )
-        self._store.insert(order)
+        # Issue #723 E8 r4: an out-of-session plan-sell refusal is advisory,
+        # never a terminal order row - persisting it would let the idempotent
+        # resubmit path replay "rejected" forever and lock the same plan's
+        # confirm out of the bound session open.  Other rejections keep
+        # their stored row so a same-id retry reports its original refusal.
+        if persist:
+            self._store.insert(order)
         return SubmitOutcome(command.order_id, "rejected", reason, REJECT[reason], 0, None, RULE_VERSION,
                              (quote.quote_time if quote else None), None)
 

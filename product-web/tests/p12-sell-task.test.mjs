@@ -24,17 +24,34 @@ test('closed exit shows history not a live ask', () => {
   has(workbench, 'data-testid="p12-ended-note"')
 })
 
-test('sell timing wording follows clock vs package market_date', () => {
+test('sell timing wording follows the package-bound next_session (E8 r4-3)', () => {
+  // The page's executable date is the package's authoritative next_session -
+  // never a computed market_date + 1 that can land on a weekend/holiday.
   has(workbench, 'sellIsTomorrow')
-  has(workbench, 'nextDate(md)')
-  assert.match(workbench, /开盘后[\s\S]*卖出/)
+  has(workbench, 'boundSessionDate')
+  has(workbench, "workbench?.package?.next_session")
+  has(workbench, 'boundSessionLabel')
+  assert.match(workbench, /09:30[\s\S]*交易时段内确认卖出/)
   has(workbench, '09:30–15:00')
   has(workbench, 'today.slice(5)')
-  has(workbench, '下一交易日计划：卖出')
+  has(workbench, '绑定交易日')
   assert.ok(!/该机会已于/.test(workbench), 'ended sentence must not use market_date')
   has(workbench, 'v-if="!(sellTask && sellTask.settled)"')
   has(workbench, 'taskTitle')
   has(fmt, 'nextDate')
+})
+
+test('queue list shows the final sized sell quantity, not the holding (E8 r4-2)', () => {
+  // A 400-held / 200-to-sell reduce reads "卖出 200 股" on the queue row -
+  // the same figure the detail card, confirm card and receipt display.
+  has(workbench, 'finalQty')
+  assert.match(workbench, /plan\.delta_qty < 0[\s\S]*Math\.abs\(item\.plan\.delta_qty\)/)
+  has(workbench, 'isResidueLotZero')
+  has(workbench, '余仓不足一手，请自行决定是否卖出')
+  has(workbench, 'data-testid="p12-residue-note"')
+  // After-hours sell confirm shows the phase-1 entry wording.
+  has(workbench, '开盘后可确认卖出')
+  has(workbench, 'data-testid="p12-sell-window-hint"')
 })
 
 test('off-price funding names the recorded fill and the bucket shortfall', () => {

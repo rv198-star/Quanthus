@@ -1504,6 +1504,16 @@
      "mode": {
       "$ref": "#/components/schemas/Mode"
      },
+     "next_session": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MarketDate"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "package_id": {
       "minLength": 1,
       "type": "string"

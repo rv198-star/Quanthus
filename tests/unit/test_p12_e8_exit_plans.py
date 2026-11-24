@@ -669,9 +669,12 @@ def test_confirm_uses_live_mark_and_raw_precision_lot_floor(tmp_path):
     assert app.paper_projection().quantity("600000") == 100
 
 
-def test_post_publish_confirm_registers_pending_and_releases_next_open(tmp_path):
-    # r2-5: a post-publish confirm registers a pending intent and only
-    # releases inside the bound next_session open - never at close.
+def test_sell_confirm_refused_outside_bound_session(tmp_path):
+    # r4: a plan-bound sell confirms ONLY inside the bound next_session
+    # continuous auction.  A post-close confirm is refused with an advisory
+    # MARKET_CLOSED (no stored order - the same confirm id stays usable);
+    # at the bound 09:30 open the same id re-sizes on the live facts and
+    # fills.  The refusal also left no open order and no reservation.
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     box = [day]  # clock at T close, market closed
     ds = _set_for(day.date(), (_exit_decision(exit_kind="full", fraction=None),))
@@ -681,20 +684,24 @@ def test_post_publish_confirm_registers_pending_and_releases_next_open(tmp_path)
         app.submit_order_event(app.scope, ev)
     paper = _paper(app, tmp_path, box)
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
-    first = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
-    assert first.status == "open"  # pending, not MARKET_CLOSED
-    stored = paper._store.get(plan_id, app.scope.account_id)
-    assert stored is not None and stored.session_date == ds.next_session.isoformat()
-    # Advance to the bound session open; a marketable quote fills it.
+    closed = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
+    assert closed.status == "rejected" and closed.reason_code == "MARKET_CLOSED"
+    # Advisory refusal: nothing persisted, the confirm id stays confirmable.
+    assert paper._store.get(plan_id, app.scope.account_id) is None
+    assert app.paper_projection().quantity("600000") == 400
+
+    # Bound-session open: the same confirm id re-sizes live and fills all.
     box[0] = day.replace(day=20, hour=9, minute=31)
     paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
-    paper.poll()
+    opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
+    assert opened.status == "filled" and opened.filled_qty == 400
     assert app.paper_projection().quantity("600000") == 0
 
 
-def test_bound_order_not_released_by_disagreeing_calendar(tmp_path):
-    # r2-5: a quote calendar ahead of the package next_session never
-    # releases the bound order early.
+def test_sell_confirm_refused_on_disagreeing_calendar(tmp_path):
+    # r4: a sell confirm outside the bound next_session is refused, even
+    # while the quote clock reads a trading day - the package binds
+    # execution to 11-23 and the quote clock 11-20 is not its session.
     day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
     nextopen = day.replace(day=20, hour=9, minute=30)
     box = [nextopen]
@@ -703,14 +710,19 @@ def test_bound_order_not_released_by_disagreeing_calendar(tmp_path):
     _seed_bucket(app)
     for ev in _buy_events(day):
         app.submit_order_event(app.scope, ev)
-    # The package binds execution to 11-23 while the quote clock is 11-20.
     app._decisions._set = dataclasses.replace(ds, next_session=box[0].replace(day=23).date())
     paper = _paper(app, tmp_path, box)
-    out = paper.submit(OrderCommand(
-        "plan:plan-OPP-EXIT-600000-" + day.date().isoformat(),
-        "sell", "600000", 100, Decimal("10.55")))
-    assert out.status == "open" and out.filled_qty == 0
+    plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
+    out = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
+    assert out.status == "rejected" and out.reason_code == "MARKET_CLOSED"
+    assert paper._store.get(plan_id, app.scope.account_id) is None
     assert app.paper_projection().quantity("600000") == 400
+
+    # On the bound session itself the same confirm fills.
+    box[0] = nextopen.replace(day=23)
+    paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
+    opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 100, Decimal("10.55")))
+    assert opened.status == "filled" and opened.filled_qty == 400
 
 
 def test_unfilled_exit_intent_carries_to_next_package(tmp_path):
@@ -755,7 +767,8 @@ def test_carried_reduce_preserves_positive_remainder(tmp_path):
         app.submit_order_event(app.scope, ev)
     paper = _paper(app, tmp_path, box, quote_price="10.30")  # below limit -> no fill
     plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
-    assert paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.55"))).status == "open"
+    opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.55")))
+    assert opened.status == "open"
     box[0] = nextopen.replace(hour=15, minute=1)
     paper.poll()
     assert paper._store.get(plan_id, app.scope.account_id).status == "expired"
@@ -769,7 +782,9 @@ def test_carried_reduce_preserves_positive_remainder(tmp_path):
     assert carry.delta_qty == -200 and carry.target_qty == 200
     # The confirm of the carried id also stays inside the residual.
     paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
-    out = paper.submit(OrderCommand("plan:" + carry.plan_id, "sell", "600000", 200, Decimal("10.55")))
+    out = paper.submit(
+        OrderCommand("plan:" + carry.plan_id, "sell", "600000", 200, Decimal("10.55"))
+    )
     assert out.filled_qty == 200
     assert app.paper_projection().quantity("600000") == 200
 
@@ -789,3 +804,100 @@ def test_inflight_sell_deducts_before_new_exit_qty(tmp_path):
     paper.submit(OrderCommand("rest-100", "sell", "600000", 100, Decimal("10.60")))
     plan = app.paper_current_plan("plan-OPP-EXIT-600000-" + day.date().isoformat())
     assert plan is not None and plan.delta_qty == 100
+
+
+def test_consumed_carry_emits_no_further_sell(tmp_path):
+    # r4-1: a continuation that fills the original intent's residual in
+    # full CONSUMES that intent - the next plain HOLD package emits no new
+    # sell plan and no new order.  Regression for the double-sell audited
+    # in round 3 (a filled 200-share carry re-emerged as a 100-share sell).
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    nextopen = day.replace(day=20, hour=9, minute=30)
+    box = [nextopen]
+    ds = _set_for(day.date(), (_exit_decision(exit_kind="reduce", fraction="0.50"),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    for ev in _buy_events(day):
+        app.submit_order_event(app.scope, ev)
+    paper = _paper(app, tmp_path, box, quote_price="10.30")  # below limit -> rests
+    plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
+    opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.55")))
+    assert opened.status == "open"
+    box[0] = nextopen.replace(hour=15, minute=1)
+    paper.poll()  # expires terminal-unfilled inside the bound session
+
+    # Monday's plain-HOLD package re-offers the intent as a continuation
+    # row; confirming it in-session fills the 200-share residual.
+    box[0] = nextopen.replace(day=23, hour=10)
+    app._decisions._set = dataclasses.replace(
+        _set_for(nextopen.date(), ()), next_session=box[0].date())
+    bench = app.workbench(app.scope)
+    carry = next(p for p in bench.package.plans if p.plan_id.startswith("plan-carry-600000"))
+    carry_row = next(o for o in bench.opportunities if o.opportunity_id == "OPP-CARRY-600000")
+    assert carry_row.action_code == "SELL" and carry_row.plan.plan_id == carry.plan_id
+    paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
+    filled = paper.submit(
+        OrderCommand("plan:" + carry.plan_id, "sell", "600000", 200, Decimal("10.55"))
+    )
+    assert filled.status == "filled" and filled.filled_qty == 200
+    assert app.paper_projection().quantity("600000") == 200
+
+    # Tuesday's plain-HOLD package: the consumed intent emits nothing new.
+    box[0] = nextopen.replace(day=24, hour=10)
+    app._decisions._set = dataclasses.replace(
+        _set_for(box[0].date() - timedelta(days=1), ()), next_session=box[0].date())
+    bench2 = app.workbench(app.scope)
+    assert not any(p.plan_id.startswith("plan-carry-600000") for p in bench2.package.plans)
+    assert not any(p.side == "sell" for p in bench2.package.plans)
+    # And the ledger records no further sell fill.
+    sells = [r for r in app.paper_history().reports if r.side == "sell"]
+    assert len(sells) == 1 and sells[0].quantity == 200
+
+
+def test_consumed_carry_confirm_resolves_zero(tmp_path):
+    # r4-1: after the continuation fills the residual, a late confirm of
+    # the SAME carry id resolves nothing new to sell.
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    nextopen = day.replace(day=20, hour=9, minute=30)
+    box = [nextopen]
+    ds = _set_for(day.date(), (_exit_decision(exit_kind="reduce", fraction="0.50"),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    for ev in _buy_events(day):
+        app.submit_order_event(app.scope, ev)
+    paper = _paper(app, tmp_path, box, quote_price="10.30")
+    plan_id = "plan:plan-OPP-EXIT-600000-" + day.date().isoformat()
+    opened = paper.submit(OrderCommand(plan_id, "sell", "600000", 200, Decimal("10.55")))
+    assert opened.status == "open"
+    box[0] = nextopen.replace(hour=15, minute=1)
+    paper.poll()
+    box[0] = nextopen.replace(day=23, hour=10)
+    app._decisions._set = dataclasses.replace(
+        _set_for(nextopen.date(), ()), next_session=box[0].date())
+    bench = app.workbench(app.scope)
+    carry = next(p for p in bench.package.plans if p.plan_id.startswith("plan-carry-600000"))
+    paper._quotes = _quotes(_clock(box), [_quote("10.66", box[0])])
+    paper.submit(
+        OrderCommand("plan:" + carry.plan_id, "sell", "600000", 200, Decimal("10.55"))
+    )
+    # The same carry id is now terminal-filled; the package emits no new
+    # continuation, and paper_current_plan sees nothing executable left.
+    bench2 = app.workbench(app.scope)
+    assert not any(p.plan_id.startswith("plan-carry-600000") for p in bench2.package.plans)
+
+
+def test_workbench_row_final_qty_matches_plan_delta(tmp_path):
+    # r4-2: list/detail/confirm/receipt all read the plan's final sized
+    # quantity - the workbench row's plan delta IS the sell figure.
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    box = [datetime(2026, 11, 20, 10, 0, tzinfo=TZ)]
+    ds = _set_for(day.date(), (_exit_decision(exit_kind="reduce", fraction="0.50"),))
+    app = _app(tmp_path, ds, box)
+    _seed_bucket(app)
+    for ev in _buy_events(day):
+        app.submit_order_event(app.scope, ev)
+    bench = app.workbench(app.scope)
+    row = next(o for o in bench.opportunities if o.security_code == "600000")
+    assert row.action_code == "SELL" and row.plan.delta_qty == -200
+    # The package itself names the executable session for page display.
+    assert bench.package.next_session == ds.next_session

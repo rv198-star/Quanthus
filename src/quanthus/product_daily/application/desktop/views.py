@@ -72,6 +72,11 @@ class PublishedPackage:
     source_ref: VersionRef
     plans: tuple[PublishedPlan, ...]
     digest: str
+    # Issue #723 E8 r4-3: the package-bound executable session.  The page's
+    # confirmable date, sell window text and confirm entry all read this
+    # authoritative next_session - never a computed market_date + 1, so a
+    # Friday or pre-holiday package shows the real bound trading day.
+    next_session: date | None = None
 
 
 @dataclass(frozen=True)

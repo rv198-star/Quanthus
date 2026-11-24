@@ -277,6 +277,7 @@ export interface Package {
   knowledge_cutoff: Timestamp
   market_date: MarketDate
   mode: Mode
+  next_session: MarketDate | null
   package_id: string
   plans: Array<PublishedPlan>
   published_at: Timestamp

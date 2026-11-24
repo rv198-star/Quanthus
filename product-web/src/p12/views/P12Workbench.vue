@@ -409,6 +409,7 @@
                   · 窗口 {{ time(confirmablePlan.eligible_at) }}–{{ time(confirmablePlan.expires_at).slice(11) }}
                 </p>
                 <small>确认即按服务端该计划的数量与限价提交模拟委托，无需手工填单。</small>
+                <small v-if="planConfirmDisabled && confirmablePlan.side === 'sell'" class="p12-confirm-window-hint" data-testid="p12-sell-window-hint">开盘后可确认卖出</small>
               </div>
               <a-button
                 type="primary"
@@ -660,7 +661,8 @@
               <p v-if="isUnheldExit(selected)" data-testid="p12-unheld-exit-note">
                 本账户此前未买入 {{ selectedDisplayName }}（当前持仓 0 股），本轮退出计划对你的账户不产生卖出任务或待办费用。
               </p>
-              <p v-else-if="selected.stage === 'exit_plan' && isDisplayOnlyReduce(selected)" data-testid="p12-reduce-note">减仓建议：建议减少对 {{ selectedDisplayName }} 的持仓，本轮无可执行卖出数量，持仓继续持有。</p>
+              <p v-else-if="selected.stage === 'exit_plan' && isResidueLotZero(selected)" data-testid="p12-residue-note">余仓不足一手，请自行决定是否卖出</p>
+              <p v-else-if="selected.stage === 'exit_plan' && isDisplayOnlyReduce(selected)" data-testid="p12-reduce-note">减仓建议：{{ (selected.plan && selected.plan.invalidations && selected.plan.invalidations[0]) || `建议减少对 ${selectedDisplayName} 的持仓，本轮无可执行卖出数量，持仓继续持有。` }}</p>
               <!-- Issue #722 r7-1: an unverifiable exit now reads as a HELD row -->
               <!-- (stage holding, HOLD + MISSING_INPUT + INPUT_UNAVAILABLE); the -->
               <!-- note still names it so the holding is never read as a sell. -->
@@ -1456,7 +1458,7 @@ export default {
       if (this.isUnheldExit(item)) return '账户核对结论'
       if (this.isUnverifiedExit(item)) return '账户核对结论'
       if (this.isOpportunityExpired(item)) return '原计划已过有效期'
-      if (item.stage === 'exit_plan') return this.sellIsTomorrow ? '下一交易日计划' : '今天的任务'
+      if (item.stage === 'exit_plan') return this.sellIsTomorrow ? '绑定交易日计划' : '今天的任务'
       return item.plan ? '下一交易日计划' : '今天的任务'
     },
     taskSubtitle () {
@@ -1482,15 +1484,33 @@ export default {
       }
       return label('next_step', app.next_step)
     },
+    boundSessionDate () {
+      // Issue #723 E8 r4-3: the page's executable date is the package-bound
+      // next_session - the authoritative trading day the sell may confirm
+      // in, never a computed market_date + 1 that mislabels a Friday or
+      // pre-holiday package as a Saturday/Sunday session.
+      return this.workbench?.package?.next_session || ''
+    },
     sellIsTomorrow () {
       const clock = (this.workbench?.clock || '').slice(0, 10)
+      const bound = this.boundSessionDate
+      if (bound) return !!clock && clock < bound
       const md = this.workbench?.package?.market_date || this.workbench?.publication?.market_date || ''
       return !!clock && !!md && clock <= md
     },
+    boundSessionLabel () {
+      const bound = this.boundSessionDate
+      if (bound) return bound.slice(5)
+      const md = this.workbench?.package?.market_date || this.workbench?.publication?.market_date || ''
+      return md ? nextDate(md) : ''
+    },
     sellWindowText () {
       if (this.sellTask && this.sellTask.settled) return ''
-      const md = this.workbench?.package?.market_date || this.workbench?.publication?.market_date || ''
-      if (this.sellIsTomorrow) return `次日（${nextDate(md)}）09:30–15:00`
+      if (this.sellIsTomorrow) {
+        return this.boundSessionDate
+          ? `绑定交易日（${this.boundSessionLabel}）09:30–15:00`
+          : `次日（${this.boundSessionLabel}）09:30–15:00`
+      }
       const today = (this.workbench?.clock || '').slice(0, 10)
       return `今天（${today.slice(5)}）09:30–15:00`
     },
@@ -1520,8 +1540,9 @@ export default {
         const open = t.open.length
         return `已成交 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)}；同一委托待终结确认${open ? `（${open} 笔进行中）` : ''}`
       }
+      const whenText = this.boundSessionLabel || '下一交易日'
       return this.sellIsTomorrow
-        ? `下一交易日计划：卖出 ${formatQuantity(t.total || 0)}，在交易窗口内登记实际成交`
+        ? `${whenText} 09:30 起在交易时段内确认卖出 ${formatQuantity(t.total || 0)}`
         : `今天任务：卖出 ${formatQuantity(t.total || 0)}，在交易窗口内登记实际成交`
     },
     takeawayActionTitle () {
@@ -1561,6 +1582,9 @@ export default {
       if (this.isUnheldExit(item)) {
         return '策略已发出退出信号，但本账户此前未买入该股（持仓 0 股），今日无需任何操作。'
       }
+      if (this.isResidueLotZero(item)) {
+        return '余仓不足一手，请自行决定是否卖出'
+      }
       const plan = item.plan
       if (this.isOpportunityExpired(item)) {
         const winText = plan ? `（${formatTime(plan.eligible_at)} 至 ${formatTime(plan.expires_at).slice(11)}）` : ''
@@ -1582,9 +1606,8 @@ export default {
         }
         if (t.filled > 0) return `已卖出 ${formatQuantity(t.filled)}，剩余 ${formatQuantity(t.remaining)} 待成交并在同委托终结`
         const qty = t.remaining || Math.abs((item.applicability && item.applicability.delta_qty) || 0)
-        const md = this.workbench?.package?.market_date || this.workbench?.publication?.market_date || ''
-        const when = this.sellIsTomorrow ? `次日（${nextDate(md)}）开盘后` : '今天'
-        return `${when}卖出 ${formatQuantity(qty)}，在交易窗口内登记实际成交`
+        const when = this.sellIsTomorrow ? `${this.boundSessionLabel || '下一交易日'} 09:30 起` : '今天'
+        return `${when}在交易时段内确认卖出 ${formatQuantity(qty)}`
       }
       if (item.stage === 'exit_plan' && item.status_code === 'ENDED') {
         const t = this.sellTask || { filled: 0, total: 0 }
@@ -1788,6 +1811,13 @@ export default {
     isDisplayOnlyReduce (item) {
       return this.isReduceExit(item) && !(item.plan && item.plan.delta_qty < 0)
     },
+    // Issue #723 E8 r4-2: a reduce whose system order quantity is zero
+    // (sub-lot residue) shows only the manual-decision note - the plan's
+    // own invalidation text names the residue case verbatim.
+    isResidueLotZero (item) {
+      const hints = (item.plan && item.plan.invalidations) || []
+      return this.isDisplayOnlyReduce(item) && hints.some(h => String(h).includes('余仓不足一手'))
+    },
     isUnverifiedExit (item) {
       // Issue #722 r6-3 + r7-1: an exit whose reduce/full type cannot be
       // verified reads as a HELD row (backend rewrites the stage to holding
@@ -1841,8 +1871,17 @@ export default {
       if (item.action_code === 'BUY' && item.applicability && item.applicability.delta_qty > 0) {
         return `买入 ${item.applicability.delta_qty} 股`
       }
-      if (item.action_code === 'SELL' && this.heldQtyFor(item.security_code) > 0) {
-        return `卖出 ${this.heldQtyFor(item.security_code)} 股`
+      if (item.action_code === 'SELL') {
+        // Issue #723 E8 r4-2: the queue shows the plan's final sized sell
+        // quantity - the same figure the detail, confirm card and receipt
+        // display - never the whole held position (400 held / 200 to sell
+        // reads "卖出 200 股" everywhere).
+        const finalQty =
+          (item.plan && item.plan.delta_qty < 0 && Math.abs(item.plan.delta_qty)) ||
+          (item.applicability && item.applicability.delta_qty < 0 && Math.abs(item.applicability.delta_qty)) ||
+          0
+        if (finalQty > 0) return `卖出 ${finalQty} 股`
+        return label('action_code', item.action_code)
       }
       return label('action_code', item.action_code)
     },
@@ -1875,6 +1914,9 @@ export default {
       }
       if (this.isUnheldExit(item)) {
         return '此前未买入该股（持仓 0 股），本轮退出信号无需操作'
+      }
+      if (this.isResidueLotZero(item)) {
+        return '余仓不足一手，请自行决定是否卖出'
       }
       if (this.isOpportunityExpired(item)) {
         const exp = item.plan && item.plan.expires_at ? `（${formatTime(item.plan.expires_at)} 截止）` : ''

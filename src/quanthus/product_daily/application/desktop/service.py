@@ -166,24 +166,72 @@ def _sellable_for(security_code, projection, history, reserved, trading_day):
     return max(0, held - today - int(reserved.get(security_code, 0)))
 
 
-def _carried_exit_orders(history) -> dict[str, list]:
-    """plan:* sell orders that ended terminal with unfilled quantity.
+_CARRY_ORDER_PREFIX = "plan:plan-carry-"
 
-    The exit intent they confirmed survives their own bound-session close:
-    a sell order that ended with quantity still held leaves a residual,
-    and this registry is what the next package reads to re-offer that
-    same intent under a re-sized plan.  An open order still reserves its
-    quantity, so only terminal rows carry.
+
+def _carried_exit_orders(history) -> dict[str, list]:
+    """Terminal plan:* sell orders whose ORIGINAL exit intent is unfulfilled.
+
+    Issue #723 E8 r4-1: the surviving obligation of an exit intent is the
+    accepted quantity of the non-carry plan sell orders that first confirmed
+    it, net of every plan:* sell fill posted against that intent - including
+    fills posted by its continuation orders.  A continuation order does not
+    add a new obligation; its fills consume the original residual.  Once a
+    continuation fills in full the ledger reads original-accepted minus
+    all-fills = 0 and no further carry plan is emitted for a later plain
+    HOLD package.  An open order still reserves its quantity, so only
+    terminal rows carry.
+
+    Returns ``{security_code: [terminal plan sell orders]}`` only for
+    securities whose original intent still has a positive residual; the
+    orders are kept for ``carry_of`` traceability.
     """
-    carried: dict[str, list] = {}
+    plan_sells: dict[str, list] = {}
     for order in getattr(history, "orders", ()) or ():
         if not str(order.order_id).startswith("plan:") or order.side != "sell":
             continue
-        residual = int(order.accepted_total_qty) - int(order.known_fill_qty)
-        if order.status != "terminal" or residual <= 0:
+        if order.status != "terminal":
             continue
-        carried.setdefault(order.security_code, []).append(order)
+        plan_sells.setdefault(order.security_code, []).append(order)
+    carried: dict[str, list] = {}
+    for security_code, orders in plan_sells.items():
+        original = sum(
+            int(o.accepted_total_qty)
+            for o in orders
+            if not str(o.order_id).startswith(_CARRY_ORDER_PREFIX)
+        )
+        filled = sum(int(o.known_fill_qty) for o in orders)
+        if original - filled <= 0:
+            continue
+        carried[security_code] = [
+            o
+            for o in orders
+            if int(o.accepted_total_qty) - int(o.known_fill_qty) > 0
+            or str(o.order_id).startswith(_CARRY_ORDER_PREFIX)
+        ]
     return carried
+
+
+def _carried_exit_residuals(history) -> dict[str, int]:
+    """Per-security surviving exit-intent quantity under the same ledger.
+
+    The confirm path re-derives the same figure: original non-carry accepted
+    minus all plan:* sell fills.  It bounds a carried plan's confirm so the
+    continuation never re-sells quantity a prior one already consumed.
+    Open (non-terminal) orders keep their hold separately through the
+    in-flight cover netting, so only terminal rows matter here.
+    """
+    originals: dict[str, int] = {}
+    fills: dict[str, int] = {}
+    for order in getattr(history, "orders", ()) or ():
+        if not str(order.order_id).startswith("plan:") or order.side != "sell":
+            continue
+        code = order.security_code
+        fills[code] = fills.get(code, 0) + int(order.known_fill_qty)
+        if str(order.order_id).startswith(_CARRY_ORDER_PREFIX):
+            continue
+        originals[code] = originals.get(code, 0) + int(order.accepted_total_qty)
+    return {code: qty - fills.get(code, 0) for code, qty in originals.items()}
 
 
 def _carried_plan_id(decisions, security_code: str) -> str:
@@ -196,7 +244,7 @@ def _carried_plan_id(decisions, security_code: str) -> str:
 # internal code stays in risk_check_ref for audit.
 _SIZING_REASON_HINT = {
     "ALREADY_BELOW_TARGET": "当前持仓已低于减仓目标，无需卖出",
-    "REDUCE_RESIDUE_LOT_ZERO": "减仓后余仓不足一手，请人工决定是否清仓",
+    "REDUCE_RESIDUE_LOT_ZERO": "余仓不足一手，请自行决定是否卖出",
     "REDUCE_BUDGET_UNKNOWN": "建仓资金桶预算未核实，暂不卖出",
     "MARK_PRICE_UNAVAILABLE": "缺少有效标记价，暂不卖出",
     "NOTHING_SELLABLE_T1": "当日无可卖出数量（T+1 未解禁）",
@@ -938,15 +986,15 @@ class P12DesktopApplication:
             carry_kind, carry_fraction = prior_exit_plans.get(
                 security_code, ("full", None)
             )
-            # E8 r3-6: the carry keeps the SAME intent - its remaining
-            # obligation is the unfilled residual of the prior order, never a
+            # E8 r3-6/r4-1: the carry keeps the SAME intent - its remaining
+            # obligation is the unfilled residual of the ORIGINAL intent,
+            # net of fills any prior continuation already posted, never a
             # fresh flat of the whole holding.  A reduce that left 200
             # unfilled re-offers at most those 200, re-bounded by today's
-            # sellable and the keep floor its fraction still imposes.
-            residual = sum(
-                int(o.accepted_total_qty) - int(o.known_fill_qty)
-                for o in prior_orders
-            )
+            # sellable and the keep floor its fraction still imposes; once a
+            # continuation fills them the residual reaches zero and no new
+            # carry is emitted.
+            residual = _carried_exit_residuals(history).get(security_code, 0)
             sizing = size_exit(
                 security_code=security_code,
                 exit_kind=carry_kind,
@@ -1032,6 +1080,7 @@ class P12DesktopApplication:
             source_ref=decisions.source_ref,
             plans=tuple(plans),
             digest=package_digest,
+            next_session=decisions.next_session,
         )
 
     # ---- account --------------------------------------------------------------------
@@ -1719,6 +1768,54 @@ class P12DesktopApplication:
             # order surface.
             if item.opportunity_id != "no-qualified-candidate"
         ]
+        # Issue #723 E8 r4-1: a carried exit intent (a plan:* sell that ended
+        # terminal-unfilled) surfaces on the workbench as an actionable
+        # continuation row - same security, same reduce/full intent, re-sized
+        # on the live holding - so the desk can see and confirm it through
+        # the normal plan path.  The row names its origin intent on the
+        # carry_of audit trail and is never emitted once the residual is
+        # consumed (the publish step no longer emits the carry plan).
+        rows_by_opp = {item.opportunity_id for item in items}
+        for plan in package.plans:
+            if not plan.plan_id.startswith("plan-carry-"):
+                continue
+            if plan.opportunity_id in rows_by_opp:
+                continue
+            if plan.delta_qty >= 0:
+                continue
+            pos = next(
+                (p for p in account.positions if p.security_code == plan.security_code),
+                None,
+            )
+            cost = (
+                pos.average_cost if pos is not None else MaybeDecimal.unknown("NO_POSITION")
+            )
+            items.append(
+                OpportunityView(
+                    opportunity_id=plan.opportunity_id,
+                    security_code=plan.security_code,
+                    security_name=(
+                        (pos.security_name if pos is not None else None)
+                        or plan.security_code
+                    ),
+                    stage=OpportunityStage.EXIT_PLAN.value,
+                    queue_group="exit",
+                    action_code="SELL",
+                    status_code="READY",
+                    reason_codes=plan.reason_codes,
+                    primary_constraint=plan.primary_constraint,
+                    changes=(),
+                    explanations=(),
+                    next_observation="上一轮卖出委托未成交，本轮续办同一退出意图的余量",
+                    chart=None,
+                    cost_price=cost,
+                    plan=plan,
+                    applicability=self._applicability(
+                        plan, projection, history, blockers, now
+                    ),
+                    exit_kind=plan.exit_kind,
+                )
+            )
         known = {item.security_code for item in decisions.decisions}
         active_buckets = self._active_bucket_by_security(funding)
         pending_attr_secs = {
@@ -2901,18 +2998,15 @@ class P12DesktopApplication:
             sell_qty = sizing.sell_qty
             if plan.plan_id.startswith("plan-carry-"):
                 # A carried intent only ever re-offers the surviving residual
-                # of the orders it carries - never a fresh flat.  Re-derive
-                # the residual from the still-terminal plan sell orders.
-                residual = sum(
-                    max(0, int(o.accepted_total_qty) - int(o.known_fill_qty))
-                    for o in getattr(snapshot.history, "orders", ()) or ()
-                    if str(o.order_id).startswith("plan:")
-                    and o.side == "sell"
-                    and o.status == "terminal"
-                    and o.security_code == plan.security_code
-                    and int(o.accepted_total_qty) - int(o.known_fill_qty) > 0
+                # of the ORIGINAL intent - never a fresh flat.  Re-derive it
+                # from the same intent ledger the publisher used: original
+                # non-carry accepted minus every plan sell fill, so a
+                # continuation that already filled the residual confirms 0
+                # instead of re-selling the same shares (E8 r4-1).
+                residual = _carried_exit_residuals(snapshot.history).get(
+                    plan.security_code, 0
                 )
-                sell_qty = min(sell_qty, residual)
+                sell_qty = min(sell_qty, max(0, residual))
             if sell_qty <= 0:
                 return None
             # The confirm-time mark fixes the keep target; the sell limit

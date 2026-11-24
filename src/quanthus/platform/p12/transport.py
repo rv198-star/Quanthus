@@ -166,6 +166,11 @@ def _package(value: PublishedPackage) -> dict[str, Any]:
         "synthetic": value.synthetic,
         "market_date": value.market_date.isoformat(),
         "knowledge_cutoff": _ts(value.knowledge_cutoff),
+        "next_session": (
+            value.next_session.isoformat()
+            if getattr(value, "next_session", None) is not None
+            else None
+        ),
         "published_at": _ts(value.published_at),
         "account_revision": value.account_revision,
         "composition_ref": _ref(value.composition_ref),

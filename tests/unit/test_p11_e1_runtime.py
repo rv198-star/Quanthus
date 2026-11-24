@@ -701,7 +701,9 @@ def test_october_factor_ledger_survives_action_isolation(assets, unknown_impleme
     }
     affected["exceptions"] = [row]
     if unknown_implemented:
-        affected["actions"] = [{"action_status": "IMPLEMENTED", "ex_date": f.T1.isoformat(), "terms": {}}]
+        affected["actions"] = [
+            {"action_status": "IMPLEMENTED", "ex_date": f.T1.isoformat(), "terms": {}}
+        ]
     req = f._request(
         market_dates=(f.T1,), securities=[good, affected],
         coverage="verified" if unknown_implemented else "partial",

@@ -85,39 +85,42 @@ def _isodate(value: Any, label: str) -> date:
     _fail("invalid_raw_history", f"{label} must be an ISO date string")
 
 
-def _listing_session_date(value: Any, label: str, venue_id: str) -> date:
-    """Project a P10 listing effective_* endpoint onto the venue's session date.
+def _listing_instant(value: Any, label: str, venue_id: str) -> datetime:
+    """Keep a P10 listing effective_* endpoint at full instant precision.
 
-    P10 supplies effective_from/effective_to as a UTC timestamp (the DWD effective
-    interval is an instant, not a date literal).  The listing is active on the
-    venue session whose calendar day contains the instant, anchored by the venue
-    timezone - the same rule the warehouse uses to bind an instant to a trading
-    day.  A bare ISO date is also accepted (it is already a session day).
-
-    The projection is explicit per venue: the instant is converted to the
-    venue's local timezone and its calendar date is taken, so 16:00+08 on
-    2026-11-24 and 00:30+08 on 2026-11-24 both land on the 2026-11-24 SSE
-    session, never truncated to a UTC date.
+    The DWD effective interval is a timestamp (effective_from/to carry a UTC
+    instant, not a date literal), so the half-open comparison
+    effective_from <= observation_start < effective_to must be evaluated on the
+    instant.  A bare ISO date is promoted to the venue's local midnight - the
+    declared legacy contract for date-only synthetic inputs, kept deliberately
+    conservative.  A timezone-aware timestamp keeps its own clock; 'Z' and an
+    explicit offset are equivalent under Python 3.10 (naive and non-finite
+    values stay rejected).
     """
     tz = _venue_tz(venue_id)
     if isinstance(value, datetime):
         if value.tzinfo is None:
             _fail("invalid_raw_history", f"{label} must carry a timezone")
-        return value.astimezone(tz).date()
-    if isinstance(value, date):
         return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time(), tzinfo=tz)
     if isinstance(value, str):
         try:
-            return date.fromisoformat(value)
+            day = date.fromisoformat(value)
         except ValueError:
-            pass
+            day = None
+        if day is not None:
+            return datetime.combine(day, datetime.min.time(), tzinfo=tz)
         try:
-            parsed = datetime.fromisoformat(value)
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
-            _fail("invalid_raw_history", f"{label} is not an ISO date or datetime")
+            _fail(
+                "invalid_raw_history",
+                f"{label} is not an ISO date or datetime",
+            )
         if parsed.tzinfo is None:
             _fail("invalid_raw_history", f"{label} must carry a timezone")
-        return parsed.astimezone(tz).date()
+        return parsed
     _fail("invalid_raw_history", f"{label} must be an ISO date or timestamp")
 
 
@@ -140,7 +143,9 @@ def _isodatetime(value: Any, label: str) -> datetime:
         return value
     if isinstance(value, str):
         try:
-            parsed = datetime.fromisoformat(value)
+            # Python 3.10 does not accept the ISO 'Z' designator; it is
+            # equivalent to +00:00 and is normalised once, here.
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             _fail("invalid_raw_history", f"{label} is not an ISO datetime")
         if parsed.tzinfo is None:
@@ -208,6 +213,10 @@ class CalendarRow:
     venue_id: str
     session_date: date
     is_open: bool
+    # Session observation anchor (dwd_trading_calendar.open_at).  The listing
+    # half-open interval effective_from <= anchor < effective_to is compared
+    # against this instant, never the session date or a fabricated close time.
+    open_at: datetime | None
     close_at: datetime | None
     knowledge_from: datetime
     source_member_id: str
@@ -218,8 +227,13 @@ class ListingRow:
     security_id: str
     listing_id: str
     venue_id: str
-    effective_from: date
-    effective_to: date | None
+    # The source effective interval is an INSTANT (DWD effective_from/to are UTC
+    # timestamps), kept at full precision so the half-open comparison against
+    # the session observation anchor matches the baseline query.  A date-only
+    # value is promoted to the venue's local midnight for the declared legacy
+    # contract; timestamp inputs keep their source clock.
+    effective_from: datetime
+    effective_to: datetime | None
     knowledge_from: datetime
     source_member_id: str
 
@@ -288,12 +302,14 @@ def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
         smid = _text(co.get("source_member_id"), f"calendar_rows[{index}].source_member_id")
         if smid not in member_ids:
             _fail("unknown_source_member", f"calendar_rows[{index}] -> {smid}")
+        open_at = _isodatetime(co["open_at"], "open_at") if co.get("open_at") else None
         close_at = _isodatetime(co["close_at"], "close_at") if co.get("close_at") else None
         knowledge_from = _isodatetime(co["knowledge_from"], "calendar_rows[].knowledge_from")
         row = CalendarRow(
             venue_id=_text(co.get("venue_id"), f"calendar_rows[{index}].venue_id"),
             session_date=_isodate(co.get("session_date"), f"calendar_rows[{index}].session_date"),
             is_open=_bool_strict(co.get("is_open"), "calendar_rows[].is_open"),
+            open_at=open_at,
             close_at=close_at,
             knowledge_from=knowledge_from,
             source_member_id=smid,
@@ -321,11 +337,11 @@ def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
         if smid not in member_ids:
             _fail("unknown_source_member", f"listing_rows[{index}] -> {smid}")
         venue = _text(lo.get("venue_id"), f"listing_rows[{index}].venue_id")
-        eff_from = _listing_session_date(
+        eff_from = _listing_instant(
             lo.get("effective_from"), f"listing_rows[{index}].effective_from", venue
         )
         eff_to = (
-            _listing_session_date(lo["effective_to"], f"listing_rows[{index}].effective_to", venue)
+            _listing_instant(lo["effective_to"], f"listing_rows[{index}].effective_to", venue)
             if lo.get("effective_to")
             else None
         )
@@ -397,12 +413,22 @@ def derive_universe_membership(
             "age cannot be inferred",
         )
     earliest_start = min(row.effective_from for row in intervals)
-    venue_sessions = sorted(
-        row.session_date
+    # Each open venue session is anchored at its observation_start
+    # (dwd_trading_calendar.open_at, an instant).  A session missing its anchor
+    # cannot be half-open-compared; that session is named, never guessed from
+    # the session date or the close clock.
+    venue_sessions: list[tuple[date, datetime | None]] = sorted(
+        (row.session_date, row.open_at)
         for row in calendar_rows
         if row.venue_id == venue_id and row.is_open and row.session_date <= market_date
     )
-    if not venue_sessions or venue_sessions[0] > earliest_start:
+    # Coverage is asserted on the session DAY the listing began: the first
+    # delivered open session must be on or before the listing's start session.
+    # (The instant comparison belongs to membership inclusion, not coverage.)
+    earliest_start_day = earliest_start.astimezone(
+        _venue_tz(venue_id)
+    ).date()
+    if not venue_sessions or venue_sessions[0][0] > earliest_start_day:
         _fail(
             "calendar_coverage_incomplete",
             f"the {venue_id} calendar does not cover the listing start "
@@ -411,13 +437,31 @@ def derive_universe_membership(
             "member passthrough instead of fabricating an age)",
         )
     membership: list[date] = []
-    for session in venue_sessions:
+    missing_anchor: list[date] = []
+    for session, anchor in venue_sessions:
+        if anchor is None:
+            # The session is admissible for listing evaluation only if we can
+            # prove the interval is active at its observation anchor.  A missing
+            # anchor is named and the session is not counted, rather than
+            # guessed from the date or close clock.
+            missing_anchor.append(session)
+            continue
         for interval in intervals:
-            if interval.effective_from <= session and (
-                interval.effective_to is None or session <= interval.effective_to
+            # baseline: effective_from <= observation_start < effective_to
+            if interval.effective_from <= anchor and (
+                interval.effective_to is None or anchor < interval.effective_to
             ):
                 membership.append(session)
                 break
+    if missing_anchor:
+        # Anchor-missing sessions are a per-security isolation: the listing
+        # interval is recorded as unverifiable for those sessions so the
+        # receipt can name them without fabricating an age.
+        _fail(
+            "listing_anchor_unavailable",
+            f"{security_id}/{listing_id}@{venue_id}: calendar rows lack an "
+            f"observation anchor for sessions {missing_anchor[:4]}",
+        )
     return tuple(membership)
 
 
@@ -568,13 +612,18 @@ def _listing_floor_proof(
     sessions_needed = GATE_LISTING
     window = membership[-sessions_needed:]
     earliest_anchor = window[0] if window else None
+    # earliest_anchor is a session DATE; the covering listing interval must
+    # contain that session's observation start.  Use the venue-local midnight
+    # of the anchor day as the conservative lower bound for the proof window
+    # (the proof only asserts a floor, not an instant).
     covering = [
         row
         for row in listing_rows
         if row.security_id == security_id
         and row.venue_id == venue_id
         and earliest_anchor is not None
-        and row.effective_from <= earliest_anchor
+        and row.effective_from
+        <= datetime.combine(earliest_anchor, datetime.min.time(), _venue_tz(row.venue_id))
     ]
     at_least = len(membership) >= sessions_needed and bool(covering)
     return {
@@ -814,7 +863,7 @@ def raw_history_digest(history: RawHistory) -> str:
 
     Every byte that can change the derived membership or the projected
     RawSecurityInput is bound: source members (id, sha256, knowledge_at, visible_at,
-    coverage), calendar rows (venue/date/is_open/close/knowledge), listing rows
+    coverage), calendar rows (venue/date/is_open/open/close/knowledge), listing rows
     (security/venue/interval/knowledge), market_date and decision_cutoff.  A change
     to any of these alters the job identity even when the projected features do not
     move - matching the original panel's source-closure requirement.
@@ -844,6 +893,7 @@ def raw_history_digest(history: RawHistory) -> str:
                 "venue_id": c.venue_id,
                 "session_date": c.session_date.isoformat(),
                 "is_open": c.is_open,
+                "open_at": c.open_at.isoformat() if c.open_at else None,
                 "close_at": c.close_at.isoformat() if c.close_at else None,
                 "knowledge_from": c.knowledge_from.isoformat(),
                 "source_member_id": c.source_member_id,

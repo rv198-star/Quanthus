@@ -69,6 +69,7 @@ def _calendar(venue: str = "SSE", days=None, member_id: str = "core-daily-1d") -
             "venue_id": venue,
             "session_date": day.isoformat(),
             "is_open": True,
+            "open_at": f"{day.isoformat()}T09:30:00+08:00",
             "close_at": f"{day.isoformat()}T15:00:00+08:00",
             "knowledge_from": f"{day.isoformat()}T15:30:00+08:00",
             "source_member_id": member_id,
@@ -747,8 +748,11 @@ def test_r2_listing_effective_timestamp_accepted_and_projected():
     assert inputs[0].universe_membership[0] == cal_days[0]
 
 
-def test_r2_listing_timestamp_day_boundary_not_truncated():
-    """A 23:00+08 instant on day X must stay on day X (not roll to X+1 UTC date)."""
+def test_r3_listing_timestamp_effective_after_session_open_excluded():
+    """effective_from=23:00+08 on day X is AFTER that session's 09:30 open ->
+    the half-open interval excludes day X (the listing was not yet active at
+    its observation start).  This is the baseline instant comparison, not a
+    date projection."""
     raw = _trend_raw("600000")
     cal_days = _weekdays_ending(TARGET, 200)
     late = datetime.combine(cal_days[0], datetime.min.time()).replace(hour=23, tzinfo=SHANGHAI)
@@ -759,7 +763,26 @@ def test_r2_listing_timestamp_day_boundary_not_truncated():
     )
     history = load_raw_history(env)
     inputs, _ = raw_security_inputs_from_history(history)
+    # The listing only becomes active at 23:00 - after day0's 09:30 anchor, so
+    # day0 is excluded and membership starts on day1.
+    assert inputs[0].universe_membership[0] == cal_days[1]
+    assert len(inputs[0].universe_membership) == 199
+
+
+def test_r3_listing_timestamp_effective_at_session_open_included():
+    """effective_from exactly == session open_at satisfies the closed lower
+    bound effective_from <= observation_start -> that session IS a member."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 200)
+    at_open = datetime.combine(cal_days[0], datetime.min.time()).replace(hour=9, minute=30, tzinfo=SHANGHAI)
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=_calendar(days=cal_days),
+        listing=[_listing(raw.identity.security_id, effective_from=at_open.isoformat())],
+    )
+    inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
     assert inputs[0].universe_membership[0] == cal_days[0]
+    assert len(inputs[0].universe_membership) == 200
 
 
 def test_r2_wrong_listing_id_rejected_not_matched():
@@ -782,3 +805,80 @@ def test_r2_wrong_listing_id_rejected_not_matched():
     assert inputs == []
     assert receipts[0]["status"] == "excluded"
     assert "listing" in receipts[0]["reason"].lower()
+
+
+def test_r3_listing_effective_to_at_session_start_excludes_T():
+    """effective_to=2026-11-24T00:00+08 ends BEFORE T's 09:30 open -> the
+    half-open interval excludes T (open < effective_to fails), so T is not a
+    member even though the date matches.  Baseline: anchor < effective_to."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 200)
+    listing = _listing(
+        raw.identity.security_id, effective_from=cal_days[0].isoformat()
+    )
+    listing["effective_to"] = f"{TARGET.isoformat()}T00:00:00+08:00"
+    env = _envelope(
+        [_security_entry(raw)], calendar=_calendar(days=cal_days), listing=[listing]
+    )
+    inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
+    membership = inputs[0].universe_membership
+    assert TARGET not in membership
+    assert len(membership) == 199
+
+
+def test_r3_listing_effective_from_after_close_excludes_T():
+    """effective_from=2026-11-24T20:00+08 (after T's 09:30 open) -> T is not
+    yet a member; membership would begin on the next session's open."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 200)
+    listing = _listing(raw.identity.security_id, effective_from=cal_days[0].isoformat())
+    listing["effective_from"] = f"{TARGET.isoformat()}T20:00:00+08:00"
+    env = _envelope(
+        [_security_entry(raw)], calendar=_calendar(days=cal_days), listing=[listing]
+    )
+    inputs, _ = raw_security_inputs_from_history(load_raw_history(env))
+    membership = inputs[0].universe_membership
+    assert membership == ()  # no session's anchor is at/after 20:00 yet
+
+
+def test_r3_listing_z_and_offset_equivalent():
+    """ISO 'Z' and '+00:00' spell the same instant; Python 3.10 needs the
+    normalisation.  Both must produce the identical membership."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 200)
+
+    def _build(suffix: str):
+        listing = _listing(
+            raw.identity.security_id,
+            effective_from=cal_days[0].isoformat() + suffix,
+        )
+        return _envelope(
+            [_security_entry(raw)], calendar=_calendar(days=cal_days), listing=[listing]
+        )
+
+    # A bare date is a legacy contract; use a timestamp with Z vs +08:00 at the
+    # same instant so the comparison is meaningful. 2026-02-18T01:30Z == 09:30+08.
+    z = _listing(raw.identity.security_id, effective_from="2026-02-18T01:30:00Z")
+    off = _listing(raw.identity.security_id, effective_from="2026-02-18T09:30:00+08:00")
+    env_z = _envelope([_security_entry(raw)], calendar=_calendar(), listing=[z])
+    env_off = _envelope([_security_entry(raw)], calendar=_calendar(), listing=[off])
+    iz, _ = raw_security_inputs_from_history(load_raw_history(env_z))
+    io, _ = raw_security_inputs_from_history(load_raw_history(env_off))
+    assert iz[0].universe_membership == io[0].universe_membership
+
+
+def test_r3_listing_missing_anchor_isolated_not_guessed():
+    """A session without open_at cannot be half-open-compared; it is named
+    (listing_anchor_unavailable) rather than guessed from the date/close."""
+    raw = _trend_raw("600000")
+    cal = _calendar()
+    cal[0].pop("open_at")  # strip the anchor on the first session
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=cal,
+        listing=[_listing(raw.identity.security_id, effective_from="2026-01-01")],
+    )
+    inputs, receipts = raw_security_inputs_from_history(load_raw_history(env))
+    assert inputs == []
+    assert receipts[0]["status"] == "excluded"
+    assert "anchor" in receipts[0]["reason"].lower()

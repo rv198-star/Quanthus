@@ -427,6 +427,7 @@ def run_e1_replay_day(
     snapshot_manifest_digest: str,
     clock: Callable[[], datetime] | None = None,
     observed_clock: Callable[[], datetime] | None = None,
+    p12_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """P12-facing replay entry: run one T through the signed replay path.
 
@@ -506,27 +507,51 @@ def run_e1_replay_day(
     # never a hard failure.  The container edge and the used-row business date
     # are disclosed separately per member.
     member_use = _analyze_member_use(req, market_date, observed_at=observed_at)
-    if member_use["blocking_used_members"]:
+    # Only a SHARED whole-day dependency blocks the whole day; a member bound
+    # to one security isolates that security (neighbours keep evaluating),
+    # and an unused member never blocks regardless of read timing.
+    if member_use["blocking_shared_members"]:
         _fail(
             "as_observed_post_T_content",
-            "member used business rows run past the T+1 match window of signal "
-            f"{market_date}: {member_use['blocking_used_members']}",
-        )
-    if member_use["unavailable_at_read"]:
-        ids = [m["member_id"] for m in member_use["unavailable_at_read"]]
-        _fail(
-            "as_observed_unavailable_at_read",
-            "member obtained later than this run's actual read/verify instant "
-            f"{observed_at.isoformat()}: {sorted(ids)}",
+            "shared member content/availability fails the whole-day gate of "
+            f"signal {market_date}: {member_use['blocking_shared_members']}",
         )
 
     # Real projection: unused wholly-late partitions are moved OUT of the
-    # period's input (not merely annotated), so the envelope handed to H1
-    # carries only the members this period can actually consume.  The full
-    # member catalogue stays disclosed in member_use for the closure.
+    # period's input; a security whose exclusive dependency is unavailable is
+    # demoted to held-only (its entry-scan inputs are cleared so it is never
+    # re-evaluated, but an already-held position still surfaces its held
+    # reminder from independently-available facts).  Neighbours keep
+    # evaluating.  Isolated securities are named in the closure with reason,
+    # original instant and scope.
     excluded_ids = {
         str(m["member_id"]) for m in member_use["excluded_late_partitions"]
     }
+    isolated_securities = set(member_use["isolated_by_security"])
+    demoted = []
+    for s in req.securities:
+        code = (
+            (s.get("identity") or {}).get("listing_code")
+            if isinstance(s, Mapping)
+            else getattr(getattr(s, "identity", None), "listing_code", None)
+        )
+        if code not in isolated_securities:
+            demoted.append(s)
+            continue
+        # Demote to held-only: keep the held markers/account position facts so
+        # the held reminder still computes; clear every entry-scan input so it
+        # is isolated, not silently evaluated on a stale member.
+        iso = dict(s) if isinstance(s, Mapping) else dict(vars(s))
+        iso["bars"] = []
+        iso["actions"] = []
+        iso["limits"] = []
+        iso["close_at_by_date"] = {}
+        iso["knowledge_cutoff_by_date"] = {}
+        iso["entry_isolated_reason"] = "member_unavailable_at_read"
+        iso["entry_isolated_member_ids"] = sorted(
+            member_use["isolated_by_security"][code]
+        )
+        demoted.append(iso)
     projected_req = (
         replace(
             req,
@@ -534,8 +559,9 @@ def run_e1_replay_day(
                 m for m in req.source_members
                 if str(_member_id_of(m)) not in excluded_ids
             ),
+            securities=tuple(demoted),
         )
-        if excluded_ids
+        if excluded_ids or isolated_securities
         else req
     )
 
@@ -553,6 +579,20 @@ def run_e1_replay_day(
             "actual_read_at": observed_at.isoformat(),
             "member_use": member_use,
             "projected_out_member_ids": sorted(excluded_ids),
+            "isolated_securities": {
+                code: {
+                    "member_ids": sorted(mids),
+                    "reason": "member_unavailable_at_read",
+                    "scope": "per_security_held_only",
+                }
+                for code, mids in member_use["isolated_by_security"].items()
+            },
+            # P12-supplied consumption evidence from the SAME #749 read: the
+            # original envelope bytes reference/SHA, per-member selected-row
+            # versions, the actual first-read/verify instants and the
+            # same-day scenario-ledger digest.  Folded into the closure under
+            # the caller's own keys; never back-filled from the run's now.
+            "p12": dict(p12_evidence or {}),
             "anchor_mode": "equivalent_day",
             "pit_disguise": False,
         }
@@ -694,73 +734,86 @@ def _member_available_at(m: Any) -> datetime | None:
     return max(instants) if instants else None
 
 
-def _used_member_ids(request: Any) -> dict[str, set[str]]:
-    """Collect the member ids the run actually consumes, by binding kind.
+def _used_member_ids(request: Any) -> dict[str, dict[str, Any]]:
+    """Collect the member ids the run consumes, split shared vs per-security.
 
-    A replay envelope is a PROJECTION: securities[] rows, calendar/listing rows,
-    action registers and declared member_evidence each name the source member
-    they came from.  A member referenced by NO consumed row is not used by this
-    period even though it ships inside the package; the package-level date_to
-    is a container edge, not the business date of any selected row.
+    A replay envelope is a PROJECTION: securities[] identity/dependency rows,
+    action rows, calendar/listing rows, action registers and declared
+    member_evidence each name the source member they came from.
+
+    A member bound through a single security's depends_on_member_ids or
+    actions rows is PER-SECURITY: its failure isolates that security only.
+    A member bound through calendar_rows, listing_rows, action_coverage
+    registers, member_evidence or required_member_ids is SHARED: it feeds
+    the whole-day gate and its failure blocks the day.  A member referenced
+    by NO consumed row is unused even though it ships inside the package.
     """
-    used: dict[str, set[str]] = {}
+    used: dict[str, dict[str, Any]] = {}
 
-    def add(member_id: Any, kind: str) -> None:
+    def add(member_id: Any, kind: str, code: str | None) -> None:
         if member_id is None:
             return
-        used.setdefault(str(member_id), set()).add(kind)
+        rec = used.setdefault(str(member_id), {"shared": set(), "securities": set()})
+        if code is None:
+            rec["shared"].add(kind)
+        else:
+            rec["securities"].add(code)
 
     for sec in getattr(request, "securities", ()) or ():
         ident = sec.get("identity") if isinstance(sec, Mapping) else getattr(sec, "identity", None)
+        code = (ident or {}).get("listing_code") if isinstance(ident, Mapping) else None
         dep = (ident or {}).get("depends_on_member_ids", ()) if isinstance(ident, Mapping) else ()
         for mid in dep:
-            add(mid, "identity")
+            add(mid, "identity", code)
         acts = sec.get("actions") if isinstance(sec, Mapping) else getattr(sec, "actions", ())
         for act in acts or ():
             if isinstance(act, Mapping):
-                add(act.get("source_member_id") or act.get("member_id"), "action")
+                add(act.get("source_member_id") or act.get("member_id"), "action", code)
     for row in getattr(request, "calendar_rows", ()) or ():
         if isinstance(row, Mapping):
-            add(row.get("source_member_id"), "calendar")
+            add(row.get("source_member_id"), "calendar", None)
     for row in getattr(request, "listing_rows", ()) or ():
         if isinstance(row, Mapping):
-            add(row.get("source_member_id"), "listing")
+            add(row.get("source_member_id"), "listing", None)
     ac = getattr(request, "action_coverage", None)
     if isinstance(ac, Mapping):
         for reg in ac.get("registers", ()) or ():
             if isinstance(reg, Mapping):
-                add(reg.get("source_member_id"), "action_register")
+                add(reg.get("source_member_id"), "action_register", None)
     for me in getattr(request, "member_evidence", ()) or ():
-        add(_member_id_of(me), "member_evidence")
+        add(_member_id_of(me), "member_evidence", None)
     for mid in getattr(request, "required_member_ids", ()) or ():
-        add(mid, "required")
+        add(mid, "required", None)
     return used
 
 
 def _analyze_member_use(
     request: Any, market_date: date, observed_at: datetime | None = None
 ) -> dict[str, Any]:
-    """Classify each source member by USED-row business content vs the period.
+    """Classify each source member by USED-row content vs the period.
 
-    The envelope slices every consumed row (bars, calendar, listing) to <=T;
-    a member's date_to is a CONTAINER edge (the latest date the package could
-    supply, possibly a whole-month or whole-year span), not the business date
-    of any selected row.  So date_to is disclosed, never a hard gate.
+    Three dependency tiers decide the blast radius of a failure:
+      shared     -- the member feeds the whole-day gate (calendar / listing /
+                    action registers / member_evidence / required).  Its
+                    unavailability or post-window truth blocks the day.
+      securities -- the member is bound only through one security's
+                    depends_on_member_ids / actions.  Its failure isolates
+                    that security (and surfaces a held reminder if the
+                    security is already held); neighbours keep evaluating.
+      unused     -- no consumed row references it; it is named, never a block.
 
-    The post-window signal is a member whose declared coverage STARTS past T:
-    every business row it could carry is wholly post-T (a November daily
-    partition).  When the period uses no row from it, it is named and moved
-    out of the period's input with a reason -- never a hard failure.  When the
-    period DOES consume rows from a member that only begins past T, that is a
-    contradiction (a used row dated past the signal) and stays fail-closed.
+    A member's date_to is a CONTAINER edge, disclosed not gated; the real
+    post-window signal is a member whose coverage only BEGINS past T.
 
-    Returns members (per-member disclosure), blocking_used_members (fail),
-    excluded_late_partitions (named, moved out), match_window_through.
+    Returns members (per-member disclosure incl. dependency tier), the
+    shared blocking member ids, per-security isolation map, unused/late
+    partition names, unavailable_at_read split by tier, match_window_through.
     """
     used = _used_member_ids(request)
     match_end = market_date + timedelta(days=1)
     members: list[dict[str, Any]] = []
-    blocking: list[str] = []
+    blocking_shared: list[str] = []
+    isolated: dict[str, list[str]] = {}  # security_code -> member_ids
     excluded: list[dict[str, Any]] = []
     unavailable: list[dict[str, Any]] = []
     for m in getattr(request, "source_members", ()) or ():
@@ -768,45 +821,59 @@ def _analyze_member_use(
         d_to = _date_to_of(m)
         d_from = _date_from_of(m)
         avail = _member_available_at(m)
-        kinds = sorted(used.get(str(mid), ())) if mid is not None else []
-        is_used = bool(kinds)
+        u = used.get(str(mid), {"shared": set(), "securities": set()}) if mid is not None else {
+            "shared": set(), "securities": set()
+        }
+        shared = sorted(u["shared"])
+        secs = sorted(u["securities"])
+        is_used = bool(shared or secs)
+        if shared:
+            tier = "shared"
+        elif secs:
+            tier = "per_security" if len(secs) == 1 else "multi_security"
+        else:
+            tier = "unused"
         rec = {
             "member_id": mid,
             "container_date_from": d_from.isoformat() if d_from else None,
             "container_date_to": d_to.isoformat() if d_to else None,
             "available_at": avail.isoformat() if avail else None,
-            "used_by": kinds,
+            "dependency_tier": tier,
+            "shared_kinds": shared,
+            "securities": secs,
             "is_used": is_used,
         }
-        # A member the consumer could not have obtained by THIS run's real
-        # read/verify instant is unavailable at read -- material later than
-        # the actual verification is refused by dependency, never admitted.
-        # This only binds members the period actually CONSUMES; a member the
-        # period does not use cannot block the day (it is named unused below).
         unreadable = avail is not None and observed_at is not None and avail > observed_at
+        wholly_late = d_from is not None and d_from > match_end
         if unreadable and is_used:
             rec["disposition"] = "unavailable_at_read"
+            rec["reason"] = "obtained_after_actual_read"
             unavailable.append(
                 {
                     "member_id": mid,
                     "available_at": avail.isoformat(),
                     "actual_read_at": observed_at.isoformat(),
-                    "used_by": kinds,
+                    "dependency_tier": tier,
+                    "securities": secs,
                     "reason": "obtained_after_actual_read",
                 }
             )
+            if tier == "shared":
+                blocking_shared.append(str(mid))
+            else:
+                for code in secs:
+                    isolated.setdefault(code, []).append(str(mid))
             members.append(rec)
             continue
-            # Unused and also not yet obtained: doubly outside the period --
-            # fall through to the wholly-late / unused classification below.
-        # A partition that only BEGINS after the signal carries no on/before-T
-        # business row at all.
-        wholly_late = d_from is not None and d_from > match_end
         if is_used and wholly_late:
-            # Consumed rows cannot predate the member's own start: a used row
-            # dated past the signal is a real post-window contradiction.
-            blocking.append(str(mid))
+            # A used member whose coverage only begins past the signal is a
+            # post-window contradiction; tier decides the blast radius.
             rec["disposition"] = "blocked_post_window"
+            if tier == "shared":
+                blocking_shared.append(str(mid))
+            else:
+                for code in secs:
+                    isolated.setdefault(code, []).append(str(mid))
         elif not is_used and wholly_late:
             rec["disposition"] = "excluded_late_partition"
             excluded.append(
@@ -820,12 +887,14 @@ def _analyze_member_use(
         else:
             rec["disposition"] = "used" if is_used else "unused"
             if not is_used and unreadable:
-                # Named but never a block: it is simply outside the period's use.
                 rec["unused_obtained_after_read"] = True
         members.append(rec)
     return {
         "members": members,
-        "blocking_used_members": sorted(set(blocking)),
+        "blocking_shared_members": sorted(set(blocking_shared)),
+        # Back-compat alias for the previous blocking list.
+        "blocking_used_members": sorted(set(blocking_shared)),
+        "isolated_by_security": {k: sorted(set(v)) for k, v in isolated.items()},
         "excluded_late_partitions": excluded,
         "unavailable_at_read": unavailable,
         "match_window_through": match_end.isoformat(),

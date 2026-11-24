@@ -31,6 +31,8 @@ daily, or live evidence.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
@@ -908,6 +910,329 @@ def _action_coverage_ok(
         # action row inside it (the conflict is isolated, never coalesced away).
         return False
     return True
+
+
+# --- signed action-authority assembly (R9) ------------------------------------------
+_SIGNED_ACTION_PRODUCER = "p10.signed-action-members.v1"
+_SIGNED_ACTION_READER = "p12.e1-signed-member-reader"
+
+
+def _member_bytes(members: Mapping[str, bytes], rel_path: str) -> bytes:
+    b = members.get(rel_path)
+    if not isinstance(b, (bytes, bytearray)):
+        _fail(
+            "action_authority_member_missing",
+            "member " + repr(rel_path) + " not present in members map",
+        )
+    return bytes(b)
+
+
+def _member_sha(b: bytes) -> str:
+    return "sha256:" + hashlib.sha256(b).hexdigest()
+
+
+def _pointer(pointer_root: Mapping[str, Any], name: str) -> tuple[str, str]:
+    p = pointer_root.get(name)
+    if not isinstance(p, Mapping):
+        _fail(
+            "action_authority_pointer_missing", "pointer_root." + name + " must name {path, sha256}"
+        )
+    rel = _text(p.get("path"), "pointer_root." + name + ".path")
+    declared = _sha256(p.get("sha256"), "pointer_root." + name + ".sha256")
+    return rel, declared
+
+
+def build_signed_action_authority(
+    *,
+    accepted: Mapping[str, Any],
+    pointer_root: Mapping[str, Any],
+    members: Mapping[str, bytes],
+    security_code: str,
+    listing_code: str,
+    stock_code: str,
+    security_id: str,
+    listing_id: str,
+    venue_id: str,
+    signal_date: str,
+    coverage_id: str | None = None,
+) -> dict[str, Any]:
+    """Rebuild the action_coverage wire for ONE signed security-day."""
+    iso = _isodate(signal_date, "signal_date").isoformat()
+
+    # 1. member bytes + pointer cross-check.
+    events_rel, events_decl = _pointer(pointer_root, "events")
+    windows_rel, windows_decl = _pointer(pointer_root, "windows")
+    coverage_rel, coverage_decl = _pointer(pointer_root, "coverage")
+    events_b = _member_bytes(members, events_rel)
+    windows_b = _member_bytes(members, windows_rel)
+    coverage_b = _member_bytes(members, coverage_rel)
+    for name, b, decl in (
+        ("events", events_b, events_decl),
+        ("windows", windows_b, windows_decl),
+        ("coverage", coverage_b, coverage_decl),
+    ):
+        if _member_sha(b) != decl:
+            _fail(
+                "action_authority_member_sha_mismatch",
+                name + " member sha " + _member_sha(b) + " != pointer-declared " + decl,
+            )
+    events_doc = json.loads(events_b.decode("utf-8"))
+    windows_doc = json.loads(windows_b.decode("utf-8"))
+    coverage_doc = json.loads(coverage_b.decode("utf-8"))
+
+    # 2. The Owner-signed table must name this security/date and both uses.
+    acc = _obj(accepted, "accepted")
+    acc_codes = _obj(acc.get("accepted_codes_by_date"), "accepted.accepted_codes_by_date")
+    day_codes = acc_codes.get(iso)
+    if not isinstance(day_codes, list) or listing_code not in [str(c) for c in day_codes]:
+        _fail(
+            "action_authority_security_day_not_signed",
+            "(security "
+            + listing_code
+            + ", T "
+            + iso
+            + ") is not in the signed accepted_codes_by_date",
+        )
+    required = {
+        _text(u, "accepted.required_uses[]")
+        for u in _seq(acc.get("required_uses", ()), "accepted.required_uses")
+    }
+    if not {"scan_two_session", "returns_61_session"} <= required:
+        _fail(
+            "action_authority_required_uses_missing",
+            "signed table does not require both window purposes",
+        )
+    # windows_sha256 pins the signed windows INDEX document (accepted.windows_file).
+    # The per-security detail rows live in the batch windows member; that member
+    # is bound by the pointer-declared sha (checked above) and by the member-map
+    # digest below.  When the caller also passes the index member bytes we verify
+    # them against the signed table - a mismatched index is fail-closed.
+    acc_windows_sha = _sha256(acc.get("windows_sha256"), "accepted.windows_sha256")
+    acc_windows_file = acc.get("windows_file")
+    if acc_windows_file is not None and isinstance(members, Mapping):
+        idx_b = members.get(str(acc_windows_file))
+        if idx_b is not None and _member_sha(idx_b) != acc_windows_sha:
+            _fail(
+                "action_authority_windows_index_sha_mismatch",
+                "signed windows index member sha != accepted.windows_sha256",
+            )
+    member_map_sha = _sha256(acc.get("source_members_sha256"), "accepted.source_members_sha256")
+    # 3. Rebuild the two windows for THIS security/T.
+    rows = [
+        w
+        for w in _seq(windows_doc.get("windows"), "windows.windows")
+        if isinstance(w, Mapping)
+        and str(w.get("security_code")) == listing_code
+        and str(w.get("T")) == iso
+    ]
+
+    def _find(use: str) -> dict[str, Any]:
+        for w in rows:
+            if str(w.get("use")) == use:
+                return dict(w)
+        _fail(
+            "action_authority_window_missing",
+            "no window use="
+            + repr(use)
+            + " for "
+            + listing_code
+            + " T="
+            + iso
+            + " in signed member",
+        )
+
+    scan_w = _find("scan_previous_and_T")
+    returns_w = _find("61_session_total_return_and_exceptions")
+    for w in (scan_w, returns_w):
+        for key, expected in (
+            ("security_id", security_id),
+            ("listing_id", listing_id),
+            ("venue_id", venue_id),
+        ):
+            if str(w.get(key)) != expected:
+                _fail(
+                    "action_authority_identity_mismatch",
+                    "window "
+                    + repr(w.get("use"))
+                    + " "
+                    + key
+                    + " "
+                    + repr(w.get(key))
+                    + " != frozen "
+                    + repr(expected),
+                )
+
+    # scan window -> loader's scan_sessions shape
+    scan_sessions = []
+    for s in _seq(scan_w.get("session_states"), "window.session_states"):
+        so = _obj(s, "window.session_states[]")
+        st = _text(so.get("event_state"), "session_states[].event_state")
+        scan_sessions.append(
+            {
+                "date": _isodate(so.get("session"), "session_states[].session").isoformat(),
+                "adjustment_effective": st == "verified_event",
+            }
+        )
+
+    # returns window -> sessions + declared events joined to bound terms
+    returns_sessions = [
+        _isodate(d, "window.sessions[]").isoformat()
+        for d in _seq(returns_w.get("sessions"), "window.sessions")
+    ]
+    returns_state = _text(returns_w.get("event_state"), "window.event_state")
+    # 4. Catalogue of named original rows the bound credential verified.
+    ev_rows = [
+        e
+        for e in _seq(events_doc.get("events"), "events.events")
+        if isinstance(e, Mapping) and str(e.get("security_code")) == listing_code
+    ]
+    cat_rows: dict[Any, dict[str, Any]] = {}
+    event_rows: list[dict[str, Any]] = []
+    effective_dates = {
+        str(d)
+        for d in _seq(
+            returns_w.get("effective_dates_in_60_return_intervals"),
+            "window.effective_dates_in_60_return_intervals",
+        )
+    }
+    for e in ev_rows:
+        pos = e.get("sse_directory_positive")
+        pos_e = (
+            _obj(pos.get("evidence"), "sse_directory_positive.evidence")
+            if isinstance(pos, Mapping)
+            else {}
+        )
+        reg_row: Any = pos_e.get("source_row_ordinal")
+        if reg_row is None:
+            reg_row = _text(e.get("notice_id"), "events[].notice_id")
+        pdf = _obj(e.get("official_pdf"), "events[].official_pdf")
+        impl = _sha256(pdf.get("sha256"), "events[].official_pdf.sha256")
+        row = {
+            "register_row": reg_row,
+            "ex_date": _text(e.get("ex_date"), "events[].ex_date"),
+            "cash_gross_per_share": _text(
+                e.get("cash_dividend_per_share_gross"),
+                "events[].cash_dividend_per_share_gross",
+            ),
+            "bonus_share_ratio": _text(e.get("bonus_share_ratio"), "events[].bonus_share_ratio"),
+            "transfer_share_ratio": _text(
+                e.get("transfer_share_ratio"), "events[].transfer_share_ratio"
+            ),
+            "currency": _text(e.get("currency"), "events[].currency"),
+            "implementation_sha256": impl,
+            "notice": _text(e.get("notice_id"), "events[].notice_id"),
+            "security_id": str(e.get("security_id")),
+            "listing_id": str(e.get("listing_id")),
+            "venue_id": str(e.get("venue_id")),
+            "stock_code": stock_code,
+        }
+        cat_rows[reg_row] = row
+        ex_iso = row["ex_date"]
+        if returns_state == "verified_event" and ex_iso in effective_dates:
+            event_rows.append(
+                {
+                    "ex_date": ex_iso,
+                    "cash_gross_per_share": row["cash_gross_per_share"],
+                    "bonus_share_ratio": row["bonus_share_ratio"],
+                    "transfer_share_ratio": row["transfer_share_ratio"],
+                    "currency": row["currency"],
+                    "implementation_sha256": impl,
+                    "register_row": reg_row,
+                    "notice": row["notice"],
+                }
+            )
+    cov_id = coverage_id or _text(coverage_doc.get("coverage_id"), "coverage.coverage_id")
+    manifest_sha = (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(pointer_root, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+    )
+    result_sha = (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(accepted, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+    )
+    cred = {
+        "batch_id": _text(pointer_root.get("batch"), "pointer_root.batch"),
+        "manifest_sha256": manifest_sha,
+        "result_sha256": result_sha,
+        "reader": _SIGNED_ACTION_READER,
+    }
+    catalog = {
+        "coverage_id": cov_id,
+        "digest": sha256_digest(
+            {str(k): v for k, v in sorted(cat_rows.items(), key=lambda kv: str(kv[0]))}
+        ),
+        "producer": _SIGNED_ACTION_PRODUCER,
+        "authority": {
+            "manifest_sha256": manifest_sha,
+            "result_sha256": result_sha,
+            "batch_id": cred["batch_id"],
+        },
+        "rows": list(cat_rows.values()),
+    }
+
+    def _ev(purpose: str, w: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "security_code": listing_code,
+            "signal_date": iso,
+            "purpose": purpose,
+            "event_state": _text(w.get("event_state"), "window.event_state"),
+            "coverage_id": cov_id,
+            "member_sha256": _member_sha(windows_b),
+            "member_map_sha256": member_map_sha,
+            "credential": dict(cred),
+            "observed_at": w.get("observed_at"),
+            "verified_at": w.get("verified_at"),
+            **extra,
+        }
+
+    return {
+        "default_state": "unknown",
+        "registers": [
+            {
+                "coverage_id": cov_id,
+                "version": str(coverage_doc.get("version", "1")),
+                "sha256": _member_sha(coverage_b),
+                "venue_id": venue_id,
+                "event_types": [
+                    _text(t, "coverage.categories[]")
+                    for t in _seq(coverage_doc.get("categories", ()), "coverage.categories")
+                ],
+                "source_member_id": coverage_rel,
+            }
+        ],
+        "securities": [
+            {
+                "security_code": security_code,
+                "security_id": security_id,
+                "listing_id": listing_id,
+                "venue_id": venue_id,
+            }
+        ],
+        "window_evidence": [
+            _ev(
+                "scan_two_session",
+                scan_w,
+                {
+                    "scan_sessions": scan_sessions,
+                    "sessions": [s["date"] for s in scan_sessions],
+                },
+            ),
+            _ev(
+                "returns_61_session",
+                returns_w,
+                {"sessions": returns_sessions, "events": event_rows},
+            ),
+        ],
+        "verified_artifacts": [catalog],
+        "note": (
+            "derived from Owner-signed member bytes; caller-copied fields are "
+            "not independently qualifying"
+        ),
+    }
 
 
 def _dedupe_action_rows(actions: Any) -> list[Any]:

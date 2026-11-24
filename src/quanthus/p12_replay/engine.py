@@ -448,14 +448,36 @@ class ReplayEngine:
     def evening_run(self, *, rerun: bool = False) -> dict:
         """Session T evening: materialize the input and run the daily job.
 
-        ``rerun=True`` re-invokes the job for the same market_date (the
-        store's idempotent publish makes a byte-identical rerun replay
-        ALREADY_PUBLISHED; a different package for the same date is
-        refused - both are evidence of the frozen no-replacement rule).
+        A restart mid-replay may re-invoke the job on a day whose package
+        is already published.  When the store already covers this
+        market_date the replay reuses that publication verbatim and
+        returns ALREADY_PUBLISHED - the same engine never emits a second
+        package for one day (R3 item 3: mid-stop resume must replay the
+        published package, never diff a second run against it).
+        ``rerun=True`` forces a fresh run for evidence purposes.
         """
 
         day = self.current_day
         self.set_now(_sh_now(day, self.publish_slots[-1]))
+        existing = self._store.package_path(day)
+        if existing.is_file() and not rerun:
+            receipt = {
+                "schema_version": "p12.replay.replay.v1",
+                "status": "ALREADY_PUBLISHED",
+                "market_date": day.isoformat(),
+                "package_id": f"p12-daily-{day.isoformat()}",
+                "reused": True,
+            }
+            self._log(
+                "evening_run",
+                market_date=day.isoformat(),
+                status=receipt["status"],
+                rerun=rerun,
+                reused_package=True,
+                logical_clock=self.now().isoformat(),
+                physical_clock=datetime.now(EXCHANGE_TZ).isoformat(),
+            )
+            return receipt
         product = self.materialize_day(day)
         receipt = run_daily(
             state_dir=self.state_dir,

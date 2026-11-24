@@ -63,17 +63,29 @@ def _project_securities(raw_securities):
     for sec in raw_securities or ():
         sec_o = dict(sec) if isinstance(sec, Mapping) else {}
         limits = sec_o.get("limits")
-        if isinstance(limits, list) and any(
-            isinstance(lim, dict) and "session_date" not in lim and "ipo_phase" in lim
-            for lim in limits
-        ):
-            sec_o["listing_regime"] = list(limits)
-            sec_o["limits"] = [
+        if isinstance(limits, list):
+            regime = [
                 lim for lim in limits
-                if isinstance(lim, dict) and "session_date" in lim
+                if isinstance(lim, dict) and "session_date" not in lim and "ipo_phase" in lim
             ]
+            if regime:
+                # only the regime-shaped rows move; session-dated records stay
+                # in limits, and any pre-existing listing_regime is preserved.
+                existing = sec_o.get("listing_regime")
+                merged = (
+                    list(existing) + regime
+                    if isinstance(existing, list)
+                    else regime
+                )
+                sec_o["listing_regime"] = merged
+                sec_o["limits"] = [
+                    lim for lim in limits
+                    if isinstance(lim, dict) and "session_date" in lim
+                ]
         projected.append(sec_o)
     return projected
+
+
 
 
 def build_replay_request(

@@ -1331,7 +1331,10 @@ def _run_daily_inner(
             receipt,
             InputBlock(
                 reason_code="INPUT_UNAVAILABLE",
-                detail=("runner blocked the day inside its seam: " + str(output.disposition or "no decision_set")),
+                detail=(
+                    "runner blocked the day inside its seam: "
+                    + str(output.disposition or "no decision_set")
+                ),
                 checked_at=moment,
                 expected_market_date=market_date,
                 observed_market_date=snapshot.market_date,
@@ -1346,9 +1349,28 @@ def _run_daily_inner(
         receipt["evaluation_receipt"] = output.evaluation_receipt
         receipt["source_closure"] = output.source_closure
         if output.exclusions:
-            receipt["exclusions"] = [{"security_code": i.security_code, "reason_code": i.reason_code, "detail": i.detail, "metric": i.metric, "window_start": i.window_start, "window_end": i.window_end, "regime_version": i.regime_version} for i in output.exclusions]
+            receipt["exclusions"] = [
+                {
+                    "security_code": i.security_code,
+                    "reason_code": i.reason_code,
+                    "detail": i.detail,
+                    "metric": i.metric,
+                    "window_start": i.window_start,
+                    "window_end": i.window_end,
+                    "regime_version": i.regime_version,
+                }
+                for i in output.exclusions
+            ]
         if output.held_signals:
-            receipt["held_signals"] = [{"security_code": i.security_code, "opportunity_id": i.opportunity_id, "action": i.action, "target_maximum_position": i.target_maximum_position} for i in output.held_signals]
+            receipt["held_signals"] = [
+                {
+                    "security_code": i.security_code,
+                    "opportunity_id": i.opportunity_id,
+                    "action": i.action,
+                    "target_maximum_position": i.target_maximum_position,
+                }
+                for i in output.held_signals
+            ]
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt

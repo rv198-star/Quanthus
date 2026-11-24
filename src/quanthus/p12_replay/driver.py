@@ -375,6 +375,21 @@ def main(argv=None) -> int:
     parser.add_argument("--fixture", type=Path, default=None)
     parser.add_argument("--window-keys", type=Path, default=None)
     parser.add_argument("--account", default="SYN-PAPER-A")
+    parser.add_argument(
+        "--e1-scenario",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "frozen p12.e1-scenario.v1 binding for the real phase-1 E1 "
+            "entry (scenario identity + signed action_coverage + exclusions "
+            "+ optional SourceMap overrides).  When given the engine runs "
+            "the P11 public run_e1_replay_day seam on the same T's #749 "
+            "envelope; an absent/unreadable/incomplete file leaves a named "
+            "e1_assembly_unavailable block and the entry never falls back "
+            "to the synthetic runner."
+        ),
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8792)
     parser.add_argument("--serve", action="store_true", help="run the console")
@@ -492,6 +507,40 @@ def main(argv=None) -> int:
         d.isoformat(): base_sessions_through(args.base_root, d) for d in sessions
     }
 
+    # 8792 phase-1 real-rule entry: --e1-scenario binds the frozen scenario
+    # JSON to the same T's #749 envelope + the P11 public replay seam.  A
+    # missing, unreadable or incomplete binding writes a named
+    # e1_assembly_unavailable block and the entry exits - it never falls
+    # back to the labelled synthetic runner.
+    e1_runner = None
+    e1_history_reader = None
+    if args.e1_scenario is not None:
+        e1_block = {"status": "ok"}
+        try:
+            from quanthus.p12_replay.e1_assembly import load_e1_scenario
+
+            e1_runner, e1_history_reader = load_e1_scenario(
+                args.e1_scenario,
+                repo_root=Path(__file__).resolve().parents[3],
+            )
+        except Exception as exc:  # noqa: BLE001 - assembly is best effort
+            e1_block = {
+                "status": "blocked",
+                "reason": "e1_assembly_unavailable",
+                "config_path": str(args.e1_scenario),
+                "detail": (
+                    "the phase-1 E1 scenario binding could not be "
+                    "assembled: " + type(exc).__name__ + ": " + str(exc)
+                ),
+            }
+        if e1_block["status"] == "blocked":
+            args.state_dir.mkdir(parents=True, exist_ok=True)
+            (args.state_dir / "e1-assembly-block.json").write_text(
+                json.dumps(e1_block, ensure_ascii=False, indent=1)
+            )
+            print(json.dumps({"e1_assembly_blocked": e1_block}, ensure_ascii=False))
+            return 2
+
     def factory(reset: bool) -> ReplayEngine:
         return make_engine(
             state_dir=args.state_dir,
@@ -503,6 +552,8 @@ def main(argv=None) -> int:
             window_map=window_map,
             exclusion_receipt=exclusion_receipt,
             observed_sessions_by_day=observed_by_day,
+            e1_runner=e1_runner,
+            history_reader=e1_history_reader,
             reset=reset,
         )
 

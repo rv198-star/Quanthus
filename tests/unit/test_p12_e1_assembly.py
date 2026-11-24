@@ -291,3 +291,138 @@ def test_evening_run_transports_envelope_to_run_daily(tmp_path, monkeypatch):
     assert receipt["status"] == "INPUT_BLOCKED"
     assert seen["raw_history"] is ENVELOPE
     assert seen["market_date"] == T
+
+
+def _scenario_doc(tmp_path, **over):
+    import json as _json
+
+    doc = {
+        "schema_version": "p12.e1-scenario.v1",
+        "scenario": {
+            "scenario_id": "spdb-20261008",
+            "account_namespace": "historical-replay:spdb-20261008",
+            "package_id": "replay-core-2026-10-08",
+            "manifest_sha256": "sha256:" + "c" * 64,
+            "account": {"account_id": "SYN-PAPER-A", "cash_available": "100000"},
+            "policy": {"policy_id": "p11-d1b@1.0.0"},
+            "facts_template": {"facts_id": "f"},
+            "snapshot_id": "snap-1",
+            "snapshot_manifest_digest": "sha256:" + "d" * 64,
+            "p12_evidence": {"envelope": {"uri": "mem://env", "sha256": "e" * 64}},
+        },
+        "action_coverage": {"signed": [{"coverage_id": "b02:l:2026-10-08"}]},
+        "exclusions": [{"exclusion_id": "737-x"}],
+        "open_sessions": ["2026-10-09"],
+    }
+    doc.update(over)
+    path = tmp_path / "scenario.json"
+    path.write_text(_json.dumps(doc))
+    return path
+
+
+def test_load_e1_scenario_builds_runner(tmp_path, monkeypatch):
+    from quanthus.p12_replay import e1_assembly as asm
+
+    monkeypatch.setattr(
+        _e1_rt, "load_e1_rule_assets", lambda root: {"assets": "fake"}
+    )
+
+    captured = {}
+
+    def fake_read(day, cutoff, *, holdings, pending, source_map):
+        captured["args"] = (day, holdings, pending, source_map is not None)
+        return _Result()
+
+    monkeypatch.setattr(asm, "read_history", fake_read)
+    runner, reader = asm.load_e1_scenario(
+        _scenario_doc(tmp_path), repo_root=tmp_path
+    )
+    assert isinstance(runner, E1ReplayRunner)
+    env = reader(T, CUTOFF)
+    assert env is ENVELOPE
+    ctx = runner._context_supplier()
+    assert ctx.scenario_id == "spdb-20261008"
+    assert ctx.account["account_id"] == "SYN-PAPER-A"
+    assert ctx.open_sessions == ("2026-10-09",)
+
+
+def test_load_e1_scenario_blocks_missing_file(tmp_path):
+    import pytest as _pt
+
+    from quanthus.p12_replay import e1_assembly as asm
+
+    with _pt.raises(OSError):
+        asm.load_e1_scenario(tmp_path / "absent.json", repo_root=tmp_path)
+
+
+def test_load_e1_scenario_blocks_wrong_schema(tmp_path):
+    import json as _json
+
+    import pytest as _pt
+
+    from quanthus.p12_replay import e1_assembly as asm
+
+    bad = tmp_path / "bad.json"
+    bad.write_text(_json.dumps({"schema_version": "other"}))
+    with _pt.raises(ValueError, match="p12.e1-scenario.v1"):
+        asm.load_e1_scenario(bad, repo_root=tmp_path)
+
+
+def test_load_e1_scenario_blocks_missing_scenario_field(tmp_path):
+    import pytest as _pt
+
+    from quanthus.p12_replay import e1_assembly as asm
+
+    doc = _scenario_doc(tmp_path)
+    # rewrite without account
+    import json as _json
+    d = _json.loads(doc.read_text())
+    del d["scenario"]["account"]
+    doc.write_text(_json.dumps(d))
+    with _pt.raises(ValueError, match="account"):
+        asm.load_e1_scenario(doc, repo_root=tmp_path)
+
+
+def test_load_e1_scenario_blocks_missing_coverage(tmp_path):
+    import json as _json
+
+    import pytest as _pt
+
+    from quanthus.p12_replay import e1_assembly as asm
+
+    doc = _scenario_doc(tmp_path)
+    d = _json.loads(doc.read_text())
+    d["action_coverage"] = None
+    doc.write_text(_json.dumps(d))
+    with _pt.raises(ValueError, match="action_coverage"):
+        asm.load_e1_scenario(doc, repo_root=tmp_path)
+
+
+def test_load_e1_scenario_source_map_override(tmp_path, monkeypatch):
+    import json as _json
+
+    from quanthus.p12_replay import e1_assembly as asm
+
+    monkeypatch.setattr(
+        _e1_rt, "load_e1_rule_assets", lambda root: {"assets": "fake"}
+    )
+    seen = {}
+
+    class _FakeMap:
+        def __init__(self, **kw):
+            seen["kw"] = kw
+
+    monkeypatch.setattr(asm, "SourceMap", _FakeMap)
+    doc = _scenario_doc(tmp_path)
+    d = _json.loads(doc.read_text())
+    d["source_map"] = {
+        "base_members_path": "/tmp/base.json",
+        "daily_members_path": "/tmp/daily.json",
+        "base_package_root": "/srv/root",
+    }
+    doc.write_text(_json.dumps(d))
+    from pathlib import Path as _P
+
+    asm.load_e1_scenario(doc, repo_root=tmp_path)
+    assert seen["kw"]["base_package_root"] == _P("/srv/root")
+    assert seen["kw"]["base_members_path"] == _P("/tmp/base.json")

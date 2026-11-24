@@ -28,6 +28,7 @@ entry never fabricates members or falls back to a synthetic package.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
@@ -150,4 +151,93 @@ def build_e1_entry(
     return runner, history_reader
 
 
-__all__ = ["build_e1_entry"]
+
+
+def load_e1_scenario(
+    path: str | Path,
+    *,
+    repo_root: str | Path,
+) -> tuple[E1ReplayRunner, Callable[[date, datetime], dict]]:
+    """Load a frozen E1 scenario JSON and assemble runner + history_reader.
+
+    The scenario file is the integration-time binding the coordinator
+    freezes for one replay (scenario identity, signed action_coverage wire,
+    exclusions, optional SourceMap member-map overrides).  Any missing
+    file, unreadable JSON or absent required field raises ValueError - the
+    CLI turns that into a named e1_assembly_unavailable block, never a
+    silent fall back to the synthetic path.
+
+    Shape::
+
+        {
+          "schema_version": "p12.e1-scenario.v1",
+          "scenario": {...E1ReplayContext binding...},
+          "action_coverage": {...signed wire...} | {"path": "..."},
+          "exclusions": [...],
+          "source_map": {
+            "base_members_path": "...",   # optional overrides
+            "daily_members_path": "...",
+            "base_package_root": "...",
+            "calendar_members_path": "..."
+          },
+          "open_sessions": ["2026-10-09", ...]
+        }
+    """
+    doc = json.loads(Path(path).read_text())
+    if doc.get("schema_version") != "p12.e1-scenario.v1":
+        raise ValueError(
+            "e1 scenario schema_version must be p12.e1-scenario.v1, got "
+            + repr(doc.get("schema_version"))
+        )
+    scenario = doc.get("scenario")
+    if not isinstance(scenario, dict):
+        raise ValueError("e1 scenario requires a scenario object")
+    for key in (
+        "scenario_id",
+        "package_id",
+        "manifest_sha256",
+        "account",
+        "policy",
+        "facts_template",
+        "snapshot_id",
+        "snapshot_manifest_digest",
+    ):
+        if scenario.get(key) is None:
+            raise ValueError(f"e1 scenario.scenario missing {key}")
+
+    coverage = doc.get("action_coverage")
+    if isinstance(coverage, dict) and set(coverage) == {"path"}:
+        coverage = json.loads(Path(coverage["path"]).read_text())
+    if coverage is None:
+        raise ValueError("e1 scenario requires action_coverage")
+
+    smap_doc = doc.get("source_map") or {}
+    smap = None
+    if smap_doc:
+        kwargs = {}
+        for name in (
+            "base_members_path",
+            "daily_members_path",
+            "base_package_root",
+            "calendar_members_path",
+        ):
+            if smap_doc.get(name):
+                kwargs[name] = Path(smap_doc[name])
+        smap = SourceMap(**kwargs)
+
+    exclusions = doc.get("exclusions") or ()
+    if isinstance(exclusions, dict) and set(exclusions) == {"path"}:
+        exclusions = tuple(json.loads(Path(exclusions["path"]).read_text()))
+
+    return build_e1_entry(
+        repo_root=repo_root,
+        scenario=scenario,
+        action_coverage=coverage,
+        exclusions=tuple(exclusions),
+        source_map=smap,
+        holdings=doc.get("holdings") or (),
+        pending=doc.get("pending") or (),
+        open_sessions=tuple(doc.get("open_sessions") or ()),
+    )
+
+__all__ = ["build_e1_entry", "load_e1_scenario"]

@@ -30,7 +30,7 @@ from quanthus.forward_validation.base24_runtime import (
 from quanthus.forward_validation.prospective_source import (
     P6ProspectiveSplitPolicy,
 )
-from quanthus.p12_daily.p11_bindings import (
+from quanthus.platform.p12.p11_bindings import (
     build_p11_bindings,
     load_p11_static,
     replay_decision_cutoff,

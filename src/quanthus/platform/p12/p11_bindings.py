@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .p11_history_runner import P11Bindings
+from quanthus.p12_daily.p11_history_runner import P11Bindings
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 

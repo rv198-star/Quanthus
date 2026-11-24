@@ -1369,9 +1369,10 @@ class ReplayEngine:
         doc = None
         run_id_now = run.get("run_id")
         declared_run = ref.get("run_id")
-        # The bound receipt must belong to THIS run; a ref that names a
-        # different run (or none) is refused - never read as this day's.
-        if declared_run and run_id_now and str(declared_run) != str(run_id_now):
+        # The bound receipt must belong to THIS run: a ref that names a
+        # different run - or names NO run - is refused, never read as this
+        # day's.  run_id is part of the complete binding (协调 R6 item 1).
+        if not declared_run or not run_id_now or str(declared_run) != str(run_id_now):
             return None
         if ref.get("path"):
             rel = str(ref["path"])
@@ -1418,13 +1419,21 @@ class ReplayEngine:
             run.get("scenario_id")
             or (run.get("source_closure") or {}).get("scenario_id")
         )
+        # Scenario is part of the same binding: whatever the ref declares
+        # and whatever the original doc declares must EACH equal the run's
+        # own scenario.  A run with no scenario means a ref/doc that
+        # declares one can never match (协调 R6 item 2).
         declared_scenario = ref.get("scenario_id")
-        if declared_scenario and run_scenario and str(declared_scenario) != str(
+        if (declared_scenario is None) != (run_scenario is None):
+            return None
+        if declared_scenario is not None and str(declared_scenario) != str(
             run_scenario
         ):
             return None
         doc_scenario = doc.get("scenario_id")
-        if doc_scenario and run_scenario and str(doc_scenario) != str(
+        if (doc_scenario is None) != (run_scenario is None):
+            return None
+        if doc_scenario is not None and str(doc_scenario) != str(
             run_scenario
         ):
             return None

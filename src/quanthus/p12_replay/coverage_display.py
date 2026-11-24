@@ -342,6 +342,19 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
             ),
             "as_observed": receipt.get("as_observed"),
         }
+    # A delivered day can STILL carry a whole-day block (e.g.
+    # calendar_coverage_incomplete): the per-security pool is real, but the
+    # day's own block reason must stay on the note, never drop to a bare
+    # N/M line (协调 R6 item 3).
+    day_block = receipt.get("day_block") or evaluation_receipt.get("day_block")
+    block_reason = None
+    if isinstance(day_block, Mapping):
+        block_reason = day_block.get("reason") or day_block.get("detail")
+    if block_reason:
+        note_parts.insert(
+            0,
+            "整日阻断：" + str(_cn_reason(block_reason) or block_reason),
+        )
     if pending:
         note_parts.append(
             "其余 " + str(len(pending)) + " 只待分红送股数据核清或输入未交付"
@@ -353,6 +366,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
         "pool_count": len(pool),
         "evaluated_count": evaluated_count,
         "pending_count": len(pending),
+        "day_block": day_block,
         "securities": rows,
         "note": "；".join(note_parts),
         "note_text": (

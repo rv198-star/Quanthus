@@ -1017,3 +1017,70 @@ class TestCoveragePrecheckRound2:
                     }}
         eng._store = _Store()
         assert eng._day_replay_receipt() is None
+
+    def test_ref_missing_run_id_refused(self, tmp_path):
+        # 协调 R6 item 1: a ref that declares NO run_id can never bind
+        # the receipt to this run - refused, not read.
+        import json, hashlib
+        state = tmp_path / "st"
+        eng = self._engine(tmp_path, state)
+        day = "2026-10-08"
+        original = self._receipt()
+        real_path = state / "runs" / "replay-day-receipts" / "run-9.json"
+        real_path.parent.mkdir(parents=True, exist_ok=True)
+        real_path.write_text(json.dumps(original))
+        self._real_sha = "sha256:" + hashlib.sha256(
+            real_path.read_bytes()).hexdigest()
+        # ref carries every field EXCEPT run_id
+        ref = {"schema_version": "p11.paper-replay-day.v1",
+               "path": "runs/replay-day-receipts/run-9.json",
+               "sha256": self._real_sha, "market_date": day,
+               "scenario_id": "scn-1"}
+        run = {"run_id": "run-9", "market_date": day, "scenario_id": "scn-1",
+               "p11_replay_day_receipt_ref": ref}
+        class _S:
+            def latest_run_for_date(self, d):
+                return run
+        eng._store = _S()
+        assert eng._day_replay_receipt() is None
+
+    def test_run_without_scenario_foreign_ref_refused(self, tmp_path):
+        # 协调 R6 item 2: the outer run has NO scenario_id - a ref whose
+        # scenario differs (or any scenario at all) can never match it.
+        import json, hashlib
+        state = tmp_path / "st"
+        eng = self._engine(tmp_path, state)
+        day = "2026-10-08"
+        original = self._receipt()
+        original["scenario_id"] = "scn-OTHER"
+        real_path = state / "runs" / "replay-day-receipts" / "run-9.json"
+        real_path.parent.mkdir(parents=True, exist_ok=True)
+        real_path.write_text(json.dumps(original))
+        real_sha = "sha256:" + hashlib.sha256(
+            real_path.read_bytes()).hexdigest()
+        ref = {"schema_version": "p11.paper-replay-day.v1", "run_id": "run-9",
+               "path": "runs/replay-day-receipts/run-9.json",
+               "sha256": real_sha, "market_date": day,
+               "scenario_id": "scn-OTHER"}
+        # The run declares NO scenario at all.
+        run = {"run_id": "run-9", "market_date": day,
+               "p11_replay_day_receipt_ref": ref}
+        class _S:
+            def latest_run_for_date(self, d):
+                return run
+        eng._store = _S()
+        assert eng._day_replay_receipt() is None
+
+    def test_delivered_day_keeps_whole_day_block_reason(self):
+        # 协调 R6 item 3: delivered N/M is real, but a whole-day block
+        # (calendar_coverage_incomplete) must stay on the note.
+        from quanthus.p12_replay.coverage_display import coverage_block
+        r = self._receipt()
+        r["day_block"] = {"reason": "calendar_coverage_incomplete",
+                          "scope": "whole_day"}
+        block = coverage_block(r)
+        assert block["pool_count"] == 2           # N/M still real
+        assert block["denominator_known"] if "denominator_known" in block else True
+        assert block["day_block"]["reason"] == "calendar_coverage_incomplete"
+        assert "calendar_coverage_incomplete" in block["note_text"] or "整日阻断" in block["note_text"]
+        assert "2" in block["note_text"]

@@ -1,0 +1,94 @@
+[
+  {
+    "action": "new_entry",
+    "a01": "adaptation_required",
+    "a02": "research_admission_required",
+    "executable_via": "FormalStrategyRunner.evaluate_entry -> ExpertEntryEligibility (TRIAL_ENTRY + target>0)",
+    "evidence": [
+      "real scan event_id",
+      "decision.digest",
+      "target_maximum_position"
+    ],
+    "dependencies": [
+      "A03 daily-core facts",
+      "A04 account facts",
+      "C01 calendar",
+      "C02 price/industry basis",
+      "C03 evaluation receipt coverage"
+    ],
+    "adoption_state": "proposed",
+    "disable_conditions": [
+      "input_blocked",
+      "missing named feature",
+      "unlocated impact scope",
+      "expert veto",
+      "stale member"
+    ],
+    "a05_identity": "fixedcycle/reserve",
+    "a06_identity": "execution/fees",
+    "a07_identity": "dailyoperation/use",
+    "note_extra": "A05/A06/A07 keep original adoption-coverage identities (fixedcycle/reserve, execution/fees, dailyoperation/use); calendar/price-industry/evaluation-coverage are new C01/C02/C03 dependencies"
+  },
+  {
+    "action": "held",
+    "a01": "adaptation_required",
+    "a02": "research_admission_required",
+    "executable_via": "FormalStrategyRunner.evaluate_held -> HeldRiskDecision",
+    "evidence": [
+      "position_facts_evidence",
+      "held decision digest"
+    ],
+    "dependencies": [
+      "A03..A07"
+    ],
+    "adoption_state": "proposed",
+    "disable_conditions": [
+      "held position facts missing -> hold+alert, never forced sale"
+    ],
+    "a05_identity": "fixedcycle/reserve",
+    "a06_identity": "execution/fees",
+    "a07_identity": "dailyoperation/use",
+    "note_extra": "A05/A06/A07 keep original adoption-coverage identities (fixedcycle/reserve, execution/fees, dailyoperation/use); calendar/price-industry/evaluation-coverage are new C01/C02/C03 dependencies"
+  },
+  {
+    "action": "reduce",
+    "a01": "adaptation_required",
+    "a02": "research_admission_required",
+    "executable_via": "evaluate_held REDUCE",
+    "adoption_state": "proposed",
+    "disable_conditions": [
+      "prior reduction count / thresholds"
+    ],
+    "dependencies": [],
+    "a05_identity": "fixedcycle/reserve",
+    "a06_identity": "execution/fees",
+    "a07_identity": "dailyoperation/use",
+    "note_extra": "A05/A06/A07 keep original adoption-coverage identities (fixedcycle/reserve, execution/fees, dailyoperation/use); calendar/price-industry/evaluation-coverage are new C01/C02/C03 dependencies"
+  },
+  {
+    "action": "exit",
+    "a01": "adaptation_required",
+    "a02": "research_admission_required",
+    "executable_via": "evaluate_held FULL_EXIT (force_liquidate_veto)",
+    "adoption_state": "proposed",
+    "disable_conditions": [
+      "only on real veto, never on missing data"
+    ],
+    "dependencies": [],
+    "a05_identity": "fixedcycle/reserve",
+    "a06_identity": "execution/fees",
+    "a07_identity": "dailyoperation/use",
+    "note_extra": "A05/A06/A07 keep original adoption-coverage identities (fixedcycle/reserve, execution/fees, dailyoperation/use); calendar/price-industry/evaluation-coverage are new C01/C02/C03 dependencies"
+  },
+  {
+    "action": "no_action",
+    "executable_via": "qualified evaluation produced no candidate -> ended no-op (no-qualified-candidate/000000)",
+    "adoption_state": "proposed",
+    "note": "never fabricate as qualified-empty when evaluation did not run",
+    "dependencies": [],
+    "a05_identity": "fixedcycle/reserve",
+    "a06_identity": "execution/fees",
+    "a07_identity": "dailyoperation/use",
+    "note_extra": "A05/A06/A07 keep original adoption-coverage identities (fixedcycle/reserve, execution/fees, dailyoperation/use); calendar/price-industry/evaluation-coverage are new C01/C02/C03 dependencies"
+  }
+]

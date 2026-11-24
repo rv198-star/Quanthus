@@ -1,0 +1,24 @@
+{
+  "schema_version": "quanthus.p11.release-registry.v1",
+  "releases": [
+    {
+      "manifest_id": "p11-d1b-fixed-rule-20261124-v2",
+      "manifest_path": "config/research/r11/d1b-20261124/release-manifest.v2.json",
+      "policy_id": "p11-d1b",
+      "policy_version": "1.0.0",
+      "evidence_grades": [
+        "SYNTHETIC_FIXED_RUNNER",
+        "TEST_ONLY_STRUCTURAL"
+      ]
+    },
+    {
+      "manifest_id": "p11-g1-structural-v1-compat",
+      "manifest_path": "config/research/r11/d1b-20261124/release-manifest.g1-compat.v2.json",
+      "policy_id": "r11-daily-advice",
+      "policy_version": "0.1.0",
+      "evidence_grades": [
+        "TEST_ONLY_STRUCTURAL"
+      ]
+    }
+  ]
+}

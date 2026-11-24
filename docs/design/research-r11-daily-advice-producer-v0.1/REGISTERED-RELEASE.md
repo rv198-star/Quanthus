@@ -1,0 +1,9 @@
+# Registered daily-rule release boundary
+
+The current p11-d1b@1.0.0 release is registered in config/research/r11/d1b-20261124/release-registry.v1.json. Publication selects p12.decision-set.v2 from its registered manifest/policy. A caller wire_version is an optional assertion; it never selects the wire. The historical r11-daily-advice@0.1.0 structural fixture has a separate registered compatibility manifest and preserves the original v1 payload bytes. Executable reduction is never serialized as v1. RuleDayOutput and P12 raw-input interfaces are unchanged.
+
+load_verified_release reloads strict manifest, machine policy and action receipts from registered files. The manifest must bind real code roles, canonical full commit/tree, strategy/feature/expert files, policy/receipt/consumer file hashes and an explicit industry binding state. Composition compares supplied objects to those same loaded files. Pending industry remains PENDING. The real P12 v2 pin is still pending, so current public v2 publication refuses before invoking a caller loader or writing files.
+
+The semantic closure includes src/quanthus, config and tests in both the Git index and worktree, plus untracked nonignored paths. Only the named blueprint/progress/conclusion ledgers are metadata exceptions. The two current self manifests may differ from the declared source only in their code commit/tree rebinding, and index/disk bytes must agree. Historical release-manifest.v1 and synthetic consumer v1 bytes are preserved.
+
+Acceptance: C5 four P1 regression classes, source/index/untracked mutations, mandatory-binding omissions, forged composition, configured-wire downgrade refusal, legitimate historical-v1 publication and pending-pin zero-write/zero-loader behavior. Formal full-suite acceptance is performed on the final integrated CN02 candidate.

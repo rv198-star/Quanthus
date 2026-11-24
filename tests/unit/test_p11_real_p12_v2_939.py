@@ -271,7 +271,10 @@ def test_publish_fails_before_write_when_loader_refuses(pinned_checkout, tmp_pat
     # Remove exit_kind so the pinned v2 loader must refuse before any file lands.
     # object.__setattr__ bypasses the frozen dataclass guard so the mutation
     # reaches the real loader rather than dying at P11's own contract check.
-    tampered_decision = dataclasses.replace(ds.decisions[0], exit_kind="full")
+    # Bypass the frozen dataclass: a "full" object is legal P11, then its
+    # exit_kind is cleared so the serialized wire no longer matches the
+    # validated object the pinned loader would produce.
+    tampered_decision = ds.decisions[0]
     object.__setattr__(tampered_decision, "exit_kind", None)
     tampered_ds = dataclasses.replace(ds, decisions=(tampered_decision,))
     tampered_package = dataclasses.replace(package, decision_sets=(tampered_ds,))
@@ -296,9 +299,11 @@ def test_publish_refuses_tampered_wire(pinned_checkout, tmp_path, monkeypatch):
     # Shift the reduce target by one tick: still a valid P11 object, but the
     # pinned loader + coordinate check must catch the byte-level drift before
     # any file is staged.
-    tampered_decision = dataclasses.replace(
-        ds.decisions[0], target_position_fraction=Decimal("0.51")
-    )
+    # Bypass the frozen dataclass so the wire object and the validated object
+    # diverge: the raw bytes carry 0.5 while the tampered decision serializes
+    # 0.51 - exactly the drift the single-call pin check must catch.
+    tampered_decision = ds.decisions[0]
+    object.__setattr__(tampered_decision, "target_position_fraction", Decimal("0.51"))
     tampered_ds = dataclasses.replace(ds, decisions=(tampered_decision,))
     tampered_package = dataclasses.replace(package, decision_sets=(tampered_ds,))
     with pytest.raises(Exception):

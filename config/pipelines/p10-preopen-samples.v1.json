@@ -1,0 +1,14 @@
+{
+  "scope": "P10 #727 paper_quote_feed finite raw-field evidence only",
+  "sample_dates": ["2026-11-25", "2026-11-26"],
+  "fallback": "/srv/agentdock/quanthus-ops/p10-preopen-727/fallback.json",
+  "dates": "/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5/DATES.json",
+  "base": "/srv/quanthus-base22-data/build/base25-20261031/work/paired-base251-adce892e-a1/published/DWD",
+  "calendar_descriptor": "/srv/agentdock/quanthus-ops/p10-forward-calendar-v1/p10-calendar-20261124-v1/descriptor.json",
+  "calendar_sha256": "f13d1862d5d73d7c9d940ef88340c6650b6507b83cb243cb7c20e85203c307e9",
+  "endpoint": "https://qt.gtimg.cn/q=",
+  "max_securities": 18,
+  "max_requests_per_day": 6,
+  "slots": ["09:15:05", "09:20:05", "09:24:50", "09:25:10", "09:29:50"],
+  "formal_halt_exdiv_new_ipo": "Unqualified categories remain explicitly unavailable; no price/zero-volume inference"
+}

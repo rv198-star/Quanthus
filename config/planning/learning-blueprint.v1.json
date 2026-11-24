@@ -873,6 +873,15 @@
         "TRACE"
       ],
       "contribution": "R11C13/C15共同候选/资金/账户风险用途合同和共享合成政策，按完整问题验证或具名受限停止；不改原模块采用或P12事实责任"
+    },
+    {
+      "id": "P10-DATA-P12-PREOPEN-001",
+      "issue": 727,
+      "modules": [
+        "DATA",
+        "TRACE"
+      ],
+      "contribution": "Finite existing-endpoint preopen field evidence for paper_quote_feed, with original-task evidence checkpoints; P12/runtime and formal source qualification stay separate."
     }
   ]
 }

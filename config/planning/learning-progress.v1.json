@@ -15151,6 +15151,89 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-727-20261124T050553846197Z",
+      "recorded_at": "2026-11-24T05:05:53.846197+00:00",
+      "actor": "P10 Owner",
+      "work_item": "P10-DATA-P12-PREOPEN-001",
+      "outcome": "progress",
+      "summary": "Finite Nov25/26 sampler candidate: durable freeze, request ledger and T-reference projection; 29 synthetic regressions/static passed. CN02 and real sampling pending.",
+      "evidence": [
+        {
+          "id": "PREOPEN-LOCAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-preopen-preparation/LOCAL-RECEIPT-v1.json",
+          "sha256": "d128d9a38a12465e5a5a7aca26d0f7c4f961dd6db2f6bac1f4e6eb7bf623f03e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "29 synthetic tests and focused static checks; no real quote request, CN02 full or field qualification."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Preserve existing DATA engineering/quality/admission states during candidate construction; new finite sampler awaits exact node check and real samples.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-P12-PREOPEN-001",
+          "number": 727,
+          "title": "[P10-DATA-P12-PREOPEN-001] 盘前现成供给可用性与资格差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T04:28:06Z",
+          "body_sha256": "e75220f2b4357f5bd4bba424b1f4a8d916e37956e05e5701bd983c07560df3a9"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA"
+      ]
+    },
+    {
+      "id": "CP-727-FINITE-SAMPLER-20261124",
+      "recorded_at": "2026-11-24T05:40:32.123536+00:00",
+      "actor": "P10 Owner",
+      "work_item": "P10-DATA-P12-PREOPEN-001",
+      "outcome": "completed",
+      "summary": "固定406有限留样工程通过CN02完整检查；两次节点timer已安装。实际字段资格待Nov25/26留样。",
+      "evidence": [
+        {
+          "id": "FINITE-PREOPEN",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p10-preopen-preparation/delivery-v1/RESULT.json",
+          "sha256": "23f0bb6f07ab9e6265e95ee13a223627fe3c255034f2053579bcaa408576e9ca",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed406 source/library engineering: 30 focused +9490pass/35skip full; two finite future timers installed. Real sample and field-grade acceptance pending."
+        }
+      ],
+      "updates": [
+        {
+          "module": "DATA",
+          "facet": "engineering",
+          "status": "accepted",
+          "supersedes": "CP-566-PREFIX128-20261027T130854Z",
+          "scope": "保留既有固定128来源工程验收；新增#727固定406有限留样工具、T参考投影与先落盘冻结，CN02 full及两次定时安装通过。",
+          "remaining": "Nov25/26真实T参考、冻结、请求/收件及逐字段paper_quote_feed资格待实样；原历史PIT、其他供给与消费者门按各自合同。",
+          "next_action": "按既有授权读取两日节点回执并交P12/P11核字段；E6上线后另绑定，保留该轮池身份。",
+          "evidence": [
+            "FINITE-PREOPEN"
+          ]
+        }
+      ],
+      "no_change_reason": "TRACE仅追加原任务证据账本、未改跟踪机制；DATA质量/用途/消费者状态沿原记录。",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-P12-PREOPEN-001",
+          "number": 727,
+          "title": "[P10-DATA-P12-PREOPEN-001] 盘前现成供给可用性与资格差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T04:28:06Z",
+          "body_sha256": "e75220f2b4357f5bd4bba424b1f4a8d916e37956e05e5701bd983c07560df3a9"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

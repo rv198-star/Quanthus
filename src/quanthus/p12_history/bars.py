@@ -110,7 +110,9 @@ def _project_member(member, sessions_set, needed_listings, security_by_listing, 
             }
         except Exception:  # noqa: BLE001
             continue
-        out.setdefault(listing_id, {})[session] = bar
+        key = (listing_id, session)
+        revs = out.setdefault(listing_id, {}).setdefault(session, [])
+        revs.append(bar)
         admitted += 1
     reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": scanned, "admitted": admitted, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
 

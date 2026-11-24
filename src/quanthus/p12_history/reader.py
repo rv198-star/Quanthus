@@ -11,7 +11,7 @@ carried, with UNKNOWN where coverage is unproven.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from quanthus.p12_history import bars as bars_mod
 from quanthus.p12_history import calendar_listing as cal_mod
@@ -19,7 +19,7 @@ from quanthus.p12_history import envelope as env_mod
 from quanthus.p12_history import identity as id_mod
 from quanthus.p12_history import supplements as sup_mod
 from quanthus.p12_history.clocks import REPLAY_AS_OBSERVED, iso, parse_ts, utcnow
-from quanthus.p12_history.source_pins import BASE_BUSINESS_THROUGH, SourceMap
+from quanthus.p12_history.source_pins import BASE_BUSINESS_THROUGH, SourceMap, sha256_file
 
 BAR_SESSIONS = bars_mod.BAR_SESSIONS
 LISTING_PROOF_SESSIONS = cal_mod.LISTING_PROOF_SESSIONS
@@ -61,11 +61,53 @@ def read_history(
     pending=(),
     source_map: SourceMap | None = None,
     observed_at: datetime | None = None,
+    replay_exclusion: dict | None = None,
 ) -> HistoryResult:
     """Read the bounded history for one T and assemble the raw_history."""
     smap = source_map or SourceMap()
     observed_at = observed_at or utcnow()
     read_at = iso(observed_at)
+
+    # #737 replay exclusion (audit 749-09): bind the frozen exclusion list
+    # by path AND declared sha256 before any security is admitted.  A wrong
+    # or unreadable list is a named whole-day block (INPUT_BLOCKED) rather
+    # than a guessed empty set - the exclusion is a hard pre-read gate.
+    exclusion_block = None
+    excluded_codes = set()
+    excluded_dates = set()
+    if replay_exclusion:
+        excl_path = replay_exclusion.get("path")
+        excl_sha = replay_exclusion.get("sha256")
+        try:
+            actual = sha256_file(excl_path) if excl_path else None
+        except Exception as exc:  # noqa: BLE001
+            actual = None
+            exclusion_block = {
+                "reason_code": "REPLAY_EXCLUSION_UNREADABLE",
+                "detail": f"#737 exclusion list could not be opened: {type(exc).__name__}: {exc}",
+                "affected_scope": "whole_day",
+                "disposition": "block_new_entries",
+            }
+        if exclusion_block is None and excl_sha and actual != excl_sha:
+            exclusion_block = {
+                "reason_code": "REPLAY_EXCLUSION_SHA_MISMATCH",
+                "detail": f"#737 exclusion list sha256 {actual} != pinned {excl_sha}",
+                "affected_scope": "whole_day",
+                "disposition": "block_new_entries",
+            }
+        if exclusion_block is None:
+            import json as _j
+            try:
+                doc = _j.loads(__import__("pathlib").Path(excl_path).read_text())
+                excluded_codes = {str(c) for c in doc.get("securities") or []}
+                excluded_dates = {str(d) for d in doc.get("excluded_dates") or []}
+            except Exception as exc:  # noqa: BLE001
+                exclusion_block = {
+                    "reason_code": "REPLAY_EXCLUSION_UNREADABLE",
+                    "detail": f"#737 exclusion list parse failed: {exc}",
+                    "affected_scope": "whole_day",
+                    "disposition": "block_new_entries",
+                }
 
     # Verify the fixed summary chain once per job (audit 749-01): the
     # Base manifest, the DATES index and each day's standard/core
@@ -87,7 +129,7 @@ def read_history(
     calendar_rows, cal_cov = cal_mod.read_calendar_rows(smap, market_date)
     listing_rows, list_cov = cal_mod.read_listing_rows(smap, market_date)
     identities, security_by_listing, uni_cov = id_mod.build_universe(
-        smap, market_date, holdings, pending, {}
+        smap, market_date, holdings, pending, {}, decision_cutoff
     )
     actions, act_cov = sup_mod.read_actions(smap, market_date)
     exceptions, exc_cov = sup_mod.read_exceptions(smap, market_date)
@@ -150,11 +192,21 @@ def read_history(
         pkg = smap.daily_core(day)
         if pkg is None:
             continue
-        day_dt = datetime.fromisoformat(day + "T16:00:00+00:00")
+        # Real member clocks (audit 749-02): use the producer's actual
+        # index-completion / warehouse-observed instant, never a fabricated
+        # day+16:00Z.  A package with no proven clock is a named gap and is
+        # still registered (its knowledge_at stays None) so the consumer
+        # sees the gap rather than a guessed cutoff-pass.
+        day_knowledge = smap.daily_knowledge_at(day)
+        day_visible = smap.daily_visible_at(day)
         for m in pkg.members:
-            if day_dt > decision_cutoff:
+            if day_knowledge is not None and day_knowledge > decision_cutoff:
                 late_visible_members.append(_member_key(m))
-            _reg(m, day_dt, date_from=day, date_to=day, visible_at=day_dt)
+            _reg(
+                m, day_knowledge,
+                date_from=day, date_to=day,
+                visible_at=day_visible if day_visible is not None else day_knowledge,
+            )
     source_member_entries = list(member_entries.values())
 
     # ---- per-security entries ----
@@ -229,12 +281,56 @@ def read_history(
             "knowledge_from": iso(parse_ts(qe.get("knowledge_from"))),
         })
 
+    # #737: a (stock_code, market_date) hit on the frozen exclusion list is
+    # dropped BEFORE the envelope is assembled - the security never enters
+    # this replay day.  The October window does not intersect the listed
+    # dates, so the list is inert for phase 1; it is bound and counted here
+    # so a later phase replays the same gate byte-for-byte.
+    iso_date = market_date.isoformat()
+    exclusion_hits = [
+        i.security_id for i in identities
+        if i.stock_code in excluded_codes and iso_date in excluded_dates
+    ]
+    if exclusion_hits:
+        identities = [i for i in identities if i.security_id not in set(exclusion_hits)]
+        security_by_listing = {i.listing_id: i.security_id for i in identities if i.listing_id}
     for ident in identities:
-        sec_bars = [
+        raw_revisions = [
             bars_by_listing[ident.listing_id][s]
             for s in sessions_sorted
             if ident.listing_id in bars_by_listing and s in bars_by_listing[ident.listing_id]
         ]
+        # PIT (audit 749-02): one session can carry several physical rows -
+        # a late correction or a withdrawn re-post.  bars[] exposes the
+        # last-known row for the H1 shape; the complete ordered revision
+        # chain, each row with its own knowledge_from / source_revision /
+        # record_source, travels alongside so a withdrawn late row is
+        # preserved verbatim, never silently overwritten.
+        sec_bars = []
+        bar_revision_chain = {}
+        for sess_revs in raw_revisions:
+            ordered = sorted(
+                sess_revs,
+                key=lambda b: (
+                    parse_ts(b.get("knowledge_from"))
+                    or datetime.min.replace(tzinfo=timezone.utc)
+                ),
+            )
+            chosen = ordered[-1]
+            sec_bars.append(chosen)
+            if len(ordered) > 1:
+                bar_revision_chain[chosen["session_date"]] = [
+                    {
+                        "source_record_id": b.get("source_record_id"),
+                        "source_revision": b.get("source_revision"),
+                        "record_source": b.get("record_source"),
+                        "knowledge_from": b.get("knowledge_from"),
+                        "close_price": b.get("close_price"),
+                        "member_id": b.get("member_id"),
+                        "package_id": b.get("package_id"),
+                    }
+                    for b in ordered
+                ]
         for b in sec_bars:
             sd = _date_iso(b.get("session_date"))
             t = tradability_by_key.get((ident.listing_id, sd))
@@ -252,12 +348,27 @@ def read_history(
         close_map = {d: v for d, v in all_close.items() if d in bar_dates}
         cutoff_map = {d: v for d, v in all_cut.items() if d in bar_dates}
         sec_limits = limit_by_listing.get(ident.listing_id) or []
+        # Per-security dependency reasons (audit 749-04): name exactly why a
+        # fact is missing instead of leaving an unexplained null - the P11
+        # adapter distinguishes "no source rows" from "rows present but
+        # empty", never a silent gap.
+        dep_reasons = {}
+        if not sec_bars:
+            dep_reasons["bars"] = "no_qualified_1d_rows"
+        if not any(k[0] == ident.listing_id for k in tradability_by_key):
+            dep_reasons["tradability_state"] = "no_tradability_state_rows"
+        if not sec_limits:
+            dep_reasons["price_limit_regime"] = "no_price_limit_regime_rows"
+        if not any(k[0] == ident.listing_id for k in exc_by_listing):
+            dep_reasons["quality_exceptions"] = "no_exception_rows"
         securities.append(
             env_mod.security_entry(
                 ident, sec_bars, sec_actions,
                 exc_by_listing.get(ident.listing_id) or [],
                 sec_limits,
                 close_map, cutoff_map,
+                bar_revisions=bar_revision_chain,
+                dependency_reasons=dep_reasons,
             )
         )
 
@@ -369,6 +480,13 @@ def read_history(
         "read_at": read_at,
         "visible_at_label": REPLAY_AS_OBSERVED,
         "market_date": market_date.isoformat(),
+        "replay_exclusion": {
+            "bound": bool(replay_exclusion),
+            "path": str(replay_exclusion.get("path")) if replay_exclusion else None,
+            "declared_sha256": replay_exclusion.get("sha256") if replay_exclusion else None,
+            "excluded_security_hits": exclusion_hits,
+            "excluded_count": len(exclusion_hits),
+        },
         "calendar": cal_cov,
         "listing": list_cov,
         "universe": uni_cov,
@@ -418,6 +536,8 @@ def read_history(
             "failed_members": [c.get("artifact") for c in chain_faults],
             "disposition": "block_new_entries",
         }
+    if exclusion_block is not None:
+        day_block = exclusion_block
     coverage["day_block"] = day_block
     status = "INPUT_BLOCKED" if day_block is not None else "READ"
     return HistoryResult(

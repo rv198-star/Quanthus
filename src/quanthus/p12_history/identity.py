@@ -68,7 +68,7 @@ def _read_table(source_map, table, columns):
     return rows, reads
 
 
-def build_universe(source_map: SourceMap, market_date, holdings, pending, verify):
+def build_universe(source_map: SourceMap, market_date, holdings, pending, verify, decision_cutoff=None):
     """Scan-domain identities: SSE/SZSE common_equity + account members.
 
     Returns (securities_identity_list, coverage_report).  Every identity
@@ -85,7 +85,7 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
     )
     list_rows, r3 = _read_table(
         source_map, "dwd_listing",
-        ["security_id", "listing_id", "venue_id", "listing_code", "board_code", "effective_from", "effective_to"],
+        ["security_id", "listing_id", "venue_id", "listing_code", "board_code", "effective_from", "effective_to", "knowledge_from"],
     )
     venue_rows, r4 = _read_table(
         source_map, "dwd_trading_venue",
@@ -97,7 +97,7 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
     )
     industry_rows, r6 = _read_table(
         source_map, "dwd_company_industry_membership",
-        ["company_id", "industry_node_id", "membership_type", "effective_from", "effective_to"],
+        ["company_id", "industry_node_id", "membership_type", "effective_from", "effective_to", "knowledge_from"],
     )
     reads = r1 + r2 + r3 + r4 + r5 + r6
 
@@ -116,9 +116,25 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
     venue_by_id = {str(v.get("venue_id") or ""): str(v.get("mic_code") or "") for v in venue_rows}
     company_name = {str(c.get("company_id") or ""): str(c.get("display_name") or "") for c in company_rows}
     company_industry = {}
+    cutoff_ts = decision_cutoff
+    mkt_ts = market_date
     for i in industry_rows:
         cid = str(i.get("company_id") or "")
-        company_industry.setdefault(cid, str(i.get("industry_node_id") or ""))
+        eff_from = parse_ts(i.get("effective_from"))
+        eff_to = parse_ts(i.get("effective_to"))
+        # PIT (audit 749-02/749-03): a membership row is usable for T only
+        # when its half-open [effective_from, effective_to) interval covers
+        # the market date AND it was known by the decision cutoff.  A
+        # future-effective row never replaces the current industry.
+        if eff_from is not None and mkt_ts is not None and eff_from.date() > mkt_ts:
+            continue
+        if eff_to is not None and mkt_ts is not None and eff_to.date() <= mkt_ts:
+            continue
+        if cutoff_ts is not None:
+            kf = parse_ts(i.get("knowledge_from"))
+            if kf is not None and kf > cutoff_ts:
+                continue
+        company_industry[cid] = str(i.get("industry_node_id") or "")
     # Primary coded identifier (the 6-digit exchange code the bar source keys on).
     code_by_security = {}
     for i in id_rows:
@@ -131,23 +147,45 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
 
     securities = []
     seen = set()
+    dup_ids = set()
+    cutoff_ts = decision_cutoff
+    mkt_ts = market_date
     for s in sec_rows:
         sid = str(s.get("security_id") or "")
         itype = str(s.get("instrument_type") or "")
         if not sid or itype != COMMON_EQUITY:
             continue
         cid = str(s.get("company_id") or "")
+        # Pick the listing row effective at T: the half-open
+        # [effective_from, effective_to) interval must cover the market
+        # date and be known by the cutoff.  A future listing and an
+        # already-retired boundary stay off the candidate pool (audit
+        # 749-03); the rule still sees every raw listing_row.
         for lst in listing_by_security.get(sid, ()):
             mic = venue_by_id.get(str(lst.get("venue_id") or ""), "")
             venue = "SSE" if mic == "XSHG" else ("SZSE" if mic == "XSHE" else str(lst.get("venue_id") or ""))
             if venue not in ADMITTED_VENUES:
                 continue
-            # One security x listing pair emits once; a duplicated listing
-            # row for the same (security_id, listing_id) is one identity,
-            # never a second securities[] entry (the loader rejects
-            # duplicate_security).
+            eff_from = parse_ts(lst.get("effective_from"))
+            eff_to = parse_ts(lst.get("effective_to"))
+            if mkt_ts is not None:
+                if eff_from is not None and eff_from.date() > mkt_ts:
+                    continue  # future listing
+                if eff_to is not None and eff_to.date() <= mkt_ts:
+                    continue  # already retired at the open boundary
+            if cutoff_ts is not None:
+                kf = parse_ts(lst.get("knowledge_from"))
+                if kf is not None and kf > cutoff_ts:
+                    continue  # not yet known at the decision cutoff
             pair = (sid, str(lst.get("listing_id") or ""))
             if pair in seen:
+                continue
+            if sid in seen:
+                # Distinct listing row for an already-emitted security:
+                # collapse to one identity (one security_id) and record the
+                # duplicate so the coverage names it instead of silently
+                # emitting a second securities[] entry.
+                dup_ids.add(sid)
                 continue
             code = code_by_security.get(sid) or str(lst.get("listing_code") or sid)
             securities.append(
@@ -208,4 +246,5 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
         "held_unknown_quantity": sorted(set(held_unknown_qty)),
         "pending_only": sorted(pending_sids - seen),
         "pending_typed": pending_typed,
+        "duplicate_security_ids": sorted(dup_ids),
     }

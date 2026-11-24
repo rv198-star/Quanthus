@@ -208,6 +208,43 @@ class SourceMap:
                 return m
         return None
 
+    # ---- real member knowledge clocks (audit 749-02) ----------------------
+    def daily_knowledge_at(self, market_date: str):
+        """The daily package's REAL source knowledge clock.
+
+        The reader never stamps a fabricated day+16:00Z.  The true
+        knowledge instant is the producer's index completion - the moment
+        the day's core manifest was sealed - falling back to the named
+        acquisition warehouse_observed_at.  Returns an aware UTC datetime,
+        or None when the package carries no proven clock (a named gap,
+        never a guess).
+        """
+        e = self._daily_entries.get(market_date) or {}
+        core = e.get("core_manifest") or {}
+        acq = (core.get("acquisition_universe_metadata") or {}).get(
+            "warehouse_observed_at"
+        )
+        from quanthus.p12_history.clocks import parse_ts
+        for candidate in (e.get("producer_index_completed_at"), acq):
+            ts = parse_ts(candidate)
+            if ts is not None:
+                return ts
+        return None
+
+    def daily_visible_at(self, market_date: str):
+        """The channel-visible instant for a daily package.
+
+        Equals the package's knowledge clock unless a purpose-bound
+        publication/withdrawal chain names a distinct visible instant
+        (the October-replay rule consumes the real clock verbatim)."""
+        e = self._daily_entries.get(market_date) or {}
+        chain = e.get("qualified_publication_or_withdrawal_chain") or {}
+        from quanthus.p12_history.clocks import parse_ts
+        ts = parse_ts(chain.get("value"))
+        if ts is not None:
+            return ts
+        return self.daily_knowledge_at(market_date)
+
     # ---- verification ---------------------------------------------------------
     def verify_member(self, member: ResolvedMember) -> dict:
         """Re-hash a member's bytes and compare to its pinned sha.

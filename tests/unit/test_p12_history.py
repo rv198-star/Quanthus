@@ -139,6 +139,9 @@ def _bar_table(days, listing="listing-600000"):
         "close": [10.5 + i for i in range(n)],
         "volume": [1000.0] * n,
         "turnover": [10500.0] * n,
+        "source_revision": ["rev-1"] * n,
+        "record_source": ["primary"] * n,
+        "knowledge_from": [datetime(d.year, d.month, d.day, 16, 0, tzinfo=UTC) for d in days],
     })
 
 
@@ -411,3 +414,130 @@ def test_account_roles_separated_on_universe(tmp_path):
     assert "outside-held" in uni["held_unknown_quantity"]
     assert "outside-pending" in uni["pending_only"]
     assert uni["pending_typed"][0]["pending_kind"] == "sell"
+
+
+def test_future_listing_and_industry_not_admitted(tmp_path):
+    """749-03: a future-effective listing/industry never replaces the current."""
+    smap = _build_map(tmp_path)
+    # Add a future listing + a future industry row for the same security.
+    fut_listing = tmp_path / "listing.parquet"
+    base_tbl = _listing_table()
+    extra = pa.table({
+        "security_id": ["security-600000"],
+        "listing_id": ["listing-600000-future"],
+        "venue_id": ["SSE"],
+        "effective_from": [datetime(2026, 11, 27, tzinfo=UTC)],
+        "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [datetime(2026, 11, 25, tzinfo=UTC)],
+    })
+    import pyarrow.parquet as pq
+    combined = pa.concat_tables([base_tbl, extra])
+    pq.write_table(combined, fut_listing)
+    # Rebuild map so the listing member re-hashes the new bytes.
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    ind = tmp_path / "dwd_company_industry_membership.parquet"
+    ind_tbl = pa.concat_tables([
+        pa.table({
+            "company_id": ["company-1"], "industry_node_id": ["ind-bank"],
+            "membership_type": ["primary"],
+            "effective_from": [datetime(2026,1,1,tzinfo=UTC)],
+            "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+            "knowledge_from": [datetime(2026,1,1,tzinfo=UTC)]}),
+        pa.table({
+            "company_id": ["company-1"], "industry_node_id": ["ind-future"],
+            "membership_type": ["primary"],
+            "effective_from": [datetime(2026,11,27,tzinfo=UTC)],
+            "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+            "knowledge_from": [datetime(2026,11,25,tzinfo=UTC)]}),
+    ])
+    pq.write_table(ind_tbl, ind)
+    members["dwd_company_industry_membership"] = [_member(tmp_path, "dwd_company_industry_membership.parquet")]
+    smap2 = StubSourceMap(members, {})
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=smap2,
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    secs = [x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000"]
+    assert len(secs) == 1
+    assert secs[0]["identity"]["listing_id"] == "listing-600000"
+    assert secs[0]["identity"]["industry_id"] == "ind-bank"
+
+
+def test_retired_at_open_boundary_not_candidate(tmp_path):
+    """749-03: a listing retired at the open boundary (effective_to <= T) drops."""
+    smap = _build_map(tmp_path)
+    lp = tmp_path / "listing.parquet"
+    retired = pa.table({
+        "security_id": ["security-600000"],
+        "listing_id": ["listing-600000"],
+        "venue_id": ["SSE"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+        "effective_to": [datetime(2026, 11, 20, tzinfo=UTC)],  # ended before T
+        "knowledge_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+    })
+    pq.write_table(retired, lp)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert all(x["identity"]["security_id"] != "security-600000" for x in res.raw_history["securities"])
+
+
+def test_duplicate_security_id_collapses(tmp_path):
+    """749-03: distinct listing rows for one security emit a single securities[] entry."""
+    smap = _build_map(tmp_path)
+    lp = tmp_path / "listing.parquet"
+    dup = pa.concat_tables([_listing_table(), pa.table({
+        "security_id": ["security-600000"],
+        "listing_id": ["listing-600000-b"],  # second listing, same window
+        "venue_id": ["SSE"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+        "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+    })])
+    pq.write_table(dup, lp)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    ids = [x["identity"]["security_id"] for x in res.raw_history["securities"]]
+    assert ids.count("security-600000") == 1
+    assert "security-600000" in res.coverage["universe"]["duplicate_security_ids"]
+
+
+def test_late_bar_revision_preserved(tmp_path):
+    """749-02: a late correction row for the same session is kept in bar_revisions."""
+    smap = _build_map(tmp_path)
+    # Re-write the bar member with an extra late-correction row for the last day.
+    bar_path = tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    days = _sessions(330)
+    base = _bar_table(days)
+    last = days[-1]
+    extra = pa.table({
+        "source_record_id": [f"src/code=600000/{last}-rev2"],
+        "observation_end": [datetime(last.year, last.month, last.day, 16, 0, tzinfo=UTC)],
+        "listing_id": ["listing-600000"],
+        "calendar_session_id": [f"cal-{last}"],
+        "interval_size": ["1d"], "price_basis": ["UNADJUSTED"], "currency": ["CNY"],
+        "open": [25.0], "high": [26.0], "low": [24.0], "close": [25.5],
+        "volume": [2000.0], "turnover": [51000.0],
+        "source_revision": ["rev-2"],
+        "record_source": ["late-correction"],
+        "knowledge_from": [datetime(2026, 11, 24, 17, 0, tzinfo=UTC)],
+    })
+    pq.write_table(pa.concat_tables([base, extra]), bar_path)
+    members = smap._members_by_table
+    members["dwd_security_bar"] = [_member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    sec = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000")
+    last_bar = sec["bars"][-1]
+    assert last_bar["close_price"] == "25.5"
+    revs = sec.get("bar_revisions", {}).get(last_bar["session_date"], [])
+    assert len(revs) == 2
+    # The revision chain keeps the withdrawn earlier row verbatim.
+    assert {r["source_revision"] for r in revs} == {"rev-1", "rev-2"}

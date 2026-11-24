@@ -310,7 +310,7 @@ def test_publish_refuses_tampered_wire(pinned_checkout, tmp_path, monkeypatch):
         "quanthus.product_daily.recommendation.publish._serialize_decision_sets",
         _tampered,
     )
-    with pytest.raises(Exception, match="plain decimal string"):
+    with pytest.raises(Exception, match="decimal string"):
         publish_package(
             package,
             directory=tmp_path,

@@ -838,6 +838,8 @@ def _analyze_member_use(
             "container_date_from": d_from.isoformat() if d_from else None,
             "container_date_to": d_to.isoformat() if d_to else None,
             "available_at": avail.isoformat() if avail else None,
+            # Back-compat union of binding kinds (shared + per-security).
+            "used_by": sorted(set(shared) | ({"security"} if secs else set())),
             "dependency_tier": tier,
             "shared_kinds": shared,
             "securities": secs,

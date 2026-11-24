@@ -121,6 +121,14 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
         if m is not None:
             sources.append(m)
     for member in sources:
+        verify = source_map.verify_member(member)
+        if not verify["matches"]:
+            reads.append({
+                "member_id": member.member_id, "status": "SHA_MISMATCH",
+                "declared_sha256": verify["declared_sha256"],
+                "actual_sha256": verify["actual_sha256"],
+            })
+            continue
         try:
             records = _rows(
                 member.abs_path,
@@ -159,7 +167,7 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
                 conflicts.append(
                     {"venue_id": row.venue_id, "session_date": session.isoformat(), "member_id": member.member_id}
                 )
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True})
     out = sorted(rows.values(), key=lambda r: (r.venue_id, r.session_date))
     return out, {"reads": reads, "conflicts": conflicts}
 
@@ -170,6 +178,14 @@ def read_listing_rows(source_map: SourceMap, market_date: date):
     reads = []
     rows = []
     for member in source_map.base_members("dwd_listing"):
+        verify = source_map.verify_member(member)
+        if not verify["matches"]:
+            reads.append({
+                "member_id": member.member_id, "status": "SHA_MISMATCH",
+                "declared_sha256": verify["declared_sha256"],
+                "actual_sha256": verify["actual_sha256"],
+            })
+            continue
         try:
             records = _rows(
                 member.abs_path,
@@ -201,6 +217,6 @@ def read_listing_rows(source_map: SourceMap, market_date: date):
                 )
             )
             n += 1
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True})
     out = sorted(rows, key=lambda r: (r.security_id, r.effective_from))
     return out, {"reads": reads}

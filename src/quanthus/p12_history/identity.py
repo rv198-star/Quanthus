@@ -50,13 +50,21 @@ def _read_table(source_map, table, columns):
     rows = []
     reads = []
     for member in source_map.base_members(table):
+        verify = source_map.verify_member(member)
+        if not verify["matches"]:
+            reads.append({
+                "member_id": member.member_id, "status": "SHA_MISMATCH",
+                "declared_sha256": verify["declared_sha256"],
+                "actual_sha256": verify["actual_sha256"],
+            })
+            continue
         try:
             recs = _rows(member.abs_path, columns)
         except Exception as exc:  # noqa: BLE001
             reads.append({"member_id": member.member_id, "status": "UNREADABLE", "error": str(exc)})
             continue
         rows.extend(recs)
-        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256})
+        reads.append({"member_id": member.member_id, "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True})
     return rows, reads
 
 

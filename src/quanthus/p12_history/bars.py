@@ -46,8 +46,17 @@ def _session_day(value):
     return end.astimezone(timezone.utc).date()
 
 
-def _project_member(member, sessions_set, needed_listings, security_by_listing, out, reads):
+def _project_member(member, sessions_set, needed_listings, security_by_listing, out, reads, source_map=None):
     """Admit qualified 1d rows from one member into out[listing_id][date]."""
+    if source_map is not None:
+        verify = source_map.verify_member(member)
+        if not verify["matches"]:
+            reads.append({
+                "member_id": member.member_id, "status": "SHA_MISMATCH",
+                "declared_sha256": verify["declared_sha256"],
+                "actual_sha256": verify["actual_sha256"],
+            })
+            return
     try:
         recs = _rows(member.abs_path, _COLUMNS)
     except Exception as exc:  # noqa: BLE001
@@ -85,7 +94,7 @@ def _project_member(member, sessions_set, needed_listings, security_by_listing, 
             continue
         out.setdefault(listing_id, {})[session] = bar
         admitted += 1
-    reads.append({"member_id": member.member_id, "status": "READ", "rows": scanned, "admitted": admitted, "sha256": member.sha256})
+    reads.append({"member_id": member.member_id, "status": "READ", "rows": scanned, "admitted": admitted, "sha256": member.sha256, "sha_match": True})
 
 
 def read_bars(source_map: SourceMap, sessions, security_by_listing):
@@ -106,7 +115,7 @@ def read_bars(source_map: SourceMap, sessions, security_by_listing):
         ym = re.search(r"observation_start_year=(\d{4})/observation_start_month=(\d+)", member.member_id)
         if ym and (int(ym.group(1)), int(ym.group(2))) not in months_needed:
             continue
-        _project_member(member, sessions_set, needed_listings, security_by_listing, out, reads)
+        _project_member(member, sessions_set, needed_listings, security_by_listing, out, reads, source_map)
 
     for day in source_map.daily_open_days():
         d = _date(day)
@@ -116,6 +125,6 @@ def read_bars(source_map: SourceMap, sessions, security_by_listing):
         if member is None:
             reads.append({"date": day, "status": "MISSING_MEMBER", "member": "dwd_security_bar"})
             continue
-        _project_member(member, sessions_set, needed_listings, security_by_listing, out, reads)
+        _project_member(member, sessions_set, needed_listings, security_by_listing, out, reads, source_map)
 
     return out, {"reads": reads}

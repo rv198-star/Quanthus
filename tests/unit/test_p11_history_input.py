@@ -48,7 +48,7 @@ CUTOFF = datetime(2026, 11, 24, 22, 30, tzinfo=SHANGHAI)
 # --- envelope builders ------------------------------------------------------------
 
 
-def _member(member_id: str = "m-cal-1") -> dict:
+def _member(member_id: str = "core-daily-1d") -> dict:
     return {
         "member_id": member_id,
         "package_id": "pkg-cal",
@@ -62,7 +62,7 @@ def _member(member_id: str = "m-cal-1") -> dict:
     }
 
 
-def _calendar(venue: str = "SSE", days=None, member_id: str = "m-cal-1") -> list:
+def _calendar(venue: str = "SSE", days=None, member_id: str = "core-daily-1d") -> list:
     days = _weekdays_ending(TARGET, 260) if days is None else days
     return [
         {
@@ -70,7 +70,7 @@ def _calendar(venue: str = "SSE", days=None, member_id: str = "m-cal-1") -> list
             "session_date": day.isoformat(),
             "is_open": True,
             "close_at": f"{day.isoformat()}T15:00:00+08:00",
-            "knowledge_from": day.isoformat(),
+            "knowledge_from": f"{day.isoformat()}T15:30:00+08:00",
             "source_member_id": member_id,
         }
         for day in days
@@ -81,7 +81,7 @@ def _listing(
     security_id: str,
     venue: str = "SSE",
     effective_from: str = "2026-01-01",
-    member_id: str = "m-cal-1",
+    member_id: str = "core-daily-1d",
     listing_id: str | None = None,
 ) -> dict:
     return {
@@ -90,7 +90,7 @@ def _listing(
         "venue_id": venue,
         "effective_from": effective_from,
         "effective_to": None,
-        "knowledge_from": "2026-01-01",
+        "knowledge_from": "2026-01-01T00:00:00+08:00",
         "source_member_id": member_id,
     }
 
@@ -300,9 +300,11 @@ def test_wrong_exchange_calendar_excluded():
             ],
         )
     )
-    inputs, receipts = raw_security_inputs_from_history(history)
-    # SSE venue has no open sessions on the delivered SZSE calendar -> empty membership.
-    assert inputs[0].universe_membership == ()
+    # SSE listing + a calendar that only carries SZSE sessions cannot prove the
+    # membership -> a shared coverage failure (the venue's calendar is wrong), not
+    # a per-security isolation.
+    with pytest.raises(ProductDailyError, match="calendar_coverage_incomplete"):
+        raw_security_inputs_from_history(history)
 
 
 def test_calendar_after_market_date_excluded():
@@ -414,7 +416,10 @@ def test_h1_receipts_bound_into_source_closure(runner, resources):
     receipts = output.source_closure["history_receipts"]
     assert receipts and receipts[0]["listing_floor_proof"]["kind"] == "AT_LEAST_120"
     assert output.source_closure["history_receipts_digest"].startswith("sha256:")
-    assert output.history_receipts == tuple(receipts)
+    # The receipts live inside source_closure (the frozen 7-field output is
+    # unchanged); they carry the enriched satisfied/failed verdicts.
+    assert receipts[0]["gates"]["features"]["status"] == "satisfied"
+    assert receipts[0]["raw_history_digest"].startswith("sha256:")
 
 
 def test_h1_neighbour_failure_isolated_not_day_block(runner, resources):
@@ -455,3 +460,158 @@ def test_h1_no_qualified_inputs_raises_missing_raw(runner, resources):
     env = _envelope([_security_entry(_trend_raw("600000"))], listing=[])
     with pytest.raises(ProductDailyError, match="missing_raw_inputs"):
         run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+
+
+# --- H1-R1 root-intake consolidated repair -------------------------------------------
+
+
+def test_r1_source_member_sha_changes_job_identity(runner, resources):
+    """A source member sha change must drift the closure digest, not reuse a pass."""
+    from copy import deepcopy
+
+    env = _trend_envelope()
+    out1 = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    env2 = deepcopy(env)
+    env2["source_members"][0]["sha256"] = "sha256:" + "c" * 64
+    out2 = run_daily_advice_from_history(env2, runner=runner, resources=resources, **_run_kwargs())
+    assert out1.source_closure != out2.source_closure
+    assert out1.receipt.source_closure_digest != out2.receipt.source_closure_digest
+
+
+def test_r1_source_knowledge_after_cutoff_rejected(runner, resources):
+    env = _trend_envelope()
+    env["source_members"][0]["knowledge_at"] = "2027-01-01T18:01:00+08:00"
+    with pytest.raises(ProductDailyError, match="source_knowledge_after_cutoff"):
+        run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+
+
+def test_r1_listing_knowledge_after_cutoff_rejected(runner, resources):
+    env = _trend_envelope()
+    env["listing_rows"][0]["knowledge_from"] = "2027-01-01T00:00:00+08:00"
+    with pytest.raises(ProductDailyError, match="listing_knowledge_after_cutoff"):
+        run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+
+
+def test_r1_envelope_cutoff_must_match_policy(runner, resources):
+    """The envelope cannot declare its own later deadline to admit a late member."""
+    env = _trend_envelope()
+    env["decision_cutoff"] = "2026-11-25T23:30:00+08:00"
+    env["source_members"][0]["visible_at"] = "2026-11-24T23:00:00+08:00"
+    with pytest.raises(ProductDailyError, match="envelope_decision_cutoff_mismatch"):
+        run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+
+
+def test_r1_only_21_bars_is_failed_not_qualified_empty(runner, resources):
+    """21 bars -> features gate 'failed' / not_qualified, never a qualified empty."""
+    env = _trend_envelope()
+    env["securities"][0]["bars"] = env["securities"][0]["bars"][-21:]
+    output = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    receipt = output.source_closure["history_receipts"][0]
+    assert receipt["gates"]["features"]["status"] == "failed"
+    assert receipt["gates"]["features"]["observed"] == 21
+    assert receipt["status"] == "not_qualified"
+
+
+def test_r1_malformed_neighbor_isolated_valid_entry_kept(runner, resources):
+    good = _security_entry(_trend_raw("600000"))
+    bad = _security_entry(_trend_raw("600001"))
+    bad["bars"][0]["close_price"] = "bad-close"
+    cal_days = _weekdays_ending(TARGET, 200)
+    env = _envelope(
+        [good, bad],
+        calendar=_calendar(days=cal_days),
+        listing=[
+            _listing("security-600000", effective_from=cal_days[0].isoformat()),
+            _listing("security-600001", effective_from=cal_days[0].isoformat()),
+        ],
+    )
+    output = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    assert output.result.package is not None
+    assert any(e["security_code"] == "600001" for e in output.source_closure["exclusions"])
+    entries = [d for d in output.seam.decisions if d.entry_allowed]
+    assert entries
+
+
+def test_r1_string_false_calendar_rejected():
+    env = _trend_envelope()
+    env["calendar_rows"][0]["is_open"] = "false"
+    with pytest.raises(ProductDailyError, match="invalid_raw_history"):
+        load_raw_history(env)
+
+
+def test_r1_conflicting_calendar_row_rejected():
+    env = _trend_envelope()
+    dup = dict(env["calendar_rows"][0])
+    dup["is_open"] = not dup["is_open"]
+    env["calendar_rows"].append(dup)
+    with pytest.raises(ProductDailyError, match="conflicting_calendar_row"):
+        load_raw_history(env)
+
+
+def test_r1_known_held_missing_listing_hold_alert(runner, resources):
+    """held_membership=True + missing listing -> hold_alert, never dropped/entry."""
+    env = _trend_envelope()
+    env["securities"][0]["held_membership"] = True
+    env["securities"][0]["held_quantity"] = 100
+    env["listing_rows"] = []
+    output = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    actions = [d.action for d in output.seam.held_decisions]
+    assert actions == ["hold_alert"]
+    stages = [d.stage for ds in output.result.package.decision_sets for d in ds.decisions]
+    assert "entry_plan" not in stages
+
+
+def test_r1_ruledayoutput_keeps_frozen_7_fields():
+    from dataclasses import fields
+
+    from quanthus.product_daily.recommendation.rule_seam import RuleDayOutput
+
+    assert [f.name for f in fields(RuleDayOutput)] == [
+        "seam",
+        "candidates",
+        "held_signals",
+        "receipt",
+        "result",
+        "source_closure",
+        "stage_metrics",
+    ]
+
+
+def test_r1_truncated_calendar_coverage_rejected(runner, resources):
+    """A calendar starting after the listing start cannot prove the full age."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 130)  # only 130 sessions
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=_calendar(days=cal_days),
+        # listing claims to start 200 sessions ago but calendar only covers 130
+        listing=[
+            _listing(
+                raw.identity.security_id,
+                effective_from=_weekdays_ending(TARGET, 200)[0].isoformat(),
+            )
+        ],
+    )
+    with pytest.raises(ProductDailyError, match="calendar_coverage_incomplete"):
+        run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+
+
+def test_r1_119_membership_below_gate_not_qualified(runner, resources):
+    """119 real membership sessions -> listing gate 'failed', not a qualified empty."""
+    raw = _trend_raw("600000")
+    cal_days = _weekdays_ending(TARGET, 119)
+    env = _envelope(
+        [_security_entry(raw)],
+        calendar=_calendar(days=cal_days),
+        listing=[_listing(raw.identity.security_id, effective_from=cal_days[0].isoformat())],
+    )
+    # bars also exceed available history; the run must not publish a fake entry.
+    try:
+        output = run_daily_advice_from_history(
+            env, runner=runner, resources=resources, **_run_kwargs()
+        )
+    except ProductDailyError:
+        return  # a whole-day block is also a valid fail-closed outcome
+    receipt = output.source_closure["history_receipts"][0]
+    assert receipt["gates"]["listing"]["status"] == "failed"
+    assert receipt["status"] == "not_qualified"

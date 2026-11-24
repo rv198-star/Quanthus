@@ -86,6 +86,8 @@ def _isodate(value: Any, label: str) -> date:
 
 def _isodatetime(value: Any, label: str) -> datetime:
     if isinstance(value, datetime):
+        if value.tzinfo is None:
+            _fail("invalid_raw_history", f"{label} must carry a timezone")
         return value
     if isinstance(value, str):
         try:
@@ -101,10 +103,15 @@ def _isodatetime(value: Any, label: str) -> datetime:
 def _decimal(value: Any, label: str, *, allow_none: bool = False) -> Decimal | None:
     if value is None and allow_none:
         return None
+    if isinstance(value, bool):
+        _fail("invalid_raw_history", f"{label} is not a decimal")
     try:
-        return Decimal(str(value))
+        parsed = Decimal(str(value))
     except Exception:
         _fail("invalid_raw_history", f"{label} is not a decimal")
+    if not parsed.is_finite():
+        _fail("invalid_raw_history", f"{label} is not a finite decimal")
+    return parsed
 
 
 def _bool3(value: Any, label: str) -> bool | None:
@@ -113,6 +120,22 @@ def _bool3(value: Any, label: str) -> bool | None:
     if type(value) is bool:
         return value
     _fail("invalid_raw_history", f"{label} must be true/false/null")
+
+
+def _bool_strict(value: Any, label: str) -> bool:
+    """A required source boolean: 'true'/'false' strings are never coerced."""
+    if type(value) is bool:
+        return value
+    _fail("invalid_raw_history", f"{label} must be a boolean")
+
+
+def _int_or_none(value: Any, label: str) -> int | None:
+    """An account quantity: int or explicit null; never coerced from another type."""
+    if value is None:
+        return None
+    if type(value) is bool or type(value) is not int:
+        _fail("invalid_raw_history", f"{label} must be an integer or null")
+    return int(value)
 
 
 # --- typed envelope -----------------------------------------------------------------
@@ -137,7 +160,7 @@ class CalendarRow:
     session_date: date
     is_open: bool
     close_at: datetime | None
-    knowledge_from: date | None
+    knowledge_from: datetime
     source_member_id: str
 
 
@@ -148,7 +171,7 @@ class ListingRow:
     venue_id: str
     effective_from: date
     effective_to: date | None
-    knowledge_from: date | None
+    knowledge_from: datetime
     source_member_id: str
 
 
@@ -210,28 +233,37 @@ def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
         )
 
     calendar_rows: list[CalendarRow] = []
+    seen_sessions: dict[tuple[str, date], CalendarRow] = {}
     for index, c in enumerate(_seq(envelope.get("calendar_rows"), "calendar_rows")):
         co = _obj(c, f"calendar_rows[{index}]")
         smid = _text(co.get("source_member_id"), f"calendar_rows[{index}].source_member_id")
         if smid not in member_ids:
             _fail("unknown_source_member", f"calendar_rows[{index}] -> {smid}")
         close_at = _isodatetime(co["close_at"], "close_at") if co.get("close_at") else None
-        calendar_rows.append(
-            CalendarRow(
-                venue_id=_text(co.get("venue_id"), f"calendar_rows[{index}].venue_id"),
-                session_date=_isodate(
-                    co.get("session_date"), f"calendar_rows[{index}].session_date"
-                ),
-                is_open=bool(co.get("is_open")),
-                close_at=close_at,
-                knowledge_from=(
-                    _isodate(co["knowledge_from"], "knowledge_from")
-                    if co.get("knowledge_from")
-                    else None
-                ),
-                source_member_id=smid,
-            )
+        knowledge_from = _isodatetime(co["knowledge_from"], "calendar_rows[].knowledge_from")
+        row = CalendarRow(
+            venue_id=_text(co.get("venue_id"), f"calendar_rows[{index}].venue_id"),
+            session_date=_isodate(co.get("session_date"), f"calendar_rows[{index}].session_date"),
+            is_open=_bool_strict(co.get("is_open"), "calendar_rows[].is_open"),
+            close_at=close_at,
+            knowledge_from=knowledge_from,
+            source_member_id=smid,
         )
+        key = (row.venue_id, row.session_date)
+        prior = seen_sessions.get(key)
+        if prior is not None and (
+            prior.is_open != row.is_open
+            or prior.source_member_id != row.source_member_id
+            or prior.knowledge_from != row.knowledge_from
+        ):
+            _fail(
+                "conflicting_calendar_row",
+                f"calendar_rows[{index}] conflicts with an earlier "
+                f"{row.venue_id} {row.session_date} row",
+            )
+        if prior is None:
+            seen_sessions[key] = row
+            calendar_rows.append(row)
 
     listing_rows: list[ListingRow] = []
     for index, lrow in enumerate(_seq(envelope.get("listing_rows"), "listing_rows")):
@@ -257,11 +289,7 @@ def load_raw_history(raw: Mapping[str, Any]) -> RawHistory:
                 venue_id=_text(lo.get("venue_id"), f"listing_rows[{index}].venue_id"),
                 effective_from=eff_from,
                 effective_to=eff_to,
-                knowledge_from=(
-                    _isodate(lo["knowledge_from"], "knowledge_from")
-                    if lo.get("knowledge_from")
-                    else None
-                ),
+                knowledge_from=_isodatetime(lo["knowledge_from"], "listing_rows[].knowledge_from"),
                 source_member_id=smid,
             )
         )
@@ -291,10 +319,12 @@ def derive_universe_membership(
 ) -> tuple[date, ...]:
     """Universe membership = open sessions of the venue covered by the listing.
 
-    A membership date is a venue open session on which the security had an active
-    listing interval, restricted to <= market_date (history never backfills the
-    prospective T+1 window into the prior listing age).  Wrong-exchange calendars are
-    excluded by keying on venue_id.  Returns the ordered membership sequence.
+    The calendar must cover every open session from the listing's earliest
+    effective_from through market_date; a calendar starting after the listing start
+    cannot prove the full age and fails calendar_coverage_incomplete (the fallback
+    is the named source_daily_universe member passthrough, not a fabricated count).
+    Membership = each open venue session where a listing interval is active, never a
+    bar-count or weekday proxy and never a T+1 backfill.
     """
     intervals = [
         row for row in listing_rows if row.security_id == security_id and row.venue_id == venue_id
@@ -304,13 +334,22 @@ def derive_universe_membership(
             "listing_fact_missing",
             f"no listing interval for {security_id}@{venue_id}; age cannot be inferred",
         )
-    open_sessions = sorted(
+    earliest_start = min(row.effective_from for row in intervals)
+    venue_sessions = sorted(
         row.session_date
         for row in calendar_rows
         if row.venue_id == venue_id and row.is_open and row.session_date <= market_date
     )
+    if not venue_sessions or venue_sessions[0] > earliest_start:
+        _fail(
+            "calendar_coverage_incomplete",
+            f"the {venue_id} calendar does not cover the listing start "
+            f"{earliest_start} for {security_id}; the full membership cannot be "
+            "proven from a truncated calendar (use the named source_daily_universe "
+            "member passthrough instead of fabricating an age)",
+        )
     membership: list[date] = []
-    for session in open_sessions:
+    for session in venue_sessions:
         for interval in intervals:
             if interval.effective_from <= session and (
                 interval.effective_to is None or session <= interval.effective_to
@@ -528,25 +567,83 @@ def history_receipt_for_security(
     }
 
 
+def _position_facts_from(sec: Mapping[str, Any]) -> tuple[Any, int | None]:
+    """Project the caller-declared position facts through, unchanged.
+
+    position_facts arrives already typed (the P12 RunnerRequest projection passes
+    the real HeldPositionFacts object); a bare dict would lose its bound evidence
+    and is rejected.  prior_deterioration_sessions is a strict non-negative int.
+    """
+    pf = sec.get("position_facts")
+    if pf is not None and isinstance(pf, dict):
+        _fail(
+            "invalid_raw_history",
+            "securities[].position_facts must be a HeldPositionFacts object, "
+            "not a dict (it would lose its bound evidence)",
+        )
+    pds = sec.get("prior_deterioration_sessions")
+    if pds is not None and (type(pds) is not int or pds < 0):
+        _fail(
+            "invalid_raw_history",
+            "securities[].prior_deterioration_sessions must be a non-negative int",
+        )
+    return pf, pds
+
+
 def raw_security_inputs_from_history(
     history: RawHistory,
 ) -> tuple[list[RawSecurityInput], list[dict[str, Any]]]:
-    """Project raw_history.securities[] into RawSecurityInput[] + per-security receipts.
+    """Project raw_history.securities[] into RawSecurityInput[] + receipts.
 
-    A bad security is isolated (recorded in receipts as excluded) so a valid neighbour
-    keeps its real entry path; an all-fail input produces zero RawSecurityInput but the
-    receipts still carry the per-security reason - never a manufactured empty pass.
+    Every securities[] item is parsed inside its own error boundary so a malformed
+    neighbour is isolated while a valid one keeps its real entry path.  An account
+    member (held_membership=True / quantity / typed pending) is preserved into a
+    RawSecurityInput even when its market facts are missing: the downstream account
+    normalisation converts that into a hold+alert, never silently dropped.  An
+    all-fail input produces zero RawSecurityInput plus explicit reasons - never a
+    manufactured qualified-empty pass.
     """
     inputs: list[RawSecurityInput] = []
     receipts: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     for si, sec in enumerate(history.securities):
         sec_o = _obj(sec, f"securities[{si}]")
-        identity = _identity_from(sec_o, si)
+        try:
+            identity = _identity_from(sec_o, si)
+        except ProductDailyError as exc:
+            receipts.append(
+                {
+                    "security_code": f"securities[{si}]",
+                    "status": "excluded",
+                    "reason": f"identity_parse: {exc}",
+                    "scope": "per_security",
+                }
+            )
+            continue
         code = identity.listing_code
         if identity.security_id in seen_ids:
             _fail("duplicate_security", f"duplicate security_id {identity.security_id}")
         seen_ids.add(identity.security_id)
+        position_facts, prior_det = _position_facts_from(sec_o)
+        held_membership = _bool3(sec_o.get("held_membership"), "securities[].held_membership")
+        pending_kind = (
+            _text(sec_o["pending_kind"], "securities[].pending_kind")
+            if sec_o.get("pending_kind") is not None
+            else None
+        )
+        held_reason = (
+            _text(sec_o["held_unavailable_reason"], "held_unavailable_reason")
+            if sec_o.get("held_unavailable_reason") is not None
+            else None
+        )
+        held_qty = _int_or_none(sec_o.get("held_quantity"), "held_quantity")
+        pending_qty = _int_or_none(sec_o.get("pending_quantity"), "pending_quantity")
+        is_account_member = (
+            held_membership is True
+            or held_qty is not None
+            or position_facts is not None
+            or pending_kind is not None
+        )
         try:
             membership = derive_universe_membership(
                 listing_rows=history.listing_rows,
@@ -556,65 +653,216 @@ def raw_security_inputs_from_history(
                 market_date=history.market_date,
             )
         except ProductDailyError as exc:
+            if getattr(exc, "reason_code", "") == "calendar_coverage_incomplete":
+                # A shared calendar that cannot cover the listing start is a
+                # shared failure for every security on that venue, not a
+                # per-security isolation.
+                raise
+            if is_account_member:
+                membership = ()
+                receipts.append(
+                    {
+                        "security_code": code,
+                        "status": "account_member_market_unavailable",
+                        "reason": str(exc),
+                        "scope": "per_security",
+                    }
+                )
+            else:
+                receipts.append(
+                    {
+                        "security_code": code,
+                        "status": "excluded",
+                        "reason": str(exc),
+                        "scope": "per_security",
+                    }
+                )
+                continue
+        try:
+            bars = _bars_from(sec_o, si)
+            actions = _actions_from(sec_o, si)
+            exceptions = _exceptions_from(sec_o, si)
+            limits = _limits_from(sec_o, si)
+            close_map = _date_map(sec_o.get("close_at_by_date", {}), "close_at_by_date")
+            cutoff_map = _date_map(
+                sec_o.get("knowledge_cutoff_by_date", {}), "knowledge_cutoff_by_date"
+            )
+        except ProductDailyError as exc:
+            if is_account_member:
+                bars, actions, exceptions, limits = (), (), (), ()
+                close_map, cutoff_map = {}, {}
+                receipts.append(
+                    {
+                        "security_code": code,
+                        "status": "account_member_market_unavailable",
+                        "reason": f"market_parse: {exc}",
+                        "scope": "per_security",
+                    }
+                )
+            else:
+                receipts.append(
+                    {
+                        "security_code": code,
+                        "status": "excluded",
+                        "reason": f"market_parse: {exc}",
+                        "scope": "per_security",
+                    }
+                )
+                continue
+        if membership:
             receipts.append(
-                {
-                    "security_code": code,
-                    "status": "excluded",
-                    "reason": str(exc),
-                    "scope": "per_security",
-                }
+                history_receipt_for_security(
+                    security_code=code,
+                    security_id=identity.security_id,
+                    venue_id=identity.venue_id,
+                    membership=membership,
+                    bars=bars,
+                    market_date=history.market_date,
+                    listing_rows=history.listing_rows,
+                )
             )
-            continue
-        bars = _bars_from(sec_o, si)
-        receipts.append(
-            history_receipt_for_security(
-                security_code=code,
-                security_id=identity.security_id,
-                venue_id=identity.venue_id,
-                membership=membership,
-                bars=bars,
-                market_date=history.market_date,
-                listing_rows=history.listing_rows,
-            )
-        )
         inputs.append(
             RawSecurityInput(
                 identity=identity,
                 bars=bars,
                 universe_membership=membership,
-                actions=_actions_from(sec_o, si),
-                exceptions=_exceptions_from(sec_o, si),
-                limits=_limits_from(sec_o, si),
-                close_at_by_date=_date_map(sec_o.get("close_at_by_date", {}), "close_at_by_date"),
-                knowledge_cutoff_by_date=_date_map(
-                    sec_o.get("knowledge_cutoff_by_date", {}), "knowledge_cutoff_by_date"
-                ),
-                # held/pending facts the caller may already project onto the
-                # envelope; None stays unknown, never a synthetic default.
-                held_membership=_bool3(
-                    sec_o.get("held_membership"), "securities[].held_membership"
-                ),
-                pending_kind=(
-                    _text(sec_o["pending_kind"], "securities[].pending_kind")
-                    if sec_o.get("pending_kind") is not None
-                    else None
-                ),
-                held_unavailable_reason=(
-                    _text(sec_o["held_unavailable_reason"], "held_unavailable_reason")
-                    if sec_o.get("held_unavailable_reason") is not None
-                    else None
-                ),
-                held_quantity=(
-                    None if sec_o.get("held_quantity") is None else int(sec_o["held_quantity"])
-                ),
-                pending_quantity=(
-                    None
-                    if sec_o.get("pending_quantity") is None
-                    else int(sec_o["pending_quantity"])
-                ),
+                actions=actions,
+                exceptions=exceptions,
+                limits=limits,
+                close_at_by_date=close_map,
+                knowledge_cutoff_by_date=cutoff_map,
+                position_facts=position_facts,
+                prior_deterioration_sessions=prior_det,
+                held_membership=held_membership,
+                pending_kind=pending_kind,
+                held_unavailable_reason=held_reason,
+                held_quantity=held_qty,
+                pending_quantity=pending_qty,
             )
         )
     return inputs, receipts
+
+
+# --- envelope identity + facts/policy binding ---------------------------------------
+
+
+def raw_history_digest(history: RawHistory) -> str:
+    """Digest the complete accepted raw_history envelope identity.
+
+    Every byte that can change the derived membership or the projected
+    RawSecurityInput is bound: source members (id, sha256, knowledge_at, visible_at,
+    coverage), calendar rows (venue/date/is_open/close/knowledge), listing rows
+    (security/venue/interval/knowledge), market_date and decision_cutoff.  A change
+    to any of these alters the job identity even when the projected features do not
+    move - matching the original panel's source-closure requirement.
+    """
+    from quanthus.event_library.contracts import sha256_digest
+
+    payload = {
+        "schema_version": RAW_HISTORY_SCHEMA,
+        "market_date": history.market_date.isoformat(),
+        "decision_cutoff": history.decision_cutoff.isoformat(),
+        "source_members": [
+            {
+                "member_id": m.member_id,
+                "package_id": m.package_id,
+                "version": m.version,
+                "member_path": m.member_path,
+                "sha256": m.sha256,
+                "date_from": m.date_from.isoformat() if m.date_from else None,
+                "date_to": m.date_to.isoformat() if m.date_to else None,
+                "knowledge_at": m.knowledge_at.isoformat(),
+                "visible_at": m.visible_at.isoformat(),
+            }
+            for m in sorted(history.source_members, key=lambda x: x.member_id)
+        ],
+        "calendar_rows": [
+            {
+                "venue_id": c.venue_id,
+                "session_date": c.session_date.isoformat(),
+                "is_open": c.is_open,
+                "close_at": c.close_at.isoformat() if c.close_at else None,
+                "knowledge_from": c.knowledge_from.isoformat(),
+                "source_member_id": c.source_member_id,
+            }
+            for c in sorted(history.calendar_rows, key=lambda x: (x.venue_id, x.session_date))
+        ],
+        "listing_rows": [
+            {
+                "security_id": lrow.security_id,
+                "listing_id": lrow.listing_id,
+                "venue_id": lrow.venue_id,
+                "effective_from": lrow.effective_from.isoformat(),
+                "effective_to": lrow.effective_to.isoformat() if lrow.effective_to else None,
+                "knowledge_from": lrow.knowledge_from.isoformat(),
+                "source_member_id": lrow.source_member_id,
+            }
+            for lrow in sorted(
+                history.listing_rows, key=lambda x: (x.security_id, x.effective_from)
+            )
+        ],
+    }
+    return str(sha256_digest(payload))
+
+
+def bind_raw_history_to_run(
+    history: RawHistory,
+    *,
+    facts: Any,
+    policy: Any,
+) -> None:
+    """Assert the envelope is the declared batch for THIS run, fail closed.
+
+    The envelope is not self-declared: its market_date must equal facts.market_date
+    and its decision_cutoff must equal policy.decision_cutoff (the predeclared
+    consumer deadline, never a max(visible_at) re-derivation).  Every source member
+    must satisfy knowledge_at <= cutoff and visible_at <= cutoff, every
+    required_member_id in facts must be carried by a named source_member, and every
+    calendar/listing knowledge_from must be <= cutoff.  A mismatch is a shared
+    whole-day failure, never a relabelled pass.
+    """
+    if history.market_date != facts.market_date:
+        _fail(
+            "envelope_market_date_mismatch",
+            f"raw_history.market_date {history.market_date} != facts.market_date "
+            f"{facts.market_date}",
+        )
+    if history.decision_cutoff != policy.decision_cutoff:
+        _fail(
+            "envelope_decision_cutoff_mismatch",
+            f"raw_history.decision_cutoff {history.decision_cutoff} != "
+            f"policy.decision_cutoff {policy.decision_cutoff}; the envelope may not "
+            "declare its own deadline",
+        )
+    for m in history.source_members:
+        if m.knowledge_at > policy.decision_cutoff:
+            _fail(
+                "source_knowledge_after_cutoff",
+                f"source_member {m.member_id} knowledge_at {m.knowledge_at} exceeds "
+                f"the run decision_cutoff {policy.decision_cutoff}",
+            )
+    required = set(getattr(facts, "required_member_ids", ()) or ())
+    supplied = {m.member_id for m in history.source_members}
+    missing = required - supplied
+    if missing:
+        _fail(
+            "required_member_not_supplied",
+            f"raw_history does not carry required member(s) {sorted(missing)}",
+        )
+    for row in history.calendar_rows:
+        if row.knowledge_from > policy.decision_cutoff:
+            _fail(
+                "calendar_knowledge_after_cutoff",
+                f"calendar {row.venue_id} {row.session_date} knowledge_from "
+                f"{row.knowledge_from} exceeds the run decision_cutoff",
+            )
+    for lrow in history.listing_rows:
+        if lrow.knowledge_from > policy.decision_cutoff:
+            _fail(
+                "listing_knowledge_after_cutoff",
+                f"listing {lrow.security_id}@{lrow.venue_id} knowledge_from "
+                f"{lrow.knowledge_from} exceeds the run decision_cutoff",
+            )
 
 
 # --- runner-facing convenience -------------------------------------------------------
@@ -626,18 +874,26 @@ def run_daily_advice_from_history(
 ) -> RuleDayOutput:
     """Strict-load a p11.raw-history-input.v1 envelope and run the existing raw chain.
 
-    This is the thin E1 seam: validate the envelope -> derive per-security
-    universe_membership from listing intervals + the venue calendar (full sequence,
-    never a 120-session truncation passed off as the complete age) -> project each
-    qualified security into RawSecurityInput -> run_daily_advice_from_raw with the
-    per-security history receipts bound into source_closure.  All runner/facts/policy
-    kwargs pass through unchanged.
+    The envelope is bound to THIS run before any evaluation: market_date must equal
+    facts.market_date, decision_cutoff must equal policy.decision_cutoff, every
+    source member's knowledge_at AND visible_at must be <= the cutoff, and every
+    required_member_id must be supplied.  The complete raw_history identity is
+    digested into source_closure so a source/clock/member change drifts the job
+    identity rather than silently reusing a pass.  All other kwargs pass through.
     """
     from quanthus.product_daily.recommendation.daily_runner import (
         run_daily_advice_from_raw,
     )
 
     history = load_raw_history(raw_history)
+    facts = kwargs.get("facts")
+    policy = kwargs.get("policy")
+    if facts is None or policy is None:
+        _fail(
+            "invalid_raw_history",
+            "run_daily_advice_from_history requires facts and policy",
+        )
+    bind_raw_history_to_run(history, facts=facts, policy=policy)
     inputs, receipts = raw_security_inputs_from_history(history)
     if not inputs:
         _fail(
@@ -645,6 +901,32 @@ def run_daily_advice_from_history(
             "raw_history produced no qualified security inputs; this is a shared "
             "block, never a fabricated qualified-empty day",
         )
-    output = run_daily_advice_from_raw(raw=inputs, history_receipts=receipts, **kwargs)
-    # The receipts also travel on the output for the P12 run receipt to record.
+    envelope_identity = raw_history_digest(history)
+    bound_receipts = [{**receipt, "raw_history_digest": envelope_identity} for receipt in receipts]
+    # Convert adapter-level exclusions into the runner's input_exclusions so a bad
+    # neighbour is a named isolation inside source_closure, never silently dropped.
+    adapter_exclusions = [
+        {
+            "security_code": receipt["security_code"],
+            "reason": "raw_history_security_invalid",
+            "member_or_field": receipt.get("reason", "unparseable securities[] entry"),
+            "scope": "per_security",
+        }
+        for receipt in receipts
+        if receipt.get("status") == "excluded"
+    ]
+    output = run_daily_advice_from_raw(raw=inputs, history_receipts=bound_receipts, **kwargs)
+    if adapter_exclusions:
+        import dataclasses as _dc
+
+        output = _dc.replace(
+            output,
+            source_closure={
+                **output.source_closure,
+                "exclusions": [
+                    *adapter_exclusions,
+                    *output.source_closure.get("exclusions", ()),
+                ],
+            },
+        )
     return output

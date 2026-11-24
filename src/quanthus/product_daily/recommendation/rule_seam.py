@@ -1029,10 +1029,84 @@ class RuleDayOutput:
     result: ProducerResult
     source_closure: dict[str, Any]
     stage_metrics: tuple[dict[str, Any], ...]
-    # H1: per-security history-gate evidence (events=22, features=61, listing=120
-    # with the bounded floor-proof kind) produced by the raw-history adapter.  The
-    # thresholds stay in the original scan/panel algorithms; this is the read receipt.
-    history_receipts: tuple[dict[str, Any], ...] = ()
+
+
+def _enriched_history_receipts(
+    history_receipts: Sequence[Mapping[str, Any]] | None,
+    *,
+    features_by_security: Mapping[str, SecurityFeatureFacts],
+    seam: SeamResult,
+) -> list[dict[str, Any]]:
+    """Bind the ORIGINAL algorithm verdicts onto the per-security history receipts.
+
+    The gate floors are not recomputed: each gate's satisfied|failed|unavailable
+    comes from the real panel row (feature_ready/entry_eligible/listing_sessions)
+    and the real scan (a scanned event vs none), so a short history is a named
+    failure rather than a qualified empty.  Excluded securities keep their
+    exclusion record.
+    """
+    if not history_receipts:
+        return []
+    decision_codes = {d.security_code for d in seam.decisions}
+    excluded_reason = {
+        e.get("security_code"): e.get("reason") or e.get("member_or_field") for e in seam.excluded
+    }
+    out: list[dict[str, Any]] = []
+    for raw_receipt in history_receipts:
+        receipt = dict(raw_receipt)
+        code = receipt.get("security_code")
+        if receipt.get("status") == "excluded":
+            out.append(receipt)
+            continue
+        facts = features_by_security.get(code)
+        gates = dict(receipt.get("gates") or {})
+
+        def _v(ok: bool | None, reason: str) -> dict[str, Any]:
+            return {
+                "status": "unavailable" if ok is None else ("satisfied" if ok else "failed"),
+                "reason": reason,
+            }
+
+        event_scanned = code in decision_codes and any(
+            d.event_id is not None for d in seam.decisions if d.security_code == code
+        )
+        gates["events"] = {
+            **gates.get("events", {}),
+            **_v(
+                event_scanned if facts is not None else None,
+                "event scan produced a transition"
+                if event_scanned
+                else "no qualified event in the 22-session window",
+            ),
+        }
+        gates["features"] = {
+            **gates.get("features", {}),
+            **_v(
+                None if facts is None else bool(facts.feature_ready),
+                "panel feature_ready qualified on the signal row"
+                if (facts is not None and facts.feature_ready)
+                else (excluded_reason.get(code) or ("panel feature_ready=False / facts missing")),
+            ),
+        }
+        listing_ok = (
+            None if facts is None else facts.listing_sessions >= 120  # GATE_LISTING; original floor
+        )
+        gates["listing"] = {
+            **gates.get("listing", {}),
+            **_v(
+                listing_ok,
+                f"listing_sessions={None if facts is None else facts.listing_sessions}"
+                " vs required 120",
+            ),
+        }
+        receipt["gates"] = gates
+        receipt["status"] = (
+            "qualified"
+            if all(g.get("status") == "satisfied" for g in gates.values())
+            else "not_qualified"
+        )
+        out.append(receipt)
+    return out
 
 
 def run_daily_advice(
@@ -1217,8 +1291,18 @@ def run_daily_advice(
         ],
         # H1 history-gate receipts: per-security 22/61/120 observations + the
         # bounded listing-floor proof kind, bound into the job's digested closure.
-        "history_receipts": [dict(item) for item in (history_receipts or ())],
-        "history_receipts_digest": sha256_digest([dict(item) for item in (history_receipts or ())]),
+        "history_receipts": _enriched_history_receipts(
+            history_receipts,
+            features_by_security=features_by_security,
+            seam=seam,
+        ),
+        "history_receipts_digest": sha256_digest(
+            _enriched_history_receipts(
+                history_receipts,
+                features_by_security=features_by_security,
+                seam=seam,
+            )
+        ),
         "held_decisions": [
             {
                 "security_code": d.security_code,
@@ -1338,7 +1422,6 @@ def run_daily_advice(
                 "elapsed_seconds": perf_counter() - assembly_start,
             },
         ),
-        history_receipts=tuple(dict(item) for item in (history_receipts or ())),
     )
 
 

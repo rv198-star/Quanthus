@@ -502,10 +502,15 @@ def decision_set_to_dict(value: MarketDecisionSet) -> dict[str, Any]:
             }
         if v2:
             wire["exit_kind"] = item.exit_kind
+            # Canonical decimal write form (issue #723 R4): format(...,f) after
+            # normalize() yields 0.<digits> with no trailing zero and never an
+            # exponent, so the emitted bytes match the shared (0,1) admission
+            # and read back byte-identical.  str(Decimal) would emit an
+            # exponent for very small fractions (e.g. 0.0000000001000 -> 1.000E-10).
             wire["target_position_fraction"] = (
                 None
                 if item.target_position_fraction is None
-                else str(item.target_position_fraction)
+                else format(item.target_position_fraction.normalize(), "f")
             )
         decisions.append(wire)
     body = {

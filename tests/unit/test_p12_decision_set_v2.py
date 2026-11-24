@@ -133,7 +133,9 @@ def test_round_trip_emits_v2_marker_only_when_v2_fields_present() -> None:
     wire = decision_set_to_dict(value)
     assert wire["decision_set_schema"] == DECISION_SET_SCHEMA_V2
     assert wire["decisions"][0]["exit_kind"] == "reduce"
-    assert wire["decisions"][0]["target_position_fraction"] == "0.50"
+    # Canonical write form (issue #723 R4): trailing zeros are stripped, so a
+    # wire "0.50" reads back as "0.5" and re-loads byte-identical.
+    assert wire["decisions"][0]["target_position_fraction"] == "0.5"
     # And the emitted wire re-loads under the v2 pin.
     value2, _ = load_decision_set(
         wire, expected_schema=DECISION_SET_SCHEMA_V2, mode="synthetic"

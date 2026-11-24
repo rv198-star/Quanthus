@@ -54,6 +54,14 @@ p5-stage-training = [
   "scikit-learn>=1.6,<2",
   "torch>=2.5,<3",
 ]
+# P12 daily advice runtime + isolated 8791 web service: one dedicated venv
+# serves both the web unit and the nightly job (audit r2).  The interpreter
+# pins pyarrow 23.x inside the repository's existing >=18,<24 constraint so
+# the daily-core 1d payload reads on the verified line; the web layer itself
+# is stdlib-only (wsgiref) and needs no extra package.
+p12-runtime = [
+  "pyarrow>=23,<24",
+]
 ods = [
   "baostock>=0.9.3,<0.10",
   "mootdx>=0.11,<0.12",

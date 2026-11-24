@@ -1,0 +1,5 @@
+# P12 runtime lock for the isolated 8791 deployment (issue #719 r2 audit).
+# Generated for Python 3.10 on CN02; the web layer is stdlib-only, the daily
+# job reads the daily-core 1d payload through pyarrow.  pyarrow is pinned to
+# the 23.x line inside the repository constraint >=18,<24.
+pyarrow==23.0.1

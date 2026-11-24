@@ -2,10 +2,12 @@
 # Nightly P12 daily advice run for the isolated 8791 paper account.
 #
 # Resolves the market date from the bound base24 pointer's DATES index (the
-# latest qualified daily) unless P12_MARKET_DATE is pinned, and derives a
-# next-session candidate.  The job itself refuses a next_session that the
-# governed calendar member does not confirm (M2 F2): a manifest without the
-# calendar member is a whole-day block, never a calendar-day-plus-one guess.
+# latest qualified daily) unless P12_MARKET_DATE is pinned.  Issue #743 (r2):
+# next_session is resolved inside the job from the P10 forward calendar
+# (DEFAULT_CALENDAR_ROOT, or QUANTHUS_P12_CALENDAR_ROOT for a job-local
+# replica); the wrapper never reads the retired manifest calendar member
+# nor guesses a calendar-day-plus-one.  A calendar the job cannot qualify
+# is a whole-day block written to the run receipt.
 set -euo pipefail
 
 JOB_ROOT="${QUANTHUS_P12_DAILY_JOB_ROOT:-/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5}"
@@ -14,9 +16,14 @@ ACCOUNT="${P12_ACCOUNT:-SYN-PAPER-A}"
 MARKET_DATE="${P12_MARKET_DATE:-}"
 NEXT_SESSION="${P12_NEXT_SESSION:-}"
 DECISION_CUTOFF="${QUANTHUS_P12_DECISION_CUTOFF:-}"
+# Issue #719 r2 audit: the dedicated P12 venv interpreter (never the host's
+# bare python3) runs every python step so the web unit and the nightly job
+# share one locked runtime.
+PY_BIN="${P12_VENV_PYTHON:-/opt/quanthus/p12-acceptance/venv/bin/python}"
+CALENDAR_ROOT="${QUANTHUS_P12_CALENDAR_ROOT:-/srv/agentdock/quanthus-ops/p10-forward-calendar-v1}"
 
 if [ -z "$MARKET_DATE" ]; then
-  MARKET_DATE="$(python3 - "$JOB_ROOT" <<'PY'
+  MARKET_DATE="$("$PY_BIN" - "$JOB_ROOT" <<'PY'
 import json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
@@ -28,32 +35,12 @@ PY
 )"
 fi
 
-if [ -z "$NEXT_SESSION" ]; then
-  # Audit R6: read the governed calendar's declared next_session from the
-  # bound manifest, never a calendar-day-plus-one guess.  A manifest without
-  # the calendar member leaves this empty and the job blocks whole-day.
-  NEXT_SESSION="$(python3 - "$JOB_ROOT" "$MARKET_DATE" <<'PY'
-import json, sys
-from pathlib import Path
-root = Path(sys.argv[1]); day = sys.argv[2]
-try:
-    pointer = json.loads((root / "CURRENT_DAILY_CORE_BASE24.json").read_text())
-    core = Path(pointer["entry"]["core"])
-    if not core.is_absolute():
-        core = root / core
-    manifest = json.loads((core / "manifest.json").read_text())
-    print((manifest.get("calendar") or {}).get("next_session") or "")
-except Exception:
-    print("")
-PY
-)"
-fi
-
 args=(
     --state-dir "$STATE_DIR"
     --job-root "$JOB_ROOT"
     --account "$ACCOUNT"
     --market-date "$MARKET_DATE"
+    --calendar-root "$CALENDAR_ROOT"
 )
 if [ -n "$NEXT_SESSION" ]; then
     args+=(--next-session "$NEXT_SESSION")
@@ -62,4 +49,4 @@ if [ -n "$DECISION_CUTOFF" ]; then
     args+=(--decision-cutoff "${MARKET_DATE}T${DECISION_CUTOFF}")
 fi
 
-exec python3 -m quanthus.p12_daily.daily_job "${args[@]}"
+exec "$PY_BIN" -m quanthus.p12_daily.daily_job "${args[@]}"

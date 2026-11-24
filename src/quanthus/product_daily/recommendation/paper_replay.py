@@ -692,7 +692,7 @@ def build_replay_envelope(
     window_set = set(window)
 
     securities: list[dict[str, Any]] = []
-    delivered: dict[str, dict[str, int]] = {}
+    delivered: dict[str, dict[str, Any]] = {}
     coverage_exclusions: list[dict[str, Any]] = []
     for index, sec in enumerate(request.securities):
         sec_o = _obj(sec, f"securities[{index}]")
@@ -764,6 +764,21 @@ def build_replay_envelope(
             "entry_eligible": not any(e["security_code"] == code for e in coverage_exclusions),
         }
 
+        signed = (request.action_coverage or {}).get("securities", {}).get(code)
+        history_venue = identity.get("venue_id")
+        if signed and history_venue in _OCTOBER_VENUES:
+            mic, warehouse_venue = _OCTOBER_VENUES[history_venue]
+            if signed.get(
+                "venue_id"
+            ) == warehouse_venue and warehouse_venue in _bound_action_venues(request, identity):
+                delivered[code]["action_venue_binding"] = {
+                    "history_venue": history_venue,
+                    "source_venue_id": warehouse_venue,
+                    "mic_code": mic,
+                    "member_id": _VENUE_MEMBER,
+                    "member_sha256": _VENUE_SHA,
+                }
+
     if not securities and not coverage_exclusions:
         _fail(
             "replay_universe_empty",
@@ -793,6 +808,55 @@ def build_replay_envelope(
         "coverage_isolated": len(coverage_exclusions),
     }
     return envelope, tuple(sorted(excluded)), window_info, tuple(coverage_exclusions)
+
+
+# The October Base 2.5.1 venue reference (primary key venue_id, column mic_code).
+# #749 projects XSHG/XSHE to SSE/SZSE for H1. Keep both source domains on the wire.
+_VENUE_MEMBER = "payload/dwd_trading_venue/all/part-000000.parquet"
+_VENUE_SHA = "sha256:ba7e6c9bdcde4918c3167e1efbd9db49b02244fbd64f4d2c5da343b219ad5fed"
+_OCTOBER_VENUES = {
+    "SSE": ("XSHG", "venue_bec59e31eb6bb28111a10d7e6d2c689f"),
+    "SZSE": ("XSHE", "venue_8c0bd9088a0dc88f28e5e7fa8efdce87"),
+}
+
+
+def _bound_action_venues(request: ReplayRequest, identity: Mapping[str, Any]) -> frozenset[str]:
+    venue = identity.get("venue_id")
+    if not isinstance(venue, str) or not venue:
+        return frozenset()
+    exact = frozenset((venue,))
+    if venue not in _OCTOBER_VENUES or _VENUE_MEMBER not in (
+        identity.get("depends_on_member_ids") or ()
+    ):
+        return exact
+    members = [m for m in request.source_members if m.get("member_id") == _VENUE_MEMBER]
+    if len(members) != 1:
+        return exact
+    member = members[0]
+    if (
+        member.get("member_path"),
+        member.get("package_id"),
+        member.get("version"),
+        member.get("sha256"),
+    ) != (
+        _VENUE_MEMBER,
+        "standard-base-2.5.1-8cd966be87fc",
+        "2.5.1",
+        _VENUE_SHA,
+    ):
+        return exact
+    return exact.union(_OCTOBER_VENUES[venue])
+
+
+def _action_row_identity_matches(
+    row: Mapping[str, Any], identity: Mapping[str, Any], venues: frozenset[str]
+) -> bool:
+    return all(
+        row.get(k) is None or row[k] == identity.get(k) for k in ("security_id", "listing_id")
+    ) and (
+        row.get("venue_id") is None
+        or (isinstance(row["venue_id"], str) and row["venue_id"] in venues)
+    )
 
 
 def _action_coverage_ok(
@@ -825,10 +889,16 @@ def _action_coverage_ok(
     if declared is None:
         return False
     ident = sec_o.get("identity", {}) if isinstance(sec_o, Mapping) else {}
-    for key in ("security_id", "listing_id", "venue_id"):
-        dv = declared.get(key)
-        iv = ident.get(key)
-        if not dv or not iv or str(dv) != str(iv):
+    venues = _bound_action_venues(request, ident)
+    if not all(
+        declared.get(k) and declared[k] == ident.get(k) for k in ("security_id", "listing_id")
+    ):
+        return False
+    if declared.get("venue_id") not in venues:
+        return False
+    if declared["venue_id"] != ident.get("venue_id"):
+        registers = request.action_coverage["registers"]
+        if any(registers[r["coverage_id"]]["venue_id"] not in venues for r in (scan, returns)):
             return False
 
     # The source action/feature key is identity.stock_code (e.g. sh.600000);
@@ -899,6 +969,7 @@ def _action_coverage_ok(
             codes,
             returns_dates,
             identity=ident,
+            venues=venues,
             bound_artifacts=bound_artifacts,
             coverage_id=returns.get("coverage_id"),
         ):
@@ -1571,6 +1642,7 @@ def _returns_events_join_actions(
     identity: Mapping[str, Any] | None = None,
     bound_artifacts: Mapping[str, Mapping[Any, Mapping[str, Any]]] | None = None,
     coverage_id: str | None = None,
+    venues: frozenset[str] | None = None,
 ) -> bool:
     """Join verified returns events to the projected actions[] for this security.
 
@@ -1588,6 +1660,8 @@ def _returns_events_join_actions(
     """
     window_set = set(window_sessions[1:])
     ident = identity or {}
+    if venues is None:
+        venues = frozenset((str(ident["venue_id"]),)) if ident.get("venue_id") else frozenset()
     allowed_codes = {c for c in codes if c}
 
     def _dec(v: Any) -> Decimal | None:
@@ -1622,6 +1696,8 @@ def _returns_events_join_actions(
             eff = a.get("effective_date")
             eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
             if eff_iso in window_set:
+                if not _action_row_identity_matches(a, ident, venues):
+                    return False
                 window_actions.setdefault(eff_iso, []).append(a)
 
     # One-to-one binding: each in-window ex_date must have exactly ONE distinct
@@ -1708,10 +1784,8 @@ def _returns_events_join_actions(
         if notice is not None and str(e.get("notice")) != str(notice):
             return False
         # Bind the verified security identity the row names.
-        for k in ("security_id", "listing_id", "venue_id"):
-            rv = row.get(k)
-            if rv is not None and ident.get(k) is not None and str(rv) != str(ident.get(k)):
-                return False
+        if not _action_row_identity_matches(row, ident, venues):
+            return False
         # Source terms: the catalogue row's original clause must equal the
         # event's declared clause AND the projected action's clause.  A row
         # may carry the true announcement digest while the event/action use a
@@ -1753,20 +1827,7 @@ def _returns_events_join_actions(
                 except ValueError:
                     ka_date = None
                 if ka_date is not None and ka_date < date.fromisoformat(ex_iso):
-                    # The action row key already bound this security via
-                    # allowed_codes; if it also names security_id/listing_id
-                    # /venue_id they must equal the frozen identity.
-                    row_ok = True
-                    for k in ("security_id", "listing_id", "venue_id"):
-                        rv = a.get(k)
-                        if (
-                            rv is not None
-                            and ident.get(k) is not None
-                            and str(rv) != str(ident.get(k))
-                        ):
-                            row_ok = False
-                    if row_ok:
-                        matched = True
+                    matched = True
         if not matched:
             return False
 

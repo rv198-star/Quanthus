@@ -2874,4 +2874,3 @@ def test_p11_day_receipt_ref_readback_refuses_replaced_file(env):
     store = DailyPackageStore(state)
     with pytest.raises(FactError):
         store.read_day_receipt(ref)
-

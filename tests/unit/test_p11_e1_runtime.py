@@ -175,3 +175,25 @@ def test_r2_default_call_no_clock_not_crash(assets):
     )
     assert output.receipt is not None
     assert report.row_count == 1
+
+
+def test_r3_replay_day_injects_equivalent_day_anchor(assets):
+    """run_e1_replay_day carries anchor_mode='equivalent_day': an open_at=null
+    session on an old continuously-listed security resolves by the day-bound
+    proof, named on the receipt's membership_proof -- not a strict isolation."""
+    from tests.unit import test_p11_paper_replay as f
+
+    days = tuple(d for d in f.SESSION_DAYS if d <= f.T1)
+    req = f._request(market_dates=(f.T1,), securities=[f._security("600000", days)])
+    # Null out open_at on a run of mid sessions (the real October Base shape):
+    # the listing predates the bound calendar so every such session resolves
+    # wholly inside the listing interval.
+    for row in req["calendar_rows"]:
+        if row["session_date"] in {d.isoformat() for d in days[40:60]}:
+            row["open_at"] = None
+    out = e_run_e1_replay(req, f.T1, assets)
+    receipts = out["source_closure"].get("history_receipts") or []
+    assert receipts
+    proof = receipts[0].get("membership_proof") or {}
+    assert proof.get("anchor_mode") == "equivalent_day"
+    assert proof.get("equivalent_day_sessions")

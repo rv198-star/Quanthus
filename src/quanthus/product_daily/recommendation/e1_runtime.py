@@ -463,7 +463,14 @@ def run_e1_replay_day(
         report_holder["report"] = report
         return report
 
-    hist_with_panel = partial(_hist, panel_report_factory=_factory)
+    # anchor_mode=equivalent_day is an explicit versioned consumer config: the
+    # October real listings carry is_open rows with open_at=null (a real
+    # strict-mode block, never backfilled).  The day-boundary proof resolves a
+    # missing-anchor session wholly inside/outside the listing, so the replay
+    # gets exact equivalent-day aging; strict stays the default elsewhere.
+    hist_with_panel = partial(
+        _hist, panel_report_factory=_factory, anchor_mode="equivalent_day"
+    )
 
     receipt = paper_replay.run_replay_day(
         req,

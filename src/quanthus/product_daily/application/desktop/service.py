@@ -2558,7 +2558,13 @@ class P12DesktopApplication:
             )
             return max(0, held - reserved)
 
-        return run_check(
+        # E6-01: consume the day's named pool through the same path, date and
+        # SHA the writer produced.  A missing/stale/corrupt pool keeps the
+        # affected facts unverified inside run_check rather than passing.
+        store = getattr(self._decisions, "_store", None)
+        pool_dir = getattr(store, "_root", None)
+
+        receipt = run_check(
             package=package,
             projection=snapshot.projection,
             history=snapshot.history,
@@ -2566,7 +2572,22 @@ class P12DesktopApplication:
             now=moment,
             sellable_for=_sellable,
             account_mode=scope.mode,
+            pool_dir=pool_dir,
         )
+        # E6-06: persist the check receipt beside the named pool so the
+        # verification, its per-fact verdicts and the re-derived quantities
+        # are recoverable across a restart and bind to the identical record.
+        if pool_dir is not None:
+            try:
+                from quanthus.product_daily.application.preopen import (
+                    write_check_receipt,
+                )
+                write_check_receipt(pool_dir, receipt)
+            except OSError:
+                # persistence is best-effort; the returned receipt still
+                # carries the full check for the caller to record.
+                pass
+        return receipt
     def write_preopen_pool(self, scope: AccountScope, *, as_of=None):
         """Build and persist the day's named pre-open stock pool (issue #723 E6).
 
@@ -2587,6 +2608,31 @@ class P12DesktopApplication:
                 "the bound decision source exposes no state dir for the pool",
             )
         return write_stock_pool_snapshot(root, snapshot)
+
+    def write_preopen_pool_merged(self, pool_bodies, *, as_of=None):
+        # E6-01: the named pool is the union of the published buy candidates
+        # and the held positions of every simulated account, so a security
+        # held by only one account still lands in the pool after another
+        # account write.  ``pool_bodies`` is each account-bound
+        # ``preopen_pool(scope)`` body; a single application cannot read
+        # another account positions, so the caller collects every account's
+        # own body and this method only merges and persists.  Returns the
+        # file path.
+        from quanthus.product_daily.application.preopen import (
+            merge_stock_pool_snapshots,
+            write_stock_pool_snapshot,
+        )
+
+        moment = as_of or self._now()
+        merged = merge_stock_pool_snapshots(tuple(pool_bodies), moment)
+        store = getattr(self._decisions, "_store", None)
+        root = getattr(store, "_root", None)
+        if root is None:
+            raise FactError(
+                "POLICY_NOT_ADOPTED",
+                "the bound decision source exposes no state dir for the pool",
+            )
+        return write_stock_pool_snapshot(root, merged)
 
     def rebuild_matches(self, scope: AccountScope) -> bool:
         """Deterministic rebuild from baseline + events equals the stored projection."""

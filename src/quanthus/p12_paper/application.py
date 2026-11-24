@@ -34,7 +34,7 @@ from typing import Any
 
 from quanthus.capabilities.execution import ExecutionReport
 from quanthus.capabilities.execution.facts import OrderObservation
-from quanthus.p12_paper.exec_rule import ORDER_STATUS, REJECT, RULE_VERSION, OrderCommand
+from quanthus.p12_paper.exec_rule import LOT, ORDER_STATUS, REJECT, RULE_VERSION, OrderCommand
 from quanthus.p12_paper.quotes import SHANGHAI, Quote, QuoteService
 from quanthus.shared.fact_contracts import FactError
 
@@ -65,6 +65,7 @@ class PaperOrder:
     reject_reason: str | None
     source: str               # sim_matched | user_reported
     receipt_id: str | None
+    pending_reason: str | None = None
 
     @property
     def remaining_qty(self) -> int:
@@ -89,6 +90,8 @@ class PaperOrder:
             "avg_price": None if self.avg_price is None else format(self.avg_price, "f"),
             "reject_reason": self.reject_reason,
             "reject_text": REJECT.get(self.reject_reason or "", None),
+            "pending_reason": self.pending_reason,
+            "pending_text": REJECT.get((self.pending_reason or "").split(";")[0], None),
             "source": self.source,
             "receipt_id": self.receipt_id,
         }
@@ -141,6 +144,9 @@ class PaperOrderStore:
         scoped to its own account.
         """
         cols = {row[1] for row in c.execute("PRAGMA table_info(sim_orders)")}
+        if "pending_reason" not in cols:
+            c.execute("ALTER TABLE sim_orders ADD COLUMN pending_reason TEXT")
+            cols.add("pending_reason")
         if "account_id" in cols:
             # Already has account_id; check whether the PK is composite.
             pk = [r[1] for r in c.execute("PRAGMA table_info(sim_orders)") if r[5]]
@@ -198,6 +204,7 @@ class PaperOrderStore:
               last_quote_time TEXT,
               avg_price TEXT,
               reject_reason TEXT,
+              pending_reason TEXT,
               source TEXT NOT NULL,
               receipt_id TEXT,
               fill_source_seq TEXT,
@@ -217,22 +224,22 @@ class PaperOrderStore:
 
     def insert(self, order: PaperOrder, *, fill_source_seq: str | None = None) -> None:
         vals = list(self._vals(order))
-        vals[16] = fill_source_seq
+        vals[17] = fill_source_seq
         with self._connect() as c:
             c.execute(
-                "INSERT INTO sim_orders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO sim_orders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 tuple(vals),
             )
 
     def update(self, order: PaperOrder, *, fill_source_seq: str | None = None) -> None:
         with self._connect() as c:
             c.execute(
-                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=? WHERE order_id=? AND account_id=?",
+                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, pending_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=? WHERE order_id=? AND account_id=?",
                 (
                     order.filled_qty, order.status,
                     None if order.last_quote_time is None else order.last_quote_time.isoformat(),
                     None if order.avg_price is None else format(order.avg_price, "f"),
-                    order.reject_reason, order.receipt_id, fill_source_seq,
+                    order.reject_reason, order.pending_reason, order.receipt_id, fill_source_seq,
                     _utcnow().isoformat(), order.order_id, order.account_id,
                 ),
             )
@@ -252,12 +259,12 @@ class PaperOrderStore:
         """
         with self._connect() as c:
             cur = c.execute(
-                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=? WHERE order_id=? AND account_id=? AND status=?",
+                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, pending_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=? WHERE order_id=? AND account_id=? AND status=?",
                 (
                     order.filled_qty, order.status,
                     None if order.last_quote_time is None else order.last_quote_time.isoformat(),
                     None if order.avg_price is None else format(order.avg_price, "f"),
-                    order.reject_reason, order.receipt_id, fill_source_seq,
+                    order.reject_reason, order.pending_reason, order.receipt_id, fill_source_seq,
                     _utcnow().isoformat(), order.order_id, order.account_id,
                     expected_status,
                 ),
@@ -306,6 +313,7 @@ class PaperOrderStore:
             last_quote_time=(None if r["last_quote_time"] is None else datetime.fromisoformat(r["last_quote_time"])),
             avg_price=(None if r["avg_price"] is None else Decimal(r["avg_price"])),
             reject_reason=r["reject_reason"], source=r["source"], receipt_id=r["receipt_id"],
+            pending_reason=r["pending_reason"],
         )
 
     @staticmethod
@@ -317,7 +325,7 @@ class PaperOrderStore:
             o.accepted_at.isoformat(),
             None if o.last_quote_time is None else o.last_quote_time.isoformat(),
             None if o.avg_price is None else format(o.avg_price, "f"),
-            o.reject_reason, o.source, o.receipt_id, None, _utcnow().isoformat(),
+            o.reject_reason, o.pending_reason, o.source, o.receipt_id, None, _utcnow().isoformat(),
         )
 
 
@@ -436,9 +444,12 @@ class PaperAccount:
             # verbatim - a cancelled or expired order must not echo "open"
             # while its row stays terminal (R2 same-id retry consistency).
             st = existing.status
+            # A pending-intent order echoes its stored alert; a live quote
+            # cannot fill it here (the re-check runs in the matcher).
+            reason = existing.reject_reason or existing.pending_reason
             return SubmitOutcome(
                 existing.order_id, st,
-                existing.reject_reason, REJECT.get(existing.reject_reason or "", None),
+                reason, REJECT.get((reason or "").split(";")[0], None),
                 existing.filled_qty, existing.avg_price, existing.rule_version,
                 existing.last_quote_time, existing.receipt_id,
             )
@@ -501,12 +512,33 @@ class PaperAccount:
                             f"PREOPEN_{fact}_UNAVAILABLE",
                             None,
                         )
+            else:
+                # E6-05: a sell / reduction confirm still proceeds when a
+                # pre-open fact is missing, but the order carries the typed
+                # unverified alert (cannot verify suspension / limit) so the
+                # outcome and the workbench warn that the fill may not match.
+                for fact in getattr(plan, "depends_on_preopen", ()) or ():
+                    provider = getattr(self._app, "preopen_fact_for", None)
+                    ok = provider(plan.security_code, fact) if callable(provider) else None
+                    if ok is not True:
+                        _preopen_alerts.append(f"PREOPEN_{fact}_UNAVAILABLE")
 
         quote = self._quotes.quote(command.security_code)
 
         # --- acceptance checks -------------------------------------------------
         if command.side == "buy":
-            need = (command.limit_price * command.quantity).quantize(Decimal("0.01"))
+            # E6-04: the cash need carries the plan's declared fee provision,
+            # and _open_buy_hold already subtracts the other open buys'
+            # reserved amount - a bare cash == price*qty confirm cannot
+            # overdraw the account once the fee is counted.
+            plan_fee = (
+                getattr(plan, "estimated_fee", None)
+                if plan is not None
+                else None
+            ) or Decimal("0.00")
+            need = (command.limit_price * command.quantity + plan_fee).quantize(
+                Decimal("0.01")
+            )
             if self._available_cash() < need:
                 return self._reject(command, "INSUFFICIENT_CASH", quote)
             # Fixed-bucket capacity: with no bucket able to take this security
@@ -516,9 +548,23 @@ class PaperAccount:
             if callable(capacity) and not capacity(command.security_code):
                 return self._reject(command, "FUNDING_NO_FREE_BUCKET", quote)
         else:
-            if self._sellable(command.security_code, trading_day) < command.quantity:
+            # E6-04: re-derive the fillable sell quantity from the live
+            # T+1-sellable position.  A plan sized above what is sellable
+            # shrinks to the sellable amount (lot-rounded); nothing
+            # sellable keeps the original refusal with its receipt.
+            sellable_qty = self._sellable(command.security_code, trading_day)
+            if sellable_qty <= 0:
                 reason = "SELL_NOT_ALLOWED_T1" if self._today_bought(command.security_code, trading_day) > 0 else "INSUFFICIENT_POSITION"
                 return self._reject(command, reason, quote)
+            if command.quantity > sellable_qty:
+                shrunk = (sellable_qty // LOT) * LOT if sellable_qty >= LOT else sellable_qty
+                if shrunk <= 0:
+                    return self._reject(command, "INSUFFICIENT_POSITION", quote)
+                command = OrderCommand(
+                    order_id=command.order_id, side=command.side,
+                    security_code=command.security_code, quantity=shrunk,
+                    limit_price=command.limit_price,
+                )
 
         # Daily price band: a limit outside the security's ±band is refused
         # up front instead of resting forever or filling at an impossible price.
@@ -548,6 +594,7 @@ class PaperAccount:
             accepted_at=self._now(), last_quote_time=quote.quote_time,
             avg_price=None, reject_reason=None,
             source=SIM_MATCHED_SOURCE, receipt_id=None,
+            pending_reason=(";".join(_preopen_alerts) if _preopen_alerts else None),
         )
         # Register the accepted order in the shared ledger first so a later
         # simulated fill posts against a real order row and the records view
@@ -561,11 +608,26 @@ class PaperAccount:
         # fills it before this insert commits is rejected by the CAS guard.
         self._store.insert(order)
         # Immediate match attempt against the live quote (accepted-at or later).
-        outcome = self._try_fill(order, quote, session)
+        # A simulated order carrying unverified pre-open facts stays a
+        # pending intent: skip the immediate match so it can never fill
+        # on facts that were not yet verified (P11 v0.2 sec.5).
+        # A buy intent with unverified facts stays pending; a sell may still
+        # fill now (the alert is attached to its outcome below).
+        _holds_intent = bool(_preopen_alerts) and command.side == "buy"
+        outcome = None if _holds_intent else self._try_fill(order, quote, session)
         if outcome is None:
             # Not marketable / not tradable now: persists as an open order.
             alert = ";".join(_preopen_alerts) if _preopen_alerts else "BELOW_LIMIT"
             return SubmitOutcome(command.order_id, "open", alert, REJECT.get(alert, REJECT["BELOW_LIMIT"]), 0, None, RULE_VERSION, quote.quote_time, None)
+        # A sell/reduction that filled while a pre-open fact was missing
+        # reports the typed unverified alert alongside the fill.
+        if _preopen_alerts and outcome.status == "filled":
+            outcome = SubmitOutcome(
+                outcome.order_id, outcome.status,
+                ";".join(_preopen_alerts), outcome.reason_text,
+                outcome.filled_qty, outcome.avg_price, outcome.rule_version,
+                outcome.matched_quote_time, outcome.receipt_id,
+            )
         return outcome
 
     def _reject(self, command: OrderCommand, reason: str, quote: Quote | None) -> SubmitOutcome:
@@ -665,6 +727,20 @@ class PaperAccount:
         )
         if not marketable:
             return None
+        # E6 r2 / P11 v0.2 sec.5: a plan: buy order re-verifies its declared
+        # pre-open facts right before the fill.  An order confirmed earlier as
+        # a pending intent (simulated mode) stays open until every dependent
+        # fact is verified; this also covers poll-driven matches and orders
+        # re-read from the store after a restart, where no in-memory alert is
+        # carried.  Sell/reduce intents never re-check the buy-only facts.
+        if order.side == "buy" and order.order_id.startswith("plan:"):
+            resolver = getattr(self._app, "paper_current_plan", None)
+            live_plan = resolver(order.order_id.split(":", 1)[1]) if callable(resolver) else None
+            provider = getattr(self._app, "preopen_fact_for", None)
+            for fact in getattr(live_plan, "depends_on_preopen", ()) or ():
+                ok = provider(order.security_code, fact) if callable(provider) else None
+                if ok is not True:
+                    return None
         # Fill at the observed last price, which the limit already bounds:
         # the buyer never pays above their cap and the seller never fills
         # below their floor, while a marketable order does not overpay.
@@ -713,6 +789,9 @@ class PaperAccount:
         object.__setattr__(order, "avg_price", fill_price)
         object.__setattr__(order, "last_quote_time", quote.quote_time)
         object.__setattr__(order, "receipt_id", result.receipt_id)
+        # The fill passed the pre-fill fact re-check, so the intent is no
+        # longer pending on an unverified fact; clear the stored alert.
+        object.__setattr__(order, "pending_reason", None)
         # Compare-and-set: only flip while the row is still open.  When a
         # racing matcher already committed a terminal state the CAS fails and
         # we fall back to the stored row rather than overwriting it.

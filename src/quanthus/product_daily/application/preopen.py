@@ -148,6 +148,102 @@ def write_stock_pool_snapshot(state_dir: Path, snapshot: dict) -> Path:
     return path
 
 
+def merge_stock_pool_snapshots(snapshots: tuple, as_of: datetime) -> dict:
+    """Merge every simulated account's pool into the day's shared snapshot.
+
+    Each account contributes the same buy-candidate set (one published
+    package) plus its own held positions.  The single named pool is the
+    union of all securities, so a security held only by account B still
+    appears after account A's write.  A security sourced from several
+    accounts keeps every applicable source and the per-account quantity.
+    """
+    securities: dict[str, dict] = {}
+    trading_date = None
+    for snap in snapshots:
+        if snap is None:
+            continue
+        trading_date = trading_date or snap.get("trading_date")
+        for row in snap.get("securities", ()):
+            code = row.get("security_code", "")
+            entry = securities.setdefault(
+                code,
+                {
+                    "security_code": code,
+                    "security_name": row.get("security_name"),
+                    "sources": [],
+                    "quantities": {},
+                },
+            )
+            if entry["security_name"] is None:
+                entry["security_name"] = row.get("security_name")
+            for src in row.get("sources", ()):
+                if src not in entry["sources"]:
+                    entry["sources"].append(src)
+            qty = row.get("quantity")
+            if qty:
+                src = row.get("account_ref") or "ledger-snapshot"
+                entry["quantities"][src] = qty
+                entry["quantity"] = entry.get("quantity", 0) + qty
+
+    rows = []
+    for code in sorted(securities):
+        row = securities[code]
+        # Total across accounts when more than one held the security.
+        if row.get("quantities"):
+            row["quantity"] = sum(row["quantities"].values())
+        rows.append(row)
+
+    body = {
+        "schema_version": SNAPSHOT_SCHEMA,
+        "trading_date": trading_date or as_of.date().isoformat(),
+        "generated_at": as_of.isoformat(),
+        "securities": rows,
+    }
+    payload = json.dumps(body, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    body["sha256"] = _sha256_bytes(payload)
+    return body
+
+
+class PoolError(Exception):
+    """A named pool was missing, stale or corrupted at consumption."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+def load_stock_pool_snapshot(state_dir: Path, trading_date) -> dict:
+    """Read the day's named pool and verify its date and embedded SHA.
+
+    The pre-open check and P10 #727 consume the *same* snapshot file.  A
+    missing, wrong-day or hash-mismatched pool is a typed error - the
+    caller keeps the affected facts unavailable rather than treating a
+    broken pool as verified input.  Returns the verified body.
+    """
+    day = trading_date if hasattr(trading_date, "isoformat") else None
+    day = day.isoformat() if day is not None else str(trading_date)
+    path = Path(state_dir) / "preopen-pool" / (day + ".json")
+    if not path.exists():
+        raise PoolError("POOL_MISSING", f"no named pre-open pool for {day}")
+    try:
+        body = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PoolError("POOL_CORRUPT", f"unreadable pre-open pool: {exc}") from exc
+    sig = body.pop("sha256", None)
+    if sig is None:
+        raise PoolError("POOL_CORRUPT", "pre-open pool has no embedded sha256")
+    payload = json.dumps(body, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    if _sha256_bytes(payload) != sig:
+        raise PoolError("POOL_CORRUPT", "pre-open pool sha256 mismatch")
+    if body.get("trading_date") != day:
+        raise PoolError(
+            "POOL_STALE",
+            f"pre-open pool is for {body.get('trading_date')}, not {day}",
+        )
+    body["sha256"] = sig
+    return body
+
+
 # ---------------------------------------------------------------------------
 # Pre-open fact resolution
 # ---------------------------------------------------------------------------
@@ -238,14 +334,58 @@ def resolve_auction(quote, code, now) -> FactVerdict:
             "none",
             now,
         )
+    # Identity and session: the snapshot must belong to the queried
+    # security and to the same T+1 trading day as the check instant.
+    if getattr(quote, "security_code", code) != code:
+        return _unavailable(
+            code, FACT_AUCTION, "quote belongs to a different security",
+            getattr(quote, "source", "tencent") or "tencent", now,
+        )
+    quote_status = getattr(quote, "status", "live")
+    if quote_status in ("unavailable", "halt", "closed") or getattr(
+        quote, "stale", False
+    ):
+        return _unavailable(
+            code, FACT_AUCTION,
+            f"quote surface is {quote_status}; no usable auction print",
+            getattr(quote, "source", "tencent") or "tencent", now,
+        )
+    # Point-in-time: a print must already be observed AND received by the
+    # check instant; a later tick is never back-read into an earlier check.
+    quote_time = getattr(quote, "quote_time", None)
+    received_at = getattr(quote, "received_at", None)
+    if quote_time is not None:
+        qt = quote_time.astimezone(EXCHANGE_TZ)
+        if qt > now:
+            return _unavailable(
+                code, FACT_AUCTION, "auction print observed after the check instant",
+                getattr(quote, "source", "tencent") or "tencent", now,
+            )
+        if qt.date() != now.date():
+            return _unavailable(
+                code, FACT_AUCTION, "auction print belongs to a different session",
+                getattr(quote, "source", "tencent") or "tencent", now,
+            )
+    if received_at is not None:
+        ra = received_at.astimezone(EXCHANGE_TZ)
+        if ra > now:
+            return _unavailable(
+                code, FACT_AUCTION, "auction print received after the check instant",
+                getattr(quote, "source", "tencent") or "tencent", now,
+            )
+        if ra.date() != now.date():
+            return _unavailable(
+                code, FACT_AUCTION, "auction print received on a different session",
+                getattr(quote, "source", "tencent") or "tencent", now,
+            )
     return FactVerdict(
         security_code=code,
         fact=FACT_AUCTION,
         status="verified",
         reason=None,
         source=getattr(quote, "source", "tencent") or "tencent",
-        observed_at=_iso(getattr(quote, "quote_time", None)),
-        received_at=_iso(getattr(quote, "received_at", None)) or now.isoformat(),
+        observed_at=_iso(quote_time),
+        received_at=_iso(received_at) or now.isoformat(),
     )
 
 
@@ -271,6 +411,7 @@ def run_check(
     now: datetime,
     sellable_for=None,
     account_mode: str = "real",
+    pool_dir=None,
 ) -> dict:
     """Run the 09:00-09:25 verification over the day's package and account.
 
@@ -288,6 +429,23 @@ def run_check(
     blocked = 0
     alerted = 0
 
+    # E6-01: the check consumes the day's named pool by the same path, date
+    # and SHA the writer produced.  A missing, stale or corrupt pool is a
+    # typed defect - every quote-dependent fact then stays unverified, so a
+    # buy depending on it cannot silently pass on a broken pool.
+    pool = None
+    pool_error = None
+    if pool_dir is not None:
+        try:
+            pool = load_stock_pool_snapshot(pool_dir, now.date())
+        except PoolError as exc:
+            pool_error = exc.code
+    pool_members = (
+        {row.get("security_code") for row in pool.get("securities", ())}
+        if pool is not None
+        else None
+    )
+
     def _sellable(code: str) -> int:
         if callable(sellable_for):
             return sellable_for(code)
@@ -304,21 +462,66 @@ def run_check(
 
         depends = tuple(getattr(plan, "depends_on_preopen", ()) or ())
         facts = [resolve_fact(quote, code, fact, now).to_dict() for fact in depends]
+
+        # A verified pool confines the check to the named securities; a
+        # pool that is missing/stale/corrupt or that does not list this
+        # security keeps every declared fact unverified (never inferred).
+        if pool_error is not None:
+            for f in facts:
+                if f["status"] == "verified":
+                    f["status"] = "unavailable"
+                    f["reason"] = f"named pre-open pool defect: {pool_error}"
+                    f["observed_at"] = None
+        elif pool is not None and code not in pool_members:
+            for f in facts:
+                if f["status"] == "verified":
+                    f["status"] = "unavailable"
+                    f["reason"] = "security absent from the named pre-open pool"
+                    f["observed_at"] = None
         missing = [f["fact"] for f in facts if f["status"] != "verified"]
 
         recheck_qty = None
         executable = True
         reasons: list[str] = []
+        if pool_error is not None:
+            reasons.append(pool_error.lower())
+        elif pool is not None and code not in pool_members:
+            reasons.append("pool_not_listed")
         if plan.side == "buy":
             current = projection.quantity(code)
             remaining = plan.target_qty - current
-            need = (plan.price_cap * remaining).quantize(Decimal("0.01"))
+            # E6-04: the buy need is the bounded cost INCLUDING the plan's
+            # declared fee provision, and the spendable cash is what is left
+            # after every still-open buy order's reserved amount.  A check
+            # that ignores either lets an account confirm above its real
+            # headroom (the audit's bare-cash counterexample).
+            fee = getattr(plan, "estimated_fee", None) or Decimal("0.00")
+            need = (plan.price_cap * remaining + fee).quantize(Decimal("0.01"))
+            reserved = sum(
+                (
+                    getattr(o, "hold_amount", None)
+                    if getattr(o, "hold_amount", None) is not None
+                    else getattr(o, "hold_cash", Decimal("0.00"))
+                )
+                for o in getattr(history, "orders", ())
+                if getattr(o, "side", "buy") == "buy"
+            ) or Decimal("0.00")
+            spendable = None if cash is None else (cash - reserved).quantize(
+                Decimal("0.01")
+            )
             if remaining <= 0:
                 executable = False
                 reasons.append("already_at_target")
-            elif cash is not None and cash < need:
+            elif spendable is not None and spendable < need:
                 executable = False
-                affordable = int(cash / plan.price_cap) // _ROUND_LOT * _ROUND_LOT
+                # The still-affordable quantity is what the free cash buys
+                # after the fee provision, rounded down to a whole lot.
+                headroom = spendable - fee
+                affordable = (
+                    int(headroom / plan.price_cap) // _ROUND_LOT * _ROUND_LOT
+                    if headroom > 0
+                    else 0
+                )
                 recheck_qty = max(0, affordable)
                 reasons.append("cash_reduced")
             if missing:
@@ -345,7 +548,16 @@ def run_check(
                 alerted += 1
                 reasons.append("preopen_unverified_alert")
 
-        auction_price = getattr(quote, "open", None) if quote is not None else None
+        # The auction comparison uses only a PIT-qualified print: the same
+        # verdict gate that admits an observed-and-received in-session open.
+        # A future, stale, wrong-security or unqualified print never feeds
+        # the price-cap failure (it stays a typed unavailable fact instead).
+        auction_verdict = resolve_fact(quote, code, FACT_AUCTION, now)
+        auction_price = (
+            getattr(quote, "open", None)
+            if (quote is not None and auction_verdict.status == "verified")
+            else None
+        )
         if (
             plan.side == "buy"
             and auction_price is not None
@@ -380,6 +592,12 @@ def run_check(
         "package_id": getattr(package, "package_id", None),
         "account_revision": getattr(projection, "revision", None),
         "cash": _decimal_text(cash),
+        "pool_sha256": pool.get("sha256") if pool is not None else None,
+        "pool_status": (
+            "verified"
+            if pool is not None
+            else ("unavailable:" + str(pool_error) if pool_error else "unbound")
+        ),
         "plans": results,
         "summary": {
             "plans_checked": len(results),
@@ -403,3 +621,19 @@ def attach_check_to_receipt(receipt: dict | None, check: dict) -> dict:
     base.setdefault("schema_version", "quanthus.p12.daily-run.v1")
     base["preopen_check"] = check
     return base
+
+
+def write_check_receipt(state_dir: Path, check: dict) -> Path:
+    """Persist a pre-open check receipt beside the named pool.
+
+    E6-06: the verify pass is durable evidence - the package, account
+    revision, policy mode, pool SHA, per-plan facts/alerts/recheck quantity
+    and refusal reasons are recoverable across a restart, keyed by trading
+    day and check SHA so a later audit reads the identical record."""
+    path = (
+        Path(state_dir)
+        / "preopen-check"
+        / (str(check["trading_date"]) + ".json")
+    )
+    _write_atomic(path, json.dumps(check, ensure_ascii=False, sort_keys=True, indent=2))
+    return path

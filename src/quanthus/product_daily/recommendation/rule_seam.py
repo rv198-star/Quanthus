@@ -679,8 +679,9 @@ def evaluate_day(
     source_policy: Any,
     features_by_security: Mapping[str, SecurityFeatureFacts],
     knowledge_cutoff: datetime,
-    held_facts_by_security: Mapping[str, HeldPositionFacts] | None = None,
+    held_facts_by_security: Mapping[str, HeldPositionFacts | None] | None = None,
     prior_deterioration_sessions_by_security: Mapping[str, int] | None = None,
+    pending_security_codes: Sequence[str] | None = None,
     shared_prereq_ok: bool = True,
     shared_prereq_reason: str | None = None,
     position_state: str = "empty",
@@ -691,8 +692,9 @@ def evaluate_day(
     * A security missing usable feature facts is excluded alone; others still produce entries.
     * A vetoed expert outcome (NO_ACTION) stays a no-entry, not an exclusion or a publishable
       entry.
-    * held_facts_by_security supplies real position facts per held security; a held security
-      with no facts yields a hold+alert, never a forced exit.
+    * held_facts_by_security supplies real position facts per held security; a held member
+      whose value is None is a declared position with unavailable facts and yields a
+      hold+alert review, never an omission and never a forced exit.
     * knowledge_cutoff is the caller-declared decision/knowledge deadline (for the prospective
       daily profile it is the pre-registered 22:30+08 cutoff that the source-policy
       prospective_clock_json already returns; it is never max(member.available_at)).
@@ -728,6 +730,19 @@ def evaluate_day(
         code = candidate.listing_code
         if held_facts_by_security is not None and code in held_facts_by_security:
             # An existing position has its own daily review, not a second entry plan.
+            continue
+        if pending_security_codes is not None and code in pending_security_codes:
+            # A pending open buy order / reserved bucket / unconfirmed fill blocks a new
+            # entry for the security but gets no held review of its own.
+            excluded.append(
+                {
+                    "security_code": code,
+                    "reason": "pending_security_no_new_entry",
+                    "member_or_field": "pending_securities",
+                    "at": knowledge_cutoff.isoformat(),
+                    "scope": "new_entry",
+                }
+            )
             continue
         facts = features_by_security.get(code)
         if facts is None or facts.rsi14 is None or facts.realized_volatility20 is None:
@@ -1015,8 +1030,12 @@ def run_daily_advice(
     policy: AdvicePolicy,
     account: AccountFactsView,
     run_id: str,
-    held_facts_by_security: Mapping[str, HeldPositionFacts] | None = None,
+    held_facts_by_security: Mapping[str, HeldPositionFacts | None] | None = None,
     prior_deterioration_sessions_by_security: Mapping[str, int] | None = None,
+    input_exclusions: Sequence[dict[str, Any]] | None = None,
+    raw_security_inputs_digest: str | None = None,
+    pending_security_codes: Sequence[str] | None = None,
+    account_disposition: str | None = None,
     shared_prereq_ok: bool = True,
     shared_prereq_reason: str | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
@@ -1067,6 +1086,7 @@ def run_daily_advice(
         knowledge_cutoff=policy.decision_cutoff,
         held_facts_by_security=held_facts_by_security,
         prior_deterioration_sessions_by_security=prior_deterioration_sessions_by_security,
+        pending_security_codes=pending_security_codes,
         shared_prereq_ok=shared_prereq_ok and policy.producer_version == RULE_DAY_PRODUCER_VERSION,
         shared_prereq_reason=(
             "producer_version_mismatch"
@@ -1141,7 +1161,15 @@ def run_daily_advice(
         "feature_panel_report_digest": resources.panel_report.digest,
         "topology_digest": runner.topology_digest,
         "evaluated_universe": list(seam.evaluated_universe),
-        "exclusions": list(seam.excluded),
+        "exclusions": [*(input_exclusions or ()), *seam.excluded],
+        # The complete accepted RawSecurityInput closure digest supplied by the raw
+        # adapter (bars/actions/exceptions/limits/membership/identity/held/clocks).  It
+        # is distinct from raw_inputs_digest (the projected scan rows) so a byte change
+        # inside an accepted raw input alters the job identity even when the projected
+        # features happen not to move.
+        "raw_security_inputs_digest": raw_security_inputs_digest,
+        "pending_security_codes": sorted(pending_security_codes or ()),
+        "account_disposition": account_disposition,
         "entry_decisions": [
             {
                 "security_code": d.security_code,

@@ -27,6 +27,7 @@ from quanthus.product_daily.recommendation.contracts import (
 )
 from quanthus.product_daily.recommendation.daily_runner import (
     RawSecurityInput,
+    raw_security_input_closure,
     run_daily_advice_from_raw,
 )
 from quanthus.product_daily.recommendation.feature_adapter import (
@@ -93,8 +94,16 @@ def _raw_security(code: str, *, trigger: bool = True, n: int = 130) -> RawSecuri
 
     days = _weekdays_ending(TARGET, n)
     bars: list[DailyBar] = []
+    closes: list[Decimal] = []
+    close = Decimal("100")
     for i, day in enumerate(days):
-        close = Decimal("100")
+        if i < n - 2:
+            # a gentle upward drift so the RSI14/structure expert facts qualify a real
+            # TRIAL_ENTRY instead of a flat NO_ACTION
+            close += Decimal("1.0") if i % 2 == 0 else Decimal("-0.4")
+        else:
+            close = closes[-1]
+        closes.append(close)
         if trigger and i == n - 2:
             # prior bar: quiet vs the 20-session median on BOTH range and turnover
             high = close * Decimal("1.004")
@@ -282,7 +291,7 @@ def test_raw_to_p12_package_positive(runner, resources):
     output = run_daily_advice_from_raw(
         runner=runner,
         resources=resources,
-        raw=[_raw_security("600000")],
+        raw=[_trend_raw("600000")],
         facts=facts,
         policy=policy,
         account=account,
@@ -345,7 +354,9 @@ def test_identity_mismatch_fails_closed(runner, resources):
             split_policy=_prospective_split(),
             source_policy=_prospective_source(),
         )
-    assert "identity_security_mismatch" in str(exc.value) or "contamination" in str(exc.value)
+    # A single bad security with no valid neighbour left is a whole-day
+    # missing_raw_inputs block; with a valid neighbour it would be a named exclusion.
+    assert "missing_raw_inputs" in str(exc.value)
 
 
 def test_entry_eligible_false_blocks_entry_feature_ready_true(runner, resources):
@@ -514,3 +525,327 @@ def test_listing_sessions_from_membership_not_bar_window():
         signal_close=datetime.combine(TARGET, time(15, 0), SHANGHAI),
     )
     assert facts.listing_sessions == 200  # membership, not the 130-bar window
+
+
+# --- M2-R1 consolidated repair: isolation, held membership, raw closure identity, real positive
+
+
+def _trend_raw(code: str = "600000") -> RawSecurityInput:
+    """C3's verified upward-drift series that produces a real TRIAL_ENTRY."""
+
+    days = _weekdays_ending(TARGET, 130)
+    closes: list[Decimal] = []
+    close = Decimal("100")
+    for i, _day in enumerate(days):
+        if i < 128:
+            close += Decimal("1.0") if i % 2 == 0 else Decimal("-0.4")
+        else:
+            close = closes[-1]
+        closes.append(close)
+    bars = []
+    for i, (day, close_) in enumerate(zip(days, closes, strict=True)):
+        if i == 128:
+            high, low = close_ * Decimal("1.004"), close_ * Decimal("0.996")
+        elif i == 129:
+            high, low = close_ * Decimal("1.05"), close_ * Decimal("0.95")
+        else:
+            high, low = close_ * Decimal("1.01"), close_ * Decimal("0.99")
+        amount = Decimal("50") if i == 128 else Decimal("400") if i == 129 else Decimal("100")
+        bars.append(
+            DailyBar(
+                security_id=f"security-{code}",
+                session_date=day,
+                open_price=close_,
+                high_price=high,
+                low_price=low,
+                close_price=close_,
+                volume=Decimal("100000"),
+                amount=amount,
+                is_tradable=True,
+            )
+        )
+    limits = tuple(
+        LimitFacts(
+            session_date=day,
+            entry_policy_allows=True,
+            is_executable=True,
+            upper_limit_pct=Decimal("10"),
+            lower_limit_pct=Decimal("10"),
+            upper_limit_price=close_ * Decimal("1.1"),
+            lower_limit_price=close_ * Decimal("0.9"),
+        )
+        for day, close_ in zip(days, closes, strict=True)
+    )
+    base = _raw_security(code)
+    from dataclasses import replace as _replace
+
+    return _replace(
+        base,
+        identity=_identity(code),
+        bars=tuple(bars),
+        universe_membership=days,
+        limits=limits,
+        close_at_by_date={day: datetime.combine(day, time(15), SHANGHAI) for day in days},
+        knowledge_cutoff_by_date={
+            day: datetime.combine(day, time(18, 1), SHANGHAI) for day in days
+        },
+    )
+
+
+def _run(runner, resources, raws, **kw):
+    facts, policy, account = _producer_inputs()
+    account = kw.pop("account", account)
+    return run_daily_advice_from_raw(
+        runner=runner,
+        resources=resources,
+        raw=raws,
+        facts=facts,
+        policy=policy,
+        account=account,
+        run_id=kw.pop("run_id", "run-r1"),
+        snapshot_id=kw.pop("snapshot_id", "snap-r1"),
+        snapshot_manifest_digest=kw.pop("snapshot_manifest_digest", sha256_digest({"seed": "r1"})),
+        card=CARD,
+        split_policy=kw.pop("split_policy", _prospective_split()),
+        source_policy=kw.pop("source_policy", _prospective_source()),
+        clock=kw.pop("clock", lambda: policy.decision_cutoff),
+        **kw,
+    )
+
+
+def _quiet_held(code: str) -> RawSecurityInput:
+    """A held series with no new transition and no position facts."""
+
+    from dataclasses import replace as _replace
+
+    raw = _trend_raw(code)
+    bars = list(raw.bars)
+    for index in (-2, -1):
+        bar = bars[index]
+        bars[index] = _replace(
+            bar,
+            high_price=bar.close_price * Decimal("1.004"),
+            low_price=bar.close_price * Decimal("0.996"),
+            amount=Decimal("100"),
+        )
+    return _replace(raw, bars=tuple(bars), position_facts=None)
+
+
+def _held_facts():
+    from quanthus.expert_strategy.position_risk import HeldPositionFacts
+    from quanthus.expert_strategy.runner import position_facts_evidence
+
+    return HeldPositionFacts(
+        holding_sessions=40,
+        marked_return=Decimal("0.05"),
+        prior_strategy_reduction_count=0,
+        evidence=position_facts_evidence(
+            unit_id="pos-r1",
+            holding_sessions=40,
+            marked_return=Decimal("0.05"),
+            prior_strategy_reduction_count=0,
+        ),
+    )
+
+
+# P1-1: per-security isolation keeps the valid neighbor's real entry -----------------------
+
+
+def test_r1_bad_neighbor_excluded_valid_entry_kept(runner, resources):
+    """A malformed second security is excluded alone; the valid neighbor enters."""
+
+    from dataclasses import replace as _replace
+
+    valid = _trend_raw("600000")
+    bad = _replace(_trend_raw("600001"), close_at_by_date={})
+    output = _run(runner, resources, [valid, bad])
+    entries = [
+        d for ds in output.result.package.decision_sets for d in ds.decisions if d.entry is not None
+    ]
+    assert entries, "the valid neighbor must still reach a real entry"
+    exclusions = output.source_closure["exclusions"]
+    assert any(
+        item["security_code"] == "600001" and "close" in item["member_or_field"]
+        for item in exclusions
+    )
+
+
+def test_r1_identity_mismatch_neighbor_isolated(runner, resources):
+    from dataclasses import replace as _replace
+
+    valid = _trend_raw("600000")
+    bad_id = _trend_raw("600001")
+    bad = _replace(bad_id, identity=_replace(bad_id.identity, security_id="security-OTHER"))
+    output = _run(runner, resources, [valid, bad])
+    assert any(item["security_code"] == "600001" for item in output.source_closure["exclusions"])
+    entries = [d for ds in output.result.package.decision_sets for d in ds.decisions if d.entry]
+    assert entries
+
+
+def test_r1_all_bad_raises_missing_raw(runner, resources):
+    """Every closure failing is a shared whole-day block, not a fabricated empty day."""
+
+    from dataclasses import replace as _replace
+
+    bad = _replace(_trend_raw("600001"), close_at_by_date={})
+    with pytest.raises(ProductDailyError, match="missing_raw_inputs"):
+        _run(runner, resources, [bad])
+
+
+# P1-2: held membership survives missing facts --------------------------------------------
+
+
+def test_r1_known_held_missing_facts_hold_alert_no_entry(runner, resources):
+    """Account-known held code with no position facts -> hold_alert, never ENDED/entry."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    account = _replace(account, active_or_reserved_security_codes=("600001",))
+    output = _run(runner, resources, [_quiet_held("600001")], account=account)
+    actions = [d.action for d in output.seam.held_decisions]
+    assert actions == ["hold_alert"], actions
+    stages = [d.stage for ds in output.result.package.decision_sets for d in ds.decisions]
+    assert "entry_plan" not in stages and "ended" not in stages
+    assert all(stage == "holding" for stage in stages)
+
+
+def test_r1_held_trigger_missing_facts_stays_hold_not_entry(runner, resources):
+    """A held member with an entry-shaped series but no facts stays a held review."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    account = _replace(account, active_or_reserved_security_codes=("600001",))
+    raw = _trend_raw("600001")
+    raw = _replace(raw, position_facts=None)
+    output = _run(runner, resources, [raw], account=account)
+    actions = [d.action for d in output.seam.held_decisions]
+    assert actions == ["hold_alert"], actions
+    stages = [d.stage for ds in output.result.package.decision_sets for d in ds.decisions]
+    assert "entry_plan" not in stages
+
+
+def test_r1_explicit_held_membership_none_facts_hold_alert(runner, resources):
+    """held_membership=True with no facts is a hold_alert; no account set needed."""
+
+    from dataclasses import replace as _replace
+
+    raw = _replace(_quiet_held("600001"), held_membership=True)
+    output = _run(runner, resources, [raw])
+    assert [d.action for d in output.seam.held_decisions] == ["hold_alert"]
+
+
+def test_r1_held_with_real_facts_exit_positive(runner, resources):
+    """A held member WITH real position facts reaches a real exit review."""
+
+    from dataclasses import replace as _replace
+
+    facts, policy, account = _producer_inputs()
+    account = _replace(account, active_or_reserved_security_codes=("600001",))
+    raw = _replace(_quiet_held("600001"), position_facts=_held_facts())
+    output = _run(runner, resources, [raw], account=account)
+    actions = [d.action for d in output.seam.held_decisions]
+    assert actions == ["exit"], actions
+    stages = [d.stage for ds in output.result.package.decision_sets for d in ds.decisions]
+    assert "exit_plan" in stages
+
+
+# pending securities block new entry without a held review --------------------------------
+
+
+def test_r1_pending_security_blocks_entry_no_held_review(runner, resources):
+    """A pending open buy order blocks a new entry; it is not a held review."""
+
+    pending = _trend_raw("600001")
+    output = _run(
+        runner,
+        resources,
+        [_trend_raw("600000"), pending],
+        pending_security_codes=("600001",),
+    )
+    entry_codes = {
+        d.security_code
+        for ds in output.result.package.decision_sets
+        for d in output.result.package.decision_sets[0].decisions
+        if d.entry is not None
+    }
+    assert "600000" in entry_codes and "600001" not in entry_codes
+    held_codes = {d.security_code for d in output.seam.held_decisions}
+    assert "600001" not in held_codes
+
+
+# account disposition: failed account read is a whole-day block -----------------------------
+
+
+def test_r1_account_facts_unavailable_blocks_day(runner, resources):
+    with pytest.raises(ProductDailyError, match="account_facts_unavailable"):
+        _run(
+            runner,
+            resources,
+            [_trend_raw("600000")],
+            account_disposition="ACCOUNT_FACTS_UNAVAILABLE",
+        )
+
+
+# P1-3: full raw closure changes the job identity -----------------------------------------
+
+
+def test_r1_raw_closure_digest_changes_with_volume(runner, resources):
+    """A bar-volume byte change must alter raw_security_inputs_digest."""
+
+    from dataclasses import replace as _replace
+
+    raw1 = _trend_raw("600000")
+    out1 = _run(runner, resources, [raw1])
+    bars = list(raw1.bars)
+    bars[0] = _replace(bars[0], volume=Decimal("999999"))
+    raw2 = _replace(raw1, bars=tuple(bars))
+    out2 = _run(runner, resources, [raw2])
+    assert (
+        out1.source_closure["raw_security_inputs_digest"]
+        != out2.source_closure["raw_security_inputs_digest"]
+    )
+
+
+def test_r1_closure_covers_membership_pending_unavailable(runner, resources):
+    from dataclasses import replace as _replace
+
+    raw = _replace(
+        _trend_raw("600000"),
+        held_membership=True,
+        pending_kind="reserved_bucket",
+        held_unavailable_reason="ledger knows code+quantity only",
+    )
+    closure = raw_security_input_closure(raw)
+    assert closure["held_membership"] is True
+    assert closure["pending_kind"] == "reserved_bucket"
+    assert closure["held_unavailable_reason"] == "ledger knows code+quantity only"
+    assert "volume" in closure["bars"][0] and "amount" in closure["bars"][0]
+
+
+# P2-1: the raw positive must reach a REAL entry through the pinned P12 loader ------------
+
+
+def test_r1_raw_to_p12_real_entry_plan(runner, resources):
+    """The named positive asserts entry_allowed and a real P12 entry_plan."""
+
+    output = _run(runner, resources, [_trend_raw("600000")])
+    assert output.result.package is not None
+    entries = [d for d in output.seam.decisions if d.entry_allowed]
+    assert entries, "a real TRIAL_ENTRY decision must be produced, not NO_ACTION"
+    plan_entries = [
+        d
+        for ds in output.result.package.decision_sets
+        for d in ds.decisions
+        if d.stage == "entry_plan"
+    ]
+    assert plan_entries, "the package must carry a real entry_plan, not only ENDED"
+
+    from tests.unit.test_product_daily_rule_seam import _p12_loader
+
+    validate = _p12_loader()
+    for ds in output.result.package.decision_sets:
+        validated = validate(ds.to_dict())
+    stages = [str(d.stage) for d in validated.decisions]
+    assert any("ENTRY_PLAN" in s for s in stages), stages

@@ -273,6 +273,66 @@ def test_end_to_end_delisted_neighbour_does_not_block_day(runner, resources):
     assert any(e["security_code"] == "600000" for e in output.source_closure.get("exclusions", ())) is False
 
 
+
+
+def test_relisted_same_security_id_two_listings_not_duplicate(runner, resources):
+    """One corporate entity with two listing_ids (delisted 000043 + relisted
+    001914 sharing security_id) is a legal relisted shape, not a duplicate.
+    The duplicate guard keys on listing_id; each row is aged by its own
+    listing interval."""
+    days = _weekdays_ending(TARGET, 200)
+    live = _szse_entry(_trend_raw("001914"))
+    live["identity"]["listing_id"] = "listing-live-001914"
+    dead = _szse_entry(_trend_raw("000043"))
+    dead["identity"]["security_id"] = live["identity"]["security_id"]
+    dead["identity"]["listing_id"] = "listing-dead-000043"
+    dead["bars"] = []
+    calendar = _calendar(venue="SZSE", days=days)
+    listing = [
+        _listing(
+            live["identity"]["security_id"],
+            venue="SZSE",
+            effective_from=days[0].isoformat(),
+            listing_id="listing-live-001914",
+        ),
+        _listing(
+            dead["identity"]["security_id"],
+            venue="SZSE",
+            effective_from="1990-12-09T16:00:00+08:00",
+            effective_to="2024-04-26T16:00:00+08:00",
+            listing_id="listing-dead-000043",
+        ),
+    ]
+    env = _envelope([live, dead], calendar=calendar, listing=listing)
+    output = run_daily_advice_from_history(
+        env, runner=runner, resources=resources, **_run_kwargs()
+    )
+    assert output.result is not None
+    ex = [e for e in output.source_closure["exclusions"] if e["security_code"] == "000043"]
+    assert ex and ex[0]["scope"] == "per_security"
+    assert "not_listed" in (ex[0]["member_or_field"] + ex[0]["reason"])
+
+
+def test_same_listing_id_twice_is_duplicate(runner, resources):
+    """The same listing_id delivered twice stays a hard duplicate error."""
+    days = _weekdays_ending(TARGET, 200)
+    a = _szse_entry(_trend_raw("001914"))
+    b = _szse_entry(_trend_raw("001914"))
+    calendar = _calendar(venue="SZSE", days=days)
+    listing = [
+        _listing(
+            a["identity"]["security_id"],
+            venue="SZSE",
+            effective_from=days[0].isoformat(),
+        )
+    ]
+    env = _envelope([a, b], calendar=calendar, listing=listing)
+    with pytest.raises(ProductDailyError, match="duplicate_security"):
+        run_daily_advice_from_history(
+            env, runner=runner, resources=resources, **_run_kwargs()
+        )
+
+
 # ---- member_use three-way split -------------------------------------------------
 
 

@@ -952,6 +952,8 @@ def raw_security_inputs_from_history(
     """
     inputs: list[RawSecurityInput] = []
     receipts: list[dict[str, Any]] = []
+    # Duplicate guard keys on the LISTING id (a relisted entity reuses
+    # security_id across listings); see the check below.
     seen_ids: set[str] = set()
     for si, sec in enumerate(history.securities):
         sec_o = _obj(sec, f"securities[{si}]")
@@ -968,9 +970,20 @@ def raw_security_inputs_from_history(
             )
             continue
         code = identity.listing_code
-        if identity.security_id in seen_ids:
-            _fail("duplicate_security", f"duplicate security_id {identity.security_id}")
-        seen_ids.add(identity.security_id)
+        # Duplicate guard keys on the LISTING id, not the bare security_id: one
+        # corporate entity legitimately carries several listings over time (a
+        # delisted + a relisted share, e.g. security_7ca1ec46 spanning 000043 /
+        # 001914).  Rejecting on security_id alone would hard-block the whole
+        # day on that relisted shape even though each listing is aged by its
+        # own listing_id interval and isolated per-listing.  The same
+        # listing_id twice stays a hard error (a true duplicate row).
+        if identity.listing_id in seen_ids:
+            _fail(
+                "duplicate_security",
+                f"duplicate listing_id {identity.listing_id} "
+                f"(security_id {identity.security_id})",
+            )
+        seen_ids.add(identity.listing_id)
         position_facts, prior_det = _position_facts_from(sec_o)
         held_membership = _bool3(sec_o.get("held_membership"), "securities[].held_membership")
         pending_kind = (

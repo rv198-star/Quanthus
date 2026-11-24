@@ -465,11 +465,38 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                 "source_published_at": eo.get("source_published_at"),
                 "verified_at": eo.get("verified_at"),
             }
+        # Verified-artifact catalogues: per-register named original rows the
+        # bound credential actually verified.  Keyed by coverage_id then
+        # register_row so a declared event can be hit-tested without the
+        # caller recomputing anything.
+        verified_artifacts: dict[str, dict[Any, dict[str, Any]]] = {}
+        for i, va in enumerate(
+            _seq(aco.get("verified_artifacts", ()), "action_coverage.verified_artifacts")
+        ):
+            vo = _obj(va, f"action_coverage.verified_artifacts[{i}]")
+            cid = _text(vo.get("coverage_id"), "verified_artifacts[].coverage_id")
+            if cid not in registers:
+                _fail(
+                    "invalid_action_coverage",
+                    f"verified_artifacts[{i}] references unregistered coverage_id {cid!r}",
+                )
+            rows: dict[Any, dict[str, Any]] = {}
+            for j, r in enumerate(_seq(vo.get("rows", ()), "verified_artifacts[].rows")):
+                rr = _obj(r, f"verified_artifacts[{i}].rows[{j}]")
+                reg_row = rr.get("register_row")
+                if reg_row is None:
+                    _fail(
+                        "invalid_action_coverage",
+                        f"verified_artifacts[{i}].rows[{j}] lacks register_row",
+                    )
+                rows[reg_row] = dict(rr)
+            verified_artifacts[cid] = rows
         action_coverage = {
             "default_state": default_state,
             "registers": registers,
             "securities": securities_cov,
             "window_evidence": window_evidence,
+            "verified_artifacts": verified_artifacts,
             "note": aco.get("note"),
         }
 
@@ -767,6 +794,16 @@ def _action_coverage_ok(
         if not dv or not iv or str(dv) != str(iv):
             return False
 
+    # The source action/feature key is identity.stock_code (e.g. sh.600000);
+    # listing_code (600000) is the trading/coverage key.  Both belong to the
+    # frozen identity, but only these two codes may key this security's rows.
+    codes = (str(ident.get("stock_code") or ""), str(ident.get("listing_code") or code))
+
+    # Verified-artifact catalogues bound to each coverage register: the named
+    # rows the upstream credential actually verified.  Caller-supplied events
+    # must hit these rows, never a self-recomputed hash.
+    bound_artifacts = request.action_coverage.get("verified_artifacts", {})
+
     # Authoritative venue open calendar: the SAME bound calendar the envelope
     # uses, so sessions are checked verbatim against the venue's real open
     # days -- a session list that skips a real open day, duplicates, goes out
@@ -816,11 +853,17 @@ def _action_coverage_ok(
         # double-counted); the ex-date that affects a return is inside
         # (first_close, last_close] i.e. sessions[1:].
         if not _returns_events_join_actions(
-            returns.get("events"), sec_o.get("actions"), code, returns_dates
+            returns.get("events"),
+            sec_o.get("actions"),
+            codes,
+            returns_dates,
+            identity=ident,
+            bound_artifacts=bound_artifacts,
+            coverage_id=returns.get("coverage_id"),
         ):
             return False
     elif returns.get("event_state") == "verified_none" and _actions_in_window(
-        sec_o.get("actions"), code, returns_dates
+        sec_o.get("actions"), codes, returns_dates
     ):
         # A positively "no adjustment" returns window contradicts any raw
         # action row inside it (the conflict is isolated, never coalesced away).
@@ -838,6 +881,13 @@ def _dedupe_action_rows(actions: Any) -> list[Any]:
     """
     if not isinstance(actions, Sequence) or isinstance(actions, str):
         return list(actions) if isinstance(actions, Sequence) else []
+
+    def _nd(v: Any) -> Decimal | None:
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return None
+
     seen: set[tuple[Any, ...]] = set()
     out: list[Any] = []
     for a in actions:
@@ -846,12 +896,14 @@ def _dedupe_action_rows(actions: Any) -> list[Any]:
             continue
         eff = a.get("effective_date")
         eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
+        ka = a.get("known_at")
+        ka_iso = ka.isoformat() if isinstance(ka, (date, datetime)) else str(ka)
         key = (
             str(a.get("security_code")),
             eff_iso,
-            str(a.get("cash_dividend_per_share")),
-            str(a.get("bonus_share_ratio")),
-            str(a.get("known_at")),
+            _nd(a.get("cash_dividend_per_share")),
+            _nd(a.get("bonus_share_ratio")),
+            ka_iso,
         )
         if key in seen:
             continue
@@ -860,16 +912,24 @@ def _dedupe_action_rows(actions: Any) -> list[Any]:
     return out
 
 
-def _actions_in_window(actions: Any, code: str, window_sessions: Sequence[str]) -> bool:
-    """True when any projected action has an effective_date inside the return
-    window (first_close, last_close] = window_sessions[1:]."""
+def _actions_in_window(
+    actions: Any, codes: tuple[str, ...], window_sessions: Sequence[str]
+) -> bool:
+    """True when any projected action for THIS security has an effective_date
+    inside the return window (first_close, last_close] = window_sessions[1:].
+
+    The action row key is the source stock_code (e.g. sh.600000); a bare
+    listing_code is admitted only when it is the identity's own listing_code.
+    An action row keyed to neither code is not this security's action.
+    """
+    allowed = {c for c in codes if c}
     if not isinstance(actions, Sequence) or isinstance(actions, str):
         return False
     window_set = set(window_sessions[1:])
     for a in actions:
         if not isinstance(a, Mapping):
             continue
-        if str(a.get("security_code")) != code:
+        if str(a.get("security_code")) not in allowed:
             continue
         eff = a.get("effective_date")
         eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
@@ -879,7 +939,13 @@ def _actions_in_window(actions: Any, code: str, window_sessions: Sequence[str]) 
 
 
 def _returns_events_join_actions(
-    events: Any, actions: Any, code: str, window_sessions: Sequence[str]
+    events: Any,
+    actions: Any,
+    codes: tuple[str, ...],
+    window_sessions: Sequence[str],
+    identity: Mapping[str, Any] | None = None,
+    bound_artifacts: Mapping[str, Mapping[Any, Mapping[str, Any]]] | None = None,
+    coverage_id: str | None = None,
 ) -> bool:
     """Join verified returns events to the projected actions[] for this security.
 
@@ -892,9 +958,12 @@ def _returns_events_join_actions(
         (the panel's single dilution ratio; summed once, never double-counted)
       event.currency must be CNY (the amount column's declared unit)
       action.known_at must precede effective_date (the panel's mapped_actions filter)
-      event.implementation_sha256 / register_row bind the original register row.
+      event.implementation_sha256 / register_row / notice bind the named
+        register artifact the bound credential actually verified.
     """
     window_set = set(window_sessions[1:])
+    ident = identity or {}
+    allowed_codes = {c for c in codes if c}
 
     def _dec(v: Any) -> Decimal | None:
         try:
@@ -903,14 +972,27 @@ def _returns_events_join_actions(
             return None
 
     def _event_ex(e: Mapping[str, Any]) -> str | None:
+        """Parse the declared ex_date strictly; an unparseable date is NOT
+        skipped (that would silently admit a malformed row) - it returns the
+        sentinel '!' which never matches an in-window or out-window date, and
+        the caller treats it as a hard failure below."""
         ex = e.get("ex_date")
-        return ex.isoformat() if isinstance(ex, date) else (str(ex) if ex else None)
+        if ex is None:
+            return None
+        if isinstance(ex, date):
+            return ex.isoformat()
+        try:
+            return date.fromisoformat(str(ex)).isoformat()
+        except (ValueError, TypeError):
+            return "!"
 
-    # Index in-window projected actions by effective_date for this security.
+    # Index in-window projected actions by effective_date for THIS security.
+    # The action row key is the source stock_code (e.g. sh.600000); a bare
+    # listing_code is admitted only when it is the identity's own listing_code.
     window_actions: dict[str, list[Mapping[str, Any]]] = {}
     if isinstance(actions, Sequence) and not isinstance(actions, str):
         for a in actions:
-            if not isinstance(a, Mapping) or str(a.get("security_code")) != code:
+            if not isinstance(a, Mapping) or str(a.get("security_code")) not in allowed_codes:
                 continue
             eff = a.get("effective_date")
             eff_iso = eff.isoformat() if isinstance(eff, date) else str(eff)
@@ -949,7 +1031,12 @@ def _returns_events_join_actions(
         if not isinstance(e, Mapping):
             return False
         ex_iso = _event_ex(e)
-        if ex_iso is None or ex_iso not in window_set:
+        if ex_iso == "!" or ex_iso is None:
+            # An unparseable or absent ex_date on a declared verified event is
+            # a hard failure, not an out-of-window skip - the caller asserted
+            # a concrete event and the row cannot be located.
+            return False
+        if ex_iso not in window_set:
             # An event outside (first_close, last_close] does not affect these
             # returns; it is neither required nor a conflict for THIS window.
             continue
@@ -969,6 +1056,37 @@ def _returns_events_join_actions(
             return False
         declared_terms[ex_iso] = this_terms
         declared_dates.add(ex_iso)
+        # Original provenance: the declared implementation_sha256 /
+        # register_row / notice must hit the named row in the verified
+        # artifact catalogue the bound credential actually verified - a
+        # caller may not self-declare a forged register row, and an event
+        # whose coverage register carries NO catalogue has no object the
+        # provenance can bind to, so the verified_event is refused (the
+        # evidence grade is preserved, never upgraded by a non-null field).
+        artifacts = (bound_artifacts or {}).get(coverage_id) if coverage_id else None
+        if artifacts is None:
+            return False
+        if artifacts is not None:
+            reg_row = e.get("register_row")
+            reg_key: Any
+            try:
+                reg_key = int(reg_row)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                reg_key = str(reg_row)
+            row = artifacts.get(reg_key) or artifacts.get(str(reg_row))
+            if row is None:
+                return False
+            impl = row.get("implementation_sha256") or row.get("sha256")
+            if impl is not None and str(e.get("implementation_sha256")) != str(impl):
+                return False
+            notice = row.get("notice") or row.get("notice_id")
+            if notice is not None and str(e.get("notice")) != str(notice):
+                return False
+            # Bind the verified security identity when the row names it.
+            for k in ("security_id", "listing_id", "venue_id"):
+                rv = row.get(k)
+                if rv is not None and ident.get(k) is not None and str(rv) != str(ident.get(k)):
+                    return False
         cands = distinct_window_actions.get(ex_iso) or []
         matched = False
         for a in cands:
@@ -987,7 +1105,20 @@ def _returns_events_join_actions(
                 except ValueError:
                     ka_date = None
                 if ka_date is not None and ka_date < date.fromisoformat(ex_iso):
-                    matched = True
+                    # The action row key already bound this security via
+                    # allowed_codes; if it also names security_id/listing_id
+                    # /venue_id they must equal the frozen identity.
+                    row_ok = True
+                    for k in ("security_id", "listing_id", "venue_id"):
+                        rv = a.get(k)
+                        if (
+                            rv is not None
+                            and ident.get(k) is not None
+                            and str(rv) != str(ident.get(k))
+                        ):
+                            row_ok = False
+                    if row_ok:
+                        matched = True
         if not matched:
             return False
 
@@ -1046,28 +1177,54 @@ def _sessions_have_effective_action(scan: Mapping[str, Any]) -> bool:
 
 
 def _scan_events_resolvable(events: Any, scan_sessions: Any) -> bool:
-    """True when a scan verified_event names a resolvable adjustment row.
+    """True when a scan verified_event names a resolvable adjustment bound to
+    one of the two scanned sessions.
 
-    A scan 'verified_event' state must reach a concrete event row carrying an
-    ex-date (or session date) or an explicit adjustment_effective marker - a
-    bare positive label with no bindable subtype row is self-contradictory and
-    the caller keeps the security out rather than granting a free clean scan.
+    A scan 'verified_event' must reach a concrete event row that either marks
+    a scanned session adjustment_effective or names an ex/effective/session
+    date ON one of the two scanned days.  A positive label whose rows only
+    carry unrelated dates is evidence-bound-to-nothing - the security is
+    isolated, never granted a free clean scan.  (A real on-session ex-date
+    separately blocks the entry via _sessions_have_effective_action; this
+    check catches the 'verified but for another day' contradiction.)
     """
+    scanned: set[str] = set()
+    for sess in scan_sessions or ():
+        if isinstance(sess, Mapping):
+            d = sess.get("date")
+            if d is not None:
+                scanned.add(d.isoformat() if isinstance(d, date) else str(d))
+        elif isinstance(sess, str):
+            scanned.add(sess)
+
+    def _day(v: Any) -> str | None:
+        if isinstance(v, date):
+            return v.isoformat()
+        try:
+            return date.fromisoformat(str(v)).isoformat()
+        except (ValueError, TypeError):
+            return None
+
     evs = list(events or ())
     if not evs:
         return False
+    bound = False
     for e in evs:
         if not isinstance(e, Mapping):
             return False
-        # A resolvable row names WHEN the adjustment applies (ex_date or a
-        # session date inside the two scanned sessions) or carries an explicit
-        # adjustment marker; a row with neither is unbindable.
         if e.get("adjustment_effective") is True:
-            return True
-        ex = e.get("ex_date") or e.get("effective_date") or e.get("session_date") or e.get("date")
-        if ex is not None:
-            return True
-    return False
+            bound = True
+            continue
+        raw = e.get("ex_date") or e.get("effective_date") or e.get("session_date") or e.get("date")
+        if raw is None:
+            return False
+        day = _day(raw)
+        if day is None:
+            # An unparseable date on a declared verified row is a hard failure.
+            return False
+        if day in scanned:
+            bound = True
+    return bound
 
 
 # Raw-term fields a positive returns event must carry verbatim, per

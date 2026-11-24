@@ -1,6 +1,8 @@
 # --- R5 action-join: verified event terms must reach the feature row ---
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from quanthus.product_daily.recommendation.paper_replay import (
     build_replay_envelope,
     load_replay_request,
@@ -8,7 +10,9 @@ from quanthus.product_daily.recommendation.paper_replay import (
 from tests.unit.test_p11_paper_replay import (
     SESSION_DAYS,
     T1,
+    _listing,
     _request,
+    _security,
 )
 
 
@@ -41,6 +45,33 @@ def _r5_action(code, effective_date, cash="0.116", bonus="0", known_at="2026-09-
     }
 
 
+def _bind_artifacts(req):
+    # For every returns_61_session verified_event, register the event rows as
+    # the verified-artifact catalogue of the bound coverage register: the
+    # P10-delivered list of (register_row -> implementation sha / notice /
+    # identity) the upstream credential actually verified.  Tampering with an
+    # event's implementation_sha256/register_row/notice then fails the bind.
+    arts = []
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] != "returns_61_session" or ev["event_state"] != "verified_event":
+            continue
+        cid = ev["coverage_id"]
+        rows = []
+        for e in ev.get("events") or []:
+            rows.append(
+                {
+                    "register_row": e.get("register_row"),
+                    "implementation_sha256": e.get("implementation_sha256"),
+                    "notice": e.get("notice"),
+                    "notice_id": e.get("notice_id") or e.get("notice"),
+                }
+            )
+        arts.append({"coverage_id": cid, "rows": rows})
+    if arts:
+        req["action_coverage"]["verified_artifacts"] = arts
+    return req
+
+
 def _r5_req(events, actions, market_date=T1):
     req = _request(market_dates=(market_date,), coverage="verified")
     for ev in req["action_coverage"]["window_evidence"]:
@@ -49,7 +80,7 @@ def _r5_req(events, actions, market_date=T1):
             ev["events"] = events
     if actions:
         req["securities"][0]["actions"] = actions
-    return req
+    return _bind_artifacts(req)
 
 
 def test_r5_verified_event_matching_action_admitted():
@@ -172,7 +203,11 @@ def test_r5_scan_verified_event_no_resolvable_row_isolated():
     assert window_info["coverage_isolated"] == 1
 
 
-def test_r5_scan_verified_event_resolvable_row_admitted():
+def test_r5_scan_verified_event_unrelated_date_isolated():
+    # R7/C6: a scan verified_event whose rows only carry an unrelated ex_date
+    # (not one of the two scanned sessions) is evidence bound to nothing -
+    # named isolation, never a free clean scan.  This replaces the old test
+    # that expected admission and masked the defect.
     req = _request(market_dates=(T1,), coverage="verified")
     for ev in req["action_coverage"]["window_evidence"]:
         if ev["purpose"] == "scan_two_session":
@@ -180,7 +215,7 @@ def test_r5_scan_verified_event_resolvable_row_admitted():
             ev["events"] = [{"ex_date": "2026-07-28"}]
     request = load_replay_request(req)
     _, _, window_info, _ = build_replay_envelope(request, T1)
-    assert window_info["coverage_isolated"] == 0
+    assert window_info["coverage_isolated"] == 1
 
 
 # --- R6: scan ex-date effectiveness + same-date action one-to-one -------------------
@@ -254,3 +289,220 @@ def test_r6_two_declared_events_same_date_conflict_isolated():
     request = load_replay_request(req)
     _, _, window_info, _ = build_replay_envelope(request, T1)
     assert window_info["coverage_isolated"] == 1
+
+
+# --- R7: code-shape identity, provenance binding, decimal-normal dedupe ----------
+
+
+def _r7_sse_security(days, stock="sh.600000"):
+    sec = _security("600000", days)
+    sec["identity"]["stock_code"] = stock
+    return sec
+
+
+def _r7_req(sec, events, actions, market_date=T1, artifacts=None):
+    req = _request(market_dates=(market_date,), coverage="verified", securities=[sec])
+    code = sec["identity"]["listing_code"]
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "returns_61_session" and ev["security_code"] == code:
+            ev["event_state"] = "verified_event"
+            ev["events"] = events
+    if actions:
+        sec["actions"] = actions
+    if artifacts is not None:
+        req["action_coverage"]["verified_artifacts"] = artifacts
+    elif events:
+        # Bind the declared events to the register's verified-artifact
+        # catalogue so a tampered provenance fails (unless a test overrides
+        # with its own catalogue via artifacts=).
+        _bind_artifacts(req)
+    return req
+
+
+def test_r7_sse_stock_code_positive_admitted():
+    # Real SPDB shape: listing_code=600000, stock_code=sh.600000, action row
+    # keyed by stock_code.  Per original-share 0.42 counts once.
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _r7_sse_security(days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    req = _r7_req(
+        sec,
+        [_r5_event(ex, cash="0.42")],
+        [_r5_action("sh.600000", ex, cash="0.42", known_at=known)],
+    )
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 0
+    assert window_info["delivered"]["600000"]["entry_eligible"] is True
+
+
+def test_r7_sse_verified_none_but_action_isolated():
+    # Reverse: declared window proves no event yet a same-security action row
+    # keyed by stock_code exists -> conflict isolation (R6 reverse join now
+    # binds the stock_code key).
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _r7_sse_security(days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    req = _r7_req(sec, [], [_r5_action("sh.600000", ex, cash="0.42", known_at=known)])
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r7_action_keyed_to_wrong_venue_isolated():
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _r7_sse_security(days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    req = _r7_req(
+        sec,
+        [_r5_event(ex, cash="0.42")],
+        [_r5_action("sz.600000", ex, cash="0.42", known_at=known)],
+    )
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r7_trailing_zero_amount_dedupes_to_one():
+    # 0.420 vs 0.42: identical terms under different decimal renderings
+    # collapse to a single panel row, not a multiplicity conflict.
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _r7_sse_security(days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    req = _r7_req(
+        sec,
+        [_r5_event(ex, cash="0.42")],
+        [
+            _r5_action("sh.600000", ex, cash="0.42", known_at=known),
+            _r5_action("sh.600000", ex, cash="0.420", known_at=known),
+        ],
+    )
+    request = load_replay_request(req)
+    env, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 0
+    rows = next(s for s in env["securities"] if s["identity"]["listing_code"] == "600000")
+    assert len(rows["actions"]) == 1
+
+
+def test_r7_same_date_distinct_version_conflict_isolated():
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _r7_sse_security(days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    req = _r7_req(
+        sec,
+        [_r5_event(ex, cash="0.42")],
+        [
+            _r5_action("sh.600000", ex, cash="0.42", known_at=known),
+            _r5_action("sh.600000", ex, cash="0.52", known_at=known),
+        ],
+    )
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r7_event_identity_mismatch_isolated():
+    # The projected action row names a different security_id -> per-security
+    # isolation, not a silent same-code match.
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _r7_sse_security(days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    bad = _r5_action("sh.600000", ex, cash="0.42", known_at=known)
+    bad["security_id"] = "security-other"
+    req = _r7_req(sec, [_r5_event(ex, cash="0.42")], [bad])
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def _r7_artifacts(coverage_id, register_row, **row):
+    return [{"coverage_id": coverage_id, "rows": [dict({"register_row": register_row}, **row)]}]
+
+
+def test_r7_bound_artifact_admits_matching_event():
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _security("600000", days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    ev = _r5_event(ex, cash="0.42")
+    req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.42", known_at=known)])
+    cid = req["action_coverage"]["registers"][0]["coverage_id"]
+    req["action_coverage"]["verified_artifacts"] = _r7_artifacts(
+        cid, 302, implementation_sha256="a" * 64, notice="r5"
+    )
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 0
+
+
+def test_r7_bound_artifact_forged_implementation_isolated():
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _security("600000", days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    ev = _r5_event(ex, cash="0.42")
+    ev["implementation_sha256"] = "f" * 64
+    req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.42", known_at=known)])
+    cid = req["action_coverage"]["registers"][0]["coverage_id"]
+    req["action_coverage"]["verified_artifacts"] = _r7_artifacts(
+        cid, 302, implementation_sha256="a" * 64, notice="r5"
+    )
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r7_bound_artifact_wrong_register_row_isolated():
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _security("600000", days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    ev = _r5_event(ex, cash="0.42")
+    ev["register_row"] = 999
+    req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.42", known_at=known)])
+    cid = req["action_coverage"]["registers"][0]["coverage_id"]
+    req["action_coverage"]["verified_artifacts"] = _r7_artifacts(
+        cid, 302, implementation_sha256="a" * 64, notice="r5"
+    )
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r7_malformed_event_date_isolated():
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    sec = _security("600000", days)
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    ev = _r5_event("not-a-date", cash="0.42")
+    req = _r7_req(sec, [ev], [_r5_action("600000", ex, cash="0.42", known_at=known)])
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+
+
+def test_r7_neighbour_retained_when_one_isolated():
+    days = tuple(d for d in SESSION_DAYS if d <= T1)
+    good = _security("600001", days)
+    bad = _r7_sse_security(days)
+    bad["identity"]["security_id"] = "security-600000"
+    ex = _returns_window()[25]
+    known = (date.fromisoformat(ex) - timedelta(days=3)).isoformat()
+    req = _request(market_dates=(T1,), coverage="verified", securities=[good, bad])
+    for ev in req["action_coverage"]["window_evidence"]:
+        if ev["purpose"] == "returns_61_session" and ev["security_code"] == "600000":
+            ev["event_state"] = "verified_event"
+            ev["events"] = [_r5_event(ex, cash="0.42")]
+    bad["actions"] = [_r5_action("sz.600000", ex, cash="0.42", known_at=known)]
+    req["listing_rows"].append(_listing("security-600001"))
+    request = load_replay_request(req)
+    _, _, window_info, _ = build_replay_envelope(request, T1)
+    assert window_info["coverage_isolated"] == 1
+    assert window_info["delivered"]["600001"]["entry_eligible"] is True
+    assert window_info["delivered"]["600000"]["entry_eligible"] is False

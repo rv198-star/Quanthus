@@ -151,14 +151,30 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
         or source_closure.get("coverage_exclusions")
         or ()
     )
-    excluded = set(
-        receipt.get("excluded_security_codes")
-        or source_closure.get("exclusions")
-        or ()
-    )
+    # Project the security key from each exclusion entry BEFORE dedup -
+    # source_closure.exclusions is a list of objects; set() on the raw
+    # dicts raises TypeError (unhashable).  Strings and mappings both map
+    # to their code so an empty-737 day with per-security exclusions
+    # still resolves.
+    def _code_of(entry: Any) -> str | None:
+        if isinstance(entry, str):
+            return entry
+        if isinstance(entry, Mapping):
+            v = entry.get("security_code") or entry.get("listing_code")
+            return str(v) if v else None
+        return None
+
     excluded_codes = {
-        str(e.get("security_code")) for e in excluded if isinstance(e, Mapping) and e.get("security_code")
-    } | {str(x) for x in excluded if isinstance(x, str)}
+        c
+        for c in (
+            _code_of(e)
+            for e in (
+                list(receipt.get("excluded_security_codes") or ())
+                + list(source_closure.get("exclusions") or ())
+            )
+        )
+        if c
+    }
 
     evaluated = set(
         seam.get("evaluated_universe")
@@ -172,6 +188,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
         if isinstance(h, Mapping) and h.get("security_code")
     }
 
+    denominator_known = bool(delivered)
     if delivered:
         pool = sorted(delivered.keys())
     else:
@@ -288,6 +305,43 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
     evaluated_count = sum(1 for r in rows if r["evaluated"])
     pending = [r for r in rows if r["state"] == "pending"]
     note_parts = []
+    if not denominator_known:
+        # No authoritative delivered map: the pool size is unknown, not
+        # the number of per-security receipts.  Show the actual state -
+        # blocked when the day carried a block, else coverage-pending -
+        # while the per-security rows stay readable as evidence.
+        day_block = receipt.get("day_block") or evaluation_receipt.get("day_block")
+        block_reason = None
+        if isinstance(day_block, Mapping):
+            block_reason = day_block.get("reason") or day_block.get("detail")
+        state_label = (
+            "已阻断" if block_reason else "覆盖待齐"
+        )
+        note_parts.insert(
+            0,
+            state_label
+            + ("：" + str(_cn_reason(block_reason) or block_reason) if block_reason else "")
+            + "，策略池分母待同日权威回执",
+        )
+        return {
+            "schema_version": "p12.replay.coverage-display.v1",
+            "pool_count": None,
+            "evaluated_count": evaluated_count,
+            "pending_count": len(pending),
+            "denominator_known": False,
+            "day_block": day_block,
+            "securities": rows,
+            "note": "；".join(note_parts),
+            "note_text": (
+                "本日可评估 "
+                + str(evaluated_count)
+                + " 只 / "
+                + state_label
+                + "（策略池分母待同日权威回执）"
+                + ("，" + "；".join(note_parts[1:]) if len(note_parts) > 1 else "")
+            ),
+            "as_observed": receipt.get("as_observed"),
+        }
     if pending:
         note_parts.append(
             "其余 " + str(len(pending)) + " 只待分红送股数据核清或输入未交付"

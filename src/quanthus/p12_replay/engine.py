@@ -1340,34 +1340,81 @@ class ReplayEngine:
         return pool_only_block(len(pool), delivered_codes=pool)
 
     def _day_replay_receipt(self) -> dict | None:
-        """The same-day p11.paper-replay-day.v1 receipt, when the runner
-        persisted it for this T.  Developer-1 writes the E1 replay's day
-        receipt next to the run records; the display binds that exact
-        file, never a rebuilt summary."""
+        """The same-day ``p11.paper-replay-day.v1`` receipt bound to THIS run.
+
+        The page and E1 read the same current run the store resolved for
+        this date (``latest_run_for_date``).  When that run records a
+        ``p11_replay_day_receipt_ref`` it binds an independently-written
+        receipt file - relative path, SHA256 and scenario identity fixed
+        by run_id - and the display reads ONLY that file after checking
+        its trade date and scenario match this run.  A date-named file is
+        never picked up on its own: a receipt bound to another date,
+        scenario or run is refused rather than read as this day's."""
+        import hashlib as _hashlib
         import json as _json
 
-        state = self.state_dir
-        day = self.current_day.isoformat()
-        candidates = [
-            state / "replay-day-receipts" / f"{day}.json",
-            state / "daily-runs" / f"{day}.replay-day.json",
-            state / f"replay-day-{day}.json",
-        ]
-        for path in candidates:
+        run = self._run_receipt()
+        if not isinstance(run, dict):
+            return None
+        ref = run.get("p11_replay_day_receipt_ref")
+        # The run may carry the bound receipt inline (embedded doc) or as a
+        # reference to an independently-written file.
+        if isinstance(ref, dict) and ref.get("schema_version") == "p11.paper-replay-day.v1":
+            doc = ref
+        elif isinstance(ref, dict) and ref.get("path"):
+            rel = str(ref["path"])
+            path = (self.state_dir / rel).resolve()
+            # The reference must stay inside the replay state dir - never
+            # follow an absolute or ../ escape to an unrelated file.
             try:
-                if not path.is_file():
-                    continue
+                path.relative_to(self.state_dir.resolve())
+            except ValueError:
+                return None
+            if not path.is_file():
+                return None
+            try:
                 doc = _json.loads(path.read_text())
             except (OSError, _json.JSONDecodeError):
-                continue
-            if not isinstance(doc, dict):
-                continue
-            schema = doc.get("schema_version") or doc.get("schema")
-            if schema == "p11.paper-replay-day.v1" or (
-                "seam" in doc or "delivered" in doc
+                return None
+            expected_sha = ref.get("sha256") or ref.get("file_sha256")
+            if expected_sha:
+                actual = "sha256:" + _hashlib.sha256(
+                    path.read_bytes()
+                ).hexdigest()
+                if str(expected_sha) != actual:
+                    return None
+        else:
+            return None
+        if not isinstance(doc, dict):
+            return None
+        schema = doc.get("schema_version") or doc.get("schema")
+        if schema != "p11.paper-replay-day.v1":
+            return None
+        # Bind the receipt to THIS run: trade date and scenario must match
+        # the day the page is showing, and the run/scenario identity the
+        # reference declared.
+        day = self.current_day.isoformat()
+        if str(doc.get("market_date")) != day:
+            return None
+        run_scenario = (
+            run.get("scenario_id")
+            or (run.get("source_closure") or {}).get("scenario_id")
+        )
+        if isinstance(ref, dict):
+            declared = ref.get("scenario_id")
+            if declared and run_scenario and str(declared) != str(run_scenario):
+                return None
+            declared_run = ref.get("run_id")
+            if declared_run and run.get("run_id") and str(declared_run) != str(
+                run.get("run_id")
             ):
-                return doc
-        return None
+                return None
+            doc_scenario = doc.get("scenario_id")
+            if doc_scenario and run_scenario and str(doc_scenario) != str(
+                run_scenario
+            ):
+                return None
+        return doc
 
     def _run_receipt(self) -> dict | None:
         """The persisted P12 run dict for this day (carries source_closure

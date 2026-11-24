@@ -794,3 +794,119 @@ class TestR5ExpireAndSkip:
         recs = eng.records_view()
         assert {"plan_id":"p1","status":"SKIPPED"} in recs["plans"]
         assert recs["skips"][0]["plan_id"] == "p1"
+
+
+class TestCoveragePrecheckRound2:
+    '''R5 覆盖第二轮预检: real-shape exclusions, sidecar bound to the
+    current run, and the missing authoritative denominator.'''
+
+    def _receipt(self):
+        return {
+            "schema_version": "p11.paper-replay-day.v1",
+            "market_date": "2026-10-08",
+            "scenario_id": "scn-1",
+            "delivered": {
+                "600000": {"entry_eligible": True},
+                "000002": {"entry_eligible": True},
+            },
+            "seam": {"evaluated_universe": ["600000", "000002"],
+                      "decisions": [], "excluded": []},
+            "source_closure": {
+                "held_decisions": [],
+                "history_receipts": [],
+                # Real shape: exclusions are OBJECTS, not bare strings.
+                "exclusions": [
+                    {"security_code": "300999", "reason": "ex"},
+                    {"security_code": "300998", "reason": "ex2"},
+                ],
+            },
+            "excluded_security_codes": [],
+            "coverage_exclusions": [],
+        }
+
+    def test_object_exclusions_projected_no_typeerror(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+        block = coverage_block(self._receipt())
+        # Empty #737 + per-security object exclusions -> no TypeError,
+        # both counted into the day's exclusion note.
+        assert block["pool_count"] == 2
+        assert "当日排除 2 只" in block["note_text"]
+
+    def test_missing_denominator_reports_state_not_fake_pool(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+        r = self._receipt()
+        del r["delivered"]
+        # A single history_receipt must NOT read as "策略池 1 只".
+        r["source_closure"]["history_receipts"] = [
+            {"security_code": "600000",
+             "gates": {"events": {"reason": "no qualified event"}}},
+        ]
+        block = coverage_block(r)
+        assert block["pool_count"] is None
+        assert block["denominator_known"] is False
+        assert "分母" in block["note_text"]
+        # per-security evidence still readable
+        assert block["securities"]
+
+    def test_denominator_missing_with_day_block(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+        r = self._receipt()
+        del r["delivered"]
+        r["day_block"] = {"reason": "history_gate_unsatisfied",
+                          "scope": "whole_day"}
+        r["seam"]["evaluated_universe"] = []
+        block = coverage_block(r)
+        assert block["pool_count"] is None
+        assert "已阻断" in block["note_text"]
+
+    def test_sidecar_bound_to_current_run(self, tmp_path):
+        from datetime import date
+        import json, hashlib
+        from quanthus.p12_replay.engine import ReplayEngine
+        from quanthus.p12_replay.replay_product import ReplayInputSpec
+        from quanthus.p12_daily.rule_runner import SyntheticRuleRunner
+
+        sessions = [date(2026,10,8), date(2026,10,9)]
+        spec = ReplayInputSpec(history={}, corporate_actions={}, volume={},
+                               knowledge_cutoff=None, completed_at=None)
+        state = tmp_path / "st"
+        eng = ReplayEngine(
+            state_dir=state, sessions=sessions, bars_by_day={},
+            runner=SyntheticRuleRunner(candidates=()), spec=spec,
+            base_manifest_path=tmp_path/"m.json",
+            base_manifest_sha256="sha256:"+"0"*64,
+            app_builder=lambda **kw: None)
+        # A real sidecar for 10-08 bound to THIS run; another-date file
+        # planted at a date-matching path must NOT be picked up on its own.
+        day = "2026-10-08"
+        real = self._receipt()
+        real_path = state / "receipts" / "run-1.json"
+        real_path.parent.mkdir(parents=True, exist_ok=True)
+        real_path.write_text(json.dumps(real))
+        real_sha = "sha256:" + hashlib.sha256(real_path.read_bytes()).hexdigest()
+        other = self._receipt(); other["market_date"] = "2026-10-09"
+        # date-named path that would have been wrongly picked up before
+        (state/"replay-day-receipts").mkdir(exist_ok=True)
+        (state/"replay-day-receipts"/f"{day}.json").write_text(json.dumps(other))
+
+        class _Store:
+            def latest_run_for_date(self, d):
+                return {"run_id":"run-1","scenario_id":"scn-1",
+                        "market_date": day,
+                        "p11_replay_day_receipt_ref": {
+                            "path": "receipts/run-1.json",
+                            "sha256": real_sha,
+                            "scenario_id": "scn-1",
+                            "run_id": "run-1"}}
+        eng._store = _Store()
+        doc = eng._day_replay_receipt()
+        assert doc is not None and doc["market_date"] == day
+        # Tampered scenario in ref -> refused, not silently read.
+        class _Store2(_Store):
+            def latest_run_for_date(self, d):
+                r = super().latest_run_for_date(d)
+                r["p11_replay_day_receipt_ref"] = dict(
+                    r["p11_replay_day_receipt_ref"], scenario_id="scn-OTHER")
+                return r
+        eng._store = _Store2()
+        assert eng._day_replay_receipt() is None

@@ -31,7 +31,6 @@ from quanthus.product_daily.recommendation.runtime_identity import (
     consumer_identity_v2,
     resolve_pinned_v2_loader,
 )
-from quanthus.shared.fact_contracts import digest as _unused_digest  # noqa: F401
 from tests.unit.test_product_daily_contract_v2 import (
     _formal_reduce_decision,
     _held,
@@ -135,18 +134,24 @@ def test_pinned_loader_rejects_missing_schema_marker(pinned_checkout, monkeypatc
     package = _reduce_package()
     raw = _v2_wire(package)
     del raw["decision_set_schema"]
-    with pytest.raises(Exception, match="marker is absent"):
+    with pytest.raises(Exception, match="without decision_set_schema"):
         loader(raw)
 
 
-def test_pinned_loader_rejects_mode_mismatch_on_wire(pinned_checkout, monkeypatch):
+def test_pinned_loader_binds_mode_from_binding_not_wire(pinned_checkout, monkeypatch):
+    """The pinned loader trusts only the caller-declared mode; a wire mode is a
+    claim, never the admission.  The returned object's mode is the binding's
+    simulation admission - P11 packages never emit a wire mode field."""
     monkeypatch.setenv("QUANTHUS_P12_CONSUMER_ROOT", str(pinned_checkout))
     loader = resolve_pinned_v2_loader(ROOT)
     package = _reduce_package()
     raw = _v2_wire(package)
-    raw["mode"] = "real"  # a wire-mode that disagrees with the declared admission
-    with pytest.raises(Exception, match="cannot serve mode"):
-        loader(raw)
+    validated, _ = loader(raw)
+    assert validated.mode == "simulation"
+    assert validated.synthetic is False
+    # The produced wire never carries a mode field - the pinned binding's mode
+    # is the only admission source.
+    assert "mode" not in raw
 
 
 def test_pinned_loader_refuses_byte_drift(tmp_path, monkeypatch):

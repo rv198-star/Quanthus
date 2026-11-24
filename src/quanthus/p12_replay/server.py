@@ -142,7 +142,7 @@ tabs{display:flex;gap:0;margin-bottom:0}
 <footer>独立回放实例 · 与 8791/8790 完全隔离 · 合成规则驱动 · 成交按真实日线开盘价判定 · 回放证据在引擎日志与记录页可核</footer>
 <script>
 let S=null;
-async function api(p,b){const t=sessionStorage.getItem('replay-token');const r=await fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(t||'')},body:b?JSON.stringify(b):undefined});if(r.status===401){sessionStorage.removeItem('replay-token');location.reload();return{}}return r.json()}
+async function api(p,b){const t=sessionStorage.getItem('replay-token');const m=b===undefined?'GET':'POST';const r=await fetch(p,{method:m,headers:{'Content-Type':'application/json','Authorization':'Bearer '+(t||'')},body:b===undefined?undefined:JSON.stringify(b)});if(r.status===401){sessionStorage.removeItem('replay-token');location.reload();return{}}if(!r.ok){let e={status:'http_'+r.status};try{e=await r.json()}catch(_){e.error='HTTP '+r.status}return e}return r.json()}
 function fmt(x){return x==null?'—':x}
 function flash(t){const f=document.getElementById('flash');f.textContent=t;f.style.opacity=1;setTimeout(()=>f.style.opacity=0,2600)}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
@@ -191,10 +191,10 @@ async function refresh(){
 async function act(k,id){const r=await api('/api/'+k,{plan_id:id});flash((k==='confirm'?'确认 ':'跳过 ')+id+' → '+(r.status||r.plan_id||'ok'));refresh()}
 async function loadReview(){const R=await api('/api/review');const adv=R.advice||[];let h='<h3>'+(R.market_date||'')+' 当日回顾</h3>';if(!adv.length&&!((R.fills_today||[]).length)){h+='<p class=empty>当日无建议或尚未运行当晚任务。</p>'}else{h+='<table><tr><th>建议</th><th>理由</th><th>处理</th><th>成交</th></tr>';for(const a of adv){const fl=(a.fills||[]).map(f=>esc(f.side)+' '+esc(f.security_code)+' ×'+esc(f.quantity)+' @'+esc(f.price)).join('<br>')||'—';h+='<tr><td><b>'+esc(a.security_code)+'</b> '+esc(a.action_label)+'</td><td>'+((a.reason_lines||[]).map(esc).join('；')||'—')+'</td><td>'+esc(a.owner_action)+'</td><td>'+fl+'</td></tr>'}h+='</table>';const acc=R.account||{};h+='<div class=note style="margin-top:8px">现金 '+fmt(acc.cash)+' · 持仓 '+((acc.positions||[]).map(p=>esc(p.security_code)+'×'+esc(p.quantity)).join('，')||'无')+' · 对账 '+(acc.rebuild_matches?'通过':'—')+'</div>'}
 h+='<div class=disc>'+esc(R.note||'')+'</div>';document.getElementById('review').innerHTML=h}
-document.getElementById('runbtn').onclick=async()=>{const r=await api('/api/run-day');flash('运行 '+((r.status)||'完成'));refresh()};
-document.getElementById('adv').onclick=async()=>{const r=await api('/api/advance');flash(r.finished?'回放结束':'进入 '+(r.market_date||''));refresh()};
-document.getElementById('autobtn').onclick=async()=>{const d=document.getElementById('auto-date').value;if(!d){flash('先选目标日期');return}flash('自动执行到 '+d+' …');const r=await api('/api/auto',{target:d});flash('已推进 '+r.processed_days+' 天，停在 '+(r.stopped_at||''));refresh()};
-document.getElementById('reset').onclick=async()=>{if(confirm('清空回放状态并回到第一个交易日？')){await api('/api/reset');flash('已重置');location.reload()}};
+document.getElementById('runbtn').onclick=async()=>{const r=await api('/api/run-day',{});flash('运行 '+((r.status)||'完成'));refresh()};
+document.getElementById('adv').onclick=async()=>{const r=await api('/api/advance',{});flash(r.finished?'回放结束':'进入 '+(r.market_date||''));refresh()};
+document.getElementById('autobtn').onclick=async()=>{const d=document.getElementById('auto-date').value;if(!d){flash('先选目标日期');return}flash('自动执行到 '+d+' …');const r=await api('/api/auto',{target:d});flash(r.error?('失败：'+r.error):(r.status&&r.status!=='filled'&&r.stopped_at===undefined?('返回 '+r.status):'已推进 '+(r.processed_days!=null?r.processed_days:0)+' 天，停在 '+(r.stopped_at||'')));refresh()};
+document.getElementById('reset').onclick=async()=>{if(confirm('清空回放状态并回到第一个交易日？')){await api('/api/reset',{});flash('已重置');location.reload()}};
 async function loadLog(){const t=await fetch('/api/log').then(r=>r.text());document.getElementById('log').textContent=t||'—'}
 refresh();loadLog();setInterval(()=>{refresh();loadLog()},5000);
 </script></body></html>

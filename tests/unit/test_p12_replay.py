@@ -212,3 +212,137 @@ class TestCnPresentation:
         assert lines[0] == "开盘价高于价格上限时不追买"
         assert "requires:PREOPEN" not in lines[1]
         assert "开盘前事实" in lines[1]
+
+
+class TestFillDay:
+    """Review R2 item 1: a T-evening plan fills at the T+1 OPEN, never T's."""
+
+    def _engine(self, tmp_path, sessions, bars_by_day):
+        from quanthus.p12_replay.engine import ReplayEngine
+        from quanthus.p12_replay.replay_product import ReplayInputSpec
+        from quanthus.p12_replay.replay_quotes import DayBar
+        from quanthus.p12_daily.rule_runner import SyntheticRuleRunner
+        from pathlib import Path
+
+        class _StubApp:
+            def __init__(self):
+                self.observations = []
+                self.reports = []
+
+            def workbench(self, scope):
+                class V:
+                    pass
+                return V()
+
+            def paper_submit_order_observation(self, obs, **kw):
+                self.observations.append((obs, kw))
+                return obs
+
+            def paper_submit_report(self, report):
+                self.reports.append(report)
+
+                class R:
+                    status = "POSTED"
+                return R()
+
+            def rebuild_matches(self, scope):
+                return True
+
+            def paper_projection(self):
+                class P:
+                    cash = 0
+                    positions = ()
+                return P()
+
+            def paper_history(self):
+                class H:
+                    orders = ()
+                    reports = ()
+                return H()
+
+            @property
+            def scope(self):
+                return "synthetic"
+
+        app = _StubApp()
+        spec = ReplayInputSpec(
+            history={"event_window_sessions": {"observed_sessions": 0}},
+            corporate_actions={},
+            volume={},
+            knowledge_cutoff=None,
+            completed_at=None,
+        )
+        eng = ReplayEngine(
+            state_dir=tmp_path / "st",
+            sessions=sessions,
+            bars_by_day=bars_by_day,
+            runner=SyntheticRuleRunner(candidates=()),
+            spec=spec,
+            base_manifest_path=tmp_path / "m.json",
+            base_manifest_sha256="sha256:" + "0" * 64,
+            app_builder=lambda **kw: app,
+        )
+        return eng, app
+
+    def _patch_plans(self, eng, plan):
+        eng._open_plans = lambda: [plan]
+
+    def test_confirm_uses_next_session_open(self, tmp_path):
+        from datetime import date
+        from decimal import Decimal
+        from quanthus.p12_replay.replay_quotes import DayBar
+
+        sessions = [date(2026, 10, 19), date(2026, 10, 20), date(2026, 10, 21)]
+        bars_by_day = {
+            date(2026, 10, 19): {
+                "600000": DayBar(security_code="600000", trade_date=date(2026, 10, 19),
+                                 open=Decimal("9.72"), high=Decimal("9.9"),
+                                 low=Decimal("9.6"), close=Decimal("9.8"),
+                                 volume=1, amount=Decimal("1"))
+            },
+            date(2026, 10, 20): {
+                "600000": DayBar(security_code="600000", trade_date=date(2026, 10, 20),
+                                 open=Decimal("9.79"), high=Decimal("9.9"),
+                                 low=Decimal("9.7"), close=Decimal("9.85"),
+                                 volume=1, amount=Decimal("1"))
+            },
+        }
+        eng, app = self._engine(tmp_path, sessions, bars_by_day)
+        self._patch_plans(eng, {
+            "plan_id": "p1", "security_code": "600000", "action_code": "BUY",
+            "side": "buy", "target_qty": 1200, "delta_qty": 1200, "price_cap": "10.0",
+        })
+        out = eng.confirm("p1")
+        assert out["status"] == "filled"
+        # filled at the T+1 open (9.79), not the publish day's open (9.72)
+        assert out["fill_price"] == "9.79"
+        assert out["session_open"] == "9.79"
+        assert out["fill_day"] == "2026-10-20"
+        assert out["publish_day"] == "2026-10-19"
+        # the fill posts at the T+1 09:30 open
+        assert app.reports[0].occurred_at.isoformat() == "2026-10-20T09:30:00+08:00"
+
+    def test_confirm_is_idempotent(self, tmp_path):
+        from datetime import date
+        from decimal import Decimal
+        from quanthus.p12_replay.replay_quotes import DayBar
+
+        sessions = [date(2026, 10, 19), date(2026, 10, 20)]
+        bars_by_day = {
+            d: {"600000": DayBar(security_code="600000", trade_date=d,
+                                 open=Decimal("9.7"), high=Decimal("9.9"),
+                                 low=Decimal("9.6"), close=Decimal("9.8"),
+                                 volume=1, amount=Decimal("1"))}
+            for d in sessions
+        }
+        eng, app = self._engine(tmp_path, sessions, bars_by_day)
+        plan = {"plan_id": "p1", "security_code": "600000", "action_code": "BUY",
+                "side": "buy", "target_qty": 100, "delta_qty": 100, "price_cap": "10.0"}
+        self._patch_plans(eng, plan)
+        first = eng.confirm("p1")
+        # plan no longer open -> without the record a repeat would PLAN_NOT_FOUND
+        self._patch_plans(eng, plan)  # still listed; the record must short-circuit
+        second = eng.confirm("p1")
+        assert second.get("idempotent_replay") is True
+        assert second["fill_price"] == first["fill_price"]
+        assert len(app.reports) == 1  # one fill only, never double-posted

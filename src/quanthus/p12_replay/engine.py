@@ -104,6 +104,9 @@ class ReplayEngine:
     # windows, UNKNOWN coverage and the 191/4173 audit keys the rule
     # reads.  None keeps the bar-only raw history.
     window_map: Any = None
+    # #737 pre-read exclusion receipt: {config_sha256, filtered_count,
+    # filtered:[{security,date}]} - recorded on the run/day receipt.
+    exclusion_receipt: dict | None = None
 
     # runtime state
     day_index: int = 0
@@ -111,6 +114,10 @@ class ReplayEngine:
     _app: Any = None
     _paper: Any = None
     _order_seq: int = 0
+    # persisted confirm/skip outcome records (plan_id -> outcome dict);
+    # runtime state, not a ctor arg - loaded in __post_init__.
+    _confirm_records: dict = field(default=None, repr=False)
+    _skip_records: dict = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         self.state_dir = Path(self.state_dir)
@@ -124,6 +131,11 @@ class ReplayEngine:
             # slot - the account baseline's as_of must precede every fact
             # the replay will post (confirm fills land at session open).
             self.replay_now = _sh_now(self.sessions[0], time(9, 0))
+        if self._confirm_records is None:
+            self._confirm_records = self._load_records("confirm")
+        if self._skip_records is None:
+            self._skip_records = self._load_records("skip")
+        self._restore_position()
 
     # ---- clock -------------------------------------------------------------------
     def now(self) -> datetime:
@@ -183,6 +195,11 @@ class ReplayEngine:
                     "listing age"
                 ),
             },
+            # Three clocks kept separate on the member: the source's own
+            # knowledge_from, the member sha256, the physical read moment
+            # and the logical_clock the replay assigned this run.  The
+            # read clock is recorded once per materialization, never
+            # merged into the source knowledge clock.
             "source_members": [
                 {
                     "member": "dwd_security_bar/interval_size=1d",
@@ -191,6 +208,11 @@ class ReplayEngine:
                         len(self.bars_by_day.get(s) or {})
                         for s in window_sessions
                     ),
+                    "sha256": self.base_manifest_sha256,
+                    "knowledge_from": "2026-10-31T16:00:00+00:00",
+                    "physical_read_at": datetime.now(EXCHANGE_TZ).isoformat(),
+                    "logical_clock": self.now().isoformat(),
+                    "as_observed": "ENGINEERING_REPLAY_AS_OBSERVED",
                 }
             ],
         }
@@ -273,6 +295,49 @@ class ReplayEngine:
                 else {}
             ),
         )
+
+    # ---- persistence ---------------------------------------------------------------
+    def _records_path(self, kind: str) -> Path:
+        return self.state_dir / f"replay-{kind}-records.json"
+
+    def _load_records(self, kind: str) -> dict:
+        path = self._records_path(kind)
+        if path.is_file():
+            try:
+                return json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                return {}
+        return {}
+
+    def _save_records(self, kind: str) -> None:
+        path = self._records_path(kind)
+        data = self._confirm_records if kind == "confirm" else self._skip_records
+        path.write_text(json.dumps(data, ensure_ascii=False, sort_keys=True, indent=1))
+
+    def _restore_position(self) -> None:
+        """Restore day_index + clock from the last logged advance/confirm.
+
+        A restart re-opens on the highest day_index seen in the replay
+        log (date, clock, orders and balance all come back with it - the
+        ledger is the source of truth for account facts; the log only
+        re-seeds the pointer)."""
+        log = self.state_dir / REPLAY_LOG
+        if not log.is_file():
+            return
+        last_index = None
+        try:
+            for line in log.read_text().splitlines():
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(rec.get("day_index"), int):
+                    last_index = rec["day_index"]
+        except OSError:
+            return
+        if last_index is not None and 0 <= last_index < len(self.sessions):
+            self.day_index = last_index
+            self.set_now(_sh_now(self.sessions[last_index], time(9, 25)))
 
     # ---- steps --------------------------------------------------------------------
     def _log(self, event: str, **fields) -> None:
@@ -388,6 +453,17 @@ class ReplayEngine:
         so rebuild/reconcile stays the real invariant.  A reject
         (unfunded bucket, T+1, bad lot, preopen fact) returns the typed
         reason verbatim - it is evidence, not a swallowed error."""
+        # Idempotent: a repeated confirm reuses the original receipt - the
+        # ledger never double-posts a fill and a restart replays the record.
+        prior = self._confirm_records.get(plan_id)
+        if prior is not None:
+            return dict(prior, idempotent_replay=True)
+
+        def _ret(outcome):
+            self._confirm_records[plan_id] = outcome
+            self._save_records("confirm")
+            return _ret(outcome)
+
         app = self._build_app()
         plan = next(
             (p for p in self._open_plans() if p["plan_id"] == plan_id), None
@@ -396,17 +472,35 @@ class ReplayEngine:
             return {"plan_id": plan_id, "status": "rejected", "reason": "PLAN_NOT_FOUND"}
         side = str(plan.get("side") or ("buy" if plan["action_code"] == "BUY" else "sell"))
         code = plan["security_code"]
-        bar = (self.bars_by_day.get(self.current_day) or {}).get(code)
+        # The advice is published on session T evening; the earliest it can
+        # fill is the T+1 session at 09:30 against that session's real open
+        # (review R2 item 1).  Never fill on the publish day's own open.
+        publish_day = self.current_day
+        if self.day_index + 1 >= len(self.sessions):
+            outcome = {
+                "plan_id": plan_id,
+                "status": "rejected",
+                "reason": "PENDING_NO_EXECUTION_DAY",
+                "detail": (
+                    f"advice published on {publish_day.isoformat()} has no "
+                    "next session to fill on"
+                ),
+            }
+            self._log("confirm", market_date=publish_day.isoformat(),
+                      plan_id=plan_id, outcome=outcome)
+            return _ret(outcome)
+        fill_day = self.sessions[self.day_index + 1]
+        bar = (self.bars_by_day.get(fill_day) or {}).get(code)
         if bar is None:
             outcome = {
                 "plan_id": plan_id,
                 "status": "rejected",
                 "reason": "QUOTE_UNAVAILABLE",
-                "detail": f"no 1d bar for {code} on {self.current_day.isoformat()}",
+                "detail": f"no 1d bar for {code} on {fill_day.isoformat()}",
             }
-            self._log("confirm", market_date=self.current_day.isoformat(),
+            self._log("confirm", market_date=fill_day.isoformat(),
                       plan_id=plan_id, outcome=outcome)
-            return outcome
+            return _ret(outcome)
         from quanthus.p12_replay.replay_quotes import match_limit
 
         fill_price = match_limit(side, Decimal(str(plan["price_cap"])), bar)
@@ -417,10 +511,17 @@ class ReplayEngine:
                 "reason": "OPEN_BEYOND_LIMIT",
                 "session_open": str(bar.open),
                 "limit": str(plan["price_cap"]),
+                "fill_day": fill_day.isoformat(),
             }
-            self._log("confirm", market_date=self.current_day.isoformat(),
+            self._log("confirm", market_date=fill_day.isoformat(),
                       plan_id=plan_id, outcome=outcome)
-            return outcome
+            return _ret(outcome)
+        # Earliest fill: the T+1 open at 09:30.  The order is accepted at
+        # the publish-evening decision clock (self.now); the fill itself is
+        # stamped at the T+1 open (fill_clock) - the two instants stay
+        # separate, never merged, and the replay clock is not pre-advanced.
+        fill_clock = _sh_now(fill_day, time(9, 30))
+        decision_clock = self.now()
         # Register the accepted order observation first - the ledger
         # refuses a fill that references an unknown order
         # (UNKNOWN_ORDER_EXPOSURE), the same contract the paper desk's
@@ -436,7 +537,7 @@ class ReplayEngine:
                     observation_id=f"{order_id}:accepted",
                     order_id=order_id,
                     status="in_progress",
-                    observed_at=self.now(),
+                    observed_at=fill_clock,
                     source_id="p12-replay-open-match",
                     source_sequence=f"{order_id}:accepted",
                     order_revision=1,
@@ -454,12 +555,12 @@ class ReplayEngine:
                 "reason": getattr(exc, "reason_code", type(exc).__name__),
                 "detail": "order observation refused: " + str(exc),
             }
-            self._log("confirm", market_date=self.current_day.isoformat(),
+            self._log("confirm", market_date=fill_day.isoformat(),
                       plan_id=plan_id, outcome=outcome)
-            return outcome
+            return _ret(outcome)
         # Post the fill into the real ledger as a simulated execution
         # report; suggestion_id links the fill back to this plan.
-        report_id = f"replay-fill-{self.current_day.strftime('%Y%m%d')}-{self._order_seq:04d}"
+        report_id = f"replay-fill-{fill_day.strftime('%Y%m%d')}-{self._order_seq:04d}"
         from quanthus.capabilities.execution import ExecutionReport
 
         report = ExecutionReport(
@@ -469,10 +570,10 @@ class ReplayEngine:
             quantity=qty,
             price=fill_price,
             confirmed_fee=Decimal("0.00"),
-            occurred_at=self.now(),
+            occurred_at=fill_clock,
             source_id="p12-replay-open-match",
             source_sequence=(
-                f"{plan_id}:open:{self.current_day.isoformat()}"
+                f"{plan_id}:open:{fill_day.isoformat()}"
             ),
             intended_quantity=qty,
             intended_price_cap=Decimal(str(plan["price_cap"])),
@@ -491,7 +592,7 @@ class ReplayEngine:
                         observation_id=f"{order_id}:terminal",
                         order_id=order_id,
                         status="terminal",
-                        observed_at=self.now(),
+                        observed_at=fill_clock,
                         source_id="p12-replay-open-match",
                         source_sequence=f"{order_id}:terminal:0:{qty}",
                         final_cumulative_fill_qty=0,
@@ -513,9 +614,9 @@ class ReplayEngine:
                 "detail": str(exc),
                 "session_open": str(bar.open),
             }
-            self._log("confirm", market_date=self.current_day.isoformat(),
+            self._log("confirm", market_date=fill_day.isoformat(),
                       plan_id=plan_id, outcome=outcome)
-            return outcome
+            return _ret(outcome)
         # Close the order: fully filled, zero cancelled.
         try:
             app.paper_submit_order_observation(
@@ -523,7 +624,7 @@ class ReplayEngine:
                     observation_id=f"{order_id}:terminal",
                     order_id=order_id,
                     status="terminal",
-                    observed_at=self.now(),
+                    observed_at=fill_clock,
                     source_id="p12-replay-open-match",
                     source_sequence=f"{order_id}:terminal:{qty}:0",
                     final_cumulative_fill_qty=qty,
@@ -546,24 +647,35 @@ class ReplayEngine:
             "quantity": report.quantity,
             "report_id": report_id,
             "post_status": status,
+            "publish_day": publish_day.isoformat(),
+            "fill_day": fill_day.isoformat(),
             "engineering_replay_as_observed": True,
         }
-        self._log("confirm", market_date=self.current_day.isoformat(),
+        self._confirm_records[plan_id] = outcome
+        self._save_records("confirm")
+        self._log("confirm", market_date=fill_day.isoformat(),
                   plan_id=plan_id, outcome=outcome)
         return outcome
 
     def skip(self, plan_id: str) -> dict:
         """Skip one published plan (the append-only skip record; the plan
-        can no longer confirm)."""
+        can no longer confirm).  Idempotent: a repeated skip reuses the
+        original record."""
+        prior = self._skip_records.get(plan_id)
+        if prior is not None:
+            return dict(prior, idempotent_replay=True)
         app = self._build_app()
         record = app.skip_plan(plan_id=plan_id, occurred_at=self.now())
+        record = record if isinstance(record, dict) else {"record": str(record)}
+        self._skip_records[plan_id] = record
+        self._save_records("skip")
         self._log(
             "skip",
             market_date=self.current_day.isoformat(),
             plan_id=plan_id,
-            record=record if isinstance(record, dict) else str(record),
+            record=record,
         )
-        return record if isinstance(record, dict) else {"record": str(record)}
+        return record
 
     def advance_day(self) -> dict:
         """Close session T+1 and open the next replay day.
@@ -632,6 +744,7 @@ class ReplayEngine:
 
         return cn_state({
             "engineering_replay_as_observed": True,
+            "exclusion_receipt": self.exclusion_receipt,
             "replay": bench["replay"],
             "workbench": bench["workbench"],
             "raw_history": getattr(self, "_raw_history", None),
@@ -772,7 +885,13 @@ class ReplayEngine:
                 }
             )
             processed += 1
-            advanced = self.advance_day()
+            # Stop exactly ON the target day: process it fully, then halt
+            # before advancing so the Owner lands on target to inspect and
+            # can continue manually - never one day past it.
+            if target is not None and day >= target:
+                advanced = {"finished": False, "stopped_on_target": True}
+            else:
+                advanced = self.advance_day()
             self._log(
                 "auto_advance_step",
                 market_date=day.isoformat(),
@@ -780,10 +899,9 @@ class ReplayEngine:
                 confirmed=len([o for o in outcomes if o.get("status") == "filled"]),
                 outcomes=len(outcomes),
                 finished=advanced.get("finished"),
+                stopped_on_target=advanced.get("stopped_on_target"),
             )
-            if advanced.get("finished"):
-                break
-            if target is not None and self.current_day > target:
+            if advanced.get("stopped_on_target") or advanced.get("finished"):
                 break
         result = {
             "auto": True,

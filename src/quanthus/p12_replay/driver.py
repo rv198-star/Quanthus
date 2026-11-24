@@ -144,10 +144,11 @@ def apply_exclusion(
     bars_by_day: dict,
     exclusion,
 ) -> dict:
-    """#737 pre-read filter: drop a security's bar on an excluded
-    (security, date) pair.  In the October window the exclusion dates
-    (11-23..11-25) do not intersect, so this is a documented no-op; the
-    binding is in place for later phases and recorded on the reads."""
+    """#737 pre-read filter applied BEFORE the replay enters: drop a
+    security's bar on an excluded (security, date) pair.  Returns the
+    receipt {config_sha256, filtered_count, filtered[]} for the run/day
+    receipt - the binding is in place for later phases and the count +
+    digest are recorded even when the October window makes it a no-op."""
 
     dropped = []
     for day, bars in list(bars_by_day.items()):
@@ -155,7 +156,14 @@ def apply_exclusion(
             if is_excluded(code, day, exclusion):
                 del bars[code]
                 dropped.append({"security": code, "date": day.isoformat()})
-    return dropped
+    return {
+        "config_sha256": getattr(exclusion, "sha256", ""),
+        "config_path": str(getattr(exclusion, "path", "")),
+        "securities": sorted(getattr(exclusion, "securities", ()) or ()),
+        "dates": sorted(getattr(exclusion, "dates", ()) or ()),
+        "filtered_count": len(dropped),
+        "filtered": dropped,
+    }
 
 
 def default_spec(market_sessions: list[date], knowledge_cutoff: str | None) -> ReplayInputSpec:
@@ -173,7 +181,10 @@ def default_spec(market_sessions: list[date], knowledge_cutoff: str | None) -> R
     # satisfied because the observed sessions exceed its requirement.
     # The runner never recomputes the floors - this is input evidence,
     # honestly reported, with the replay provenance block naming it.
-    observed = max(len(market_sessions), 120)
+    # History floors report the sessions ACTUALLY read for this window -
+    # never inflated to a threshold.  observed_sessions is the real count
+    # delivered; the rule reads it, the reader never recomputes a floor.
+    observed = len(market_sessions)
     return ReplayInputSpec(
         history={
             "event_window_sessions": {"observed_sessions": observed},
@@ -188,7 +199,10 @@ def default_spec(market_sessions: list[date], knowledge_cutoff: str | None) -> R
             # stay present-and-valid (0.00 baseline, not a claim that no
             # action occurred); coverage_status + affected scope hand the
             # rule the per-security UNKNOWN set to filter.
-            "fields_complete": True,
+            # UNKNOWN coverage is NEVER presented as fields_complete=true:
+            # the per-security affected set is unbound, so completeness is
+            # unproven.  The numeric placeholders stay valid-but-not-evidence.
+            "fields_complete": False,
             "cash_dividend_per_share": "0.00",
             "bonus_share_ratio": "0.00",
             "exceptions": [],
@@ -234,6 +248,7 @@ def make_engine(
     candidates_path: Path | None,
     account_id: str = "SYN-PAPER-A",
     account_mode: str = "synthetic",
+    exclusion_receipt: dict | None = None,
     base_manifest_path: Path = BASE_MANIFEST,
     base_manifest_sha256: str = BASE_MANIFEST_SHA256,
     knowledge_cutoff: str | None = None,
@@ -271,6 +286,7 @@ def make_engine(
         runner=runner,
         runner_factory=runner_factory,
         window_map=window_map,
+        exclusion_receipt=exclusion_receipt,
         spec=default_spec(sessions, knowledge_cutoff),
         base_manifest_path=Path(base_manifest_path),
         base_manifest_sha256=base_manifest_sha256,
@@ -345,10 +361,11 @@ def main(argv=None) -> int:
         "quanthus-p10-october-action-feasibility/v1/WINDOW-AND-KEYS.json"
     )
     window_map = OctoberWindowMap.load(wk_path) if wk_path.is_file() else None
+    exclusion_receipt = None
     if window_map is not None:
-        dropped = apply_exclusion(bars_by_day, window_map.exclusion)
-        if dropped:
-            print(json.dumps({"exclusion_applied": dropped}))
+        exclusion_receipt = apply_exclusion(bars_by_day, window_map.exclusion)
+        if exclusion_receipt["filtered_count"]:
+            print(json.dumps({"exclusion_applied": exclusion_receipt}))
 
     def factory(reset: bool) -> ReplayEngine:
         return make_engine(
@@ -359,6 +376,7 @@ def main(argv=None) -> int:
             account_id=args.account,
             fixture_path=args.fixture,
             window_map=window_map,
+            exclusion_receipt=exclusion_receipt,
             reset=reset,
         )
 
@@ -366,6 +384,15 @@ def main(argv=None) -> int:
         from quanthus.p12_replay.server import serve
 
         users = {}
+        # Single shared console account (same as 8790): admin / operator.
+        # The password always comes from the environment - never a repo
+        # file, a command-line literal or a doc.  --user stays available
+        # for explicit extra accounts in a lab shell.
+        import os
+
+        admin_pw = os.environ.get("P12_REPLAY_ADMIN_PASSWORD")
+        if admin_pw:
+            users["admin"] = ("operator", admin_pw)
         for spec in args.user or ():
             parts = spec.split(":", 2)
             if len(parts) != 3 or not all(parts):

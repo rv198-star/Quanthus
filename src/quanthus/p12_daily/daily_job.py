@@ -1214,7 +1214,11 @@ def main(argv: list[str] | None = None) -> int:
         calendar_root=args.calendar_root,
     )
     print(json.dumps(receipt, ensure_ascii=False, indent=2))
-    return 0 if receipt["status"] in (STATUS_PUBLISHED, STATUS_ALREADY_PUBLISHED) else 1
+    # A blocked or precheck run is a successful execution of the fail-closed
+    # contract - the timer unit must not record it as a service failure.
+    # Only an actual FAILED receipt (a crash or a write that never
+    # completed) returns nonzero (audit r2).
+    return 0 if receipt["status"] != STATUS_FAILED else 1
 
 
 if __name__ == "__main__":

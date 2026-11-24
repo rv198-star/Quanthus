@@ -799,12 +799,21 @@ def _limits_from(sec: Mapping[str, Any], security_index: int) -> tuple[LimitFact
     return tuple(out)
 
 
-def _date_map(raw_map: Any, label: str) -> dict[date, datetime]:
+def _date_map(raw_map: Any, label: str) -> dict[date, datetime | None]:
+    """A per-session instant map: date key -> aware instant, or explicit null.
+
+    A JSON null is a DECLARED absence (the bound calendar row kept the session
+    date/is_open flag but left its native instant empty), which downstream
+    clock policy may refuse or admit as a date-context row -- it is not a
+    parse failure.  A non-null value stays strict ISO + timezone.  Only the
+    close/cutoff maps use this shape; other date maps keep their own parsers.
+    """
     if not isinstance(raw_map, dict):
         _fail("invalid_raw_history", f"{label} must be an object")
-    out: dict[date, datetime] = {}
+    out: dict[date, datetime | None] = {}
     for key, value in raw_map.items():
-        out[_isodate(key, f"{label} key")] = _isodatetime(value, f"{label}[{key}]")
+        day = _isodate(key, f"{label} key")
+        out[day] = None if value is None else _isodatetime(value, f"{label}[{key}]")
     return out
 
 
@@ -1004,6 +1013,27 @@ def raw_security_inputs_from_history(
             or position_facts is not None
             or pending_kind is not None
         )
+        # Versioned #749 role.  "calendar_source_knowledge_from" declares the
+        # row's decision coordinate is the source calendar knowledge_from; it
+        # is bound verbatim into the input closure and admitted downstream only
+        # inside the versioned as-observed replay context.  Read BEFORE the
+        # market try so an unknown role is its own named exclusion, never a
+        # mislabelled market_parse failure.
+        knowledge_clock_role = sec_o.get("knowledge_clock_role")
+        if knowledge_clock_role is not None and knowledge_clock_role != (
+            "calendar_source_knowledge_from"
+        ):
+            receipts.append(
+                {
+                    "security_code": code,
+                    "status": "excluded",
+                    "reason": (
+                        f"knowledge_clock_role: {knowledge_clock_role!r} is not a named clock role"
+                    ),
+                    "scope": "per_security",
+                }
+            )
+            continue
         sec_proof: dict[str, str] = {}
         try:
             # Always resolve equivalent-day proofs into a local sink so the
@@ -1151,6 +1181,7 @@ def raw_security_inputs_from_history(
                 limits=limits,
                 close_at_by_date=close_map,
                 knowledge_cutoff_by_date=cutoff_map,
+                knowledge_clock_role=knowledge_clock_role,
                 position_facts=position_facts,
                 prior_deterioration_sessions=prior_det,
                 held_membership=held_membership,
@@ -1344,9 +1375,7 @@ def run_daily_advice_from_history(
     # caller before entry; this only keeps the archival clocks honest.
     as_observed = kwargs.pop("as_observed", False)
     observed_sink = kwargs.pop("observed_sink", None)
-    history = load_raw_history(
-        raw_history, as_observed=as_observed, observed_sink=observed_sink
-    )
+    history = load_raw_history(raw_history, as_observed=as_observed, observed_sink=observed_sink)
     facts = kwargs.get("facts")
     policy = kwargs.get("policy")
     if facts is None or policy is None:
@@ -1395,11 +1424,35 @@ def run_daily_advice_from_history(
         if receipt.get("status") == "excluded"
     ]
     runner_exclusions = [*(adapter_exclusions), *(kwargs.pop("input_exclusions", None) or ())]
+    # The single-T numeric context is established only inside the versioned
+    # as-observed replay entry; a strict/forward/H1/M2 caller supplying it is
+    # a contract breach, never a silent widening.  Under as_observed the
+    # context is fixed (not a caller-chosen string), so no anchor or boolean
+    # substitute is accepted elsewhere.  The public raw entry admits the
+    # private OctoberReplayContext token only - this entry mints it from the
+    # verified as_observed projection, so a bare string can never reach the
+    # admission gate.
+    numeric_context = kwargs.pop("numeric_context", None)
+    if numeric_context is not None and (
+        not as_observed or numeric_context != "october_replay_as_observed"
+    ):
+        _fail(
+            "invalid_raw_history",
+            "numeric_context requires the versioned as-observed replay mode",
+        )
+    replay_token = None
+    if numeric_context is not None:
+        from quanthus.product_daily.recommendation.daily_runner import (
+            _new_october_context,
+        )
+
+        replay_token = _new_october_context(numeric_context)
     output = run_daily_advice_from_raw(
         raw=inputs,
         history_receipts=bound_receipts,
         caller_input_exclusions=runner_exclusions,
         consumption_evidence=kwargs.pop("consumption_evidence", None),
+        numeric_context=replay_token,
         **kwargs,
     )
     # The issued receipt's digest must match the closure actually carried on the

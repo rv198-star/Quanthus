@@ -212,7 +212,10 @@ def _reference_security_scan(rows: list[CandidateDailyInput]):
         card=CARD,
         source_policy=SOURCE,
     )
-    return (raw, reasons, evaluated), optimized
+    # _scan_security_series returns (raw, reasons, evaluated, verdicts); the
+    # reference compares the three-value engine output, the verdicts are an
+    # additional per-(security, date) surface asserted separately.
+    return (raw, reasons, evaluated), optimized[:3]
 
 
 def _entry_evidence(

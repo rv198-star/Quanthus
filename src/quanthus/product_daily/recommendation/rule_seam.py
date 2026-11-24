@@ -229,6 +229,7 @@ class SeamResult:
     held_decisions: tuple[HeldDecision, ...] = ()
     experts: ExpertBundle | None = None
     evaluated_universe: tuple[str, ...] = ()
+    scan_result: Any = None
 
     @property
     def entries(self) -> tuple[SeamDecision, ...]:
@@ -714,7 +715,7 @@ def evaluate_day(
         )
 
     adapter = RuleSeamAdapter(runner, resources)
-    candidates = (
+    scan_result = (
         scan_forward_candidates(
             rows,
             trading_dates=trading_dates,
@@ -723,15 +724,23 @@ def evaluate_day(
             card=card,
             split_policy=split_policy,
             source_policy=source_policy,
-        ).candidates
+        )
         if rows
-        else ()
+        else None
     )
+    candidates = scan_result.candidates if scan_result is not None else ()
     decisions: list[SeamDecision] = []
     excluded: list[dict[str, str]] = []
     source_rows: dict[tuple[str, date], list[CandidateDailyInput]] = {}
     for row in rows:
-        if row.knowledge_cutoff <= knowledge_cutoff:
+        if row.knowledge_cutoff is None:
+            # A date-context warm-up row carries no instant; it qualifies by
+            # business date -- strictly earlier than the declared decision
+            # cutoff's session day under the ordered session sequence, never
+            # a borrowed clock.
+            if row.session_date < knowledge_cutoff.date():
+                source_rows.setdefault((row.listing_code, row.session_date), []).append(row)
+        elif row.knowledge_cutoff <= knowledge_cutoff:
             source_rows.setdefault((row.listing_code, row.session_date), []).append(row)
     for candidate in candidates:
         code = candidate.listing_code
@@ -867,6 +876,7 @@ def evaluate_day(
         decisions=tuple(decisions),
         excluded=tuple(excluded),
         held_decisions=tuple(held_decisions),
+        scan_result=scan_result,
         experts=ExpertBundle.from_runner(runner),
         evaluated_universe=tuple(
             sorted({row.listing_code for row in rows} | set(held_facts_by_security or {}))
@@ -1036,13 +1046,17 @@ def _enriched_history_receipts(
     *,
     features_by_security: Mapping[str, SecurityFeatureFacts],
     seam: SeamResult,
+    signal_date: date,
+    scan_rows: Sequence[CandidateDailyInput],
 ) -> list[dict[str, Any]]:
     """Bind the ORIGINAL algorithm verdicts onto the per-security history receipts.
 
     The gate floors are not recomputed: each gate's satisfied|failed|unavailable
     comes from the real panel row (feature_ready/entry_eligible/listing_sessions)
-    and the real scan (a scanned event vs none), so a short history is a named
-    failure rather than a qualified empty.  Excluded securities keep their
+    and the real scan verdict (a sufficient 22-session window evaluated to a real
+    trigger-or-quiet verdict vs an unusable window), so a short history is a named
+    failure rather than a qualified empty - and a fully-scanned no-signal is a
+    qualified quiet day, not a blocked one.  Excluded securities keep their
     exclusion record.
     """
     if not history_receipts:
@@ -1051,6 +1065,17 @@ def _enriched_history_receipts(
     excluded_reason = {
         e.get("security_code"): e.get("reason") or e.get("member_or_field") for e in seam.excluded
     }
+    # The real scan verdicts the SAME evaluation produced, re-keyed from
+    # (security_id, signal_date) to this run's listing_code via the actual scan rows
+    # (each row carries both identities).  A receipt names the per-security T verdict
+    # from this map - never re-derived from counters and never "no candidate" ==
+    # NOT_TRIGGERED.
+    id_to_code: dict[str, str] = {row.security_id: row.listing_code for row in scan_rows}
+    scan_verdicts: dict[tuple[str, str], str] = {}
+    if seam.scan_result is not None:
+        for sec_id, sig_date, verdict in getattr(seam.scan_result, "signal_verdicts", ()):
+            resolved = id_to_code.get(sec_id, sec_id)
+            scan_verdicts[(resolved, sig_date)] = verdict
     out: list[dict[str, Any]] = []
     for raw_receipt in history_receipts:
         receipt = dict(raw_receipt)
@@ -1067,16 +1092,48 @@ def _enriched_history_receipts(
                 "reason": reason,
             }
 
+        # The events gate is the real 22-session scan window VERDICT, not the
+        # trigger outcome.  A security that produced a valid T scan row (its
+        # facts exist - the raw closure and signal row both qualified) reached
+        # a real scan evaluation: it either fired a candidate transition or
+        # evaluated NOT_TRIGGERED / a named eligibility veto / a real blocked
+        # verdict.  The verdict comes from the SAME scan's signal_verdicts for
+        # this security at T - not from reason_counts and never "no candidate"
+        # == NOT_TRIGGERED.  The window-sufficiency floor stays named in
+        # required/observed.
         event_scanned = code in decision_codes and any(
             d.event_id is not None for d in seam.decisions if d.security_code == code
         )
+        events_observed = gates.get("events", {}).get("observed")
+        events_required = gates.get("events", {}).get("required")
+        window_sufficient = (
+            isinstance(events_observed, int)
+            and isinstance(events_required, int)
+            and events_observed >= events_required
+        )
+        # Resolve this security's real scan verdict at T (receipts are keyed on
+        # listing_code; scan_verdicts was already re-keyed to listing_code above).
+        scan_verdict = scan_verdicts.get((code, signal_date.isoformat()))
+        scan_reached_verdict = facts is not None and window_sufficient and scan_verdict is not None
+        if event_scanned or scan_verdict == "triggered":
+            events_reason = "event scan produced a transition"
+        elif scan_verdict is not None:
+            # A real verdict from the same scan.  A genuine no-signal keeps its
+            # qualified name; a named eligibility veto / unusable window keeps
+            # its own reason - never flattened to a generic "no-signal".
+            if scan_verdict == "not_triggered":
+                events_reason = "qualified no-signal: scan window reached a real verdict"
+            else:
+                events_reason = f"scan verdict at T: {scan_verdict}"
+        elif scan_reached_verdict:
+            events_reason = "qualified no-signal: scan window reached a real verdict"
+        else:
+            events_reason = "no qualified event window in the 22-session scan"
         gates["events"] = {
             **gates.get("events", {}),
             **_v(
-                event_scanned if facts is not None else None,
-                "event scan produced a transition"
-                if event_scanned
-                else "no qualified event in the 22-session window",
+                scan_reached_verdict if facts is not None else None,
+                events_reason,
             ),
         }
         gates["features"] = {
@@ -1318,6 +1375,8 @@ def run_daily_advice(
         history_receipts,
         features_by_security=features_by_security,
         seam=seam,
+        signal_date=facts.market_date,
+        scan_rows=current_rows,
     )
     source_closure["history_receipts"] = enriched_history
     source_closure["history_receipts_digest"] = sha256_digest(enriched_history)

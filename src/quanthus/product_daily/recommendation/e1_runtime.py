@@ -485,6 +485,12 @@ def run_e1_replay_day(
         as_observed=True,
         observed_sink=observed_sink,
         consumption_evidence=consumption_evidence,
+        # The verified October scenario admits date-context warm-up rows
+        # (named open sessions whose native instants are absent keep their
+        # original nulls and qualify by business date).  Forward/H1/M2
+        # entries never receive this string, so they keep the strict
+        # per-bar instant requirement.
+        numeric_context="october_replay_as_observed",
     )
 
     # This run's real read instant, resolved ONCE and shared with the replay

@@ -422,8 +422,8 @@ def daily_input_from_bar(
     bar: DailyBar,
     identity: IdentityFacts,
     listing_sessions: int,
-    close_at: datetime,
-    knowledge_cutoff: datetime,
+    close_at: datetime | None,
+    knowledge_cutoff: datetime | None,
     source_evidence_digest: str,
     adjustment_effective: bool | None = None,
 ) -> CandidateDailyInput:
@@ -434,7 +434,10 @@ def daily_input_from_bar(
 
     close_at is the session close instant the calendar supplies for this date (15:00
     exchange time under the daily profile); it is not invented here.  turnover is the
-    CNY amount (amount), not share volume.
+    CNY amount (amount), not share volume.  A replay warm-up row on a named open
+    session whose native instants are absent may carry BOTH as None -- a
+    date-context row whose knowledge coordinate is its business date, never a
+    borrowed clock.  A partial pair stays invalid downstream.
     """
 
     # A foreign bar must never be re-labelled onto this identity: the bar's own
@@ -444,8 +447,10 @@ def daily_input_from_bar(
             "cross_security_contamination",
             "the bar's security_id differs from the identity's",
         )
-    require_aware(close_at, "close_at")
-    require_aware(knowledge_cutoff, "knowledge_cutoff")
+    if close_at is not None:
+        require_aware(close_at, "close_at")
+    if knowledge_cutoff is not None:
+        require_aware(knowledge_cutoff, "knowledge_cutoff")
     return CandidateDailyInput(
         security_id=identity.security_id,
         listing_id=identity.listing_id,

@@ -100,6 +100,10 @@ class ReplayEngine:
     # Optional per-day runner factory (candidate sets that vary by
     # session); when absent the bound runner runs every day unchanged.
     runner_factory: Any = None
+    # P10-pinned October window/key map: each signal day's verbatim
+    # windows, UNKNOWN coverage and the 191/4173 audit keys the rule
+    # reads.  None keeps the bar-only raw history.
+    window_map: Any = None
 
     # runtime state
     day_index: int = 0
@@ -190,6 +194,10 @@ class ReplayEngine:
                 }
             ],
         }
+        # The P10-pinned per-T windows and audit keys: the rule reads
+        # them in the same run and decides which securities drop.
+        if self.window_map is not None:
+            raw_history["p10_members"] = self.window_map.raw_history_members(day)
 
         # The calendar must cover every session the replay may query;
         # materialize the authoritative open-session list once per day

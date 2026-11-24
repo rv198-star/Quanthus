@@ -22,13 +22,26 @@ Routes (JSON except GET /):
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import secrets
+import time
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
 from quanthus.p12_replay.engine import ReplayEngine
+
+LOGIN_PAGE = r"""<!doctype html>
+<html lang=zh><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>P12 历史回放 · 登录</title>
+<style>body{margin:0;font:14px -apple-system,"PingFang SC",sans-serif;background:#f6f7f8;display:flex;align-items:center;justify-content:center;min-height:100vh}.box{background:#fff;border:1px solid #e3e5e8;border-radius:8px;padding:36px 40px;width:340px}.badge{font-weight:700;color:#fff;background:#8c1d18;padding:4px 14px;border-radius:3px;font-size:13px;display:inline-block;margin-bottom:18px}h1{font-size:19px;margin:0 0 6px}p{color:#7a7f85;font-size:13px;margin:0 0 20px}input{width:100%;padding:9px 12px;border:1px solid #e3e5e8;border-radius:4px;margin-bottom:12px;font:inherit;box-sizing:border-box}button{width:100%;padding:10px;background:#1a1d21;color:#fff;border:none;border-radius:4px;font:inherit;cursor:pointer}#err{color:#a02215;font-size:13px;min-height:18px;margin-top:8px}</style></head>
+<body><div class=box><span class=badge>历史回放 · 模拟</span><h1>登录</h1><p>这是独立回放控制台，与 8791/8790 完全隔离。</p><form onsubmit="return go()"><input id=u placeholder=用户名 autocomplete=username><input id=pw type=password placeholder=密码 autocomplete=current-password><button>进入</button></form><div id=err></div>
+<script>async function go(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:pw.value})});const d=await r.json();if(r.ok&&d.token){sessionStorage.setItem('replay-token',d.token);location='/'}else{err.textContent=d.error||'用户名或密码不对'}return false}</script>
+</body></html>
+"""
 
 PAGE = r"""<!doctype html>
 <html lang=zh><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
@@ -129,7 +142,7 @@ tabs{display:flex;gap:0;margin-bottom:0}
 <footer>独立回放实例 · 与 8791/8790 完全隔离 · 合成规则驱动 · 成交按真实日线开盘价判定 · 回放证据在引擎日志与记录页可核</footer>
 <script>
 let S=null;
-async function api(p,b){const r=await fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});return r.json()}
+async function api(p,b){const t=sessionStorage.getItem('replay-token');const r=await fetch(p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(t||'')},body:b?JSON.stringify(b):undefined});if(r.status===401){sessionStorage.removeItem('replay-token');location.reload();return{}}return r.json()}
 function fmt(x){return x==null?'—':x}
 function flash(t){const f=document.getElementById('flash');f.textContent=t;f.style.opacity=1;setTimeout(()=>f.style.opacity=0,2600)}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
@@ -201,7 +214,28 @@ def _read_body(handler) -> dict:
         return {}
 
 
-def make_handler(engine_factory):
+def make_handler(engine_factory, users: dict | None = None):
+    # users: {username: (role, password)} - same shape as the P12
+    # local_server's --user seeding.  Sessions are in-memory bearer
+    # tokens; a restart ends every session (the replay is a lab console,
+    # not a durable account).  When users is empty the console stays
+    # open (local loopback only).
+    users = users or {}
+    sessions: dict[str, tuple[str, float]] = {}
+    SESSION_TTL = 12 * 3600
+
+    def _check_auth(headers) -> str | None:
+        if not users:
+            return "local"
+        auth = headers.get("Authorization") or ""
+        if not auth.lower().startswith("bearer "):
+            return None
+        token = auth.split(None, 1)[1].strip()
+        rec = sessions.get(token)
+        if rec is None or rec[1] < time.time():
+            return None
+        return rec[0]
+
     class ReplayHandler(BaseHTTPRequestHandler):
         server_version = "p12-replay/2"
 
@@ -231,9 +265,13 @@ def make_handler(engine_factory):
         def do_GET(self):
             path = urlparse(self.path).path
             if path in ("/", "/index.html"):
+                if users and _check_auth(self.headers) is None:
+                    return self._text(LOGIN_PAGE, ctype="text/html; charset=utf-8")
                 return self._text(PAGE, ctype="text/html; charset=utf-8")
             if path == "/health":
                 return self._json({"ok": True, "now": self._engine().now().isoformat()})
+            if users and _check_auth(self.headers) is None:
+                return self._json({"error": "unauthorized"}, 401)
             if path == "/api/state":
                 return self._json(self._engine().day_state())
             if path == "/api/review":
@@ -247,6 +285,19 @@ def make_handler(engine_factory):
         def do_POST(self):
             path = urlparse(self.path).path
             body = _read_body(self)
+            if path == "/api/login":
+                username = str(body.get("username") or "")
+                password = str(body.get("password") or "")
+                rec = users.get(username)
+                if rec is not None and hmac.compare_digest(
+                    rec[1].encode(), password.encode()
+                ):
+                    token = secrets.token_urlsafe(32)
+                    sessions[token] = (username, time.time() + SESSION_TTL)
+                    return self._json({"ok": True, "token": token, "user": username, "role": rec[0]})
+                return self._json({"error": "用户名或密码不对"}, 401)
+            if users and _check_auth(self.headers) is None:
+                return self._json({"error": "unauthorized"}, 401)
             engine = self._engine()
             try:
                 if path == "/api/run-day":
@@ -271,8 +322,8 @@ def make_handler(engine_factory):
     return ReplayHandler
 
 
-def serve(engine_factory, host: str, port: int) -> ThreadingHTTPServer:
-    handler = make_handler(engine_factory)
+def serve(engine_factory, host: str, port: int, users: dict | None = None) -> ThreadingHTTPServer:
+    handler = make_handler(engine_factory, users)
     server = ThreadingHTTPServer((host, port), handler)
     server.engine = engine_factory(reset=False)
     return server

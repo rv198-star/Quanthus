@@ -26,6 +26,7 @@ from quanthus.p12_daily.rule_runner import SyntheticRuleRunner
 from quanthus.p12_replay.assembly import build_replay_app
 from quanthus.p12_replay.bar_slice import read_month_bars
 from quanthus.p12_replay.engine import ReplayEngine
+from quanthus.p12_replay.october_window import OctoberWindowMap, is_excluded
 from quanthus.p12_replay.replay_product import ReplayInputSpec
 from quanthus.p12_replay.replay_quotes import DayBar
 
@@ -139,6 +140,24 @@ def load_window(
     return sessions, bars_by_day, reads
 
 
+def apply_exclusion(
+    bars_by_day: dict,
+    exclusion,
+) -> dict:
+    """#737 pre-read filter: drop a security's bar on an excluded
+    (security, date) pair.  In the October window the exclusion dates
+    (11-23..11-25) do not intersect, so this is a documented no-op; the
+    binding is in place for later phases and recorded on the reads."""
+
+    dropped = []
+    for day, bars in list(bars_by_day.items()):
+        for code in list(bars.keys()):
+            if is_excluded(code, day, exclusion):
+                del bars[code]
+                dropped.append({"security": code, "date": day.isoformat()})
+    return dropped
+
+
 def default_spec(market_sessions: list[date], knowledge_cutoff: str | None) -> ReplayInputSpec:
     """Static manifest evidence for a replay input day.
 
@@ -209,6 +228,7 @@ def make_engine(
     *,
     state_dir: Path,
     fixture_path: Path | None = None,
+    window_map=None,
     sessions: list[date],
     bars_by_day: dict,
     candidates_path: Path | None,
@@ -250,6 +270,7 @@ def make_engine(
         bars_by_day=bars_by_day,
         runner=runner,
         runner_factory=runner_factory,
+        window_map=window_map,
         spec=default_spec(sessions, knowledge_cutoff),
         base_manifest_path=Path(base_manifest_path),
         base_manifest_sha256=base_manifest_sha256,
@@ -276,10 +297,22 @@ def main(argv=None) -> int:
     parser.add_argument("--end", type=date.fromisoformat, required=True)
     parser.add_argument("--candidates", type=Path, default=None)
     parser.add_argument("--fixture", type=Path, default=None)
+    parser.add_argument("--window-keys", type=Path, default=None)
     parser.add_argument("--account", default="SYN-PAPER-A")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8792)
     parser.add_argument("--serve", action="store_true", help="run the console")
+    parser.add_argument(
+        "--user",
+        action="append",
+        default=None,
+        metavar="USERNAME:ROLE:PASSWORD",
+        help=(
+            "seed a console login; repeat for several.  When at least one "
+            "is given the console requires a bearer session from "
+            "/api/login - same model as the P12 local_server --user."
+        ),
+    )
     parser.add_argument(
         "--evidence-dir",
         type=Path,
@@ -312,13 +345,20 @@ def main(argv=None) -> int:
             candidates_path=args.candidates,
             account_id=args.account,
             fixture_path=args.fixture,
+            window_map=window_map,
             reset=reset,
         )
 
     if args.serve:
         from quanthus.p12_replay.server import serve
 
-        server = serve(factory, args.host, args.port)
+        users = {}
+        for spec in args.user or ():
+            parts = spec.split(":", 2)
+            if len(parts) != 3 or not all(parts):
+                raise SystemExit("--user expects USERNAME:ROLE:PASSWORD")
+            users[parts[0]] = (parts[1], parts[2])
+        server = serve(factory, args.host, args.port, users=users)
         print(
             json.dumps(
                 {
@@ -334,6 +374,19 @@ def main(argv=None) -> int:
         except KeyboardInterrupt:
             server.shutdown()
         return 0
+
+    # P10-pinned October window map (when the frozen file is present):
+    # the rule reads each T's verbatim windows, UNKNOWN coverage and
+    # audit keys in the same run.  #737 applies before native reads.
+    wk_path = args.window_keys or Path(
+        "/Users/william/Documents/Codex/2026-11-25/"
+        "quanthus-p10-october-action-feasibility/v1/WINDOW-AND-KEYS.json"
+    )
+    window_map = OctoberWindowMap.load(wk_path) if wk_path.is_file() else None
+    if window_map is not None:
+        dropped = apply_exclusion(bars_by_day, window_map.exclusion)
+        if dropped:
+            print(json.dumps({"exclusion_applied": dropped}))
 
     # Headless: same engine, same steps as the console - run each day's
     # evening job, confirm every published plan through the same

@@ -349,11 +349,23 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
     day_block = receipt.get("day_block") or evaluation_receipt.get("day_block")
     block_reason = None
     if isinstance(day_block, Mapping):
-        block_reason = day_block.get("reason") or day_block.get("detail")
+        # The actual reason the day blocked: P11's natural-language detail
+        # first (it is the real explanation), then the reason code through
+        # the CN map - an unmapped code keeps the raw reason, never the
+        # "详见记录页" placeholder for a whole-day block the Owner reads.
+        detail = day_block.get("detail")
+        code = day_block.get("reason")
+        if detail and (_has_cjk(str(detail)) or " " in str(detail)):
+            block_reason = str(detail)
+        elif code:
+            mapped = _cn_reason(code)
+            block_reason = mapped if mapped != "详见记录页" else str(code)
+        elif detail:
+            block_reason = str(detail)
     if block_reason:
         note_parts.insert(
             0,
-            "整日阻断：" + str(_cn_reason(block_reason) or block_reason),
+            "整日阻断：" + str(block_reason),
         )
     if pending:
         note_parts.append(

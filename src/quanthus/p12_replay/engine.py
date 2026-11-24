@@ -1419,24 +1419,27 @@ class ReplayEngine:
             run.get("scenario_id")
             or (run.get("source_closure") or {}).get("scenario_id")
         )
-        # Scenario is part of the same binding: whatever the ref declares
-        # and whatever the original doc declares must EACH equal the run's
-        # own scenario.  A run with no scenario means a ref/doc that
-        # declares one can never match (协调 R6 item 2).
+        # Scenario binding (协调口径): the ref's declared scenario and the
+        # ORIGINAL doc's scenario are checked against EACH OTHER always -
+        # a receipt the ref binds under spdb-test can never be served for a
+        # doc written under another scenario.  The outer P12 run carries
+        # scenario_id only once the writer has bound one (INPUT_BLOCKED
+        # runs often have none); when it does, BOTH must also equal it.
         declared_scenario = ref.get("scenario_id")
-        if (declared_scenario is None) != (run_scenario is None):
+        doc_scenario = doc.get("scenario_id")
+        # ref <-> original: direct cross-check, always.
+        if (declared_scenario is None) != (doc_scenario is None):
             return None
         if declared_scenario is not None and str(declared_scenario) != str(
-            run_scenario
+            doc_scenario
         ):
             return None
-        doc_scenario = doc.get("scenario_id")
-        if (doc_scenario is None) != (run_scenario is None):
-            return None
-        if doc_scenario is not None and str(doc_scenario) != str(
-            run_scenario
-        ):
-            return None
+        # Outer run bound a scenario -> ref and doc must each equal it.
+        if run_scenario is not None:
+            if str(declared_scenario) != str(run_scenario):
+                return None
+            if str(doc_scenario) != str(run_scenario):
+                return None
         return doc
 
     def _run_receipt(self) -> dict | None:

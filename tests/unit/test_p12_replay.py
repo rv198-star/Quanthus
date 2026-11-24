@@ -1044,15 +1044,13 @@ class TestCoveragePrecheckRound2:
         eng._store = _S()
         assert eng._day_replay_receipt() is None
 
-    def test_run_without_scenario_foreign_ref_refused(self, tmp_path):
-        # 协调 R6 item 2: the outer run has NO scenario_id - a ref whose
-        # scenario differs (or any scenario at all) can never match it.
+    def _ref_store(self, tmp_path, state, day, *,
+                   doc_scenario, ref_scenario, run_scenario=None):
+        # Build a real-writer-shape ref + run for the given scenario set.
         import json, hashlib
-        state = tmp_path / "st"
-        eng = self._engine(tmp_path, state)
-        day = "2026-10-08"
         original = self._receipt()
-        original["scenario_id"] = "scn-OTHER"
+        if doc_scenario is not None:
+            original["scenario_id"] = doc_scenario
         real_path = state / "runs" / "replay-day-receipts" / "run-9.json"
         real_path.parent.mkdir(parents=True, exist_ok=True)
         real_path.write_text(json.dumps(original))
@@ -1060,16 +1058,60 @@ class TestCoveragePrecheckRound2:
             real_path.read_bytes()).hexdigest()
         ref = {"schema_version": "p11.paper-replay-day.v1", "run_id": "run-9",
                "path": "runs/replay-day-receipts/run-9.json",
-               "sha256": real_sha, "market_date": day,
-               "scenario_id": "scn-OTHER"}
-        # The run declares NO scenario at all.
+               "sha256": real_sha, "market_date": day}
+        if ref_scenario is not None:
+            ref["scenario_id"] = ref_scenario
         run = {"run_id": "run-9", "market_date": day,
                "p11_replay_day_receipt_ref": ref}
+        if run_scenario is not None:
+            run["scenario_id"] = run_scenario
         class _S:
             def latest_run_for_date(self, d):
                 return run
+        eng = self._engine(tmp_path, state)
         eng._store = _S()
+        return eng
+
+    def test_writer_no_outer_scenario_legit_ref_reads(self, tmp_path):
+        # 协调口径: real writer INPUT_BLOCKED runs often carry NO outer
+        # scenario_id; the legal ref + original both declare spdb-test.
+        # ref<->doc agree -> the receipt reads (was wrongly refused).
+        state = tmp_path / "st"
+        eng = self._ref_store(tmp_path, state, "2026-10-08",
+                              doc_scenario="spdb-test",
+                              ref_scenario="spdb-test",
+                              run_scenario=None)
+        doc = eng._day_replay_receipt()
+        assert doc is not None
+        assert doc["delivered"]["600000"]["entry_eligible"] is True
+        assert doc["scenario_id"] == "spdb-test"
+
+    def test_ref_scenario_differs_from_original_refused(self, tmp_path):
+        # ref<->doc ALWAYS cross-check: a ref declaring scn-A bound to a
+        # doc written under scn-B is refused, whatever the outer run has.
+        state = tmp_path / "st"
+        eng = self._ref_store(tmp_path, state, "2026-10-08",
+                              doc_scenario="scn-B",
+                              ref_scenario="scn-A",
+                              run_scenario=None)
         assert eng._day_replay_receipt() is None
+
+    def test_outer_scenario_bound_must_match_too(self, tmp_path):
+        # When the outer run DOES bind a scenario, ref and doc must each
+        # equal it - a doc/ref pair agreed on spdb-test but run bound to
+        # scn-OTHER is refused.
+        state = tmp_path / "st"
+        eng = self._ref_store(tmp_path, state, "2026-10-08",
+                              doc_scenario="spdb-test",
+                              ref_scenario="spdb-test",
+                              run_scenario="scn-OTHER")
+        assert eng._day_replay_receipt() is None
+        # same, run bound to spdb-test -> reads
+        eng2 = self._ref_store(tmp_path, state, "2026-10-08",
+                               doc_scenario="spdb-test",
+                               ref_scenario="spdb-test",
+                               run_scenario="spdb-test")
+        assert eng2._day_replay_receipt() is not None
 
     def test_delivered_day_keeps_whole_day_block_reason(self):
         # 协调 R6 item 3: delivered N/M is real, but a whole-day block

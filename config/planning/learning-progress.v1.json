@@ -16354,6 +16354,117 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-20261124T191224202336Z",
+      "recorded_at": "2026-11-24T19:12:24.202336+00:00",
+      "actor": "P11-root-october-e1-replay",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "CN02 三券48日上市计龄通过。首个真实十月信封已核原件，受限于正式H1时钟及三行公司行为版本映射。P12已收到税前0.42元的具名来源和可合入的回放入口。",
+      "evidence": [
+        {
+          "id": "OCT-AGE-CN02",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/age-2bab-root/RESULT.json",
+          "sha256": "5edd3b56ccb1bc32bfa81944b8dd848bd6cbe013d0b04533a54609f18020ca14",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "64 absolute session counts checked. Three securities for 48 replay dates plus 16 independent control dates."
+        },
+        {
+          "id": "OCT-B10-READ",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/B10-INTAKE.json",
+          "sha256": "4b2dc8e219522c8b244e81df1fa734cb41599bb497f484ece8b8c20311d7e160",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed source routing, aggregate coverage and the consumer intake of metadata."
+        },
+        {
+          "id": "OCT-E1-FACTORY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/public-e1-65be2bf2.json",
+          "sha256": "8d8e578b8b9984ffba5f1dd940963353175da58b4d201d23cd863f357177168c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Normal replay builds a one-row feature panel from the current job. Its content digest changes with its inputs. The listing proof passes with a missing opening instant on an unambiguous day."
+        },
+        {
+          "id": "OCT-ACTION-R6",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/action-65be2bf2.json",
+          "sha256": "1e30960f2245445b6311d5f403e4012c4f498e44e6c78a9996fefd421f65c7d2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Same-date cash conflict and a known effective action on signal T isolate new entries. Identical events are counted once in the tested projection."
+        },
+        {
+          "id": "OCT-INTAKE-749",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/real-oct08-749/H1-ENTRY-DIAGNOSTIC.json",
+          "sha256": "4f346e1c540afb3f18e07f540faf5d8339bd0a74f6a2ac673cbae9b05993b9ca",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual sealed October envelope is rejected at the first declared late member by the strict historical interface."
+        },
+        {
+          "id": "OCT-SPDB-LINEAGE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/real-oct08-749/P10-B02-B10-ACTION-LINEAGE.json",
+          "sha256": "75aa24612abdcd06ceda76532aa40a9ad5b878f9a26e9c9c227284f362597c9c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Issuer gross cash per ordinary share CNY 0.42, matched to the original event and the version conflict in the sealed envelope."
+        },
+        {
+          "id": "OCT-TIME-ROLE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/OCTOBER-REPLAY-TIME-v1.md",
+          "sha256": "2a52f5255c07c74e11b296e5511162abdd3938b42f99c244b1cba9e75389322f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Approved dating of historical observations and actual versions for this isolated engineering replay."
+        },
+        {
+          "id": "OCT-V2-READ",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/execution/r4-pin-015e/EVIDENCE.md",
+          "sha256": "2cb7e8405dbe45f94f3f931379642cd5967d792e1fec5fc07e592267ac86cd3c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed 015e6adc preserves the two fixture digest surfaces, with outstanding acceptance and exact decimal serialization differences. 0.50000001 is a valid canonical value."
+        },
+        {
+          "id": "OCT-E1-REGRESSION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-24/quanthus-p11-rule-release/e1-runtime-intake/joint-65be-targeted.log",
+          "sha256": "edf2a84bfb056a8f2e62242a1f05fb85a86a7a67a0c4be3881ccb5705989bf50",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "221 selected regressions on the integrated sample and its frozen source."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "计龄和公司行为规则工程仅供十月隔离回放。真实账户快照、回放时间分支、正式读取器及同树全检仍在进行，E5待签。",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-24T19:11:42Z",
+          "body_sha256": "c12ed3b562b913f78e649d46dfd420556617fd0fe559a2d7718ca8d1fa0fb646"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

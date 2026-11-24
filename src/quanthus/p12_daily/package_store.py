@@ -43,6 +43,10 @@ READABLE_PACKAGE_SCHEMAS = frozenset({PACKAGE_SCHEMA, PACKAGE_SCHEMA_V1})
 # bare v1 inner set for back-compat.
 DECISION_SET_SCHEMA_V2 = "p12.decision-set.v2"
 ENVELOPE_INNER_MISMATCH = "ENVELOPE_INNER_MISMATCH"
+# v2-only decision fields. A v1 envelope must refuse any inner decision_set
+# that carries these keys - whether it declares the v2 marker or smuggles the
+# fields bare - so the new exit semantics are never silently downgraded.
+_V2_ONLY_FIELDS = ("exit_kind", "target_position_fraction")
 RETRACTION_SCHEMA = "quanthus.p12.package-retraction.v1"
 RUN_SCHEMA = "quanthus.p12.daily-run.v1"
 
@@ -264,16 +268,25 @@ class DailyPackageStore:
         # envelope must never carry a v2 decision_set - the legacy reader
         # would silently drop the new exit fields.  Refuse the mix outright
         # rather than serve a downgraded package.
-        inner_schema = (raw.get("decision_set") or {}).get("decision_set_schema")
-        if (
-            raw["schema_version"] == PACKAGE_SCHEMA_V1
-            and inner_schema is not None
-            and str(inner_schema) == DECISION_SET_SCHEMA_V2
-        ):
-            raise FactError(
-                ENVELOPE_INNER_MISMATCH,
-                "a v1 package envelope cannot carry a v2 decision_set",
+        inner = raw.get("decision_set") or {}
+        inner_schema = inner.get("decision_set_schema")
+        if raw["schema_version"] == PACKAGE_SCHEMA_V1:
+            # Refuse a v2-marked inner set, and also a bare inner set that
+            # smuggles a v2-only key (exit_kind / target_position_fraction,
+            # even as null): both would silently downgrade under a v1 read.
+            leaked = any(
+                isinstance(item, dict)
+                and any(field in item for field in _V2_ONLY_FIELDS)
+                for item in inner.get("decisions") or ()
             )
+            if (
+                inner_schema is not None
+                and str(inner_schema) == DECISION_SET_SCHEMA_V2
+            ) or leaked:
+                raise FactError(
+                    ENVELOPE_INNER_MISMATCH,
+                    "a v1 package envelope cannot carry a v2 decision_set",
+                )
         market_date = date.fromisoformat(str(raw["market_date"]))
         retraction = self.retraction_for(market_date)
         return StoredPackage(

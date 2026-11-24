@@ -323,3 +323,46 @@ def test_v2_envelope_carrying_v2_inner_reads(tmp_path) -> None:
         datetime.date(2026, 11, 24)
     )
     assert stored.decision_set["decision_set_schema"] == DECISION_SET_SCHEMA_V2
+
+
+def test_v1_envelope_bare_inner_with_v2_keys_is_refused(tmp_path) -> None:
+    """A v1 envelope must refuse a bare inner set (no decision_set_schema)
+    that smuggles a v2-only key, whether the value is a real value or null."""
+
+    for field, value in (
+        ("exit_kind", "reduce"),
+        ("exit_kind", None),
+        ("target_position_fraction", "0.5"),
+        ("target_position_fraction", None),
+    ):
+        inner = _raw("v1-baseline.json")  # no decision_set_schema marker
+        inner["decisions"][0][field] = value
+        _write_envelope(
+            tmp_path,
+            envelope_schema="quanthus.p12.daily-package.v1",
+            decision_set=inner,
+        )
+        with pytest.raises(FactError) as exc:
+            DailyPackageStore(tmp_path).package_for(
+                datetime.date(2026, 11, 24)
+            )
+        assert "v1" in str(exc.value) or "envelope" in str(exc.value).lower()
+        # clean the package so the next field writes a fresh file
+        (Path(tmp_path) / "daily-packages" / "2026-11-24.json").unlink()
+
+
+def test_v1_envelope_bare_inner_reads_through_stored_for(tmp_path) -> None:
+    """Regression: a clean v1 envelope with a bare v1 inner set still reads
+    via package_for/stored_for with bytes and digest unchanged."""
+
+    inner = _raw("v1-baseline.json")
+    _write_envelope(
+        tmp_path,
+        envelope_schema="quanthus.p12.daily-package.v1",
+        decision_set=inner,
+    )
+    stored = DailyPackageStore(tmp_path).package_for(
+        datetime.date(2026, 11, 24)
+    )
+    assert stored.decision_set["source_id"] == "p11-g1-synthetic"
+    assert "exit_kind" not in stored.decision_set["decisions"][0]

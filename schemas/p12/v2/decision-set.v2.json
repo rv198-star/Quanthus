@@ -188,18 +188,108 @@
      "description": "Decimal string in [0,1); set only on a reduce exit, null on full. Denominator is locked_cycle_budget; 0-share rounds emit no order (E8)."
     }
    },
-   "if": {
-    "properties": {
-     "stage": {
-      "const": "exit_plan"
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "stage": {
+        "const": "exit_plan"
+       }
+      },
+      "required": [
+       "stage"
+      ]
+     },
+     "then": {
+      "required": [
+       "exit_kind"
+      ],
+      "properties": {
+       "exit_kind": {
+        "enum": [
+         "full",
+         "reduce"
+        ]
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "not": {
+       "properties": {
+        "stage": {
+         "const": "exit_plan"
+        }
+       },
+       "required": [
+        "stage"
+       ]
+      }
+     },
+     "then": {
+      "properties": {
+       "exit_kind": {
+        "const": null
+       },
+       "target_position_fraction": {
+        "const": null
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "exit_kind": {
+        "const": "reduce"
+       }
+      },
+      "required": [
+       "exit_kind"
+      ]
+     },
+     "then": {
+      "required": [
+       "target_position_fraction"
+      ],
+      "properties": {
+       "target_position_fraction": {
+        "type": "string",
+        "allOf": [
+         {
+          "pattern": "^0\\.[0-9]+$"
+         },
+         {
+          "not": {
+           "pattern": "^0\\.0+$"
+          }
+         }
+        ]
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "exit_kind": {
+        "const": "full"
+       }
+      },
+      "required": [
+       "exit_kind"
+      ]
+     },
+     "then": {
+      "properties": {
+       "target_position_fraction": {
+        "const": null
+       }
+      }
      }
     }
-   },
-   "then": {
-    "required": [
-     "exit_kind"
-    ]
-   }
+   ]
   }
  }
 }

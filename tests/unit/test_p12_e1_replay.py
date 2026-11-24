@@ -9,22 +9,21 @@ chain is the REAL P11 one (never a P12 stand-in).
 
 from __future__ import annotations
 
+from dataclasses import replace as _replace
 from datetime import date
 
 import pytest
 
+from quanthus.event_library.contracts import sha256_digest
 from quanthus.p12_daily.e1_replay import (
     E1ReplayContext,
     E1ReplayRunner,
     build_replay_request,
 )
-from quanthus.product_daily.recommendation.e1_runtime import load_e1_rule_assets
 from quanthus.p12_daily.rule_runner import RunnerRequest
-from quanthus.event_library.contracts import sha256_digest
+from quanthus.product_daily.recommendation.e1_runtime import load_e1_rule_assets
 from quanthus.shared.fact_contracts import FactError
-
 from tests.unit import test_p11_paper_replay as fx
-
 
 ROOT = fx.ROOT if hasattr(fx, "ROOT") else None
 
@@ -141,7 +140,6 @@ def test_e1_replay_runner_carries_p12_evidence_into_closure(assets):
         "scenario_account": {"ledger_digest": "ef" * 32, "as_of": "2026-10-08T21:30:00+08:00"},
         "action_use": {"b02": ["member:ca-600000"], "b10": []},
     }
-    from dataclasses import replace as _replace
     ctx = _replace(_context(req), p12_evidence=evidence)
     runner = E1ReplayRunner(
         runner_ref_id="p11.e1-replay-day",

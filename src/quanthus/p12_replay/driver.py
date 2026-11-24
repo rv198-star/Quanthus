@@ -140,6 +140,33 @@ def load_window(
     return sessions, bars_by_day, reads
 
 
+def base_sessions_through(base_root: Path, end: date) -> int:
+    """Count authoritative SSE open sessions through ``end`` in the pinned
+    Base calendar - the real observed session count the history floors
+    report for T (never inflated to a threshold, never the replay
+    window's few days)."""
+
+    total = 0
+    for path in sorted(
+        (base_root / "payload/dwd_trading_calendar").glob(
+            "trade_date_year=*/*.parquet"
+        )
+    ):
+        import pyarrow.parquet as pq
+
+        table = pq.ParquetFile(str(path)).read(
+            columns=["trade_date", "is_open", "source_record_id"]
+        )
+        for row in table.to_pylist():
+            if not row.get("is_open"):
+                continue
+            if "exchange=SSE" not in str(row.get("source_record_id") or ""):
+                continue
+            if row["trade_date"] <= end:
+                total += 1
+    return total
+
+
 def apply_exclusion(
     bars_by_day: dict,
     exclusion,
@@ -166,7 +193,7 @@ def apply_exclusion(
     }
 
 
-def default_spec(market_sessions: list[date], knowledge_cutoff: str | None) -> ReplayInputSpec:
+def default_spec(observed_sessions: int, knowledge_cutoff: str | None) -> ReplayInputSpec:
     """Static manifest evidence for a replay input day.
 
     history/corporate_actions/volume are UNKNOWN-named gaps - the replay
@@ -182,9 +209,9 @@ def default_spec(market_sessions: list[date], knowledge_cutoff: str | None) -> R
     # The runner never recomputes the floors - this is input evidence,
     # honestly reported, with the replay provenance block naming it.
     # History floors report the sessions ACTUALLY read for this window -
-    # never inflated to a threshold.  observed_sessions is the real count
-    # delivered; the rule reads it, the reader never recomputes a floor.
-    observed = len(market_sessions)
+    # the authoritative Base open-session count through T, never inflated
+    # to a threshold and never the replay window's few days.
+    observed = observed_sessions
     return ReplayInputSpec(
         history={
             "event_window_sessions": {"observed_sessions": observed},
@@ -249,6 +276,7 @@ def make_engine(
     account_id: str = "SYN-PAPER-A",
     account_mode: str = "synthetic",
     exclusion_receipt: dict | None = None,
+    observed_sessions_by_day: dict | None = None,
     base_manifest_path: Path = BASE_MANIFEST,
     base_manifest_sha256: str = BASE_MANIFEST_SHA256,
     knowledge_cutoff: str | None = None,
@@ -287,7 +315,8 @@ def make_engine(
         runner_factory=runner_factory,
         window_map=window_map,
         exclusion_receipt=exclusion_receipt,
-        spec=default_spec(sessions, knowledge_cutoff),
+        spec=default_spec(len(sessions), knowledge_cutoff),
+        observed_sessions_by_day=observed_sessions_by_day,
         base_manifest_path=Path(base_manifest_path),
         base_manifest_sha256=base_manifest_sha256,
         account_id=account_id,
@@ -366,6 +395,12 @@ def main(argv=None) -> int:
         exclusion_receipt = apply_exclusion(bars_by_day, window_map.exclusion)
         if exclusion_receipt["filtered_count"]:
             print(json.dumps({"exclusion_applied": exclusion_receipt}))
+
+    # Real observed SSE open-session count through each signal day (the
+    # history-floor evidence the manifest honestly reports per T).
+    observed_by_day = {
+        d.isoformat(): base_sessions_through(args.base_root, d) for d in sessions
+    }
 
     def factory(reset: bool) -> ReplayEngine:
         return make_engine(

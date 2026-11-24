@@ -107,6 +107,9 @@ class ReplayEngine:
     # #737 pre-read exclusion receipt: {config_sha256, filtered_count,
     # filtered:[{security,date}]} - recorded on the run/day receipt.
     exclusion_receipt: dict | None = None
+    # Per-T real observed open-session counts (the honest history-floor
+    # evidence the manifest reports for that day - never a window count).
+    observed_sessions_by_day: dict | None = None
 
     # runtime state
     day_index: int = 0
@@ -232,6 +235,19 @@ class ReplayEngine:
         )
 
         self._raw_history = raw_history
+        spec = self.spec
+        if self.observed_sessions_by_day is not None:
+            observed = self.observed_sessions_by_day.get(day.isoformat())
+            if observed is not None:
+                from dataclasses import replace as _dc_replace
+
+                spec = _dc_replace(
+                    self.spec,
+                    history={
+                        k: dict(v, observed_sessions=observed)
+                        for k, v in self.spec.history.items()
+                    },
+                )
         product = write_replay_day(
             self._job_root,
             market_date=day,
@@ -240,7 +256,7 @@ class ReplayEngine:
                 "dwd_security_bar": len(bars),
                 "dwd_trading_calendar": 3,
             },
-            spec=self.spec,
+            spec=spec,
             base_manifest_path=self.base_manifest_path,
             base_manifest_sha256=self.base_manifest_sha256,
             package_id=f"replay-core-{day.isoformat()}",
@@ -773,7 +789,23 @@ class ReplayEngine:
         review, never crash the page.
         """
         app = self._build_app()
-        view = app.records(app.scope)
+        # A T-only day (next_session stays null by contract) has no pending
+        # decision set; the review still shows the day's fills + balances
+        # rather than failing - records degrades to an empty chain, the
+        # ledger state already carries the truth.
+        try:
+            view = app.records(app.scope)
+        except Exception as exc:  # noqa: BLE001 - named gap, not a crash
+            self._log(
+                "records_view_degraded",
+                market_date=self.current_day.isoformat(),
+                reason=getattr(exc, "reason_code", type(exc).__name__),
+            )
+            return {
+                "reports": [], "orders": [], "plans": [], "events": [],
+                "outbox_pending": 0,
+                "degraded": getattr(exc, "reason_code", type(exc).__name__),
+            }
         history = view.history
         reports = [
             {

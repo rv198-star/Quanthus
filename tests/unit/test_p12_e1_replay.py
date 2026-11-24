@@ -109,7 +109,11 @@ def test_build_replay_request_projects_members_and_context():
 
 
 def test_e1_replay_runner_runs_real_chain_to_runner_output(assets):
-    req = fx._request(market_dates=(fx.T1,))
+    days = tuple(d for d in fx.SESSION_DAYS if d <= fx.T1)
+    req = fx._request(
+        market_dates=(fx.T1,),
+        securities=[fx._security("600000", days)],
+    )
     raw = _raw_history(fx.T1, req)
     runner = E1ReplayRunner(
         runner_ref_id="p11.e1-replay-day",

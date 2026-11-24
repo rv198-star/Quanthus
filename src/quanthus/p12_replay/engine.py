@@ -1267,30 +1267,68 @@ class ReplayEngine:
     def _coverage_block(self) -> dict:
         """本日覆盖展示: the day's evaluable/pool counts + per-security rows.
 
-        Source is the day's own run receipt (the same run the page already
-        shows).  When a real-rule runner issues a receipt carrying
-        delivered/seam/coverage fields, coverage_block() renders the
-        verbatim N/M and per-security verdicts; otherwise the synthetic
-        phase reports pool-only coverage and no invented per-security rows.
+        Source is the day's own run receipt(s).  The real-rule runner's
+        day receipt (p11.paper-replay-day.v1) is read first - it is the
+        authoritative coverage carrier (delivered / seam / coverage /
+        excluded lists + source_closure.history_receipts).  A P12 run
+        dict carrying source_closure/evaluation_receipt is the second
+        carrier.  An INPUT_BLOCKED run dict holds neither, so the block
+        falls back to pool-only rather than a fake 0/0.
         """
         from quanthus.p12_replay.coverage_display import (
             coverage_block,
             pool_only_block,
         )
-        receipt = None
-        try:
-            latest = self._store.latest_run_for_date(self.current_day)
-            if isinstance(latest, dict):
-                receipt = latest
-        except Exception:  # noqa: BLE001 - coverage is additive, never fatal
-            receipt = None
+
+        receipt = self._day_replay_receipt() or self._run_receipt()
         block = coverage_block(receipt) if receipt else None
         if block is not None:
             return block
-        # Pool size is honest even under the synthetic runner: the number of
+        # Pool size is honest even with no coverage carrier: the number of
         # securities whose bars the replay actually delivered for this day.
         pool = sorted((self.bars_by_day.get(self.current_day) or {}).keys())
         return pool_only_block(len(pool), delivered_codes=pool)
+
+    def _day_replay_receipt(self) -> dict | None:
+        """The same-day p11.paper-replay-day.v1 receipt, when the runner
+        persisted it for this T.  Developer-1 writes the E1 replay's day
+        receipt next to the run records; the display binds that exact
+        file, never a rebuilt summary."""
+        import json as _json
+
+        state = self.state_dir
+        day = self.current_day.isoformat()
+        candidates = [
+            state / "replay-day-receipts" / f"{day}.json",
+            state / "daily-runs" / f"{day}.replay-day.json",
+            state / f"replay-day-{day}.json",
+        ]
+        for path in candidates:
+            try:
+                if not path.is_file():
+                    continue
+                doc = _json.loads(path.read_text())
+            except (OSError, _json.JSONDecodeError):
+                continue
+            if not isinstance(doc, dict):
+                continue
+            schema = doc.get("schema_version") or doc.get("schema")
+            if schema == "p11.paper-replay-day.v1" or (
+                "seam" in doc or "delivered" in doc
+            ):
+                return doc
+        return None
+
+    def _run_receipt(self) -> dict | None:
+        """The persisted P12 run dict for this day (carries source_closure
+        and evaluation_receipt once the runner produced output).  An
+        INPUT_BLOCKED dict holds neither and is left for the pool-only
+        fallback rather than mis-read as coverage."""
+        try:
+            latest = self._store.latest_run_for_date(self.current_day)
+        except Exception:  # noqa: BLE001 - coverage is additive, never fatal
+            return None
+        return latest if isinstance(latest, dict) else None
 
     # ---- phase-1 experience additions ------------------------------------------------
     def records_view(self) -> dict:

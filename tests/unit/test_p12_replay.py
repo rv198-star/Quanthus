@@ -561,13 +561,15 @@ class TestFillDay:
 
 
 class TestCoverageDisplay:
-    '''R5: 当日覆盖展示 - the same-run rule receipt drives N/M and the
-    per-security verdict + scan reason; the synthetic phase shows pool-only.'''
+    '''R5 预检实证: coverage reads the same-day p11.paper-replay-day
+    receipt (or a run dict's source_closure/evaluation_receipt), reports
+    the real N/M, keeps natural-language scan reasons verbatim, lists
+    zero-signal evaluated securities, and keeps out-of-pool held rows
+    separate from the pool counts.'''
 
-    def test_real_receipt_rows_and_counts(self):
-        from quanthus.p12_replay.coverage_display import coverage_block
-
-        receipt = {
+    def _receipt(self):
+        return {
+            "schema_version": "p11.paper-replay-day.v1",
             "delivered": {
                 "600000": {"bar_rows": 61, "window_sessions": 61,
                            "gap_sessions": 0, "entry_eligible": True},
@@ -577,10 +579,8 @@ class TestCoverageDisplay:
                            "gap_sessions": 21, "entry_eligible": False},
             },
             "seam": {
-                "evaluated_universe": ["600000", "000002"],
+                "evaluated_universe": ["600000", "000002", "300750"],
                 "decisions": [
-                    {"security_code": "600000", "disposition": "ENTRY",
-                     "reason": "NEW_ENTRY_SIGNAL"},
                     {"security_code": "000002", "disposition": "REVIEW",
                      "reason": "SOME_CODE"},
                 ],
@@ -588,63 +588,108 @@ class TestCoverageDisplay:
             },
             "source_closure": {
                 "held_decisions": [
-                    {"security_code": "600000", "action": "held",
+                    {"security_code": "300750", "action": "held",
                      "reason": "HELD_OK"},
+                ],
+                "history_receipts": [
+                    {"security_code": "600000", "status": "not_qualified",
+                     "gates": {"events": {"reason": "no qualified event in the 22-session window"}}},
                 ],
             },
             "excluded_security_codes": ["300999"],
             "coverage_exclusions": [
                 {"security_code": "601390", "reason": "ACTION_COVERAGE_UNKNOWN"},
             ],
-            "as_observed": {"note": "x"},
         }
-        block = coverage_block(receipt)
+
+    def test_real_receipt_counts_and_rows(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+
+        block = coverage_block(self._receipt())
+        # Pool M = delivered entries (3); held 300750 is outside the pool.
         assert block["pool_count"] == 3
+        # N = evaluated members of the pool only (600000 + 000002); the
+        # out-of-pool held 300750 never inflates N or M.
         assert block["evaluated_count"] == 2
         assert block["pending_count"] == 1
         assert block["note_text"].startswith("本日可评估 2 只 / 策略池 3 只")
-        assert "其余 1 只" in block["note_text"]
         rows = {r["security_code"]: r for r in block["securities"]}
+        # 600000: scanned, no qualified event -> evaluated, entry-fail
+        # verdict and the event-scan reason, never a blank row.
         assert rows["600000"]["evaluated"] is True
-        assert rows["600000"]["verdict"] == "新建信号"
+        assert rows["600000"]["verdict"] == "未通过入场"
+        assert "22-session" in rows["600000"]["scan_reason"]
+        # 000002: real decision verdict + reason mapping.
         assert rows["000002"]["verdict"] == "待复核"
-        # The coverage-isolated member is pending with a clearance reason.
+        # Out-of-pool held row kept, marked not-in-pool, not counted.
+        assert rows["300750"]["in_pool"] is False
+        assert rows["300750"]["evaluated"] is False
+        assert rows["300750"]["state"] == "held"
+        # Coverage-isolated member pending with a clearance reason.
         assert rows["601390"]["evaluated"] is False
         assert rows["601390"]["state"] == "pending"
         assert rows["601390"]["scan_reason"]
 
-    def test_zero_signal_day_still_lists_evaluated(self):
+    def test_natural_language_reason_preserved(self):
         from quanthus.p12_replay.coverage_display import coverage_block
 
-        receipt = {
-            "delivered": {
-                "600000": {"entry_eligible": True},
-                "000002": {"entry_eligible": True},
-            },
-            "seam": {
-                "evaluated_universe": ["600000", "000002"],
-                "decisions": [],
-                "excluded": [],
-            },
-            "source_closure": {"held_decisions": []},
-            "coverage_exclusions": [],
-        }
-        block = coverage_block(receipt)
-        # Zero signals: N=2 evaluated, every one still listed.
-        assert block["evaluated_count"] == 2
-        assert len(block["securities"]) == 2
-        assert all(r["evaluated"] for r in block["securities"])
-        assert all(r["verdict"] is None for r in block["securities"])
+        r = self._receipt()
+        # A CJK / sentence reason on a decision passes through verbatim,
+        # never collapsed to the generic 详见记录页 label.
+        r["seam"]["decisions"][0]["reason"] = "趋势在 61 日窗口内走弱，触发复核"
+        block = coverage_block(r)
+        rows = {x["security_code"]: x for x in block["securities"]}
+        assert rows["000002"]["scan_reason"] == "趋势在 61 日窗口内走弱，触发复核"
 
-    def test_synthetic_returns_pool_only(self):
+    def test_zero_signal_and_blocked_pair(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+
+        # Zero-signal: everyone evaluated, no decisions, all listed.
+        r = self._receipt()
+        r["seam"]["decisions"] = []
+        block = coverage_block(r)
+        assert block["evaluated_count"] == 2
+        assert all(
+            x["evaluated"] for x in block["securities"] if x["in_pool"]
+            and x["entry_eligible"]
+        )
+        # Whole-day blocked: the receipt carries a block, coverage still
+        # reports the delivered pool and the named block reason.
+        r2 = self._receipt()
+        r2["day_block"] = {"reason": "history_gate_unsatisfied",
+                           "scope": "whole_day"}
+        r2["seam"]["evaluated_universe"] = []
+        block2 = coverage_block(r2)
+        assert block2["pool_count"] == 3
+        assert block2["evaluated_count"] == 0
+
+    def test_run_dict_carrier_and_blocked_fallback(self):
         from quanthus.p12_replay.coverage_display import (
             coverage_block,
             pool_only_block,
         )
-        assert coverage_block(None) is None
-        block = pool_only_block(3, delivered_codes=["600000", "000002", "601390"])
-        assert block["pool_count"] == 3
-        assert block["evaluated_count"] is None
-        assert len(block["securities"]) == 3
-        assert all(r["evaluated"] is None for r in block["securities"])
-        assert "待真实规则接入" in block["note_text"]
+        # A P12 run dict carrying source_closure + evaluation_receipt is
+        # a valid carrier (seam under evaluation_receipt).
+        r = {
+            "schema_version": "quanthus.p12.daily-run.v1",
+            "status": "PUBLISHED",
+            "evaluation_receipt": {
+                "seam": {"evaluated_universe": ["600000"],
+                          "decisions": [{"security_code": "600000",
+                                          "disposition": "ENTRY",
+                                          "reason": "NEW_ENTRY_SIGNAL"}]},
+                "delivered": {"600000": {"entry_eligible": True}},
+            },
+            "source_closure": {"held_decisions": [], "history_receipts": []},
+        }
+        block = coverage_block(r)
+        assert block["pool_count"] == 1
+        assert block["evaluated_count"] == 1
+        # INPUT_BLOCKED run dict: no seam/source_closure coverage -> None.
+        blocked = {"schema_version": "quanthus.p12.daily-run.v1",
+                   "status": "INPUT_BLOCKED",
+                   "input_block": {"reason_code": "INPUT_UNAVAILABLE"}}
+        assert coverage_block(blocked) is None
+        only = pool_only_block(2, delivered_codes=["600000", "000002"])
+        assert only["pool_count"] == 2
+        assert only["evaluated_count"] is None

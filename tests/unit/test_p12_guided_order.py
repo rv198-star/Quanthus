@@ -141,9 +141,12 @@ def test_fill_links_back_to_plan_and_survives_relogin(state_dir):
     qbox = {"600000": _quote("10.66", now_box[0])}
     acct, app = _account(state_dir, now, qbox, session_box)
     plan_id = "plan-OPP-REPLAY-600000-2026-11-19"
+    # The confirm echoes the authoritative plan quantity (1200 lot-rounded),
+    # the figure the card actually shows - never the raw 2,000-share intent.
+    plan = next(o.plan for o in app.workbench(app.scope).opportunities if o.plan)
     out = acct.submit(OrderCommand(
         order_id=f"plan:{plan_id}", side="buy",
-        security_code="600000", quantity=2000, limit_price=Decimal("10.75"),
+        security_code="600000", quantity=plan.delta_qty, limit_price=Decimal("10.75"),
     ))
     assert out.status == "filled"
     # Relogin: rebuild the application over the same state dir and confirm the
@@ -172,9 +175,10 @@ def test_expired_plan_window_rejects(state_dir):
     qbox = {"600000": _quote("10.66", now_box[0])}
     acct, app = _account(state_dir, now, qbox, session_box)
     plan_id = "plan-OPP-REPLAY-600000-2026-11-19"
+    plan = next(o.plan for o in app.workbench(app.scope).opportunities if o.plan)
     acct.submit(OrderCommand(
         order_id=f"plan:{plan_id}", side="buy",
-        security_code="600000", quantity=2000, limit_price=Decimal("10.75"),
+        security_code="600000", quantity=plan.delta_qty, limit_price=Decimal("10.75"),
     ))
     # Advance the replay clock past the close; the market is no longer trading.
     now_box[0] = _closed()
@@ -312,10 +316,17 @@ def test_plan_confirm_uses_server_qty_and_cap_not_client(state_dir):
     qbox = {"600000": _quote("10.66", now_box[0])}
     acct, app = _account(state_dir, now, qbox, session_box)
     plan = next(o.plan for o in app.workbench(app.scope).opportunities if o.plan)
-    # Client asks for 100 @ 9.99; the live plan governs at 2000 @ 10.75.
+    # A client echo of 100 @ 9.99 is NOT the shown quantity: the confirm is
+    # refused CONFIRM_RESIZED, nothing written; re-confirming the authoritative
+    # plan.delta_qty @ plan.price_cap binds under the same id.
     out = acct.submit(OrderCommand(
         order_id=f"plan:{plan.plan_id}", side="buy",
         security_code="600000", quantity=100, limit_price=Decimal("9.99"),
+    ))
+    assert out.status == "rejected" and out.reason_code == "CONFIRM_RESIZED"
+    out = acct.submit(OrderCommand(
+        order_id=f"plan:{plan.plan_id}", side="buy",
+        security_code="600000", quantity=plan.delta_qty, limit_price=plan.price_cap,
     ))
     assert out.status == "filled" and out.filled_qty == plan.delta_qty
     linked = [r for r in app._facts.history(app._context).reports
@@ -342,6 +353,11 @@ def test_trial_cap_binds_below_strategy_intent(state_dir):
     out = acct.submit(OrderCommand(
         order_id=f"plan:{plan.plan_id}", side="buy",
         security_code="600000", quantity=2000, limit_price=Decimal("10.75"),
+    ))
+    assert out.status == "rejected" and out.reason_code == "CONFIRM_RESIZED"
+    out = acct.submit(OrderCommand(
+        order_id=f"plan:{plan.plan_id}", side="buy",
+        security_code="600000", quantity=plan.delta_qty, limit_price=plan.price_cap,
     ))
     assert out.status == "filled" and out.filled_qty == 1200
 

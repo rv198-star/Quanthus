@@ -405,7 +405,7 @@
               <div class="p12-plan-confirm-body">
                 <strong>{{ confirmablePlan.side === 'sell' ? '系统建议卖出' : '系统建议买入' }} {{ confirmablePlan.security_code }}</strong>
                 <p class="p12-num">
-                  {{ confirmablePlan.side === 'sell' ? Math.abs(confirmablePlan.delta_qty) : confirmablePlan.delta_qty }} 股 · 限价{{ confirmablePlan.side === 'sell' ? '下限' : '上限' }} ¥{{ confirmablePlan.price_cap }}
+                  {{ confirmablePlan.display_qty != null ? confirmablePlan.display_qty : (confirmablePlan.side === 'sell' ? Math.abs(confirmablePlan.delta_qty) : confirmablePlan.delta_qty) }} 股 · 限价{{ confirmablePlan.side === 'sell' ? '下限' : '上限' }} ¥{{ confirmablePlan.price_cap }}
                   · 窗口 {{ time(confirmablePlan.eligible_at) }}–{{ time(confirmablePlan.expires_at).slice(11) }}
                 </p>
                 <!-- Issue #723 E8 r5 (buy): when the confirm-time (bound-open)
@@ -594,7 +594,7 @@
               <dl class="p12-plan p12-num" data-testid="p12-plan">
                 <div><dt>当前持有</dt><dd>{{ qty(selected.applicability.current_qty) }}</dd></div>
                 <div><dt>计划目标</dt><dd>{{ qty(selected.plan.target_qty) }}</dd></div>
-                <div><dt>还差</dt><dd data-testid="p12-delta">{{ qty(selected.applicability.delta_qty) }}</dd></div>
+                <div><dt>还差</dt><dd data-testid="p12-delta">{{ qty(selected.plan.confirm_qty != null ? selected.plan.confirm_qty : selected.applicability.delta_qty) }}</dd></div>
                 <div><dt>有效窗口</dt><dd>{{ time(selected.plan.eligible_at) }} 至 {{ time(selected.plan.expires_at).slice(11) }}</dd></div>
                 <div><dt>价格上限</dt><dd>{{ selected.plan.price_cap }}</dd></div>
                 <div><dt>资金上限</dt><dd>{{ money(selected.plan.cash_bound) }}（含预估费用 {{ money(selected.plan.estimated_fee) }}）</dd></div>
@@ -670,7 +670,7 @@
               <dl class="p12-plan p12-num" data-testid="p12-plan">
                 <div><dt>当前持有</dt><dd>{{ qty(selected.applicability.current_qty) }}</dd></div>
                 <div><dt>计划目标</dt><dd>{{ qty(selected.plan.target_qty) }}</dd></div>
-                <div><dt>还差</dt><dd data-testid="p12-delta">{{ qty(selected.applicability.delta_qty) }}</dd></div>
+                <div><dt>还差</dt><dd data-testid="p12-delta">{{ qty(selected.plan.confirm_qty != null ? selected.plan.confirm_qty : selected.applicability.delta_qty) }}</dd></div>
                 <div><dt>有效窗口</dt><dd>{{ time(selected.plan.eligible_at) }} 至 {{ time(selected.plan.expires_at).slice(11) }}</dd></div>
                 <div><dt>价格上限</dt><dd>{{ selected.plan.price_cap }}</dd></div>
               </dl>
@@ -1199,7 +1199,22 @@ export default {
         (isSell && sel.action_code === 'SELL' && sel.status_code === 'READY') ||
         (sel.applicability && sel.applicability.status === 'ACTIONABLE')
       if (!actionable) return null
-      return { ...plan, security_code: sel.security_code }
+      // Issue #723 E8 r5 (buy): the quantity the card can actually offer is
+      // the confirm-time re-sized figure when the server re-sizes on the
+      // bound-open mark (confirm_qty), else the published delta_qty.  A
+      // re-size to ZERO means there is nothing left to confirm - the entry
+      // stays closed, never a clickable "submit 0" card.
+      const displayQty = isSell
+        ? Math.abs(plan.confirm_qty != null ? plan.confirm_qty : plan.delta_qty)
+        : (plan.confirm_qty != null ? plan.confirm_qty : plan.delta_qty)
+      if (!(displayQty > 0)) return null
+      // A plan whose confirm order already filled is done - the execution
+      // entry stays closed rather than re-offering a completed suggestion.
+      const planOrderId = `plan:${plan.plan_id}`
+      const settled = (this.simOrders || []).some(o =>
+        o.order_id === planOrderId && (o.status === 'filled' || (o.filled_qty || 0) > 0))
+      if (settled) return null
+      return { ...plan, security_code: sel.security_code, display_qty: displayQty }
     },
     planConfirmDisabled () {
       const session = this.marketSession
@@ -2125,7 +2140,7 @@ export default {
           // confirm_qty once the user has seen and accepted the resized
           // figure.  A stale echo returns CONFIRM_RESIZED instead of silently
           // binding a number the user never saw.
-          quantity: plan.side === 'sell' ? Math.abs(plan.delta_qty) : (plan.accepted_qty != null ? plan.accepted_qty : plan.delta_qty),
+          quantity: plan.side === 'sell' ? Math.abs(plan.display_qty != null ? plan.display_qty : plan.delta_qty) : (plan.display_qty != null ? plan.display_qty : (plan.accepted_qty != null ? plan.accepted_qty : plan.delta_qty)),
           limit_price: plan.price_cap,
           occurred_at: nowIso
         })

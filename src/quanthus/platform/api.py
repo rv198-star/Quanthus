@@ -744,7 +744,9 @@ class PlatformHttpApp:
         self, observed_request: HttpRequest, params: Mapping[str, str]
     ) -> HttpResponse:
         principal = _principal(self._identity, observed_request, "p12:read")
-        status, payload = self._p12.accounts(principal, observed_request.request_id)
+        status, payload = self._p12.accounts(
+            principal, observed_request.request_id, observed_request.query_string
+        )
         return _json_response(payload, status)
 
     def _p12_workbench(

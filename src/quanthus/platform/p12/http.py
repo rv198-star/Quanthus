@@ -107,7 +107,28 @@ class P12Endpoints:
 
             raise FactError("UNAUTHORIZED_CONTEXT", "requested mode differs from the binding")
 
-    def accounts(self, principal: AuthenticatedPrincipal, request_id: str) -> Result:
+    @staticmethod
+    def _negotiated(query_string: str) -> str | None:
+        # An unmodified legacy client sends no schema_version; the HTTP
+        # layer resolves that to the frozen v2 projection (ruling
+        # 7148440273: an unmodified v2 reader gets its declared contract).
+        # An explicit value is passed through so transport projects v3 or
+        # v2 by its own rule.
+        declared = urllib.parse.parse_qs(query_string).get("schema_version", [None])[0]
+        return declared if declared is not None else "p12.desktop.v2"
+
+    @staticmethod
+    def _write_negotiated(query_string: str) -> str | None:
+        # A write request declares its contract on the body itself.  Pass
+        # the query's raw schema_version through: absent means the body's
+        # own declaration governs (current contract), explicit v2/v3 binds
+        # the request to that projection so the response matches what the
+        # writer negotiated.
+        return urllib.parse.parse_qs(query_string).get("schema_version", [None])[0]
+
+    def accounts(
+        self, principal: AuthenticatedPrincipal, request_id: str, query_string: str = ""
+    ) -> Result:
         def call(runtime: P12Runtime) -> dict[str, Any]:
             entries = [
                 {
@@ -119,7 +140,8 @@ class P12Endpoints:
                 for account_id, binding in sorted(runtime.bindings.items())
                 if principal.username in binding.allowed_usernames
             ]
-            payload: dict[str, Any] = _transport().accounts_dto(entries)
+            negotiated = self._negotiated(query_string)
+            payload: dict[str, Any] = _transport().accounts_dto(entries, negotiated)
             return payload
 
         return self._run(request_id, call)
@@ -144,7 +166,9 @@ class P12Endpoints:
             )
             if not record.get("plan_id"):
                 record["plan_id"] = plan_id
-            return _transport().skip_plan_outcome_dto(record)
+            return _transport().skip_plan_outcome_dto(
+                record, self._write_negotiated(query_string)
+            )
 
         return self._run(request_id, call)
 
@@ -166,7 +190,7 @@ class P12Endpoints:
     def workbench(
         self, principal: AuthenticatedPrincipal, account_id: str, query: str, request_id: str
     ) -> Result:
-        negotiated = urllib.parse.parse_qs(query).get("schema_version", [None])[0]
+        negotiated = self._negotiated(query)
         return self._read(
             principal,
             account_id,
@@ -180,7 +204,7 @@ class P12Endpoints:
     def records(
         self, principal: AuthenticatedPrincipal, account_id: str, query: str, request_id: str
     ) -> Result:
-        negotiated = urllib.parse.parse_qs(query).get("schema_version", [None])[0]
+        negotiated = self._negotiated(query)
         return self._read(
             principal,
             account_id,
@@ -194,12 +218,15 @@ class P12Endpoints:
     def funding_rules(
         self, principal: AuthenticatedPrincipal, account_id: str, query: str, request_id: str
     ) -> Result:
+        negotiated = self._negotiated(query)
         return self._read(
             principal,
             account_id,
             query,
             request_id,
-            lambda app: _transport().funding_rules_dto(app.funding_rules(app.scope)),
+            lambda app: _transport().funding_rules_dto(
+                app.funding_rules(app.scope), negotiated
+            ),
         )
 
     def submit_fill(
@@ -213,9 +240,12 @@ class P12Endpoints:
         def call(runtime: P12Runtime) -> dict[str, Any]:
             binding = runtime.binding_for(principal, account_id)
             self._scope_query(binding, query_string)
-            command = _transport().parse_submit_fill(body)
+            negotiated = self._write_negotiated(query_string)
+            command = _transport().parse_submit_fill(body, negotiated)
             app = binding.application
-            payload: dict[str, Any] = _transport().outcome_dto(app.submit_fill(app.scope, command))
+            payload: dict[str, Any] = _transport().outcome_dto(
+                app.submit_fill(app.scope, command), negotiated
+            )
             return payload
 
         return self._run(request_id, call)
@@ -231,9 +261,12 @@ class P12Endpoints:
         def call(runtime: P12Runtime) -> dict[str, Any]:
             binding = runtime.binding_for(principal, account_id)
             self._scope_query(binding, query_string)
-            command = _transport().parse_correct_fill(body)
+            negotiated = self._write_negotiated(query_string)
+            command = _transport().parse_correct_fill(body, negotiated)
             app = binding.application
-            payload: dict[str, Any] = _transport().outcome_dto(app.correct_fill(app.scope, command))
+            payload: dict[str, Any] = _transport().outcome_dto(
+                app.correct_fill(app.scope, command), negotiated
+            )
             return payload
 
         return self._run(request_id, call)
@@ -332,7 +365,11 @@ class P12Endpoints:
                     app._facts.history(app._context).baseline_cash,
                 )
                 bound = app.bind_funding(app.scope, state, body.get("bucket_securities"))
-                return {"action": "bind", "funding": _transport().funding_rules_dto(app.funding_rules(app.scope))["funding"], "revision": bound.revision}
+                negotiated = self._write_negotiated(query_string)
+                funding = _transport().funding_rules_dto(
+                    app.funding_rules(app.scope), negotiated
+                )["funding"]
+                return {"action": "bind", "funding": funding, "revision": bound.revision}
             if action == "prepare_cycle":
                 decision = app.prepare_funding_cycle(
                     app.scope,
@@ -357,10 +394,11 @@ class P12Endpoints:
         def call(runtime: P12Runtime) -> dict[str, Any]:
             binding = runtime.binding_for(principal, account_id)
             self._scope_query(binding, query_string)
-            command = _transport().parse_order_event(body)
+            negotiated = self._write_negotiated(query_string)
+            command = _transport().parse_order_event(body, negotiated)
             app = binding.application
             payload: dict[str, Any] = _transport().outcome_dto(
-                app.submit_order_event(app.scope, command)
+                app.submit_order_event(app.scope, command), negotiated
             )
             return payload
 

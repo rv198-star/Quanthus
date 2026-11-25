@@ -85,7 +85,11 @@ def test_http_journey_matches_the_brief_amounts(p12_kernel) -> None:
     headers = _auth(p12_kernel)
     status, _, accounts = wsgi_request(p12_kernel, "GET", "/api/p12/v1/accounts", headers=headers)
     assert status == 200 and [a["account_id"] for a in accounts["accounts"]] == ["SYN-P12-A"]
-    status, _, board = wsgi_request(p12_kernel, "GET", f"{A}/workbench", headers=headers)
+    # A v3-declaring client pins its contract on every call; an absent
+    # schema_version reads the legacy v2 projection instead.
+    status, _, board = wsgi_request(
+        p12_kernel, "GET", f"{A}/workbench?schema_version={SCHEMA_VERSION}", headers=headers
+    )
     assert status == 200 and board["schema_version"] == SCHEMA_VERSION
     plan = board["package"]["plans"][0]
     assert (plan["plan_id"], plan["target_qty"], plan["price_cap"]) == (PLAN, 400, "12.40")
@@ -259,7 +263,11 @@ def test_http_cli_and_direct_calls_produce_the_same_results(tmp_path, attributio
     ]
     assert [_normalise(x) for x in http] == [_normalise(x) for x in cli_out]
     assert [_normalise(x) for x in http] == [_normalise(x) for x in direct]
-    board_http = wsgi_request(kernel, "GET", f"{A}/workbench", headers=headers)[2]
+    # board_cli / board_direct resolve the current (v3) contract; the http
+    # read pins v3 explicitly so all three surface the same projection.
+    board_http = wsgi_request(
+        kernel, "GET", f"{A}/workbench?schema_version={SCHEMA_VERSION}", headers=headers
+    )[2]
     board_cli = cli.run("workbench", state_dir=cli_state, account_id="SYN-P12-A")[1]
     board_direct = transport.workbench_dto(app.workbench(app.scope))
     assert board_http == board_cli == board_direct
@@ -321,9 +329,15 @@ def test_javascript_validator_accepts_python_dtos(tmp_path, attribution_release)
         kernel, "POST", f"{A}/execution-reports", payload={**FILL, "plan_id": PLAN}, headers=headers
     )
     samples = {
-        "Workbench": wsgi_request(kernel, "GET", f"{A}/workbench", headers=headers)[2],
-        "Records": wsgi_request(kernel, "GET", f"{A}/records", headers=headers)[2],
-        "FundingRules": wsgi_request(kernel, "GET", f"{A}/funding-rules", headers=headers)[2],
+        "Workbench": wsgi_request(
+            kernel, "GET", f"{A}/workbench?schema_version={SCHEMA_VERSION}", headers=headers
+        )[2],
+        "Records": wsgi_request(
+            kernel, "GET", f"{A}/records?schema_version={SCHEMA_VERSION}", headers=headers
+        )[2],
+        "FundingRules": wsgi_request(
+            kernel, "GET", f"{A}/funding-rules?schema_version={SCHEMA_VERSION}", headers=headers
+        )[2],
     }
     sample_path = tmp_path / "samples.json"
     sample_path.write_text(json.dumps(samples), encoding="utf-8")

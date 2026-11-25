@@ -13,14 +13,18 @@ from typing import Any
 from quanthus.platform.p12 import errors
 from quanthus.platform.p12.contract_generated import REASON_TEXTS, SCHEMA_VERSION
 
-# Issue #723 E8 r5 (compat): the frozen pre-field contract.  A request with
-# no schema_version, or one that explicitly pins p12.desktop.v2, reads the
-# v2 projection (post-frozen fields stripped, envelope and package version
-# rewritten to v2).  Only a client that explicitly selects the newer
-# contract reads next_session / confirm_qty.
+# Issue #723 E8 r5 (compat): the frozen pre-field contract.  An HTTP request
+# that sends no schema_version, or one that explicitly pins p12.desktop.v2,
+# reads the v2 projection (post-frozen fields stripped, envelope and package
+# version rewritten to v2) - the http layer supplies the v2 marker for an
+# absent query.  Only a client that explicitly selects the newer contract
+# reads next_session / confirm_qty.  A programmatic caller that passes no
+# version resolves the current contract.
 LEGACY_V2 = "p12.desktop.v2"
 
 def _effective_version(schema_version: str | None) -> str:
+    if schema_version is None:
+        return SCHEMA_VERSION
     return SCHEMA_VERSION if schema_version == SCHEMA_VERSION else LEGACY_V2
 
 from quanthus.platform.p12.validation import ContractViolation, validate
@@ -550,13 +554,15 @@ def records_dto(value: RecordsView, schema_version: str | None = None) -> dict[s
     )
 
 
-def funding_rules_dto(value: FundingRulesView) -> dict[str, Any]:
+def funding_rules_dto(
+    value: FundingRulesView, schema_version: str | None = None
+) -> dict[str, Any]:
     funding = value.funding
     risk = value.risk
     return _out(
         "FundingRules",
         {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": _effective_version(schema_version),
             "scope": _scope(value.scope),
             "composition_ref": _ref(value.composition_ref),
             "execution_profile": value.execution_profile,
@@ -627,14 +633,15 @@ def funding_rules_dto(value: FundingRulesView) -> dict[str, Any]:
             "account_revision": value.account_revision,
             "retained_bucket_mode_available": False,
         },
+        schema_version,
     )
 
 
-def outcome_dto(value: FactOutcome) -> dict[str, Any]:
+def outcome_dto(value: FactOutcome, schema_version: str | None = None) -> dict[str, Any]:
     return _out(
         "FactOutcome",
         {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": _effective_version(schema_version),
             "kind": value.kind,
             "receipt_id": value.receipt_id,
             "status": value.status,
@@ -647,14 +654,17 @@ def outcome_dto(value: FactOutcome) -> dict[str, Any]:
             "quantity_delta": value.quantity_delta,
             "current_fact_revision": value.current_fact_revision,
         },
+        schema_version,
     )
 
 
-def skip_plan_outcome_dto(record: dict[str, Any]) -> dict[str, Any]:
+def skip_plan_outcome_dto(
+    record: dict[str, Any], schema_version: str | None = None
+) -> dict[str, Any]:
     return _out(
         "SkipPlanOutcome",
         {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": _effective_version(schema_version),
             "skipped": True,
             "record": {
                 "plan_id": str(record.get("plan_id") or ""),
@@ -663,24 +673,39 @@ def skip_plan_outcome_dto(record: dict[str, Any]) -> dict[str, Any]:
                 "actor": str(record.get("actor") or ""),
             },
         },
+        schema_version,
     )
 
 
-def accounts_dto(entries: list[dict[str, Any]]) -> dict[str, Any]:
-    return _out("AccountList", {"schema_version": SCHEMA_VERSION, "accounts": entries})
+def accounts_dto(
+    entries: list[dict[str, Any]], schema_version: str | None = None
+) -> dict[str, Any]:
+    return _out(
+        "AccountList",
+        {"schema_version": _effective_version(schema_version), "accounts": entries},
+        schema_version,
+    )
 
 
 error_dto = errors.error_dto
 
 
-def _require_version(body: dict[str, Any]) -> None:
-    if body.get("schema_version") != SCHEMA_VERSION:
-        raise FactError("SCHEMA_VERSION_MISMATCH", f"expected {SCHEMA_VERSION}")
+def _require_version(body: dict[str, Any], schema_version: str | None = None) -> None:
+    # The negotiated version re-binds the SchemaVersion const for this request:
+    # a v2 reader declares p12.desktop.v2, a v3 reader p12.desktop.v3.  The body
+    # must declare the same version it negotiated on the query string.
+    expected = _effective_version(schema_version)
+    if body.get("schema_version") != expected:
+        raise FactError("SCHEMA_VERSION_MISMATCH", f"expected {expected}")
 
 
-def parse_submit_fill(body: dict[str, Any]) -> SubmitFill:
-    _require_version(body)
-    validate("SubmitFillRequest", body)
+def _const_override(schema_version: str | None) -> str | None:
+    return LEGACY_V2 if _effective_version(schema_version) == LEGACY_V2 else None
+
+
+def parse_submit_fill(body: dict[str, Any], schema_version: str | None = None) -> SubmitFill:
+    _require_version(body, schema_version)
+    validate("SubmitFillRequest", body, const_override=_const_override(schema_version))
     return SubmitFill(
         report_id=body["report_id"],
         plan_id=body["plan_id"],
@@ -691,9 +716,9 @@ def parse_submit_fill(body: dict[str, Any]) -> SubmitFill:
     )
 
 
-def parse_correct_fill(body: dict[str, Any]) -> CorrectFill:
-    _require_version(body)
-    validate("CorrectFillRequest", body)
+def parse_correct_fill(body: dict[str, Any], schema_version: str | None = None) -> CorrectFill:
+    _require_version(body, schema_version)
+    validate("CorrectFillRequest", body, const_override=_const_override(schema_version))
     return CorrectFill(
         correction_id=body["correction_id"],
         fact_id=body["fact_id"],
@@ -704,9 +729,13 @@ def parse_correct_fill(body: dict[str, Any]) -> CorrectFill:
     )
 
 
-def parse_order_event(body: dict[str, Any]) -> SubmitOrderEvent:
-    _require_version(body)
-    validate("SubmitOrderEventRequest", body)
+def parse_order_event(
+    body: dict[str, Any], schema_version: str | None = None
+) -> SubmitOrderEvent:
+    _require_version(body, schema_version)
+    validate(
+        "SubmitOrderEventRequest", body, const_override=_const_override(schema_version)
+    )
 
     def money(name: str) -> Decimal | None:
         value = body.get(name)

@@ -40,12 +40,13 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc).astimezone()
 
 
-def build_quote_live_marks(
+def _quote_field_marks(
     quotes: object,
+    field: str,
     *,
     ttl_seconds: float = 3.0,
 ) -> Callable[[Iterable[str]], dict[str, Decimal]]:
-    """Build a read-only live mark-price lookup backed by QuoteService/ReplayQuotes."""
+    """Build a read-only mark lookup bound to one named quote field."""
     lock = threading.Lock()
     cache: dict[str, tuple[float, Decimal | None]] = {}
 
@@ -68,9 +69,9 @@ def build_quote_live_marks(
                     quote = None
                 price = None
                 if quote is not None and getattr(quote, "status", None) != "unavailable":
-                    last = getattr(quote, "last_price", None)
-                    if isinstance(last, Decimal) and last.is_finite() and last > 0:
-                        price = last
+                    value = getattr(quote, field, None)
+                    if isinstance(value, Decimal) and value.is_finite() and value > 0:
+                        price = value
                 cached_price = price
                 if ttl_seconds > 0:
                     with lock:
@@ -80,6 +81,30 @@ def build_quote_live_marks(
         return marks
 
     return lookup
+
+
+def build_quote_live_marks(
+    quotes: object,
+    *,
+    ttl_seconds: float = 3.0,
+) -> Callable[[Iterable[str]], dict[str, Decimal]]:
+    """Build a read-only live mark-price (last-price) lookup."""
+    return _quote_field_marks(quotes, "last_price", ttl_seconds=ttl_seconds)
+
+
+def build_quote_open_marks(
+    quotes: object,
+    *,
+    ttl_seconds: float = 3.0,
+) -> Callable[[Iterable[str]], dict[str, Decimal]]:
+    """Build a read-only lookup for the bound session's opening price.
+
+    Issue #723 E8 r5 (buy): a suggestion bound to trading day T+1 sizes on
+    that session's opening print (e.g. the 10-08 09:30 open), never a later
+    live last price.  The quote's ``open`` field is the same bound day's
+    opening print because a confirm only resolves inside the bound session.
+    """
+    return _quote_field_marks(quotes, "open", ttl_seconds=ttl_seconds)
 
 
 class PaperDecisionSource:
@@ -199,6 +224,7 @@ def build_paper_application(
     now: Callable[[], datetime] | None = None,
     decision_source=None,
     live_marks: Callable[[Iterable[str]], Mapping[str, Decimal]] | None = None,
+    open_marks: Callable[[Iterable[str]], Mapping[str, Decimal]] | None = None,
     live_valuation_ref: str = "paper-live-quote",
     sell_execution_open: bool = False,
 ) -> P12DesktopApplication:
@@ -261,6 +287,7 @@ def build_paper_application(
         live_marks=live_marks,
         live_valuation_ref=live_valuation_ref,
         sell_execution_open=sell_execution_open,
+        open_marks=open_marks,
     )
     app.establish_baseline(request_id=PAPER_BASELINE_REQUEST, cash=baseline_cash)
     try:

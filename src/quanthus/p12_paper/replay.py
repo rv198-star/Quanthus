@@ -101,6 +101,18 @@ class Replay:
         point = info["points"][count - 1]
         fields = [""] * 40
         fields[1:5] = [info["name"], code, point["price"], info["previous_close"]]
+        # Field 5 is the CURRENT session's OPEN print - the first completed
+        # minute's price stamped on the session the replay clock is sitting
+        # in.  A bound-session buy confirming on that session's open sizes on
+        # it (e.g. 10-08 09:30), never a later last price and never an
+        # earlier session's print on a multi-day tape (Issue #723 E8 r5).
+        points = info["points"]
+        day_digits = now.strftime("%Y%m%d")
+        open_point = next(
+            (row for row in points if str(row.get("time", "")).startswith(day_digits)),
+            None,
+        )
+        fields[5] = open_point["price"] if open_point is not None else ""
         fields[6] = point["volume_lots"]
         fields[30] = self._times[code][count - 1].strftime("%Y%m%d%H%M%S")
         return fields, now

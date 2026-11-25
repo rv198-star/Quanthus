@@ -336,6 +336,7 @@ class P12DesktopApplication:
         live_marks: Callable[[Iterable[str]], Mapping[str, Decimal]] | None = None,
         live_valuation_ref: str = "paper-live-quote",
         sell_execution_open: bool = True,
+        open_marks: Callable[[Iterable[str]], Mapping[str, Decimal]] | None = None,
     ) -> None:
         if (context.account_id, context.mode) != (scope.account_id, scope.mode):
             raise FactError("UNAUTHORIZED_CONTEXT", "facts context and account scope differ")
@@ -353,6 +354,9 @@ class P12DesktopApplication:
         self._live_marks = live_marks
         self._live_valuation_ref = live_valuation_ref
         self._sell_execution_open = sell_execution_open
+        # Bound-session opening-price supply: a suggestion bound to T+1 sizes
+        # on that session's opening print, never a later live last price.
+        self._open_marks = open_marks
 
     @property
     def sell_execution_open(self) -> bool:
@@ -2953,6 +2957,35 @@ class P12DesktopApplication:
                 return mark
         return marks_map.get(security_code)
 
+    def _bound_open_mark(self, security_code: str, marks_map: dict):
+        """Bound-session opening price for a buy confirm (Issue #723 E8 r5).
+
+        A suggestion bound to trading day T+1 sizes on that session's opening
+        print (e.g. the 10-08 09:30 open of 49.80), never a later live last
+        price (the 09:32 quote of 52.00).  Resolution order: the bound
+        opening-price supply, then the bound quote service's ``open`` field,
+        else the package mark.  The ``open`` field is the bound day's opening
+        print because a buy confirm only resolves inside the bound session.
+        """
+        if self._open_marks is not None:
+            try:
+                opened = self._open_marks([security_code]) or {}
+            except Exception:  # noqa: BLE001 - fall back to quote/package
+                opened = {}
+            mark = _optional_decimal(opened.get(security_code))
+            if mark is not None and mark > 0:
+                return mark
+        quote_svc = getattr(self, "_quote_service", None) or getattr(self, "_quotes", None)
+        if quote_svc is not None:
+            try:
+                quote = quote_svc.quote(security_code)
+            except Exception:  # noqa: BLE001
+                quote = None
+            mark = _optional_decimal(getattr(quote, "open", None))
+            if mark is not None and mark > 0:
+                return mark
+        return marks_map.get(security_code)
+
     def _resized_buy_qty(self, plan, decisions, snapshot, live_mark):
         """Confirm-time whole-lot quantity a buy plan binds to.
 
@@ -2964,10 +2997,15 @@ class P12DesktopApplication:
         should keep its prior remaining-delta fallback.
         """
         marks_map = dict(_marks(decisions))
+        # Issue #723 E8 r5 (buy): size on the BOUND-SESSION opening price,
+        # never the confirm-time live last price.  An injected ``live_mark``
+        # is the caller-resolved bound-session open (submit passes the
+        # quote's ``open`` field); when absent the bound open-mark chain
+        # resolves the same opening print, else the package mark.
         injected = _optional_decimal(live_mark)
         confirm_mark = (
             injected if injected is not None and injected > 0
-            else self._confirm_mark(plan.security_code, marks_map)
+            else self._bound_open_mark(plan.security_code, marks_map)
         )
         decision = next(
             (d for d in decisions.decisions if d.opportunity_id == plan.opportunity_id),
@@ -3165,7 +3203,13 @@ class P12DesktopApplication:
         resized = self._resized_buy_qty(plan, decisions, snapshot, live_mark)
         if resized is not None:
             if resized <= 0:
-                return None
+                # Issue #723 E8 r5 (buy-2, ruling 7148440273): a re-size to
+                # ZERO is still a user-facing change - the order path must
+                # not fall through to PLAN_NOT_FOUND and free the id, it
+                # returns a confirm_qty=0 plan so the confirm is refused
+                # with the new figure (zero orders, zero fills) and the user
+                # explicitly accepts the shrunken quantity.
+                return dataclasses.replace(plan, delta_qty=0, confirm_qty=0)
             # Bind the order to the re-sized figure but keep the package
             # delta_qty visible - the confirm card shows the NEW confirm_qty
             # beside the published number so a resized confirm is confirmed

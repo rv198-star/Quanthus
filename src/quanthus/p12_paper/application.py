@@ -531,8 +531,17 @@ class PaperAccount:
             # back to the package mark when no live mark is available.
             live_mark = None
             live_quote = self._quotes.quote(command.security_code)
-            if live_quote is not None and live_quote.last_price is not None:
-                live_mark = live_quote.last_price
+            if live_quote is not None:
+                if command.side == "buy":
+                    # Issue #723 E8 r5 (buy-2, ruling 7148440273): a buy bound
+                    # to T+1 sizes on that session's OPENING print (the 10-08
+                    # 09:30 open of 49.80), never a later live last price
+                    # (the 09:32 quote of 52.00).  The injected mark the
+                    # resolver sizes on is the bound session's open field.
+                    live_mark = live_quote.open
+                elif live_quote.last_price is not None:
+                    # A sell still re-sizes on the confirm-time last price.
+                    live_mark = live_quote.last_price
             try:
                 plan = resolver(plan_id, live_mark) if callable(resolver) else None
             except TypeError:
@@ -551,7 +560,13 @@ class PaperAccount:
             # demands the explicit user re-accept; a mismatch on an
             # otherwise unchanged plan still binds the authoritative
             # quantity the same way it always did.
-            if getattr(plan, "confirm_qty", None) is not None and command.quantity != plan.delta_qty:
+            # Issue #723 E8 r5 (buy, ruling 7148440273): the order binds the
+            # quantity the user actually saw and confirmed - never a stale
+            # echo.  The check now runs on EVERY confirm, not only when the
+            # resolver re-sized: when the figure swings back to the published
+            # number, or shrinks to zero, an echo of any other quantity is
+            # still refused so the user re-confirms what is actually shown.
+            if command.quantity != plan.delta_qty:
                 return self._reject(
                     command,
                     "CONFIRM_RESIZED",

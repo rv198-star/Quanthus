@@ -42,7 +42,10 @@ def _quote(price, moment, prev="10.50"):
         status="live",
         last_price=Decimal(price),
         previous_close=Decimal(prev),
-        open=Decimal("10.55"),
+        # The bound-session opening print equals the stubbed trigger price
+        # (a confirm only resolves inside the bound session), so a quote of
+        # 55.00 carries an open of 55.00 the buy resizes on.
+        open=Decimal(price),
         high=Decimal("10.80"),
         low=Decimal("10.52"),
         volume_lots=900000,
@@ -1045,7 +1048,7 @@ def test_workbench_buy_plan_shows_resized_confirm_qty(tmp_path):
     box = [nextopen]
     ds = _set_for(day.date(), (_buy_decision(qty=200, market_date=day.date()),))
     app = _app(tmp_path, ds, box)
-    app._live_marks = lambda codes: {c: D("55.00") for c in codes}
+    app._open_marks = lambda codes: {c: D("55.00") for c in codes}
     _seed_bucket(app)
     bench = app.workbench(app.scope)
     row = next(o for o in bench.opportunities if o.security_code == "600000")

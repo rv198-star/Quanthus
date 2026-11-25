@@ -2038,3 +2038,105 @@ def test_seg_b_binding_preserves_scenario_and_nested(tmp_path):
     assert ab["environment"] == "isolated_paper"
     assert ab["source_databases"][0]["sha256"] == "2233b4e0"
 
+
+def _seg_b_write_snapshot(tmp_path, holdings, pending, as_of="2026-10-20T09:30:00+08:00", account_id="SYN-PAPER-A"):
+    """Materialise a REAL account snapshot file (the same object the
+    isolated paper run produced) and return (path, pinned_sha)."""
+    import json as _j
+    snap_obj = {
+        "account_id": account_id,
+        "account_mode": "synthetic",
+        "environment": "isolated_paper",
+        "as_of": as_of,
+        "scenario": "held_after_bound_open_fill",
+        "holdings": holdings,
+        "pending": pending,
+        "security_identity": {"security_id": _B_SID, "listing_id": _B_LID,
+                              "venue_id": "SSE", "security_code": "600000"},
+        "generation_receipt": {"sha256": "7d05c625"},
+    }
+    p = tmp_path / "snapshot.json"
+    p.write_text(_j.dumps(snap_obj))
+    return str(p), "sha256:" + __import__("hashlib").sha256(p.read_bytes()).hexdigest()
+
+
+def test_seg_b_same_bytes_caller_cleared_holdings_still_projects(tmp_path):
+    """Same real SHA: the caller mapping's holdings cleared to [] still
+    projects the VERIFIED file bytes - a refused/cleared mapping must not
+    read as a verified empty account."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    # Caller mapping: same account id + pinned sha, but holdings cleared.
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "holdings": [], "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["rejections"] == []
+    # Projection came from the verified file bytes (1200 held), not the
+    # caller's cleared mapping - the held fact is NOT erased.
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert sec["held_quantity"] == 1200
+
+
+def test_seg_b_same_bytes_caller_repoints_as_of(tmp_path):
+    """Same real SHA: a caller mapping re-pointing as_of to a FUTURE
+    instant is overridden by the verified file's own as_of (09:30+08)."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A",
+            "as_of": "2030-01-01T00:00:00+08:00",  # caller re-pointed
+            "holdings": held, "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    # The verified file's as_of (09:30+08) governs - not the caller's
+    # future re-point - so there is NO future-snapshot rejection.
+    assert ab["as_of"] == "2026-10-20T09:30:00+08:00"
+    assert "ACCOUNT_SNAPSHOT_FUTURE" not in {
+        r["reason_code"] for r in ab["rejections"]}
+
+
+def test_seg_b_rejection_is_not_a_verified_empty(tmp_path):
+    """A rejected binding clears the account facts but records a NAMED
+    refusal - it must never present as a verified empty account."""
+    path, sha = _seg_b_write_snapshot(tmp_path, [], [], account_id="SYN-PAPER-B")
+    snap = {"account_id": "SYN-PAPER-B",  # the file is a DIFFERENT account
+            "as_of": "2026-10-20T09:30:00+08:00",
+            "holdings": [], "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_ID_MISMATCH" in codes
+    # Account facts are NOT projected - the security stays a candidate
+    # with NO held/pending, and the named refusal is on record (distinct
+    # from a verified empty account).
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+    assert sec["pending_records"] == []
+
+
+def test_seg_b_generation_receipt_sha_verified(tmp_path):
+    """The generation receipt's own bytes are hashed too: a mismatched
+    receipt sha is a named ACCOUNT_RECEIPT_SHA_MISMATCH."""
+    import hashlib as _hl
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text('{"ok":true}')
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "holdings": held, "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha,
+            "generation_receipt": {"path": str(receipt),
+                                   "sha256": "sha256:" + "0" * 64}}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_RECEIPT_SHA_MISMATCH" in codes
+

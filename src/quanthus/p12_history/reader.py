@@ -10,6 +10,7 @@ carried, with UNKNOWN where coverage is unproven.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -667,9 +668,14 @@ def read_history(
         snap_sha = snap.get("snapshot_sha256") or snap.get("sha256")
         account_binding["snapshot_path"] = str(snap_path) if snap_path else None
         account_binding["declared_snapshot_sha256"] = snap_sha
-        gr = snap.get("generation_receipt") or {}
-        account_binding["generation_receipt_sha256"] = gr.get("sha256")
-        # Wrong snapshot sha -> named rejection.
+        # Same-bytes binding (audit R4 seg-B second pass): when a snapshot
+        # path is bound we verify ITS sha, then decode THAT SAME byte
+        # content and project the account facts from the verified bytes -
+        # never from the caller-supplied mapping.  A mapping whose
+        # holdings/pending/as_of were cleared or re-pointed while still
+        # borrowing the real file's sha is a refusal, not a verified
+        # empty account.
+        snap_v = None
         if snap_path and snap_sha:
             try:
                 actual_snap = sha256_file(snap_path)
@@ -686,23 +692,79 @@ def read_history(
                         "reason_code": "ACCOUNT_SNAPSHOT_SHA_MISMATCH",
                         "detail": f"account snapshot sha256 {actual_snap} != pinned {snap_sha}",
                     })
+                else:
+                    # sha matched: decode the SAME verified bytes.
+                    try:
+                        with open(snap_path, "r", encoding="utf-8") as _sf:
+                            snap_v = json.load(_sf)
+                        if not isinstance(snap_v, dict):
+                            snap_v = None
+                            account_binding["rejections"].append({
+                                "reason_code": "ACCOUNT_SNAPSHOT_MALFORMED",
+                                "detail": "verified snapshot bytes did not decode to a JSON object",
+                            })
+                    except Exception as exc:  # noqa: BLE001
+                        account_binding["rejections"].append({
+                            "reason_code": "ACCOUNT_SNAPSHOT_MALFORMED",
+                            "detail": f"verified snapshot bytes failed to parse: {type(exc).__name__}: {exc}",
+                        })
+        elif snap_path and not snap_sha:
+            # A bound path with no declared sha cannot be proven - refuse.
+            account_binding["rejections"].append({
+                "reason_code": "ACCOUNT_SNAPSHOT_NO_DECLARED_SHA",
+                "detail": "account snapshot path is bound but no pinned sha256 is declared",
+            })
+        # Use the verified decoded snapshot (snap_v) when a path was bound;
+        # otherwise fall back to the in-memory mapping (engineering path).
+        src = snap_v if snap_v is not None else snap
+        account_binding["scenario"] = src.get("scenario")
+        account_binding["account_mode"] = src.get("account_mode")
+        account_binding["environment"] = src.get("environment")
+        account_binding["as_of"] = src.get("as_of")
+        account_binding["source_databases"] = src.get("source_databases")
+        account_binding["nested_account"] = src.get("account")
+        account_binding["account_id"] = src.get("account_id")
+        gr = src.get("generation_receipt") or {}
+        account_binding["generation_receipt_sha256"] = gr.get("sha256")
+        # Generation receipt actually verified (audit): the receipt is a
+        # SEPARATE file - its path comes from the bound caller input while
+        # the expected sha comes from the VERIFIED snapshot bytes.  Its
+        # bytes must hash to that pinned sha, else a named refusal.
+        caller_gr = (snap.get("generation_receipt") or {})
+        gr_path = gr.get("path") or caller_gr.get("path")
+        if gr_path and gr.get("sha256"):
+            try:
+                actual_gr = sha256_file(gr_path)
+            except Exception as exc:  # noqa: BLE001
+                actual_gr = None
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_RECEIPT_UNREADABLE",
+                    "detail": f"generation receipt could not be opened: {type(exc).__name__}: {exc}",
+                })
+            if actual_gr is not None and actual_gr != gr.get("sha256"):
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_RECEIPT_SHA_MISMATCH",
+                    "detail": f"generation receipt sha256 {actual_gr} != pinned {gr.get('sha256')}",
+                })
+            if actual_gr is not None:
+                account_binding["generation_receipt_sha256"] = actual_gr
         # A different account swapped in -> named rejection.
         if (expected_account_id is not None
-                and snap.get("account_id") != expected_account_id):
+                and src.get("account_id") != expected_account_id):
             account_binding["rejections"].append({
                 "reason_code": "ACCOUNT_ID_MISMATCH",
                 "detail": (
-                    f"bound account_id {snap.get('account_id')} != expected "
+                    f"bound account_id {src.get('account_id')} != expected "
                     f"{expected_account_id} for this read"
                 ),
             })
         # A future-dated snapshot -> named rejection.
-        as_of_ts = parse_ts(snap.get("as_of"))
+        as_of_ts = parse_ts(src.get("as_of"))
         if as_of_ts is not None and as_of_ts > decision_cutoff:
             account_binding["rejections"].append({
                 "reason_code": "ACCOUNT_SNAPSHOT_FUTURE",
                 "detail": (
-                    f"snapshot as_of {snap.get('as_of')} post-dates the "
+                    f"snapshot as_of {src.get('as_of')} post-dates the "
                     f"decision cutoff {iso(decision_cutoff)}"
                 ),
             })
@@ -710,13 +772,13 @@ def read_history(
         # snapshot's security_identity and the effective identity -> named
         # rejection.  The snapshot's declared identity must agree with the
         # security_id its holdings/pending actually carry.
-        s_ident = snap.get("security_identity") or {}
+        s_ident = src.get("security_identity") or {}
         snap_sids = {
             str(h.get("security_id") or h.get("security_code") or "")
-            for h in snap.get("holdings") or ()
+            for h in src.get("holdings") or ()
         } | {
             str(p.get("security_id") or p.get("security_code") or "")
-            for p in snap.get("pending") or ()
+            for p in src.get("pending") or ()
         }
         snap_sids.discard("")
         declared_sid = str(s_ident.get("security_id") or "")
@@ -735,8 +797,8 @@ def read_history(
         # it supplies them; a rejected snapshot contributes NO account
         # facts (the named rejection stands instead).
         if not account_binding["rejections"]:
-            holdings = tuple(snap.get("holdings") or ())
-            pending = tuple(snap.get("pending") or ())
+            holdings = tuple(src.get("holdings") or ())
+            pending = tuple(src.get("pending") or ())
         else:
             holdings = ()
             pending = ()

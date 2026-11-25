@@ -3637,3 +3637,140 @@ def test_segA_unified_partial_backup_isolated_not_whole_day(tmp_path):
                for b in sec["security-600001"]["bars"])
     assert not any(b["session_date"] == "2026-11-23"
                    for b in sec["security-600000"]["bars"])
+
+
+# ---- R4 seg-A final-qualified-coverage closeout: row-level PIT gaps -------
+
+
+def _row_reject_daily_bar(tmp_path, day, listings, mutate):
+    """Write a prior-session Daily price member whose rows carry a row-level
+    PIT defect for every listed listing_id (the member itself READs and is
+    channel-admitted - the failure is on the row, not the member)."""
+    days = _sessions(330)
+    rows = []
+    for lid in listings:
+        rows += [r for r in _bar_table(days, listing=lid).to_pylist()
+                 if str(r["observation_end"].date()) == day]
+    mutate(rows)
+    rel = f"payload/dwd_security_bar/day={day}/dwd_security_bar.parquet"
+    _write(tmp_path / rel,
+           pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    return rel
+
+
+def _row_coverage_map(tmp_path, members, day, mutate, base_mode):
+    """Assemble the two-security universe with the prior Daily carrying a
+    row-level defect and the Base aggregate supplying the session for the
+    chosen backup radius; return the formal read result."""
+    _two_security_universe(members, tmp_path)
+    days = _sessions(330)
+    rel_base = ("payload/dwd_security_bar/interval_size=1d/"
+                "observation_start_year=2026/observation_start_month=11/"
+                "part-0.parquet")
+    if base_mode == "none":
+        cal_only = [d for d in days if str(d) != day]
+        rows = (_bar_table(cal_only).to_pylist()
+                + _bar_table(cal_only, listing="listing-600001").to_pylist())
+    elif base_mode == "partial":
+        cal_only = [d for d in days if str(d) != day]
+        rows = (_bar_table(cal_only).to_pylist()
+                + _bar_table(days, listing="listing-600001").to_pylist())
+    else:  # all - the Base carries both securities' qualified rows
+        rows = (_bar_table(days).to_pylist()
+                + _bar_table(days, listing="listing-600001").to_pylist())
+    _write(tmp_path / rel_base,
+           pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    members["dwd_security_bar"] = [_member(tmp_path, rel_base)]
+    rel = _row_reject_daily_bar(
+        tmp_path, day, ["listing-600000", "listing-600001"], mutate)
+    dm = _member(tmp_path, rel, package_id=f"daily-{day}",
+                 kind="daily", market_date=day)
+    at = datetime(2026, 11, 23, 10, 0, tzinfo=UTC)
+    clocks = {day: {"knowledge": at, "producer": at, "channel": at}}
+    fmap = _FormalStubSourceMap(members, {day: [dm]}, clocks)
+    return _formal_read(fmap, tmp_path)
+
+
+_ROW_MUTATIONS = {
+    "late": lambda rows: [
+        r.update(knowledge_from=datetime(2026, 11, 24, 17, 0, tzinfo=UTC))
+        for r in rows],
+    "null": lambda rows: [r.update(knowledge_from=None) for r in rows],
+    "withdrawn": lambda rows: [
+        r.update(knowledge_to=datetime(2026, 11, 24, 12, 0, tzinfo=UTC))
+        for r in rows],
+    "conflict": lambda rows: (
+        [r.update(knowledge_from=datetime(2026, 11, 23, 12, 0, tzinfo=UTC),
+                  knowledge_to=None) for r in rows],
+        rows.extend([dict(r, volume=float(r["volume"]) + 1,
+                          source_revision="conflicting") for r in rows])
+    )[1],
+}
+
+
+@pytest.mark.parametrize("rejection", ("late", "null", "withdrawn"))
+@pytest.mark.parametrize("backup", ("none", "partial", "all"))
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_final_qualified_row_gap_matrix(
+        tmp_path, rejection, backup, order):
+    """Final qualified coverage: a needed session whose only Daily price
+    member READ + channel-admitted yet has EVERY row rejected at the row
+    PIT gate (late knowledge / null knowledge / withdrawn) starves the
+    pool exactly like a channel gap - whole-day block when no qualified
+    backup covers the session, isolated when a partial backup does, clean
+    READ when a full qualified backup does.  Physical row order is
+    irrelevant."""
+    T = date(2026, 11, 24)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    res = _row_coverage_map(
+        tmp_path, members, "2026-11-23",
+        _ROW_MUTATIONS[rejection], backup)
+    sec = {x["identity"]["security_id"]: x
+           for x in res.raw_history["securities"]}
+    if backup == "none":
+        assert res.status == "INPUT_BLOCKED"
+        block = res.coverage["day_block"]
+        assert block["reason_code"] == "SHARED_INPUT_GAP"
+        assert block["affected_scope"] == "whole_day"
+        assert set(block["affected_securities"]) == {
+            "security-600000", "security-600001"}
+    elif backup == "partial":
+        assert res.status == "READ"
+        assert res.coverage["day_block"] is None
+        gaps = res.coverage["isolated_input_gaps"]
+        assert gaps and gaps[0]["affected_securities"] == ["security-600000"]
+        assert any(b["session_date"] == "2026-11-23"
+                   for b in sec["security-600001"]["bars"])
+        assert not any(b["session_date"] == "2026-11-23"
+                       for b in sec["security-600000"]["bars"])
+    else:
+        assert res.status == "READ"
+        assert res.coverage["day_block"] is None
+        assert not res.coverage.get("isolated_input_gaps")
+        assert any(b["session_date"] == "2026-11-23"
+                   for b in sec["security-600000"]["bars"])
+        assert any(b["session_date"] == "2026-11-23"
+                   for b in sec["security-600001"]["bars"])
+
+
+@pytest.mark.parametrize("backup", ("none", "partial", "all"))
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_final_qualified_same_clock_conflict_blocks(
+        tmp_path, backup, order):
+    """Final qualified coverage: the latest same-clock conflict is an
+    ambiguity on the session's QUALIFIED fact - an earlier qualified Base
+    row must NOT be used to salvage it (no cutoff/window/PIT bypass), so
+    every backup radius still ends whole-day INPUT_BLOCKED with the
+    conflicting member named on the receipt."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    res = _row_coverage_map(
+        tmp_path, members, "2026-11-23",
+        _ROW_MUTATIONS["conflict"], backup)
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block["reason_code"] == "SHARED_INPUT_GAP"
+    assert block["affected_scope"] == "whole_day"
+    assert set(block["affected_securities"]) == {
+        "security-600000", "security-600001"}

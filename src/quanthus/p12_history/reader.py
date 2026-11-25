@@ -1008,6 +1008,14 @@ def read_history(
     _sec_session_has_rows = {}   # (security_id, session_iso) -> had source rows
     _sec_session_qualified = {}  # (security_id, session_iso) -> qualified bar survived
     _member_session_sids = {}    # (member_key, session_iso) -> securities it supplies
+    # Row-level post-admission coverage (audit R4 seg-A final-qualified-
+    # coverage closeout): the shared-scope decision must see a session whose
+    # rows all FAILED row PIT/channel gates even though the member itself
+    # READ and was channel-admitted.  Record, per (member_key, session_iso),
+    # the securities whose rows that member physically surfaced and then had
+    # rejected, with the actual rejection reasons, so the coverage matrix can
+    # name the member that left a needed session without a qualified bar.
+    _member_session_row_gaps = {}  # (member_key, session_iso) -> {"securities":set,"reasons":set,"rows":[]}
     for ident in identities:
         raw_revisions = [
 
@@ -1161,6 +1169,43 @@ def read_history(
             _sec_session_qualified[(ident.security_id, _sess_iso)] = (
                 chosen is not None
                 and chosen.get("member_key") not in formal_inadmissible_keys)
+            # Final qualified coverage (audit R4 seg-A final-qualified-
+            # coverage closeout): when THIS security's session ended with NO
+            # selected bar under a formal read, record every member that
+            # physically surfaced a row for the session together with the
+            # actual row-rejection reasons, so the coverage matrix can bind
+            # the gap to the member that left the session starved - the
+            # member READ and was channel-admitted, so it never reached the
+            # physical/channel failure ledger on its own.
+            if formal and chosen is None:
+                for _b in ordered:
+                    _mk = _b.get("member_key")
+                    if not _mk:
+                        continue
+                    _rg = _member_session_row_gaps.setdefault(
+                        (_mk, _sess_iso),
+                        {"securities": set(), "reasons": set(), "rows": []})
+                    _rg["securities"].add(ident.security_id)
+                    _bkf = parse_ts(_b.get("knowledge_from"))
+                    _bkt = parse_ts(_b.get("knowledge_to"))
+                    if _mk in formal_inadmissible_keys:
+                        _rg["reasons"].add("CHANNEL_INADMISSIBLE")
+                    elif _bkf is None:
+                        _rg["reasons"].add("NULL_KNOWLEDGE_CLOCK")
+                    elif _bkf > decision_cutoff:
+                        _rg["reasons"].add("LATE_FOR_CUTOFF")
+                    elif _bkt is not None and _bkt <= decision_cutoff:
+                        _rg["reasons"].add("WITHDRAWN_BEFORE_CUTOFF")
+                    else:
+                        # Eligible individually but lost the same-clock
+                        # ambiguity - the conflicting revision kept it out.
+                        _rg["reasons"].add("SAME_KNOWLEDGE_CONFLICT")
+                    _rg["rows"].append({
+                        "security_id": ident.security_id,
+                        "source_revision": _b.get("source_revision"),
+                        "knowledge_from": _b.get("knowledge_from"),
+                        "knowledge_to": _b.get("knowledge_to"),
+                    })
             # The revision/rejection chain keeps EVERY physical row for
             # the session (late, withdrawn, channel-ineligible), flagged -
             # even when no row was selected for this formal read.
@@ -1808,6 +1853,52 @@ def read_history(
         _failed_days = []
         _shared_failed = []          # members whose gap is pool-wide
         _local_gaps = []             # (member, [starved security ids])
+        # Final qualified coverage (audit R4 seg-A final-qualified-coverage
+        # closeout): a member that READ and was channel-admitted still fails
+        # the session's real supply when EVERY row it surfaced lost its row
+        # PIT gate - null knowledge, a late source clock, a withdrawal before
+        # the cutoff, or the latest same-clock conflict.  Those members never
+        # reached _gap_members because they carry no named_input_gap and no
+        # physical read failure.  Fold each (member, session) whose rows left
+        # pool securities starved into the SAME unified ledger as a supply
+        # gap, keyed on the session it actually serves - the radius judgement
+        # below then decides shared vs isolated exactly as a channel gap.
+        _gap_member_keys = {
+            (e.get("package_key") or e.get("member_key"),
+             (e.get("gap_session_day").isoformat()
+              if hasattr(e.get("gap_session_day"), "isoformat")
+              else str(e.get("gap_session_day"))))
+            for e in _gap_members
+        }
+        _entries_by_key = {
+            (e.get("package_key") or e.get("member_key")): e
+            for e in source_member_entries
+        }
+        for (_mk, _sess_iso), _rg in sorted(_member_session_row_gaps.items()):
+            if _sess_iso not in needed_day_set:
+                continue
+            if not _rg["securities"]:
+                continue
+            _src = _entries_by_key.get(_mk)
+            if _src is None:
+                continue
+            # Dependency class comes from the member id (the same rule the
+            # registration loop applies): an admitted member never earned a
+            # stored dependency_type, so the field is absent here.
+            _mid_l = str(_src.get("member_id") or "")
+            if not ("dwd_security_bar" in _mid_l
+                    and "dwd_security_valuation" not in _mid_l):
+                continue
+            if (_mk, _sess_iso) in _gap_member_keys:
+                continue
+            _inj = dict(_src)
+            _inj["dependency_type"] = "SHARED_T_PRICE"
+            _inj["shared_hard_dependency"] = True
+            _inj["gap_session_day"] = _sess_iso
+            _inj["named_input_gap"] = "NO_QUALIFIED_FORMAL_REVISION"
+            _inj["row_rejection_reasons"] = sorted(_rg["reasons"])
+            _inj["row_rejected_rows"] = _rg["rows"]
+            _gap_members.append(_inj)
         for e in _gap_members:
             _gday = e.get("gap_session_day")
             _gday_iso = (_gday.isoformat()

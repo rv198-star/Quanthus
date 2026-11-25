@@ -102,6 +102,7 @@ footer{max-width:1120px;margin:0 auto 40px;padding:0 20px;color:var(--muted);fon
 .covrow .v{color:var(--info);font-weight:600}
 .covrow .r{color:var(--muted);flex:1;min-width:160px}.covdetail{margin:2px 0 4px 0;padding-left:4px;font-size:12px;line-height:1.7;color:var(--muted)}.covdetail .chk{display:inline-block;margin-right:14px}.covdetail .chk.pass{color:#1a7f37}.covdetail .chk.fail{color:#b03a3a}.covdetail .gates{color:#6a737d;margin-right:14px}
 details.covdetail summary{cursor:pointer;color:var(--info,#06c);font-size:12px;list-style:none}details.covdetail summary::-webkit-details-marker{display:none}details.covdetail summary:before{content:'▸ '}details.covdetail[open] summary:before{content:'▾ '}.pendwrap{margin-top:6px}.pendwrap summary{cursor:pointer;font-size:13px;color:var(--muted);padding:6px 0}.pendwrap summary::-webkit-details-marker{display:none}.pendwrap summary:before{content:'▸ '}details.pendwrap[open] summary:before{content:'▾ '}.en{color:#6a737d;font-style:italic;font-size:11px;display:block;margin:2px 0}
+.checks{margin:2px 0 2px 0;padding-left:4px;font-size:12px;line-height:1.7}.checks .chk{display:inline-block;margin-right:14px}.checks .chk.pass{color:#1a7f37}.checks .chk.fail{color:#b03a3a}
 tabs{display:flex;gap:0;margin-bottom:0}
 .tab{padding:8px 18px;cursor:pointer;border:1px solid var(--line);border-bottom:none;border-radius:5px 5px 0 0;background:#f3f4f5;font-size:13px}
 .tab.on{background:#fff;font-weight:600;border-bottom:1px solid #fff;margin-bottom:-1px}
@@ -160,6 +161,7 @@ tabs{display:flex;gap:0;margin-bottom:0}
 let S=null;
 async function api(p,b){const t=sessionStorage.getItem('replay-token');const m=b===undefined?'GET':'POST';const r=await fetch(p,{method:m,headers:{'Content-Type':'application/json','Authorization':'Bearer '+(t||'')},body:b===undefined?undefined:JSON.stringify(b)});if(r.status===401){sessionStorage.removeItem('replay-token');location.reload();return{}}if(!r.ok){let e={status:'http_'+r.status};try{e=await r.json()}catch(_){e.error='HTTP '+r.status}return e}return r.json()}
 function fmt(x){return x==null?'—':x}
+function fmtmoney(x){if(x==null)return'—';const n=Number(x);return isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}
 function flash(t){const f=document.getElementById('flash');f.textContent=t;f.style.opacity=1;setTimeout(()=>f.style.opacity=0,2600)}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
 function lines(arr,cls){if(!arr||!arr.length)return'';return '<ul class="reasons '+(cls||'')+'">'+arr.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'}
@@ -170,26 +172,35 @@ function sideClass(label){if(label==='买入建议')return'buy';if(label==='卖�
 function renderCoverage(){
  const el=document.getElementById('coverage');const c=(S&&S.coverage)||null;
  if(!c){el.innerHTML='';return}
- let h='<p class=covnote><b>'+esc(c.note_text||'')+'</b>'+(c.replay_message?'<span style="font-weight:400;color:var(--muted)"> · '+esc(c.replay_message)+'</span>':'')+'</p>';
+ // 覆盖总行只呈 实评/策略池 (read-only); the pending count lives on the
+ // single expandable summary, not duplicated in the note.  Non-read-only
+ // mode keeps the original note_text verbatim.
+ const covnote=S.read_only?(('本日可评估 '+(c.evaluated_count!=null?c.evaluated_count:'—')+' 只 / 策略池 '+(c.pool_count!=null?c.pool_count:'—')+' 只')):(c.note_text||'');
+ let h='<p class=covnote><b>'+esc(covnote)+'</b>'+(c.replay_message?'<span style="font-weight:400;color:var(--muted)"> · '+esc(c.replay_message)+'</span>':'')+'</p>';
  const all=c.securities||[];const ev=all.filter(x=>x.evaluated);const pend=all.filter(x=>!x.evaluated);
  if(ev.length){
   for(const r of ev){
    const sd=r.scan_detail||{};
-   h+='<div class=covrow><span class=c>'+esc(r.security_code)+(r.security_name?' '+esc(r.security_name):'')+'</span><span class="covtag cov-eval">已评估</span>'+(sd.conclusion_cn?'<span class=v>'+esc(sd.conclusion_cn)+'</span>':'')+'</div>';
-   if(sd.checks||sd.gates||sd.verdict||sd.original_en){
-    let dh='<details class=covdetail data-code="'+esc(r.security_code)+'"><summary>依据详情</summary>';
-    if((sd.gates||[]).length){dh+='<span class=gates>'+sd.gates.map(esc).join(' · ')+'</span>'}
-    for(const ck of (sd.checks||[])){dh+='<span class="chk '+(ck.passed?'pass':'fail')+'">'+esc(ck.label)+' 实测 '+esc(ck.actual)+(ck.passed?' ✓':' ✗')+'</span>'}
-    if(sd.original_en){dh+='<div class=en>原解释 '+esc(sd.original_en)+'</div>'}
-    if(sd.verdict){dh+='<span class=gates>判定 '+esc(sd.verdict)+'</span>'}
-    if(sd.prior_session||sd.signal_date){dh+='<div class=gates>前一交易日 '+esc(sd.prior_session||'')+' · 信号日 '+esc(sd.signal_date||'')+'</div>'}
-    dh+='</details>';h+=dh;
+   const cks=sd.checks||[];const quiet=cks.filter(x=>/^quiet_/.test(x.key||''));const active=cks.filter(x=>!/^quiet_/.test(x.key||''));
+   const ctitle=(r.security_name?esc(r.security_name)+' ':'')+esc(r.security_code);
+   h+='<div class=covrow><span class=c>'+ctitle+'</span><span class="covtag cov-eval">已评估</span>'+(sd.conclusion_cn?'<span class=v>'+esc(sd.conclusion_cn)+'</span>':'')+'</div>';
+   if(cks.length){
+    let ch='<div class=checks>';
+    for(const ck of quiet){ch+='<span class="chk '+(ck.passed?'pass':'fail')+'">'+esc(ck.label)+' 实测 '+esc(ck.actual)+(ck.passed?' ✓':' ✗')+'</span>'}
+    for(const ck of active){ch+='<span class="chk '+(ck.passed?'pass':'fail')+'">'+esc(ck.label)+' 实测 '+esc(ck.actual)+(ck.passed?' ✓':' ✗')+'</span>'}
+    ch+='</div>';h+=ch;
    }
+   let dh='<details class=covdetail data-code="'+esc(r.security_code)+'"><summary>依据详情</summary>';
+   if(r.scan_reason){dh+='<div class=en>原解释 '+esc(r.scan_reason)+'</div>'}
+   if(sd.verdict){dh+='<span class=gates>判定 '+esc(sd.verdict)+'</span>'}
+   if((sd.gates||[]).length){dh+='<span class=gates>'+sd.gates.map(esc).join(' · ')+'</span>'}
+   if(sd.prior_session||sd.signal_date){dh+='<div class=gates>前一交易日 '+esc(sd.prior_session||'')+' · 信号日 '+esc(sd.signal_date||'')+'</div>'}
+   dh+='</details>';h+=dh;
   }
  }
  if(pend.length){
   const pr=pend[0]&&pend[0].scan_reason?pend[0].scan_reason:'今日未评估';
-  h+='<details id=pendwrap class=pendwrap><summary>'+pend.length+' 只因 '+esc(pr)+'，今日未评估（点击展开清单）</summary><div id=pendlist></div></details>';
+  h+='<details id=pendwrap class=pendwrap><summary>'+pend.length.toLocaleString()+' 只因 '+esc(pr)+'，今日未评估</summary><div id=pendlist></div></details>';
  }
  el.innerHTML=h
  const pw=document.getElementById('pendwrap');
@@ -235,9 +246,10 @@ async function refresh(){
  renderCoverage();
  const a=S.account||{};const acct=(wb.account||{});
  document.getElementById('cash').textContent=(a.cash==null)?'—':fmt(a.cash);
+ document.getElementById('cash').textContent=fmtmoney(a.cash);
  // Empty positions -> market value is a real 0.00, not a missing field.
- const mkt=(a.positions&&a.positions.length)?(acct.market_value||acct.total_value):((a.cash!=null)?0:null);
- document.getElementById('mkt').textContent=(mkt==null)?'—':fmt(mkt);
+ const mkt=(a.positions&&a.positions.length)?(acct.market_value||acct.total_value):(a.account_snapshot_bound?0:null);
+ document.getElementById('mkt').textContent=fmtmoney(mkt);
  document.getElementById('pos').textContent=(a.positions||[]).map(p=>p.security_code+'×'+p.quantity).join('，')||'无';
  document.getElementById('ord').textContent=fmt(a.orders);document.getElementById('recon').textContent=a.rebuild_matches?'通过':'—';
  const ords=(wb.orders||[]);document.getElementById('orders').innerHTML=ords.length?ords.map(o=>esc(o.order_id)+' · '+esc(o.side)+' '+esc(o.security_code)+' ×'+esc(o.accepted_total_qty)+' · '+esc(o.status)).join('<br>'):'—';

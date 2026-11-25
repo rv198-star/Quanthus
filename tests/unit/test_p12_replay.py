@@ -630,6 +630,28 @@ class TestCoverageDisplay:
         assert rows["601390"]["state"] == "pending"
         assert rows["601390"]["scan_reason"]
 
+    def test_coverage_isolation_code_maps_to_real_reason(self):
+        from quanthus.p12_replay.coverage_display import coverage_block
+
+        # The sealed October-Base gap transports the machine code
+        # replay_action_coverage_unknown on each isolated member.  The
+        # page must render the real coverage cause (公司行为/分红送股
+        # 未核清), never the generic 详见记录页 placeholder, and never an
+        # evaluated verdict on a security the run never reached.
+        r = self._receipt()
+        r["coverage_exclusions"] = [
+            {"security_code": "601390", "reason": "replay_action_coverage_unknown",
+             "member_or_field": "securities[].actions", "scope": "per_security"},
+        ]
+        block = coverage_block(r)
+        rows = {x["security_code"]: x for x in block["securities"]}
+        iso = rows["601390"]
+        assert iso["evaluated"] is False
+        assert iso["state"] == "pending"
+        assert iso["verdict"] in (None, "")
+        assert "分红送股" in iso["scan_reason"] or "公司行为" in iso["scan_reason"]
+        assert iso["scan_reason"] != "详见记录页"
+
     def test_natural_language_reason_preserved(self):
         from quanthus.p12_replay.coverage_display import coverage_block
 

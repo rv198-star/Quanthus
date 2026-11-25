@@ -34,6 +34,18 @@ from quanthus.platform.p12.contract_generated import REASON_TEXTS
 
 _CJK_LO, _CJK_HI = "\u4e00", "\u9fff"
 
+# P11-side coverage codes the frozen REASON_TEXTS contract never carried.
+# They reach the page through _cn_reason like any other code; keeping the
+# local map here means the real isolation cause renders instead of the
+# generic 详见记录页 placeholder.  OCTOBER_ACTION_COVERAGE_UNKNOWN is the
+# sealed October-Base corporate-action coverage gap (P10 data line) - the
+# affected security stays 待核, never presented as evaluated.
+_COVERAGE_REASON_TEXTS = {
+    "REPLAY_ACTION_COVERAGE_UNKNOWN": "分红送股/公司行为数据未核清",
+    "OCTOBER_ACTION_COVERAGE_UNKNOWN": "分红送股/公司行为数据未核清",
+    "ACTION_COVERAGE_UNKNOWN": "分红送股/公司行为数据未核清",
+}
+
 
 def _has_cjk(text: str) -> bool:
     return any(_CJK_LO <= ch <= _CJK_HI for ch in text)
@@ -55,6 +67,9 @@ def _cn_reason(code: Any) -> str | None:
     mapped = REASON_TEXTS.get(text.upper())
     if mapped:
         return mapped
+    local = _COVERAGE_REASON_TEXTS.get(text.upper())
+    if local:
+        return local
     # A CJK / sentence-form reason is already Owner-readable; pass it.
     if _has_cjk(text) or " " in text:
         return text
@@ -479,6 +494,10 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
                 "hold_alert": "持仓提醒",
             }.get(action, action or "持仓评估")
         elif is_evaluated:
+            # Only a genuinely scanned-and-not-signal security carries the
+            # 未通过入场 strategy verdict.  A coverage-isolated / not-
+            # delivered member was never evaluated - showing that verdict
+            # would claim a strategy conclusion the run never reached.
             verdict = "未通过入场"
         scan = _scan_reason_for(
             code,

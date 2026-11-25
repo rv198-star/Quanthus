@@ -292,12 +292,20 @@ def read_history(
         # package_id::member_id keeps both registered and resolvable.
         return f"{member.package_id}::{member.member_id}"
     def _reg(member, knowledge_at, date_from=None, date_to=None, visible_at=None,
-             producer_completed_at=None, channel_visible_at=None):
+             producer_completed_at=None, channel_visible_at=None,
+             keep_null_visible=False):
         key = _member_key(member)
         if key not in member_entries:
+            # keep_null_visible: a formal read whose channel is UNKNOWN
+            # keeps visible_at null (a named gap) instead of back-filling
+            # the member's own knowledge clock.
+            eff_visible = (
+                visible_at if (visible_at is not None or keep_null_visible)
+                else knowledge_at
+            )
             e = env_mod.member_entry(
                 member, knowledge_at,
-                visible_at if visible_at is not None else knowledge_at,
+                eff_visible,
                 date_from, date_to,
                 producer_completed_at=producer_completed_at,
                 channel_visible_at=channel_visible_at,
@@ -364,26 +372,42 @@ def read_history(
             smap.daily_channel_visible_at(day)
             if formal else smap.daily_visible_at(day)
         )
-        # Formal admission is judged on the channel-visible instant; a
-        # missing channel clock is a named gap (the member is registered
-        # but flagged late so the rule can fail it closed).
+        # Formal admission is judged on the channel-visible instant and
+        # splits two DISTINCT states (audit R4 second segment):
+        #   * rejected_no_channel_proof - the channel clock is UNKNOWN
+        #     (no qualified publication/withdrawal event); the member is
+        #     rejected for lack of proof, NOT merely late.  Its
+        #     visible_at stays null (never back-filled from knowledge).
+        #   * late_for_cutoff - a qualified channel clock exists and is
+        #     genuinely after the decision cutoff.
         admissible_instant = day_channel if formal else day_knowledge
         for m in pkg.members:
+            rejected_no_proof = False
             late = False
-            if admissible_instant is not None and admissible_instant > decision_cutoff:
+            if formal:
+                if day_channel is None:
+                    rejected_no_proof = True   # channel UNKNOWN -> reject
+                elif day_channel > decision_cutoff:
+                    late = True              # qualified but genuinely late
+            elif admissible_instant is not None and admissible_instant > decision_cutoff:
                 late = True
-            elif admissible_instant is None and formal:
-                late = True  # no proven channel clock under a formal read
             if late:
                 late_visible_members.append(_member_key(m))
                 if formal:
                     formal_inadmissible_keys.add(_member_key(m))
+            if rejected_no_proof and formal:
+                formal_inadmissible_keys.add(_member_key(m))
             _reg(
                 m, day_knowledge,
                 date_from=day, date_to=day,
-                visible_at=(day_channel if day_channel is not None else day_knowledge),
+                # channel UNKNOWN keeps visible_at null under a formal
+                # read - the receipt shows the gap, never a guess.  The
+                # replay still uses the real clock verbatim.
+                visible_at=(day_channel if formal
+                            else (day_channel if day_channel is not None else day_knowledge)),
                 producer_completed_at=day_producer,
                 channel_visible_at=day_channel,
+                keep_null_visible=formal,
             )
             if formal:
                 # Late-for-cutoff receipt + the named input gap a P10
@@ -396,23 +420,44 @@ def read_history(
                 # security or single-action gap is isolated to that
                 # dependency so a qualified neighbour keeps working.
                 ent = member_entries[_member_key(m)]
-                ent["formal_admission"] = "late_for_cutoff" if late else "admitted"
+                ent["formal_admission"] = (
+                    "rejected_no_channel_proof" if rejected_no_proof
+                    else ("late_for_cutoff" if late else "admitted"))
                 mid_l = str(m.member_id or "")
-                shared_dep = (
-                    "dwd_trading_calendar" in mid_l
-                    or "dwd_listing" in mid_l
-                    or "dwd_security_bar" in mid_l
-                    or "dwd_security_identifier" in mid_l
-                    or "dwd_security" in mid_l and "identifier" not in mid_l
-                )
+                # Dependency type per P10 MEMBER-GAPS: the T shared
+                # price and the native T session/calendar are shared
+                # hard dependencies (their gap blocks the whole day);
+                # listing/identity/security extensions and tradability
+                # are conditional (applied only to a use that actually
+                # depends on the member); audit/universe/other members
+                # are declared-not-read.
+                if "dwd_security_bar" in mid_l:
+                    dep_type = "SHARED_T_PRICE"
+                    shared_dep = True
+                elif "dwd_trading_calendar" in mid_l:
+                    dep_type = "NATIVE_T_SESSION_AND_TIME"
+                    shared_dep = True
+                elif "dwd_tradability_state" in mid_l:
+                    dep_type = "CONDITIONAL_T_TRADABILITY"
+                    shared_dep = False
+                elif ("dwd_listing" in mid_l or "dwd_security" in mid_l
+                      or "dwd_listed_company" in mid_l
+                      or "dwd_company_identifier" in mid_l):
+                    dep_type = "CONDITIONAL_T_IDENTITY"
+                    shared_dep = False
+                else:
+                    dep_type = "DECLARED_NOT_READ_ONLY"
+                    shared_dep = False
                 if day_channel is None and day_knowledge is None:
                     ent["named_input_gap"] = (
                         "NO_PROVEN_CHANNEL_OR_KNOWLEDGE_CLOCK"
                     )
                 elif day_channel is None:
                     ent["named_input_gap"] = "NO_CHANNEL_VISIBILITY_PROOF"
-                if ent.get("named_input_gap") and shared_dep:
-                    ent["shared_hard_dependency"] = True
+                if ent.get("named_input_gap"):
+                    ent["dependency_type"] = dep_type
+                    if shared_dep:
+                        ent["shared_hard_dependency"] = True
 
     source_member_entries = list(member_entries.values())
 
@@ -899,7 +944,9 @@ def read_history(
         "late_visible_members": late_visible_members,
         "named_input_gaps": [
             {"member_key": e["package_key"], "member_id": e["member_id"],
-             "package_id": e["package_id"], "gap": e["named_input_gap"]}
+             "package_id": e["package_id"], "gap": e["named_input_gap"],
+             "dependency_type": e.get("dependency_type"),
+             "shared_hard_dependency": bool(e.get("shared_hard_dependency"))}
             for e in source_member_entries if e.get("named_input_gap")
         ] if (purpose == FORMAL_DAILY_UPDATE) else [],
         "member_consumption": member_consumption,

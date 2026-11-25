@@ -1471,8 +1471,16 @@ def test_formal_missing_channel_single_member_named_not_day_block(tmp_path):
     assert res.status == "READ"
     gaps = res.coverage["named_input_gaps"]
     assert any(g["gap"] == "NO_CHANNEL_VISIBILITY_PROOF" for g in gaps)
+    # Channel-UNKNOWN member is REJECTED for lack of proof, not merely
+    # late: it is named on named_input_gaps + flagged
+    # rejected_no_channel_proof, and its visible_at stays null.
     key = f"daily-2026-11-24::{rel}"
-    assert key in res.coverage["late_visible_members"]
+    assert key not in res.coverage["late_visible_members"]
+    src = next(m for m in res.raw_history["source_members"]
+               if m["member_id"] == rel)
+    assert src["formal_admission"] == "rejected_no_channel_proof"
+    assert src["visible_at"] is None
+    assert src["channel_visible_at"] is None
 
 
 # ---- segment B: real non-empty paper account snapshots --------------------

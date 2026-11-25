@@ -512,14 +512,13 @@ def main(argv=None) -> int:
             _scen_pin = None
         if isinstance(_scen_pin, str):
             _scen_pin = {"path": _scen_pin}
+        # A scenario binding conflicts only when it declares a DIFFERENT
+        # frozen digest - the same sha256 under an alias path is the same
+        # frozen list, so it is the identical binding, not an alternate.
         if (
             isinstance(_scen_pin, dict)
-            and _scen_pin.get("path") is not None
             and _scen_pin.get("sha256") is not None
-            and (
-                str(_scen_pin.get("path")) != str(exclusion_path)
-                or str(_scen_pin.get("sha256")) != EXPECTED_EXCLUSION_SHA256
-            )
+            and str(_scen_pin.get("sha256")) != EXPECTED_EXCLUSION_SHA256
         ):
             exclusion_block = {
                 "status": "blocked",

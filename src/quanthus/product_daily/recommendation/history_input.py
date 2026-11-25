@@ -976,6 +976,12 @@ def _position_facts_from(
     """
     unverifiable: str | None = None
     pf = sec.get("position_facts")
+    # A declared position_facts dict marks a held-existence record whose risk
+    # fields cannot be verified.  Track that existence separately from the
+    # resulting facts value: the wire dict is degraded to None below (never a
+    # fabricated HeldPositionFacts), but the member is still a declared-held
+    # account record, not an ordinary not-held security.
+    declared_position_facts = isinstance(pf, dict)
     if pf is not None and isinstance(pf, dict):
         pf, unverifiable = _adapt_position_facts_dict(pf, sec)
     pds = sec.get("prior_deterioration_sessions")
@@ -984,7 +990,7 @@ def _position_facts_from(
             "invalid_raw_history",
             "securities[].prior_deterioration_sessions must be a non-negative int",
         )
-    return pf, pds, unverifiable
+    return pf, pds, unverifiable, declared_position_facts
 
 def _adapt_position_facts_dict(
     pf: Mapping[str, Any],
@@ -1085,7 +1091,7 @@ def raw_security_inputs_from_history(
         # account_id or bare security field is not an independently-read
         # fact).  Degrade to a named hold_alert; a typed HeldPositionFacts
         # passes through unchanged.
-        position_facts, prior_det, pf_unverifiable = _position_facts_from(sec_o)
+        position_facts, prior_det, pf_unverifiable, held_unverified = _position_facts_from(sec_o)
         held_membership = _bool3(sec_o.get("held_membership"), "securities[].held_membership")
         pending_kind = (
             _text(sec_o["pending_kind"], "securities[].pending_kind")
@@ -1103,6 +1109,7 @@ def raw_security_inputs_from_history(
             held_membership is True
             or held_qty is not None
             or position_facts is not None
+            or held_unverified
             or pending_kind is not None
             or bool(_seq(sec_o.get("pending") or (), f"securities[{si}].pending"))
         )
@@ -1174,6 +1181,7 @@ def raw_security_inputs_from_history(
                     position_facts=position_facts,
                     prior_deterioration_sessions=prior_det,
                     held_membership=held_membership,
+                    held_membership_unverified=held_unverified,
                     pending_kind=pending_kind,
                     held_unavailable_reason=pf_unverifiable or held_reason,
                     held_quantity=held_qty,
@@ -1268,6 +1276,7 @@ def raw_security_inputs_from_history(
                             position_facts=position_facts,
                             prior_deterioration_sessions=prior_det,
                             held_membership=held_membership,
+                            held_membership_unverified=held_unverified,
                             pending_kind=pending_kind,
                             held_unavailable_reason=held_reason,
                             held_quantity=held_qty,
@@ -1439,6 +1448,7 @@ def raw_security_inputs_from_history(
                 position_facts=position_facts,
                 prior_deterioration_sessions=prior_det,
                 held_membership=held_membership,
+                held_membership_unverified=held_unverified,
                 pending_kind=pending_kind,
                 held_unavailable_reason=held_reason,
                 held_quantity=held_qty,

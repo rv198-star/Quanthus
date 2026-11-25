@@ -130,6 +130,14 @@ class RawSecurityInput:
     # entries but does not establish a fill. Explicit membership, qualified position
     # facts or positive held quantity establish a held review, even with bad market.
     held_membership: bool | None = None
+    # Declared-held existence whose risk facts could NOT be verified: a
+    # serializable wire position_facts dict marks a real held record, but its
+    # sessions/return/reduction counts carry no same-read verified account
+    # snapshot, so they are degraded (position_facts=None) and the member is
+    # held-blocked via this flag rather than the risk object.  This keeps the
+    # held EXISTENCE (entry block + named hold_alert) separate from the
+    # unverified RISK values (which only the typed internal path may supply).
+    held_membership_unverified: bool = False
     # Pending kind from the P12 RunnerRequest.pending_securities projection
     # (open_buy_order | reserved_bucket | unconfirmed_fill): it blocks a new entry for
     # the security but does not itself receive a held review.  A code that is also a
@@ -229,6 +237,7 @@ def raw_security_input_closure(item: RawSecurityInput) -> dict[str, Any]:
         ),
         "prior_deterioration_sessions": item.prior_deterioration_sessions,
         "held_membership": item.held_membership,
+        "held_membership_unverified": item.held_membership_unverified,
         "pending_kind": item.pending_kind,
         "held_unavailable_reason": item.held_unavailable_reason,
         "held_quantity": item.held_quantity,
@@ -325,12 +334,21 @@ def _normalize_account_inputs(
         if item.pending_quantity is not None and item.pending_kind is None:
             raise ProductDailyError("pending_kind_unavailable", code)
         has_facts = item.position_facts is not None
+        # A declared-held record exists whether its risk facts arrived typed
+        # (has_facts) or as an unverifiable wire dict (held_membership_unverified,
+        # whose values were already dropped).  Either marks held EXISTENCE for the
+        # membership decision and the contradiction check below; only the typed
+        # object carries verifiable RISK values for an exit.
+        has_held_existence = has_facts or item.held_membership_unverified
         positive_quantity = item.held_quantity is not None and item.held_quantity > 0
-        if (item.held_membership is False and (has_facts or positive_quantity)) or (
-            item.held_quantity == 0 and (item.held_membership is True or has_facts)
+        if (item.held_membership is False and (has_held_existence or positive_quantity)) or (
+            item.held_quantity == 0
+            and (item.held_membership is True or has_held_existence)
         ):
             raise ProductDailyError("contradictory_account_membership", code)
-        is_held = item.held_membership is True or has_facts or positive_quantity
+        is_held = (
+            item.held_membership is True or has_held_existence or positive_quantity
+        )
         is_pending = (
             item.pending_kind is not None or code in pending or (code in hints and not is_held)
         )
@@ -357,6 +375,7 @@ def _normalize_account_inputs(
         records[code] = {
             "security_code": code,
             "held_membership": item.held_membership,
+            "held_membership_unverified": item.held_membership_unverified,
             "held": is_held,
             "held_quantity": item.held_quantity,
             "pending": is_pending,
@@ -367,7 +386,9 @@ def _normalize_account_inputs(
             if details and all(d["quantity"] is not None for d in details)
             else "unavailable",
             "membership_source": "filled_position_evidence"
-            if is_held
+            if (is_held and not item.held_membership_unverified)
+            else "held_membership_unverified"
+            if item.held_membership_unverified
             else "pending_descriptor"
             if details
             else "combined_account_hint"

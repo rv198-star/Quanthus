@@ -424,6 +424,128 @@ def _package_instant(value: Any) -> datetime:
     return instant
 
 
+_P1_LEDGER_ID = "ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet"
+_P1_PACKAGE = "base-ods"
+_P1_MEMBER_KEY = f"{_P1_PACKAGE}::{_P1_LEDGER_ID}"
+
+
+def _p1_read_error(
+    request: Any,
+    read: Mapping[str, Any],
+    consumption: Mapping[str, Any],
+    source_read: datetime,
+    observed: datetime,
+) -> str | None:
+    """Join the reported READ to this request's source declaration and both intake receipts."""
+
+    def matches(row: Mapping[str, Any]) -> bool:
+        return (
+            row.get("member_id") == _P1_LEDGER_ID
+            and row.get("member_key", _P1_MEMBER_KEY) == _P1_MEMBER_KEY
+            and row.get("package_key", _P1_MEMBER_KEY) == _P1_MEMBER_KEY
+            and row.get("package_id", _P1_PACKAGE) == _P1_PACKAGE
+        )
+
+    if not matches(read) or read.get("member_key") != _P1_MEMBER_KEY:
+        return "p1_member_identity_mismatch"
+    sources = [r for r in request.source_members if r.get("member_id") == _P1_LEDGER_ID]
+    rows = consumption.get("members") if isinstance(consumption, Mapping) else None
+    if not isinstance(rows, (list, tuple)):
+        return "p1_read_without_unique_member"
+    ordinary = [
+        r
+        for r in rows
+        if isinstance(r, Mapping) and r.get("member_id") == _P1_LEDGER_ID
+    ]
+    intake = [m for m in request.member_evidence if m.member_id == _P1_LEDGER_ID]
+    if len(sources) != 1 or len(ordinary) != 1 or len(intake) != 1:
+        return "p1_read_without_unique_member"
+    source, row, member = sources[0], ordinary[0], intake[0]
+    if (
+        not matches(source)
+        or source.get("package_id") != _P1_PACKAGE
+        or not matches(row)
+        or row.get("status", "READ") != "READ"
+    ):
+        return "p1_member_identity_mismatch"
+    digest = source.get("sha256")
+    if (
+        read.get("sha_match") is not True
+        or row.get("sha_match") is not True
+        or not (digest == read.get("sha256") == row.get("sha256") == member.digest)
+        or any(
+            r[key] != digest
+            for r in (row, read)
+            for key in ("declared_sha256", "actual_sha256")
+            if key in r
+        )
+    ):
+        return "p1_member_digest_mismatch"
+    try:
+        verified = _package_instant(read.get("verified_at"))
+        matching_clock = (
+            _package_instant(consumption.get("run_read_at")) == source_read
+            and source_read <= verified <= observed
+            and verified == _package_instant(row.get("verify_at")) == member.available_at
+        )
+    except ProductDailyError:
+        matching_clock = False
+    return None if matching_clock else "p1_member_verify_clock_mismatch"
+
+
+def _p1_read_evidence(
+    request: Any,
+    evidence: Mapping[str, Any],
+    source_read: datetime,
+    observed: datetime,
+) -> dict[str, Any]:
+    """Preserve failed attempts. Only corroborated successful reads can certify the ledger."""
+    required = _P1_LEDGER_ID in request.required_member_ids
+    if "p1_exceptions" not in evidence:
+        return dict(evidence)
+    section = evidence.get("p1_exceptions")
+    reads = section.get("reads") if isinstance(section, Mapping) else None
+    error = None
+    successful = []
+    if not isinstance(reads, list) or not all(isinstance(r, Mapping) for r in reads):
+        error = "p1_read_evidence_missing"
+    else:
+        successful = [r for r in reads if r.get("status") == "READ"]
+        if len(successful) > 1 or (successful and section.get("p1_unverified")):
+            error = "p1_read_evidence_conflict"
+        elif successful:
+            error = _p1_read_error(
+                request,
+                successful[0],
+                evidence.get("member_consumption") or {},
+                source_read,
+                observed,
+            )
+        elif required:
+            error = "p1_required_read_unverified"
+    if error is None:
+        return dict(evidence)
+    if required:
+        _fail("replay_p1_read_mismatch", f"{_P1_MEMBER_KEY}: {error}")
+    # An optional claim may be unavailable to this run. Keep the reported
+    # bytes/clocks for audit, outside the list of accepted READs. Native prices
+    # and signed holder terms have their own independent proof.
+    attempts = (
+        [r for r in reads if isinstance(r, Mapping) and r.get("status") != "READ"]
+        if isinstance(reads, list)
+        else []
+    )
+    return {
+        **evidence,
+        "p1_exceptions": {
+            "reads": attempts,
+            "p1_unverified": True,
+            "reason": error,
+            "reported_evidence": section,
+        },
+    }
+
+
 def _october_package_clock(
     request: Any,
     evidence: Mapping[str, Any],
@@ -690,12 +812,6 @@ def run_e1_replay_day(
                 }
                 for code, mids in member_use["isolated_by_security"].items()
             },
-            # P12-supplied consumption evidence from the SAME #749 read: the
-            # original envelope bytes reference/SHA, per-member selected-row
-            # versions, the actual first-read/verify instants and the
-            # same-day scenario-ledger digest.  Folded into the closure under
-            # the caller's own keys; never back-filled from the run's now.
-            "p12": dict(p12_evidence or {}),
             # The named consumer rule by which this replay reads the exchange
             # calendar plus the PROVEN schedule evidence for the venue sessions
             # it actually relies on (P10 #747).  Each claimed session must
@@ -722,6 +838,9 @@ def run_e1_replay_day(
             req, p12_evidence, source_read_at, observed_at, logical_cutoff,
             snapshot_manifest_digest, consumption_evidence["calendar_schedule_evidence"],
         )
+    consumption_evidence["p12"] = _p1_read_evidence(
+        req, p12_evidence or {}, source_read_at, observed_at
+    )
     receipt = paper_replay.run_replay_day(
         projected_req,
         market_date,

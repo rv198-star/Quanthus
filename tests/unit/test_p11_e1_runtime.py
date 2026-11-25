@@ -768,7 +768,13 @@ def test_public_replay_checks_price_inputs_before_entry(
     closure = day["source_closure"]
     assert closure["price_basis"] == "none"
     ce = closure["consumption_evidence"]
-    assert ce["p12"]["p1_exceptions"]["reads"] == [read]
+    special = ce["p12"]["p1_exceptions"]
+    if ledger_failure:
+        assert special["reads"] == [read]
+    else:
+        # The optional success claim is unpaired in this fixture.
+        assert special["p1_unverified"] and not special["reads"]
+        assert special["reported_evidence"]["reads"] == [read]
     (item,) = ce["p1_factor_visibility"]["price_inputs"]
     assert item["disposition"] == expected
     assert item["dependency_reasons"] == subject.get("dependency_reasons", {})
@@ -776,3 +782,84 @@ def test_public_replay_checks_price_inputs_before_entry(
     if not admitted:
         (isolation,) = day["coverage_exclusions"]
         assert isolation["reason"] == expected and isolation in closure["exclusions"]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        None,
+        "late",
+        "early",
+        "different_time_in_window",
+        "digest",
+        "source_digest",
+        "different_package",
+        "ordinary_package",
+        "duplicate_read",
+        "duplicate_ordinary",
+    ],
+)
+def test_p1_read_pairs_identity_source_digest_and_original_clocks(change):
+    from types import SimpleNamespace
+
+    from quanthus.product_daily.recommendation.e1_runtime import _p1_read_evidence
+
+    mid = "ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet"
+    key = "base-ods::" + mid
+    digest = "sha256:" + "d" * 64
+    start, verified, observed = [
+        datetime.fromisoformat("2026-11-25T00:" + hm + "+00:00")
+        for hm in ("33:50", "34:06", "36:00")
+    ]
+    special = {
+        "member_id": mid,
+        "member_key": key,
+        "status": "READ",
+        "sha_match": True,
+        "verified_at": verified.isoformat(),
+        "sha256": digest,
+    }
+    row = {
+        "member_id": mid,
+        "package_key": key,
+        "status": "READ",
+        "sha_match": True,
+        "verify_at": verified.isoformat(),
+        "sha256": digest,
+    }
+    source = {"member_id": mid, "package_id": "base-ods", "sha256": digest}
+    member = SimpleNamespace(member_id=mid, digest=digest, available_at=verified)
+    request = SimpleNamespace(
+        source_members=[source], member_evidence=[member], required_member_ids=[mid]
+    )
+    evidence = {
+        "member_consumption": {"run_read_at": start.isoformat(), "members": [row]},
+        "p1_exceptions": {"reads": [special]},
+    }
+    if change in ("late", "early", "different_time_in_window"):
+        special["verified_at"] = {
+            "late": "2026-11-25T00:38:00Z",
+            "early": "2026-11-25T00:33:49Z",
+            "different_time_in_window": "2026-11-25T00:34:05Z",
+        }[change]
+    elif change == "digest":
+        special["sha256"] = "sha256:" + "c" * 64
+    elif change == "source_digest":
+        source["sha256"] = "sha256:" + "c" * 64
+    elif change == "different_package":
+        special["member_key"] = "other::" + mid
+    elif change == "ordinary_package":
+        row["package_key"] = "other::" + mid
+    elif change == "duplicate_read":
+        evidence["p1_exceptions"]["reads"].append(dict(special))
+    elif change == "duplicate_ordinary":
+        evidence["member_consumption"]["members"].append(dict(row))
+    if change is None:
+        assert _p1_read_evidence(request, evidence, start, observed) == evidence
+        return
+    with pytest.raises(ProductDailyError, match="replay_p1_read_mismatch"):
+        _p1_read_evidence(request, evidence, start, observed)
+    request.required_member_ids = []
+    result = _p1_read_evidence(request, evidence, start, observed)["p1_exceptions"]
+    assert result["p1_unverified"] and result["reads"] == []
+    assert result["reported_evidence"] == evidence["p1_exceptions"]

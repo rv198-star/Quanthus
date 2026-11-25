@@ -158,15 +158,16 @@ class Replay:
         time_label = self._contract.get("time_label")
         visible_at = self._contract.get("visible_at")
         # Field TYPE checks precede membership tests and dict access, so a
-        # list/object/scalar wrong type is a named structural rejection and
-        # never a TypeError that takes the service down.
-        if time_label is not None and not isinstance(time_label, str):
-            return f"tape contract time_label field has the wrong type {type(time_label).__name__}"
-        if visible_at is not None and not isinstance(visible_at, str):
-            return f"tape contract visible_at field has the wrong type {type(visible_at).__name__}"
-        open_field = self._contract.get("open_field")
-        if open_field is not None and not isinstance(open_field, str):
-            return f"tape contract open_field field has the wrong type {type(open_field).__name__}"
+        # list/object/null wrong type is a named structural rejection and
+        # never a TypeError that takes the service down.  A key that is
+        # PROVIDED (present in the dict) carries a declared type; a provided
+        # null is itself a structural violation, distinct from an absent key.
+        for _f in ("time_label", "visible_at", "open_field"):
+            if _f in self._contract and not isinstance(self._contract.get(_f), str):
+                return (
+                    f"tape contract {_f} field has the wrong type "
+                    f"{type(self._contract.get(_f)).__name__}"
+                )
         if time_label not in self._LABEL_VISIBLE:
             return f"undefined tape time_label {time_label!r}"
         if self._LABEL_VISIBLE[time_label] != visible_at:
@@ -190,18 +191,31 @@ class Replay:
                     _tick_ok = False
             if not _tick_ok:
                 return f"tape contract min_tick is not a finite positive decimal {_mt!r}"
-        opens = self._contract.get("opens")
-        if opens is not None:
+        # ``opens`` when PROVIDED must be an array of objects each declaring
+        # string security/time and a scalar price.  A provided null (or a
+        # non-list) is a structural violation - not a legal empty supply -
+        # and each mistyped field names its own path (opens[i].security).
+        if "opens" in self._contract:
+            opens = self._contract.get("opens")
             if not isinstance(opens, list):
                 return "tape contract opens is not an array"
-            for decl in opens:
+            for _i, decl in enumerate(opens):
                 if not isinstance(decl, dict):
-                    return "tape contract opens entry is not an object"
+                    return f"tape contract opens[{_i}] entry is not an object"
                 for key in ("security", "time", "price"):
                     if key not in decl:
-                        return f"tape contract opens entry missing {key!r}"
-                if not isinstance(decl["security"], str) or not isinstance(decl["time"], str):
-                    return "tape contract opens entry field has the wrong type"
+                        return f"tape contract opens[{_i}] entry missing {key!r}"
+                if not isinstance(decl["security"], str):
+                    return f"tape contract opens[{_i}].security field has the wrong type {type(decl['security']).__name__}"
+                if not isinstance(decl["time"], str):
+                    return f"tape contract opens[{_i}].time field has the wrong type {type(decl['time']).__name__}"
+                # The price field must be a SCALAR literal (str/int/float/
+                # Decimal, never bool or a container) before the value-domain
+                # Decimal gate; a list/dict/bool is a structural violation,
+                # not a merely-invalid price.
+                _pv = decl["price"]
+                if isinstance(_pv, bool) or not isinstance(_pv, (str, int, float)) and _pv is not None:
+                    return f"tape contract opens[{_i}].price field has the wrong type {type(_pv).__name__}"
         return None
 
     def _point_visible_at(self, row: dict[str, Any]) -> datetime | None:

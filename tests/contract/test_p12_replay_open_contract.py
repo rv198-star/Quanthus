@@ -475,6 +475,50 @@ def test_bad_tick_does_not_drop_precision_gate():
     assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
 
 
+# ---- field presence vs provided-null, and entry field paths ---------------
+
+
+def test_provided_null_opens_is_structural_not_unavailable():
+    # opens=null is a DECLARED wrong type - structural INVALID, never a
+    # legal empty supply or a merely-missing one.
+    contract = dict(MINUTE_START)
+    contract["opens"] = None
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert "opens is not an array" in replay._contract_error
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
+
+
+def test_provided_null_open_field_is_structural():
+    contract = dict(MINUTE_START)
+    contract["open_field"] = None
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": "49.80"}
+    ]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert "open_field" in replay._contract_error
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
+
+
+def test_opens_entry_field_type_names_the_field_path():
+    # security/time/price wrong types name opens[i].<field> in the detail.
+    for field, raw in (
+        ("security", ["x"]), ("security", {"x": 1}), ("security", True),
+        ("time", []), ("price", ["49.80"]), ("price", {"x": 1}), ("price", True),
+    ):
+        contract = dict(MINUTE_START)
+        contract["opens"] = [
+            {"security": "600000", "time": "202610080929", "price": "49.80",
+             field: raw}
+        ]
+        tape = _tape(_POINTS_BASE, contract=contract)
+        replay = Replay(tape, day="2026-10-07", source="t")
+        assert replay._contract_error is not None
+        assert f"opens[0].{field}" in replay._contract_error
+        assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
+
+
 # ---- Decimal equivalence vs real conflict ----------------------------------
 
 

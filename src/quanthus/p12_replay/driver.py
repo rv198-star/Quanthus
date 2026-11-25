@@ -304,6 +304,7 @@ def make_engine(
     base_manifest_sha256: str = BASE_MANIFEST_SHA256,
     knowledge_cutoff: str | None = None,
     publish_time: time = time(22, 30, tzinfo=EXCHANGE_TZ),
+    read_only_account_snapshot: dict | None = None,
     reset: bool = False,
 ) -> ReplayEngine:
     """Build a ReplayEngine bound to the replay's own state dir."""
@@ -358,6 +359,7 @@ def make_engine(
         account_mode=account_mode,
         publish_time=publish_time,
         read_only=os.environ.get("P12_REPLAY_READONLY") in ("1", "true", "yes"),
+        read_only_account_snapshot=read_only_account_snapshot,
         app_builder=lambda **kw: build_replay_app(
             fixture_path=fixture_path, **kw
         ),
@@ -394,6 +396,30 @@ def main(argv=None) -> int:
             "e1_assembly_unavailable block and the entry never falls back "
             "to the synthetic runner."
         ),
+    )
+    parser.add_argument(
+        "--account-snapshot",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "read-only review only: the signed-off scenario account snapshot "
+            "the projection reads for cash/holdings (sha256 + scenario "
+            "verified before use).  Absent/mismatched -> the page reports "
+            "account_snapshot_unavailable rather than a fabricated balance."
+        ),
+    )
+    parser.add_argument(
+        "--account-snapshot-sha256",
+        default=None,
+        metavar="SHA256",
+        help="expected sha256:... digest of --account-snapshot.",
+    )
+    parser.add_argument(
+        "--account-snapshot-scenario",
+        default=None,
+        metavar="ID",
+        help="expected scenario_id inside --account-snapshot.",
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8792)
@@ -577,6 +603,15 @@ def main(argv=None) -> int:
             decision_cutoff_time=e1_decision_cutoff,
             account_mode=(
                 "simulation" if e1_runner is not None else "synthetic"
+            ),
+            read_only_account_snapshot=(
+                {
+                    "path": args.account_snapshot,
+                    "sha256": args.account_snapshot_sha256,
+                    "scenario_id": args.account_snapshot_scenario,
+                }
+                if args.account_snapshot is not None
+                else None
             ),
             reset=reset,
         )

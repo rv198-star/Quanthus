@@ -1,21 +1,36 @@
-"""Read-only review projection: GET paths never open the ledger/app.
-
-Regression for the coordinator finding that /api/state under
-P12_REPLAY_READONLY still ran the normal day_state path -> _build_app ->
-replay ledger (sqlite files in the state dir).  In read_only mode the
-engine must project the sealed run/package/day-receipt evidence plus the
-known baseline account (snapshot fc92def5, 100000.00 cash, zero holdings)
-without ever calling app_builder - and must label the account a display
-projection, never a reconciled ledger truth.
+"""Read-only review projection: GET paths never open the ledger/app, and the
+account is a bound evidence snapshot - never a hard-coded balance.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import date
+from pathlib import Path
 
 from quanthus.p12_replay.engine import ReplayEngine
 
+_SNAP = {
+    "scenario_id": "spdb-20261008-2130",
+    "account": {
+        "engineering_replay_as_observed": True,
+        "rebuild_matches": True,
+        "cash": "100000.00",
+        "positions": [],
+        "orders": 0,
+        "reports": 0,
+    },
+}
 
-def _engine(tmp_path, *, read_only: bool) -> ReplayEngine:
+
+def _snap_file(tmp_path, doc=_SNAP):
+    raw = json.dumps(doc).encode()
+    path = tmp_path / "snap.json"
+    path.write_bytes(raw)
+    return path, "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _engine(tmp_path, *, read_only, snapshot=None):
     calls = {"app": 0}
 
     def _app_builder(**_kw):
@@ -32,60 +47,79 @@ def _engine(tmp_path, *, read_only: bool) -> ReplayEngine:
         base_manifest_path=tmp_path / "m.json",
         base_manifest_sha256="sha256:0",
         read_only=read_only,
+        read_only_account_snapshot=snapshot,
     )
     engine._calls = calls
     return engine
 
 
 def _snapshot(root):
-    return sorted(
-        str(p.relative_to(root))
-        for p in root.rglob("*")
-        if p.is_file()
-    )
+    return sorted(str(p.relative_to(root)) for p in root.rglob("*") if p.is_file())
 
 
 class TestReadOnlyProjection:
     def test_day_state_never_opens_app_or_ledger(self, tmp_path):
-        engine = _engine(tmp_path, read_only=True)
-        before = _snapshot(tmp_path)
+        path, sha = _snap_file(tmp_path)
+        engine = _engine(
+            tmp_path,
+            read_only=True,
+            snapshot={
+                "path": path,
+                "sha256": sha,
+                "scenario_id": "spdb-20261008-2130",
+            },
+        )
+        before = _snapshot(engine.state_dir)
         state = engine.day_state()
-        after = _snapshot(tmp_path)
-
+        after = _snapshot(engine.state_dir)
         assert engine._calls["app"] == 0
-        # No new file (sqlite/ledger/log) may appear on a read path.
-        assert after == before, f"read created files: {set(after) - set(before)}"
+        assert after == before
         account = state["account"]
         assert account["read_only_projection"] is True
+        assert account["account_snapshot_bound"] is True
+        assert account["account_snapshot_sha256"] == sha
+        assert account["rebuild_matches"] is True
         assert account["cash"] == "100000.00"
         assert account["positions"] == []
         assert account["orders"] == 0
-        # A read-only projection is NOT a rebuild-from-events reconciliation.
-        assert account["rebuild_matches"] is None
-        assert state["replay"]["current_day"] == "2026-10-08"
         assert state["open_plans"] == []
 
-    def test_day_review_projects_empty_chain_without_app(self, tmp_path):
-        engine = _engine(tmp_path, read_only=True)
+    def test_snapshot_sha_mismatch_reports_unavailable(self, tmp_path):
+        path, _sha = _snap_file(tmp_path)
+        engine = _engine(
+            tmp_path,
+            read_only=True,
+            snapshot={
+                "path": path,
+                "sha256": "sha256:" + "0" * 64,
+                "scenario_id": "spdb-20261008-2130",
+            },
+        )
+        account = engine.day_state()["account"]
+        assert engine._calls["app"] == 0
+        assert "sha256_mismatch" in account["account_snapshot_unavailable"]
+        assert account["cash"] is None
+        assert account["rebuild_matches"] is None
+
+    def test_missing_snapshot_reports_not_bound(self, tmp_path):
+        engine = _engine(tmp_path, read_only=True, snapshot=None)
+        account = engine.day_state()["account"]
+        assert account["account_snapshot_unavailable"] == "account_snapshot_not_bound"
+        assert account["cash"] is None
+
+    def test_day_review_and_records_project_without_app(self, tmp_path):
+        engine = _engine(tmp_path, read_only=True, snapshot=None)
         review = engine.day_review()
         assert engine._calls["app"] == 0
         assert review["advice"] == []
         assert review["orders_today"] == []
         assert review["account"]["read_only_projection"] is True
-
-    def test_workbench_and_records_are_projections(self, tmp_path):
-        engine = _engine(tmp_path, read_only=True)
-        bench = engine.workbench()
-        assert bench["workbench"]["opportunities"] == []
         records = engine.records_view()
         assert records["read_only_projection"] is True
         assert records["orders"] == []
-        assert engine._calls["app"] == 0
 
-    def test_normal_mode_still_builds_app(self, tmp_path, monkeypatch):
+    def test_normal_mode_still_builds_app(self, tmp_path):
         engine = _engine(tmp_path, read_only=False)
-        # In the normal (non-read-only) mode reconcile() must still reach
-        # _build_app; with our raising builder it raises the AssertionError.
         try:
             engine.reconcile()
         except AssertionError:

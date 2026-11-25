@@ -148,6 +148,14 @@ class ReplayEngine:
     # (sqlite) and the simulated account never open on a read path - GETs
     # project the same payload shape without touching account truth.
     read_only: bool = False
+    # Optional bound account snapshot for the read-only projection:
+    # {path, sha256, scenario_id}.
+    # When set, _readonly_account reads the signed-off scenario account
+    # snapshot (a real rebuild receipt from that scenario), verifies the
+    # file sha256 + scenario_id, and returns its account block - a bound
+    # evidence read, never a hard-coded balance.  Absent, unreadable or
+    # mismatched, the projection reports snapshot-unavailable instead.
+    read_only_account_snapshot: dict | None = None
 
     # runtime state
     day_index: int = 0
@@ -1311,27 +1319,72 @@ class ReplayEngine:
         }
 
     def _readonly_account(self) -> dict:
-        """The known account projection for a sealed read-only review.
+        """The bound scenario account snapshot for a sealed read-only review.
 
-        The sealed v10 evidence binds the replay account baseline snapshot
-        fc92def5: SYN-PAPER-A opened with 100000.00 cash and zero holdings /
-        orders.  The day published 今日无操作, so no cash moved and no order
-        was posted.  This is a DISPLAY projection from that signed-off
-        baseline - not a rebuild-from-events reconciliation.  rebuild_matches
-        stays None (the read-only path never runs the ledger rebuild check)
-        so the page labels the cash as a projected baseline, never a verified
-        reconciled balance.  Opening the replay ledger (sqlite) or the
-        simulated account on a read path is refused.
+        The projection reads the signed-off scenario account snapshot bound
+        to this run (read_only_account_snapshot): the file sha256 and
+        scenario_id are verified before its account block is returned.
+        That block carries the scenario own rebuild receipt - a real
+        rebuild-from-events truth for that account at that cutoff, here
+        served read-only.  rebuild_matches is kept verbatim from the
+        snapshot (it is the scenario own evidence, not a check this read
+        path performed).  When no matching snapshot is bound the projection
+        reports account_snapshot_unavailable and never fabricates a cash
+        figure or an empty position as verified.
         """
-        return {
+        snap = self.read_only_account_snapshot or {}
+        marker = {
             "engineering_replay_as_observed": True,
             "read_only_projection": True,
-            "rebuild_matches": None,
-            "cash": "100000.00",
-            "positions": [],
-            "orders": 0,
-            "reports": 0,
         }
+        path = snap.get("path")
+        want_sha = str(snap.get("sha256") or "")
+        want_scen = str(snap.get("scenario_id") or "")
+        reason = None
+        doc = None
+        actual = None
+        if not path:
+            reason = "account_snapshot_not_bound"
+        else:
+            try:
+                raw = Path(path).read_bytes()
+            except Exception as exc:  # noqa: BLE001 - report, never crash
+                reason = f"account_snapshot_unreadable:{type(exc).__name__}"
+            else:
+                import hashlib as _hashlib
+                import json as _json
+                actual = "sha256:" + _hashlib.sha256(raw).hexdigest()
+                if want_sha and actual != want_sha:
+                    reason = f"account_snapshot_sha256_mismatch:{actual[:19]}"
+                else:
+                    try:
+                        doc = _json.loads(raw.decode("utf-8"))
+                    except Exception as exc:  # noqa: BLE001
+                        reason = f"account_snapshot_parse:{type(exc).__name__}"
+        if reason is None and doc is not None:
+            scen = str(doc.get("scenario_id") or "")
+            if want_scen and scen != want_scen:
+                reason = f"account_snapshot_scenario_mismatch:{scen}"
+            else:
+                account = doc.get("account") or {}
+                out = dict(marker)
+                out["account_snapshot_bound"] = True
+                out["account_snapshot_sha256"] = actual
+                out["account_snapshot_scenario_id"] = scen
+                out["rebuild_matches"] = account.get("rebuild_matches")
+                out["cash"] = account.get("cash")
+                out["positions"] = list(account.get("positions") or [])
+                out["orders"] = account.get("orders", 0)
+                out["reports"] = account.get("reports", 0)
+                return out
+        out = dict(marker)
+        out["account_snapshot_unavailable"] = reason
+        out["rebuild_matches"] = None
+        out["cash"] = None
+        out["positions"] = []
+        out["orders"] = 0
+        out["reports"] = 0
+        return out
 
     def _readonly_workbench(self) -> dict:
         """The workbench payload for a sealed read-only day.

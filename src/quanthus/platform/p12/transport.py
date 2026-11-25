@@ -152,15 +152,39 @@ def _account(value: AccountSummary) -> dict[str, Any]:
     }
 
 
-def _plan(value: PublishedPlan, schema_version: str | None = None) -> dict[str, Any]:
+def _plan(
+    value: PublishedPlan,
+    schema_version: str | None = None,
+    *,
+    align_legacy_confirm: bool = True,
+) -> dict[str, Any]:
+    # Issue #723 E8 r5 (legacy-v2 quantity closeout): an unmodified
+    # p12.desktop.v2 client has no confirm_qty field - its confirm card,
+    # queue label and detail "还差" all read plan/applicability delta_qty,
+    # and its submit echoes plan.delta_qty.  When the live plan carries a
+    # confirm-time re-sized figure (confirm_qty set), projecting the raw
+    # published delta_qty shows the old client a quantity the order path
+    # will refuse (CONFIRM_RESIZED) on every click - a dead loop.  The v2
+    # projection therefore aligns the confirm-facing figures to the
+    # current confirmable quantity: delta_qty -> confirm_qty and
+    # target_qty -> current_qty + confirm_qty, so target - current stays
+    # internally equal to the projected delta.  The sealed package, the
+    # internal plan object, receipts and the v3 projection keep the
+    # original published figure beside confirm_qty - this rewrite is
+    # confined to the v2 *opportunity plan* projection, never the package.
+    confirm = getattr(value, "confirm_qty", None)
+    v2 = _effective_version(schema_version) == LEGACY_V2
+    aligned = align_legacy_confirm and v2 and confirm is not None and value.side == "buy"
+    delta = confirm if aligned else value.delta_qty
+    target = (value.current_qty + confirm) if aligned else value.target_qty
     plan = {
         "plan_id": value.plan_id,
         "opportunity_id": value.opportunity_id,
         "security_code": value.security_code,
         "side": value.side,
         "current_qty": value.current_qty,
-        "target_qty": value.target_qty,
-        "delta_qty": value.delta_qty,
+        "target_qty": target,
+        "delta_qty": delta,
         "price_cap": _money(value.price_cap),
         "cash_bound": _money_or_none(value.cash_bound),
         "estimated_fee": _money_or_none(value.estimated_fee),
@@ -177,8 +201,7 @@ def _plan(value: PublishedPlan, schema_version: str | None = None) -> dict[str, 
     # Issue #723 E8 r5 (buy): confirm_qty is the confirm-time re-sized
     # figure (optional contract field, only in the v3 projection).  A
     # p12.desktop.v2 reader predates it, so it is stripped for v2.
-    confirm = getattr(value, "confirm_qty", None)
-    if _effective_version(schema_version) != LEGACY_V2 and confirm is not None:
+    if not v2 and confirm is not None:
         plan["confirm_qty"] = confirm
     return plan
 
@@ -210,7 +233,14 @@ def _package(value: PublishedPackage, schema_version: str | None = None) -> dict
         "account_revision": value.account_revision,
         "composition_ref": _ref(value.composition_ref),
         "source_ref": _ref(value.source_ref),
-        "plans": [_plan(item) for item in value.plans],
+        # The sealed package is the publication of record: its plans keep
+        # the ORIGINAL published delta/target (confirm_qty stripped for v2,
+        # never realigned) so the historical 1,200 stays distinguishable
+        # from the confirm-time 1,100 the opportunity projection shows.
+        "plans": [
+            _plan(item, schema_version, align_legacy_confirm=False)
+            for item in value.plans
+        ],
         "digest": value.digest,
         "superseded": False,
     })
@@ -253,6 +283,25 @@ def _publication(value: PublicationStatus) -> dict[str, Any]:
 def _opportunity(value: OpportunityView, schema_version: str | None = None) -> dict[str, Any]:
     chart = value.chart
     applicability = value.applicability
+    # Issue #723 E8 r5 (legacy-v2 quantity closeout): the v2 queue label
+    # ("买入 N 股") and the detail "还差" read applicability.delta_qty, so the
+    # same confirmable-quantity alignment applied to the projected plan must
+    # reach this block - otherwise a resized buy still lists the stale
+    # published figure beside an aligned confirm card.  The applicability
+    # delta is target - current; under the v2 projection that equals the
+    # plan's confirm_qty.
+    plan_confirm = getattr(value.plan, "confirm_qty", None)
+    v2 = _effective_version(schema_version) == LEGACY_V2
+    aligned_delta = (
+        plan_confirm
+        if (
+            v2
+            and plan_confirm is not None
+            and value.plan is not None
+            and value.plan.side == "buy"
+        )
+        else (applicability.delta_qty if applicability is not None else None)
+    )
     return {
         "opportunity_id": value.opportunity_id,
         "security_code": value.security_code,
@@ -305,7 +354,7 @@ def _opportunity(value: OpportunityView, schema_version: str | None = None) -> d
             "plan_id": applicability.plan_id,
             "status": applicability.status,
             "current_qty": applicability.current_qty,
-            "delta_qty": applicability.delta_qty,
+            "delta_qty": aligned_delta,
             "account_revision": applicability.account_revision,
             "reason_codes": _reasons(applicability.reason_codes),
             "next_step": applicability.next_step,

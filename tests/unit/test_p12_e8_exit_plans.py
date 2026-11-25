@@ -1090,6 +1090,66 @@ def test_workbench_next_session_compatible_transport(tmp_path):
     assert seen["schema_version=p12.desktop.v3"] == (200, "2026-11-20", "p12.daily-decision-package.v1")
 
 
+def test_legacy_v2_projection_aligns_resized_confirm_qty(tmp_path):
+    # R5 closeout (ruling 7148440273): the unmodified p12.desktop.v2 client
+    # reads plan.delta_qty on its queue label, detail "还差" and confirm
+    # card, and submits that same figure.  A confirm-time re-size (open
+    # mark 55.00 re-sizes the published 200 to 100) must therefore project
+    # the CURRENT confirmable quantity into the v2 plan/applicability so
+    # the old client's next natural click submits the bound figure - never
+    # a stale echo the order path refuses as CONFIRM_RESIZED in a dead loop.
+    # The sealed package and the v3 projection keep the published 200
+    # beside confirm_qty=100.
+    import logging
+    from decimal import Decimal as D
+    from types import SimpleNamespace
+
+    from quanthus.platform.p12.http import P12AccountBinding, P12Endpoints, P12Runtime
+
+    logging.disable(logging.CRITICAL)
+    day = datetime(2026, 11, 19, 19, 0, tzinfo=TZ)
+    nextopen = day.replace(day=20, hour=9, minute=30)
+    box = [nextopen]
+    ds = _set_for(day.date(), (_buy_decision(qty=200, market_date=day.date()),))
+    app = _app(tmp_path, ds, box)
+    # Bound-session open of 55.00 re-sizes the published figure under the
+    # same budget ceiling (the package mark sized 200 at 10.55; at 55.00
+    # the same ceiling affords only 100).
+    app._open_marks = lambda codes: {c: D("55.00") for c in codes}
+    _seed_bucket(app)
+    key = app.scope.account_id
+    ep = P12Endpoints(P12Runtime(
+        "fixture", {key: P12AccountBinding(app, key, frozenset(["auditor"]), True)}
+    ))
+    principal = SimpleNamespace(username="auditor")
+
+    status_v2, resp_v2 = ep.workbench(principal, key, "", "audit")
+    status_v3, resp_v3 = ep.workbench(principal, key, "schema_version=p12.desktop.v3", "audit")
+    assert status_v2 == status_v3 == 200
+    opp_v2 = next(o for o in resp_v2["opportunities"] if o["security_code"] == "600000")
+    opp_v3 = next(o for o in resp_v3["opportunities"] if o["security_code"] == "600000")
+    plan_v2, plan_v3 = opp_v2["plan"], opp_v3["plan"]
+    published = plan_v3["delta_qty"]
+    confirm = plan_v3["confirm_qty"]
+    assert published != confirm  # a real re-size is under test
+    # v2: every confirm-facing figure is the CURRENT confirmable quantity;
+    # confirm_qty itself stays out of the closed v2 DTO.
+    assert "confirm_qty" not in plan_v2
+    assert plan_v2["delta_qty"] == confirm
+    assert plan_v2["target_qty"] == plan_v2["current_qty"] + confirm
+    assert opp_v2["applicability"]["delta_qty"] == confirm
+    # v3 keeps the published figure beside the re-sized confirm figure.
+    assert plan_v3["delta_qty"] == published
+    # The sealed package - the publication of record - keeps the original
+    # published delta/target on BOTH projections (confirm_qty never enters
+    # the package plan list); the historical quantity stays distinguishable
+    # from the confirm-time figure the opportunity projection shows.
+    pkg_plan_v2 = next(p for p in resp_v2["package"]["plans"] if p["security_code"] == "600000")
+    pkg_plan_v3 = next(p for p in resp_v3["package"]["plans"] if p["security_code"] == "600000")
+    assert pkg_plan_v2["delta_qty"] == published == pkg_plan_v3["delta_qty"]
+    assert "confirm_qty" not in pkg_plan_v2
+
+
 def test_inflight_sell_deducts_before_new_exit_qty(tmp_path):
     # r5: preserved netting - a partial in-flight cover only adds the
     # difference - with the resting sell injected at the facts port (the

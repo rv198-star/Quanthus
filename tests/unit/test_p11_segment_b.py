@@ -293,8 +293,9 @@ def test_b_r1_position_facts_without_source_refused(assets):
     assert not (out.get("day_block") or {}).get("reason")
     held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
     assert ("600000", "hold_alert") in held
-    memb = [m for m in out["source_closure"]["account_membership"]
-            if m.get("security_code") == "600000"]
+    memb = [
+        m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
+    ]
     assert memb and "evidence" in (memb[0].get("unavailable_reason") or "")
 
 
@@ -500,8 +501,7 @@ def test_c8_r1_legal_ref_with_bound_anchor_still_exits(assets):
     # Declare the same-read anchor on the scenario account: a pool-external
     # unresolved record from the same ledger snapshot source.
     req["account"]["unresolved"] = [
-        {"account_key": "outside-x", "role": "held", "quantity": 1,
-         "source": "ledger-snapshot"}
+        {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
     ]
     out = e_run_e1_replay(req, f.T1, assets)
     stages = {c: s for c, s in _decisions(out)}
@@ -510,8 +510,9 @@ def test_c8_r1_legal_ref_with_bound_anchor_still_exits(assets):
     held = [h for h in out.get("held_signals", []) if h.get("security_code") == "600000"]
     assert held and held[0].get("action") != "hold_alert" or True
     # The member keeps a real unavailable_reason=None (no degrade).
-    memb = [m for m in out["source_closure"]["account_membership"]
-            if m.get("security_code") == "600000"]
+    memb = [
+        m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
+    ]
     assert memb and memb[0].get("unavailable_reason") is None
 
 
@@ -525,14 +526,14 @@ def test_c8_r1_wrong_digest_only_alerts(assets):
     sec = _held_sec(evidence=ref)
     req = _req([sec, f._security("600001", _DAYS)])
     req["account"]["unresolved"] = [
-        {"account_key": "outside-x", "role": "held", "quantity": 1,
-         "source": "ledger-snapshot"}
+        {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
     ]
     out = e_run_e1_replay(req, f.T1, assets)
     held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
     assert ("600000", "hold_alert") in held
-    memb = [m for m in out["source_closure"]["account_membership"]
-            if m.get("security_code") == "600000"]
+    memb = [
+        m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
+    ]
     assert memb and "digest" in (memb[0].get("unavailable_reason") or "")
 
 
@@ -558,12 +559,12 @@ def test_c8_r1_ref_without_unit_id_recovers_when_bound(assets):
     sec = _held_sec(evidence=ref)
     req = _req([sec, f._security("600001", _DAYS)])
     req["account"]["unresolved"] = [
-        {"account_key": "outside-x", "role": "held", "quantity": 1,
-         "source": "ledger-snapshot"}
+        {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
     ]
     out = e_run_e1_replay(req, f.T1, assets)
-    memb = [m for m in out["source_closure"]["account_membership"]
-            if m.get("security_code") == "600000"]
+    memb = [
+        m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
+    ]
     assert memb and memb[0].get("unavailable_reason") is None
 
 
@@ -575,8 +576,7 @@ def test_c8_r1_changed_value_same_digest_alerts(assets):
     sec = _held_sec(evidence=ref, holding=41)  # different declared value
     req = _req([sec, f._security("600001", _DAYS)])
     req["account"]["unresolved"] = [
-        {"account_key": "outside-x", "role": "held", "quantity": 1,
-         "source": "ledger-snapshot"}
+        {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
     ]
     out = e_run_e1_replay(req, f.T1, assets)
     held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
@@ -592,14 +592,18 @@ def test_c8_r3_sell_direction_mismatch_keeps_original_fields(assets):
     to a clean sell); the security still cannot receive a new entry."""
     sec = f._security("600000", _DAYS)
     sec["pending"] = [
-        {"kind": "sell", "direction": "buy", "quantity": 5,
-         "order_key": "s-mismatch", "source_receipt": "src.s"},
+        {
+            "kind": "sell",
+            "direction": "buy",
+            "quantity": 5,
+            "order_key": "s-mismatch",
+            "source_receipt": "src.s",
+        },
     ]
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
     assert not any(c == "600000" for c, s in _decisions(out))
     rec = [
-        r for r in out["source_closure"]["account_unresolved"]
-        if r.get("order_key") == "s-mismatch"
+        r for r in out["source_closure"]["account_unresolved"] if r.get("order_key") == "s-mismatch"
     ]
     assert rec and rec[0]["kind"] == "sell" and rec[0]["direction"] == "buy"
     assert rec[0]["missing_reason"] == "pending_kind_direction_conflict"
@@ -610,13 +614,17 @@ def test_c8_r3_buy_direction_mismatch_also_named(assets):
     both original fields are kept verbatim."""
     sec = f._security("600000", _DAYS)
     sec["pending"] = [
-        {"kind": "open_buy_order", "direction": "sell", "quantity": 5,
-         "order_key": "b-mismatch", "source_receipt": "src.b"},
+        {
+            "kind": "open_buy_order",
+            "direction": "sell",
+            "quantity": 5,
+            "order_key": "b-mismatch",
+            "source_receipt": "src.b",
+        },
     ]
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
     rec = [
-        r for r in out["source_closure"]["account_unresolved"]
-        if r.get("order_key") == "b-mismatch"
+        r for r in out["source_closure"]["account_unresolved"] if r.get("order_key") == "b-mismatch"
     ]
     assert rec and rec[0]["kind"] == "open_buy_order" and rec[0]["direction"] == "sell"
     assert rec[0]["missing_reason"] == "pending_kind_direction_conflict"
@@ -626,19 +634,25 @@ def test_c8_r3_consistent_directions_keep_working(assets):
     """sell+sell, sell+missing, buy+buy, buy+missing all keep their original
     contract behaviour; only an actual divergence is a named conflict."""
     for pending, expected_reason in (
-        ({"kind": "sell", "direction": "sell", "quantity": 5,
-          "order_key": "k1"}, "sell_order_requires_explicit_disposition"),
-        ({"kind": "sell", "quantity": 5, "order_key": "k2"},
-         "sell_order_requires_explicit_disposition"),
-        ({"kind": "open_buy_order", "direction": "buy", "quantity": 5,
-          "order_key": "k3"}, None),
+        (
+            {"kind": "sell", "direction": "sell", "quantity": 5, "order_key": "k1"},
+            "sell_order_requires_explicit_disposition",
+        ),
+        (
+            {"kind": "sell", "quantity": 5, "order_key": "k2"},
+            "sell_order_requires_explicit_disposition",
+        ),
+        ({"kind": "open_buy_order", "direction": "buy", "quantity": 5, "order_key": "k3"}, None),
     ):
         sec = f._security("600000", _DAYS)
         sec["pending"] = [pending]
         out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
         if expected_reason:
-            rec = [r for r in out["source_closure"]["account_unresolved"]
-                   if r.get("order_key") == pending["order_key"]]
+            rec = [
+                r
+                for r in out["source_closure"]["account_unresolved"]
+                if r.get("order_key") == pending["order_key"]
+            ]
             assert rec and rec[0]["missing_reason"] == expected_reason
         else:
             assert "600000" in out["source_closure"]["pending_security_codes"]

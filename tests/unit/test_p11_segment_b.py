@@ -289,3 +289,115 @@ def test_b_r1_buy_pending_evidence_in_closure(assets):
         if r.get("order_key") == "ord-b1"
     ]
     assert ev and ev[0]["source_receipt"] == "src.b1" and ev[0]["quantity"] == 12
+
+
+# ---- #751/#752 cross-fix: held/pending coexist with per-security isolation -----
+
+
+def _bad_digest_sec(code: str) -> dict:
+    sec = f._security(code, _DAYS)
+    sec["identity"] = dict(sec["identity"])
+    sec["identity"]["source_evidence_digest"] = "malformed-digest"
+    return sec
+
+
+def _missing_digest_sec(code: str) -> dict:
+    sec = f._security(code, _DAYS)
+    sec["identity"] = dict(sec["identity"])
+    sec["identity"]["source_evidence_digest"] = ""
+    return sec
+
+
+def test_b_752_held_member_survives_malformed_neighbour(assets):
+    """A held member (751 protection) keeps its independent hold review even
+    when a sibling's raw row carries a malformed digest (752 isolation): the
+    bad member is a named per-security exclusion and the held outcome is not
+    dropped or converted into an exit."""
+    held = f._security("600000", _DAYS, held=True)
+    bad = _bad_digest_sec("600001")
+    out = e_run_e1_replay(_req([held, bad]), f.T1, assets)
+    held_actions = [
+        (h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])
+    ]
+    assert ("600000", "holding") in held_actions or any(
+        c == "600000" and s == "holding" for c, s in _decisions(out)
+    )
+    excl = [
+        e for e in out["source_closure"].get("exclusions", [])
+        if e.get("security_code") == "600001"
+    ]
+    assert excl and "EventContractError" in excl[0]["member_or_field"]
+    assert excl[0].get("source_evidence_digest") == "malformed-digest"
+
+
+def test_b_752_pending_member_survives_malformed_neighbour(assets):
+    """A typed pending member stays isolated (no new entry) while the
+    malformed neighbour is a named exclusion; pending never masquerades as a
+    real fill and the neighbour's isolation does not leak into pending."""
+    pend = f._security("600000", _DAYS)
+    pend["pending"] = [
+        {"kind": "open_buy_order", "quantity": 12,
+         "order_key": "ord-x1", "source_receipt": "src.x1"},
+    ]
+    bad = _bad_digest_sec("600001")
+    out = e_run_e1_replay(_req([pend, bad]), f.T1, assets)
+    # pending blocks 600000's new entry without a held review; 600001 is
+    # excluded alone, never evaluated.
+    assert not any(c == "600000" for c, s in _decisions(out))
+    excl = [
+        e for e in out["source_closure"].get("exclusions", [])
+        if e.get("security_code") == "600001"
+    ]
+    assert excl and "EventContractError" in excl[0]["member_or_field"]
+    assert "600000" in out["source_closure"]["pending_security_codes"]
+
+
+def test_b_752_mixed_bad_digest_keeps_clean_neighbour(assets):
+    """Reliable-neighbour equivalence under B + 751/752: the legal security's
+    complete published business fields are identical run alone vs mixed with
+    a malformed-digest neighbour (not only the code set)."""
+    solo = e_run_e1_replay(_req([f._security("600000", _DAYS)]), f.T1, assets)
+    mixed = e_run_e1_replay(
+        _req([f._security("600000", _DAYS), _bad_digest_sec("600001")]),
+        f.T1,
+        assets,
+    )
+    def entry(out):
+        return [
+            x
+            for ds in (out.get("package") or {}).get("decision_sets", [])
+            for x in ds["decisions"]
+            if x.get("security_code") == "600000"
+        ]
+    se, me = entry(solo), entry(mixed)
+    assert len(se) == len(me) == 1
+    for field in ("opportunity_id", "stage", "action", "fraction",
+                  "price_bound", "mark_price", "reason_codes", "entry"):
+        assert se[0].get(field) == me[0].get(field), field
+    # The mixed closure additionally names the excluded neighbour.
+    assert any(
+        e.get("security_code") == "600001"
+        for e in mixed["source_closure"].get("exclusions", [])
+    )
+    assert not any(
+        e.get("security_code") == "600001"
+        for e in solo["source_closure"].get("exclusions", [])
+    )
+
+
+def test_b_752_missing_digest_mixed_also_isolated(assets):
+    """An empty-digest sibling in a mixed run is the same contract breach:
+    named per-security exclusion, legal neighbour unaffected."""
+    out = e_run_e1_replay(
+        _req([f._security("600000", _DAYS), _missing_digest_sec("600001")]),
+        f.T1,
+        assets,
+    )
+    excl = [
+        e for e in out["source_closure"].get("exclusions", [])
+        if e.get("security_code") == "600001"
+    ]
+    assert excl and "EventContractError" in excl[0]["member_or_field"]
+    assert excl[0].get("source_evidence_digest") == ""
+    # Legal neighbour still evaluates.
+    assert any(c == "600000" for c, s in _decisions(out))

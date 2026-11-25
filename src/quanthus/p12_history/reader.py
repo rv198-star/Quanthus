@@ -2008,6 +2008,67 @@ def read_history(
                     if (int(_yy), int(_mm)) == (
                             int(_ym.group(1)), int(_ym.group(2))):
                         _attributed.append(e)
+            if not _attributed:
+                # Unregistered required-month supply (independent audit 749A
+                # 1bf71583 P1): the starved session has NO registered member to
+                # attribute - no pinned Daily, no member surfaced a row, and no
+                # in-window Base month partition member exists at all (the whole
+                # required month was never registered).  The empty/sha/unreadable
+                # controls still carry a registered member so they reach the
+                # fallback above; a missing month reaches NONE of these.
+                #
+                # The placeholder must fire ONLY when the session's month is
+                # genuinely unregistered - no Base month partition member and no
+                # pinned Daily member exists in the pinned map at all for it.
+                # A session whose month DOES have a registered member (even one
+                # that is channel-unknown, physically failed, or simply carried
+                # no row for this exact day) is already attributed to THAT real
+                # member by the ledger above; adding the placeholder there would
+                # mis-widen a real narrower gap into a fabricated pool collapse.
+                try:
+                    _yy, _mm, _ = _sess_iso.split("-")
+                    _missing_month = f"{_yy}-{int(_mm):02d}"
+                except (ValueError, IndexError):
+                    _missing_month = str(_sess_iso)
+                _month_registered = False
+                for _e in source_member_entries:
+                    _mid_chk = str(_e.get("member_id") or "")
+                    if ("dwd_security_bar" not in _mid_chk
+                            or "dwd_security_valuation" in _mid_chk):
+                        continue
+                    _df_c = _e.get("date_from")
+                    _df_c_iso = (_df_c.isoformat()
+                                 if hasattr(_df_c, "isoformat") else str(_df_c))
+                    if _df_c_iso == _sess_iso:
+                        # a pinned Daily member is registered for this session
+                        _month_registered = True
+                        break
+                    _ymc = re.search(
+                        r"observation_start_year=(\d{4})/"
+                        r"observation_start_month=(\d+)", _mid_chk)
+                    if _ymc and f"{_ymc.group(1)}-{int(_ymc.group(2)):02d}" == _missing_month:
+                        # a Base month partition member is registered for the month
+                        _month_registered = True
+                        break
+                if _month_registered:
+                    # the month has a real registered member - the starved cells
+                    # are that member's narrower gap, not an unregistered month.
+                    continue
+                _placeholder = {
+                    "member_key": None,
+                    "package_key": None,
+                    "member_id": (
+                        "unregistered-required-month:"
+                        + _missing_month),
+                    "dependency_type": "SHARED_T_PRICE",
+                    "shared_hard_dependency": True,
+                    "gap_session_day": _sess_iso,
+                    "named_input_gap": "MISSING_REQUIRED_MONTH_SUPPLY",
+                    "unregistered_supply": True,
+                    "missing_month": _missing_month,
+                    "starved_securities": sorted(_starved_here),
+                }
+                _gap_members.append(_placeholder)
             for _e in _attributed:
                 _mk = _e.get("package_key") or _e.get("member_key")
                 _rg = _member_session_row_gaps.get((_mk, _sess_iso)) or {}
@@ -2171,6 +2232,26 @@ def read_history(
                 r.get("status") in ("SHA_MISMATCH", "UNREADABLE")
                 for r in _bar_reads_here if r.get("member_id"))
             if not _total_price_collapse:
+                # Report each distinct failed/missing supply once while keeping
+                # the real per-session scope.  An unregistered required month
+                # yields one ledger placeholder per starved session; collapse
+                # those to a single named supply but record the actual missing
+                # months / sessions / securities so the receipt names the real
+                # gap instead of a fabricated member sha or source clock.
+                _fm_keys = []
+                for _e in _shared_failed:
+                    _fk = (_e.get("package_key") or _e.get("member_key")
+                           or _e.get("member_id"))
+                    if _fk not in _fm_keys:
+                        _fm_keys.append(_fk)
+                _missing_sessions = sorted({
+                    str(_e.get("gap_session_day"))
+                    for _e in _shared_failed if _e.get("unregistered_supply")
+                })
+                _missing_months = sorted({
+                    str(_e.get("missing_month"))
+                    for _e in _shared_failed if _e.get("missing_month")
+                })
                 day_block = {
                     "reason_code": "SHARED_INPUT_GAP",
                     "detail": (
@@ -2178,11 +2259,14 @@ def read_history(
                         "a qualified source for this formal read"
                     ),
                     "affected_scope": "whole_day",
-                    "failed_members": [e.get("package_key") or e.get("member_key")
-                                       for e in _shared_failed],
+                    "failed_members": _fm_keys,
                     "affected_securities": _starved,
                     "disposition": "block_new_entries",
                 }
+                if _missing_months:
+                    day_block["missing_months"] = _missing_months
+                if _missing_sessions:
+                    day_block["missing_sessions"] = _missing_sessions
         elif _local_gaps:
             # A local single-security gap is NOT a whole-day block: record
             # the isolated dependency so the consumer blocks only the

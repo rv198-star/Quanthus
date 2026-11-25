@@ -165,3 +165,78 @@ def test_e1_replay_runner_blocks_missing_envelope(assets):
     with pytest.raises(FactError):
         runner.run(_request({"schema_version": "wrong"}))
 
+
+
+def _snapshot():
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        package_id="replay-core-t",
+        market_date=date(2026, 10, 8),
+        core_manifest_sha256="sha256:" + "ab" * 32,
+        index_sha256="sha256:" + "cd" * 32,
+        base_manifest_sha256="sha256:" + "ef" * 32,
+        content_digest="sha256:" + "01" * 32,
+        row_counts={"dwd_security_bar": 5209},
+    )
+
+
+def _receipt(p11_closure):
+    return {
+        # package=None + publishable=False exercises the same source_closure
+        # projection the publish gate reads (INPUT_BLOCKED carries it too),
+        # without requiring a fully-valid v2 decision_set fixture.
+        "publishable": False,
+        "disposition": "blocked",
+        "package": None,
+        "receipt": {
+            "producer_id": "p11.fixed-rule-day",
+            "source_closure_digest": sha256_digest(p11_closure),
+            "run_id": "r1",
+            "evaluated_universe": [],
+        },
+        "source_closure": p11_closure,
+        "held_signals": (),
+        "diagnostics": (),
+    }
+
+
+def test_project_keeps_p11_closure_verbatim_and_binds_p12_core():
+    p11_closure = {
+        "batch_id": "b02",
+        "history_receipts": [{"security_code": "600000"}],
+        "evaluated_universe": ["600000"],
+        "exclusions": [],
+        "package_id": "p11-pkg",
+        "manifest_sha256": "sha256:" + "99" * 32,
+    }
+    declared = sha256_digest(p11_closure)
+    runner = E1ReplayRunner(
+        runner_ref_id="r", runner_version="1", assets=None, context=None
+    )
+    out = runner._project(_receipt(p11_closure), snapshot=_snapshot())
+    sc = out.source_closure
+    # The signed P11 closure is carried verbatim and its digest still
+    # recomputes to the producer-issued value.
+    assert sha256_digest(sc["p11_closure"]) == declared
+    # The outer closure keeps the producer's fields flat for downstream
+    # readers, and this run's P12 core binding rides a separate field.
+    assert sc["evaluated_universe"] == ["600000"]
+    assert sc["history_receipts"][0]["security_code"] == "600000"
+    core = sc["p12_core"]
+    assert core["core_manifest_sha256"] == "sha256:" + "ab" * 32
+    assert core["package_id"] == "replay-core-t"
+    assert core["replay_package_id"] == "p11-pkg"
+    assert core["replay_manifest_sha256"] == "sha256:" + "99" * 32
+
+
+def test_project_does_not_mutate_signed_p11_closure():
+    p11_closure = {"history_receipts": [], "k": 1}
+    declared = sha256_digest(p11_closure)
+    runner = E1ReplayRunner(
+        runner_ref_id="r", runner_version="1", assets=None, context=None
+    )
+    out = runner._project(_receipt(dict(p11_closure)), snapshot=_snapshot())
+    # The producer's object bytes are unchanged - the digest matches the
+    # declared value rather than drifting under P12's expansion.
+    assert sha256_digest(out.source_closure["p11_closure"]) == declared

@@ -349,10 +349,15 @@ class E1ReplayRunner:
                 p12_core["replay_package_id"] = p11_closure["package_id"]
             if p11_closure.get("manifest_sha256") is not None:
                 p12_core["replay_manifest_sha256"] = p11_closure["manifest_sha256"]
-            source_closure = {
-                "p11_closure": p11_closure,
-                "p12_core": p12_core,
-            }
+            # The outer closure keeps every P11 top-level key flat so the
+            # replay page / coverage reader / gate still see the producer's
+            # own fields (history_receipts, evaluated_universe, exclusions,
+            # held_decisions, day_blocked, ...), while ``p11_closure`` carries
+            # the byte-verbatim signed object whose digest the receipt binds
+            # and ``p12_core`` binds THIS run's P12 daily-core identity.
+            source_closure = dict(p11_closure)
+            source_closure["p11_closure"] = p11_closure
+            source_closure["p12_core"] = p12_core
         diagnostics = {
             "diagnostics": list(receipt.get("diagnostics") or ()),
             **({"day_block": day_block} if day_block else {}),

@@ -2141,6 +2141,68 @@ def test_seg_b_generation_receipt_sha_verified(tmp_path):
     assert "ACCOUNT_RECEIPT_SHA_MISMATCH" in codes
 
 
+def test_seg_b_same_bytes_malformed_named_rejection(tmp_path):
+    """Closeout: verified snapshot bytes that do NOT decode to a JSON
+    object produce a named ACCOUNT_SNAPSHOT_MALFORMED refusal - never a
+    verified account projection."""
+    import hashlib as _hl, json as _j
+    raw = _j.dumps(["not", "a", "dict"])  # valid JSON, wrong top-level shape
+    p = tmp_path / "snapshot.json"
+    p.write_text(raw)
+    sha = "sha256:" + _hl.sha256(p.read_bytes()).hexdigest()
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": str(p), "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    # sha matched the real bytes but the object shape is malformed ->
+    # named refusal, no held/pending facts projected.
+    assert "ACCOUNT_SNAPSHOT_MALFORMED" in codes
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_same_bytes_no_declared_sha_named_rejection(tmp_path):
+    """Closeout: a bound snapshot path with NO pinned sha is a named
+    ACCOUNT_SNAPSHOT_NO_DECLARED_SHA refusal via the public entry."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, _sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path}  # NO declared sha
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_NO_DECLARED_SHA" in codes
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_same_bytes_no_second_decode_after_swap(tmp_path):
+    """Closeout: verification + projection decode ONLY the first read's
+    bytes.  A caller whose pinned sha matches the ORIGINAL content but whose
+    mapping re-points facts cannot smuggle a different second read in - the
+    single verified bytes govern (no reopened decode of new content)."""
+    import hashlib as _hl, json as _j
+    # File holds 1200 held.  Caller pins its REAL sha but clears holdings in
+    # the mapping; the verified bytes (not any second/swap read) project 1200.
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "holdings": [], "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["rejections"] == []
+    assert ab["actual_snapshot_sha256"] == sha
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert sec["held_quantity"] == 1200
+
+
 # ---- R4 segment A closeout ---------------------------------------------
 
 def _formal_read(smap, tmp_path, T=date(2026, 11, 24),

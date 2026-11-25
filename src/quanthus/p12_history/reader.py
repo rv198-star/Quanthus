@@ -10,6 +10,7 @@ carried, with UNKNOWN where coverage is unproven.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -693,15 +694,19 @@ def read_history(
         # empty account.
         snap_v = None
         if snap_path and snap_sha:
+            # Same-bytes closeout: read the bound snapshot ONCE - the single
+            # in-memory bytes feed both the sha256 and the decode, so verify
+            # and project never re-open the path for a swapped second read.
             try:
-                actual_snap = sha256_file(snap_path)
+                snap_bytes = open(snap_path, "rb").read()
             except Exception as exc:  # noqa: BLE001
-                actual_snap = None
+                snap_bytes = None
                 account_binding["rejections"].append({
                     "reason_code": "ACCOUNT_SNAPSHOT_UNREADABLE",
                     "detail": f"account snapshot could not be opened: {type(exc).__name__}: {exc}",
                 })
-            if actual_snap is not None:
+            if snap_bytes is not None:
+                actual_snap = "sha256:" + hashlib.sha256(snap_bytes).hexdigest()
                 account_binding["actual_snapshot_sha256"] = actual_snap
                 if (str(actual_snap).split(":", 1)[-1]
                         != str(snap_sha).split(":", 1)[-1]):
@@ -710,10 +715,9 @@ def read_history(
                         "detail": f"account snapshot sha256 {actual_snap} != pinned {snap_sha}",
                     })
                 else:
-                    # sha matched: decode the SAME verified bytes.
+                    # sha matched: decode the SAME bytes already in memory.
                     try:
-                        with open(snap_path, "r", encoding="utf-8") as _sf:
-                            snap_v = json.load(_sf)
+                        snap_v = json.loads(snap_bytes.decode("utf-8"))
                         if not isinstance(snap_v, dict):
                             snap_v = None
                             account_binding["rejections"].append({

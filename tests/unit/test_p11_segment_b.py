@@ -1,0 +1,202 @@
+"""#749 Segment-B: consumer projection for held/pending/unresolved accounts.
+
+The B segment adapts a non-empty replay account into the consumer view:
+per-order typed pending facts, a versioned serializable position_facts,
+pool-external unresolved account records, nested-account conflict refusal
+and sell-order explicit disposition.  All run through the public
+run_e1_replay_day entry on the same fixed replay request.
+"""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from tests.unit import test_p11_paper_replay as f
+from tests.unit.test_p11_e1_runtime import (
+    ROOT,
+    e_run_e1_replay,
+    load_e1_rule_assets,
+)
+from quanthus.product_daily.contracts import ProductDailyError
+from quanthus.product_daily.recommendation.paper_replay import (
+    build_replay_envelope,
+    load_replay_request,
+)
+
+
+@pytest.fixture(scope="module")
+def assets():
+    return load_e1_rule_assets(ROOT)
+
+
+_DAYS = tuple(d for d in f.SESSION_DAYS if d <= f.T1)
+
+
+def _req(securities, **extra):
+    req = f._request(market_dates=(f.T1,), securities=securities)
+    req["listing_rows"].append(f._listing("security-600001"))
+    req.update(extra)
+    return req
+
+
+def _decisions(out):
+    return [
+        (x.get("security_code"), x.get("stage"))
+        for ds in (out.get("package") or {}).get("decision_sets", [])
+        for x in ds["decisions"]
+    ]
+
+
+# ---- held + position_facts dict ----------------------------------------------
+
+
+def test_b_held_with_serializable_position_facts(assets):
+    """A serializable position_facts dict is adapted into HeldPositionFacts;
+    the held decision still fires and the neighbour keeps entry_plan."""
+    sec = f._security("600000", _DAYS)
+    sec.update(
+        held_membership=True,
+        held_quantity=1200,
+        position_facts={
+            "holding_sessions": 10,
+            "marked_return": "-0.003",
+            "prior_strategy_reduction_count": 0,
+        },
+    )
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    assert ("600000", "holding") in _decisions(out)
+    assert ("600001", "entry_plan") in _decisions(out)
+
+
+def test_b_held_unknown_quantity_and_no_bars(assets):
+    """held_quantity=None keeps the held review with an unavailable reason;
+    held-no-bars also stays held (facts decide membership, not bars)."""
+    for kwargs in (
+        {"held_quantity": None},
+        {"held_quantity": 1200, "bars": []},
+    ):
+        sec = f._security("600000", _DAYS)
+        sec.update(held_membership=True, **kwargs)
+        out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+        assert ("600000", "holding") in _decisions(out)
+
+
+# ---- per-order pending --------------------------------------------------------
+
+
+def test_b_pending_only_no_entry_no_held(assets):
+    """pending_only isolates the security's new entry without a held review;
+    the neighbour keeps entry_plan."""
+    sec = f._security("600000", _DAYS)
+    sec.update(pending_kind="open_buy_order", pending_quantity=1200)
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    assert ("600001", "entry_plan") in _decisions(out)
+    assert not any(c == "600000" for c, s in _decisions(out))
+    assert not out.get("held_signals")
+
+
+def test_b_multi_pending_records_verbatim(assets):
+    """Multiple per-order pending records stay verbatim (never summed or
+    last-one-wins); sell orders are NOT folded into buy-side pending."""
+    sec = f._security("600000", _DAYS)
+    sec.update(held_membership=True, held_quantity=1200)
+    sec["pending"] = [
+        {"kind": "open_buy_order", "quantity": 1200, "order_key": "ord-b1"},
+        {"kind": "unconfirmed_fill", "quantity": 300, "order_key": "ord-b2"},
+    ]
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    sc = out["source_closure"]
+    assert "600000" in sc["pending_security_codes"]
+    # Held + pending both land in account_membership for the same code.
+    memb = [m for m in sc["account_membership"] if m["security_code"] == "600000"]
+    assert memb and memb[0]["held"] is True and memb[0]["pending"] is True
+
+
+def test_b_sell_order_goes_to_unresolved_not_pending(assets):
+    """A sell order keeps direction+quantity verbatim but requires explicit
+    consumer disposition: it lands on account_unresolved, never in the
+    buy-side pending set."""
+    sec = f._security("600000", _DAYS)
+    sec["pending"] = [
+        {"kind": "sell", "quantity": 5, "order_key": "ord-s1", "direction": "sell"},
+    ]
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    sc = out["source_closure"]
+    sell = [
+        r for r in sc["account_unresolved"] if r.get("direction") == "sell"
+    ]
+    assert sell and sell[0]["quantity"] == 5 and sell[0]["order_key"] == "ord-s1"
+    assert "600000" not in sc["pending_security_codes"]
+
+
+# ---- pool-external unresolved account records ----------------------------------
+
+
+def test_b_pool_external_unresolved_preserved(assets):
+    """Pool-external unresolved records are named verbatim inside the issued
+    closure with their own role/quantity/missing_reason; a neighbour still
+    evaluates and they never admit an entry or exit for that key."""
+    sec = f._security("600000", _DAYS)
+    req = _req([sec, f._security("600001", _DAYS)])
+    req["account"]["unresolved"] = [
+        {"account_key": "outside-held-x", "role": "held", "quantity": None,
+         "missing_reason": "no_listing_identity", "source": "ledger-snapshot"},
+        {"account_key": "outside-held-y", "role": "held", "quantity": 50,
+         "missing_reason": "no_history_bars", "source": "ledger-snapshot"},
+        {"account_key": "outside-pend", "role": "pending", "quantity": 5,
+         "missing_reason": "sell_order_requires_explicit_disposition",
+         "direction": "sell", "source": "ledger-snapshot"},
+    ]
+    out = e_run_e1_replay(req, f.T1, assets)
+    sc = out["source_closure"]
+    keys = {r["account_key"] for r in sc["account_unresolved"]}
+    assert {"outside-held-x", "outside-held-y", "outside-pend"} <= keys
+    # Neither an entry nor a held review was admitted for a pool-external key.
+    codes = {c for c, _ in _decisions(out)}
+    assert "outside-held-x" not in codes and "outside-pend" not in codes
+
+
+# ---- nested account conflict ----------------------------------------------------
+
+
+def test_b_nested_account_alone_is_unresolved_not_entry(assets):
+    """A bare securities[].account block (no row-level markers) is NOT fill
+    evidence: it lands on account_unresolved and never produces an entry."""
+    sec = f._security("600000", _DAYS)
+    sec["account"] = {"account_role": "held", "held_quantity": 1200, "pending": []}
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    sc = out["source_closure"]
+    assert ("600001", "entry_plan") in _decisions(out)
+    assert not any(c == "600000" for c, s in _decisions(out))
+    unres = [r for r in sc["account_unresolved"] if r.get("security_code") == "600000"]
+    assert unres and unres[0]["missing_reason"] == "nested_account_block_only_no_row_markers"
+
+
+def test_b_nested_account_conflict_refused(assets):
+    """A nested account block whose held_quantity diverges from the row-level
+    markers is a projection conflict: the raw row is named and refused."""
+    sec = f._security("600000", _DAYS)
+    sec.update(held_membership=True, held_quantity=1200)
+    sec["account"] = {"account_role": "held", "held_quantity": 999}
+    with pytest.raises(ProductDailyError, match="account_projection_conflict"):
+        e_run_e1_replay(_req([sec]), f.T1, assets)
+
+
+# ---- envelope-level projection ---------------------------------------------------
+
+
+def test_b_envelope_carries_pending_and_unresolved():
+    """build_replay_envelope binds both B-segment lists into the raw-history
+    envelope the public entry consumes."""
+    sec = f._security("600000", _DAYS)
+    sec["pending"] = [{"kind": "open_buy_order", "quantity": 7}]
+    req = _req([sec])
+    req["account"]["unresolved"] = [
+        {"account_key": "ext-1", "role": "held", "quantity": 1}
+    ]
+    env, _, _, _ = build_replay_envelope(load_replay_request(req), f.T1)
+    assert env["pending_securities"][0]["kind"] == "open_buy_order"
+    assert env["pending_securities"][0]["quantity"] == 7
+    assert env["account_unresolved"][0]["account_key"] == "ext-1"

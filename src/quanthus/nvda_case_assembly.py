@@ -33,7 +33,7 @@ try:
 except ImportError:  # pragma: no cover - exercised in runtimes without parquet support
     pq = None
 
-ASSEMBLER_VERSION = "nvda-case-assembly.v3"
+ASSEMBLER_VERSION = "nvda-case-assembly.v4"
 
 RAW_OBJECT_KINDS = ("wire", "document-events", "markdown")
 
@@ -141,7 +141,7 @@ def read_record(objects_root: Path, member_sha: str) -> dict[str, Any] | None:
     for kind in ("case-input", "case-result-capture"):
         candidate = objects_root / kind / member_sha[:2] / member_sha
         if candidate.exists():
-            record = json.loads(candidate.read_bytes())
+            record: dict[str, Any] = json.loads(candidate.read_bytes())
             record["_object_kind"] = kind
             return record
     return None
@@ -438,7 +438,15 @@ def project_inventory_members(
     side: str,
     gaps: list[dict[str, Any]],
     label: str,
+    tables: tuple[str, ...] = ("dwd_security_bar",),
 ) -> list[dict[str, Any]]:
+    """Project inventory members of the requested physical tables only.
+
+    The inventory may contain both equity and index frames for a mixed-use
+    date. Callers choose the table closure explicitly; this helper never lets a
+    whole-day move decide that a benchmark or an equity disappears from the
+    side where the contract requires it.
+    """
     projected = []
     by_date: dict[str, dict[str, dict[str, Any]]] = {}
     for member in members:
@@ -448,6 +456,8 @@ def project_inventory_members(
             if "dwd_index_bar" in str(member.get("path"))
             else "dwd_security_bar"
         )
+        if table not in tables:
+            continue
         by_date.setdefault(date, {})[table] = member
     for date in sorted(by_date):
         for table in sorted(by_date[date]):
@@ -466,7 +476,7 @@ def project_inventory_members(
                         }
                     )
                 continue
-            if table == "dwd_security_bar":
+            if table in tables:
                 projected.extend(
                     project_table_members(
                         table_path=path,
@@ -613,7 +623,8 @@ def collect_case_members(
             side, gap_reason, clocks = classify_member_side(
                 record, input_cutoff, assembly_window_end
             )
-            role = record.get("case_role")
+            role_value = record.get("case_role")
+            role = str(role_value) if role_value is not None else ""
             object_kind = record["_object_kind"]
             expected_object_kind = EXPECTED_OBJECT_KIND_BY_ROLE.get(role)
             expected_side = EXPECTED_SIDE_BY_ROLE.get(role)
@@ -713,9 +724,11 @@ def equity_projection(universe: dict[str, Any] | None) -> dict[str, Any]:
 
 def dates_entries(index: dict[str, Any]) -> dict[str, Any]:
     if "dates" in index:
-        return index["dates"]
+        dates: dict[str, Any] = index["dates"]
+        return dates
     if "days" in index:
-        return index["days"]
+        days: dict[str, Any] = index["days"]
+        return days
     raise ValueError("TRADE_INDEX_SCHEMA_UNRECOGNIZED")
 
 
@@ -731,7 +744,8 @@ def manifest_file_entry(
     )
     for entry in manifest.get("files") or []:
         if entry.get("path") == suffix or str(entry.get("path", "")).endswith(suffix):
-            return entry
+            result: dict[str, Any] = entry
+            return result
     return None
 
 
@@ -743,12 +757,12 @@ def seal_core_day(
     gaps: list[dict[str, Any]],
     label: str,
     side_tag: str | None,
-    tables=("dwd_index_bar", "dwd_security_bar"),
+    tables: tuple[str, ...] = ("dwd_index_bar", "dwd_security_bar"),
 ) -> list[dict[str, Any]]:
     """Bind the day through its manifest: manifest digest must match the indexed
     binding, then each bar member is verified against the manifest-declared member
     sha256. Recomputation is a consistency check, not the source of truth."""
-    rows = []
+    rows: list[dict[str, Any]] = []
     manifest_path = core_dir / "manifest.json"
     if not manifest_path.exists():
         gaps.append(
@@ -900,7 +914,9 @@ def seal_anchor(
     bytes. Successful anchors (HTTP 200 wire captures) and vendor-blocked
     reference stubs stay distinct; blocked stubs are evidence of the block, not
     content."""
-    raw_path = Path(snap.get("raw_path") or anchor_input_root / (snap["source"] + ".wire"))
+    original_value = snap.get("raw_path")
+    original_path = Path(original_value) if original_value else None
+    staged_path = anchor_input_root / (snap["source"] + ".wire")
     entry: dict[str, Any] = {
         "source": snap["source"],
         "role": snap.get("role"),
@@ -912,18 +928,44 @@ def seal_anchor(
             "producer-observed clocks preserved verbatim; vendor publication channel clock unknown"
         ),
     }
-    if not raw_path.exists():
+    if not staged_path.exists():
         gaps.append(
             {
                 "item": "anchor:" + snap["source"],
                 "status": "unavailable",
-                "reason": "WIRE_FILE_MISSING",
+                "reason": "STAGED_WIRE_FILE_MISSING",
             }
         )
         entry["status"] = "unavailable"
+        entry["original_path"] = str(original_path) if original_path is not None else None
+        entry["staged_path"] = str(staged_path)
         return entry
-    original_path = Path(snap["raw_path"]) if snap.get("raw_path") else raw_path
-    if original_path != raw_path:
+    if original_path is None:
+        gaps.append(
+            {
+                "item": "anchor:" + snap["source"],
+                "status": "unavailable",
+                "reason": "ORIGINAL_WIRE_PATH_NOT_DECLARED",
+            }
+        )
+        entry["status"] = "unavailable"
+        entry["original_path"] = None
+        entry["staged_path"] = str(staged_path)
+        return entry
+    original_binding = "ORIGINAL_PATH_DECLARED"
+    original_verified = False
+    if original_path is not None:
+        if not original_path.exists():
+            original_binding = "ORIGINAL_WIRE_FILE_MISSING"
+        elif sha_file(original_path) != snap["raw_sha256"]:
+            raise ValueError("ANCHOR_ORIGINAL_SHA_MISMATCH:" + snap["source"])
+        else:
+            original_binding = (
+                "SAME_AS_STAGED_PATH_SHA256_VERIFIED"
+                if original_path == staged_path
+                else "ORIGINAL_WIRE_SHA256_VERIFIED"
+            )
+            original_verified = True
         if not original_path.exists():
             gaps.append(
                 {
@@ -933,20 +975,22 @@ def seal_anchor(
                 }
             )
             entry["status"] = "unavailable"
+            entry["original_path"] = str(original_path)
+            entry["staged_path"] = str(staged_path)
             return entry
-        if sha_file(original_path) != snap["raw_sha256"]:
-            raise ValueError("ANCHOR_ORIGINAL_SHA_MISMATCH:" + snap["source"])
-    if sha_file(raw_path) != snap["raw_sha256"]:
+    if sha_file(staged_path) != snap["raw_sha256"]:
         raise ValueError("ANCHOR_STAGED_SHA_MISMATCH:" + snap["source"])
-    seal = link_bytes(raw_path, dest_dir, snap["raw_sha256"])
+    seal = link_bytes(staged_path, dest_dir, snap["raw_sha256"])
     blocked = (
         snap.get("status") in BLOCKED_REFERENCE_STATUSES or (snap.get("http_status") or 0) >= 400
     )
     entry.update(
         {
             "sha256": seal["sha256"],
-            "original_path": snap.get("raw_path"),
-            "staged_path": str(raw_path),
+            "original_path": str(original_path) if original_path is not None else None,
+            "staged_path": str(staged_path),
+            "original_binding": original_binding,
+            "original_verified": original_verified,
             "path_binding": (
                 "original capture path and staged path verified to the same"
                 " fixed raw_sha256 before sealing"
@@ -1037,21 +1081,29 @@ def assemble(
     gaps.extend(projection.pop("gaps"))
     write_json_atomic(input_root / "equity-projection.json", projection)
 
-    # Input side: ONLY strictly pre-cutoff inventory members. Overlap-day
-    # inventory bytes (>= first result date) are excluded from input and resealed
-    # blind on the result side, tagged RESULT_SIDE_POST_CUTOFF.
-    result_start = min(result_dates) if result_dates else None
+    # Input side: inventory members strictly before the market date of the
+    # frozen input cutoff are the input source for the frozen equity closure.
+    # Dates are not moved wholesale when a result-side benchmark shares the
+    # same market date: 2026-11-23 may simultaneously carry input-side frozen
+    # equities and result-side benchmark evidence. Inventory bytes stamped on
+    # or after the cutoff market date never enter the input closure; they are
+    # resealed blind as overlap evidence on the result side.
     inventory_members = list(inventory.get("members", []))
+    cutoff_date = str(policy["input_cutoff"])[:10]
     pre_members = [
-        m
-        for m in inventory_members
-        if result_start is None or str(m.get("market_date") or "") < result_start
+        m for m in inventory_members if str(m.get("market_date") or "") < cutoff_date
     ]
-    overlap_members = [
-        m
-        for m in inventory_members
-        if result_start is not None and str(m.get("market_date") or "") >= result_start
-    ]
+    input_dates = sorted(
+        {
+            str(m.get("market_date"))
+            for m in pre_members
+            if m.get("market_date")
+        }
+    )
+    result_date_set = {str(date) for date in result_dates}
+    result_equity_dates = sorted(date for date in result_date_set if date >= cutoff_date)
+    pre_member_ids = {id(m) for m in pre_members}
+    overlap_members = [m for m in inventory_members if id(m) not in pre_member_ids]
     bars_input = verify_inventory_bars(pre_members, input_root / "bars", "input-bars", gaps)
     frozen_identities, frozen_identity_gaps = identity_rows_for_frozen(universe)
     gaps.extend(frozen_identity_gaps)
@@ -1061,13 +1113,14 @@ def assemble(
         "input",
         gaps,
         "input-projection",
+        tables=("dwd_security_bar",),
     )
     write_json_atomic(
         input_root / "member-projection.json",
         {
             "schema": "quanthus.p10.nvda-case-input-member-projection.v1",
             "scope": "frozen 12 equities only; benchmark count zero",
-            "dates": expected_input_trade_dates(inventory),
+            "dates": input_dates,
             "members": input_member_projection,
         },
     )
@@ -1077,13 +1130,6 @@ def assemble(
     for row in bars_overlap:
         row["side"] = "RESULT_SIDE_POST_CUTOFF"
         row["sealed_blind_at"] = now()
-    overlap_member_projection = project_inventory_members(
-        overlap_members,
-        benchmark_identity_rows(),
-        "result",
-        gaps,
-        "result-overlap-benchmark-projection",
-    )
 
     # Input anchors: fixed-sha binding against staged originals.
     anchor_entries = []
@@ -1097,9 +1143,9 @@ def assemble(
                 gaps,
             )
         )
-    for receipt in sorted(anchor_input_root.glob("*.receipt.json")):
-        digest = sha_file(receipt)
-        link_bytes(receipt, input_root / "anchor-receipts", digest)
+    for anchor_receipt_path in sorted(anchor_input_root.glob("*.receipt.json")):
+        digest = sha_file(anchor_receipt_path)
+        link_bytes(anchor_receipt_path, input_root / "anchor-receipts", digest)
 
     case_members = collect_case_members(
         objects_root,
@@ -1158,11 +1204,16 @@ def assemble(
                 gaps,
                 "result-bars",
                 "RESULT_SIDE_POST_CUTOFF",
+                tables=(
+                    ("dwd_index_bar", "dwd_security_bar")
+                    if date in result_equity_dates
+                    else ("dwd_index_bar",)
+                ),
             )
             bars_result.extend(rows)
             benchmark_identities = benchmark_identity_rows()
             for row in rows:
-                if row.get("table") == "dwd_security_bar":
+                if row.get("table") == "dwd_security_bar" and date in result_equity_dates:
                     result_member_projection.extend(
                         project_table_members(
                             table_path=Path(row["source_path"]),
@@ -1258,7 +1309,7 @@ def assemble(
         "benchmark_role": "RESULT_SIDE_ONLY_NOT_DECISION_INPUT",
         "bars": all_result_bars,
         "member_projection": result_member_projection,
-        "benchmark_projection": result_benchmark_projection + overlap_member_projection,
+        "benchmark_projection": result_benchmark_projection,
         "member_projection_unavailable": [
             g for g in collect_projection_unavailable(gaps) if g.get("side") == "result"
         ],
@@ -1269,7 +1320,7 @@ def assemble(
             "bars": len(all_result_bars),
             "news_members": len(result_news),
             "member_projection": len(result_member_projection),
-            "benchmark_projection": len(result_benchmark_projection + overlap_member_projection),
+            "benchmark_projection": len(result_benchmark_projection),
         },
         "assembled_at_actual": finished,
         "sealed_at_actual": finished,
@@ -1322,7 +1373,11 @@ def assemble(
 def verification_hash(artifact: Path) -> str:
     digest = hashlib.sha256()
     with artifact.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
+
+        def read_chunk() -> bytes:
+            return handle.read(1 << 20)
+
+        for chunk in iter(read_chunk, b""):
             digest.update(chunk)
     return digest.hexdigest()
 
@@ -1402,7 +1457,10 @@ def gated_read(
     sealed member, and the logged artifact sha256 is reverified at read time."""
     if not (result_root / "manifest.json").exists():
         raise ValueError("RESULT_MANIFEST_MISSING")
-    auth_file_sha = sha_file(authorization_file) if authorization_file.exists() else None
+    auth_file_sha: str | None = (
+        sha_file(authorization_file) if authorization_file.exists() else None
+    )
+    auth_error: str | None
     try:
         authorizations = validate_authorization_file(authorization_file)
     except (AuthorizationError, FileNotFoundError, json.JSONDecodeError) as exc:

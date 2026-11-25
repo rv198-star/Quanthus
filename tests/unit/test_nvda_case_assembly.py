@@ -199,7 +199,7 @@ def policy_file(tmp_path: Path) -> Path:
     return path
 
 
-def anchor_files(tmp_path: Path):
+def anchor_files(tmp_path: Path, distinct_original: bool = True):
     root = tmp_path / "anchors"
     root.mkdir()
     ok = root / "anchor-NVDA.wire"
@@ -207,12 +207,18 @@ def anchor_files(tmp_path: Path):
     blocked = root / "ap-case-reference.wire"
     blocked.write_bytes(b"synthetic blocked stub")
     (root / "anchor-NVDA.receipt.json").write_bytes(encoded({"synthetic": True}))
+    ok_raw_path = str(ok)
+    if distinct_original:
+        original = tmp_path / "original-captures" / "anchor-NVDA.wire"
+        original.parent.mkdir(parents=True)
+        original.write_bytes(ok.read_bytes())
+        ok_raw_path = str(original)
     result = {
         "case": CASE_ID,
         "snapshots": [
             {
                 "source": "anchor-NVDA",
-                "raw_path": str(ok),
+                "raw_path": ok_raw_path,
                 "raw_sha256": sha(ok.read_bytes()),
                 "row_count": 14,
                 "http_status": 200,
@@ -508,6 +514,9 @@ def test_overlap_inventory_excluded_from_input(tmp_path: Path) -> None:
     )
     inp, result = manifests(out)
     assert {b["market_date"] for b in inp["bars"]} == {"2026-11-23"}
+    input_rows = rows_by_date_and_code(inp["member_projection"])
+    assert sorted(input_rows) == ["2026-11-23"]
+    assert sorted(input_rows["2026-11-23"]) == sorted(FROZEN_EQUITIES)
     overlap = [
         b
         for b in result["bars"]
@@ -515,9 +524,136 @@ def test_overlap_inventory_excluded_from_input(tmp_path: Path) -> None:
     ]
     assert overlap
     assert result["overlap_inventory_bars_resealed_blind"] == 2
+    # The formal DATES/core result member is projected separately for equities;
+    # overlap inventory bytes remain blind evidence and are not decoded again.
+    assert len([
+        row
+        for row in result["member_projection"]
+        if row["market_date"] == "2026-11-24" and row["table"] == "dwd_security_bar"
+    ]) == len(FROZEN_EQUITIES)
     # dedupe: same sha sealed once even when core day covers the same bytes
     shas24 = [b["sha256"] for b in result["bars"] if b["market_date"] == "2026-11-24"]
     assert len(shas24) == len(set(shas24))
+
+
+def inventory_input_trade_dates() -> list[str]:
+    return [
+        "2026-11-04",
+        "2026-11-05",
+        "2026-11-06",
+        "2026-11-09",
+        "2026-11-10",
+        "2026-11-11",
+        "2026-11-12",
+        "2026-11-13",
+        "2026-11-16",
+        "2026-11-17",
+        "2026-11-18",
+        "2026-11-19",
+        "2026-11-20",
+        "2026-11-23",
+    ]
+
+
+def rows_by_date_and_code(rows: list[dict]) -> dict[str, dict[str, int]]:
+    grouped: dict[str, dict[str, int]] = {}
+    for row in rows:
+        day_rows = grouped.setdefault(row["market_date"], {})
+        day_rows[row["code"]] = day_rows.get(row["code"], 0) + 1
+    return grouped
+
+
+def test_mixed_use_1123_input_equities_and_result_benchmarks(tmp_path: Path) -> None:
+    """One normal assembly run represents the 11-23 mixed-use day by purpose,
+    date and identity instead of moving the whole inventory day to one side."""
+    dates14 = inventory_input_trade_dates()
+    receipt, out, _s = run_assemble(
+        tmp_path,
+        inventory_dates=tuple(dates14),
+        result_dates=("2026-11-23", "2026-11-24", "2026-11-25"),
+    )
+    assert receipt["status"] == "SEALED"
+    inp, result = manifests(out)
+    input_rows = rows_by_date_and_code(inp["member_projection"])
+    assert len(input_rows) == 14
+    for date in dates14:
+        assert sorted(input_rows[date]) == sorted(FROZEN_EQUITIES)
+    assert inp["counts"]["benchmark_projection"] == 0
+    assert not inp.get("benchmark_projection")
+
+    result_rows = rows_by_date_and_code(result["member_projection"])
+    assert sorted(result_rows) == ["2026-11-24", "2026-11-25"]
+    for date in ("2026-11-24", "2026-11-25"):
+        assert sorted(result_rows[date]) == sorted(FROZEN_EQUITIES)
+
+    benchmark_rows = rows_by_date_and_code(result["benchmark_projection"])
+    assert sorted(benchmark_rows) == ["2026-11-23", "2026-11-24", "2026-11-25"]
+    for date in ("2026-11-23", "2026-11-24", "2026-11-25"):
+        assert sorted(benchmark_rows[date]) == ["000300", "399006"]
+    assert result["counts"]["benchmark_projection"] == 6
+
+
+def test_mixed_use_missing_index_identity_is_named_per_day(tmp_path: Path) -> None:
+    news_root, _s = make_news_root(tmp_path)
+    inventory = make_inventory(tmp_path, ["2026-11-23"])
+    index = make_index(tmp_path, ["2026-11-23", "2026-11-24"])
+    # Remove both benchmark identities only from the result-side 11-23 index
+    # member. The other date remains complete; gaps must stay day/identity exact.
+    part = (
+        tmp_path
+        / "resultcore"
+        / "core-2026-11-23"
+        / "payload"
+        / "security_market_observation"
+        / "dwd_index_bar"
+        / "market_date=2026-11-23"
+        / "part-00000.parquet"
+    )
+    frame = pa.table({"index_id": ["999999"], "interval_size": ["1d"]})
+    pq.write_table(frame, part)
+    core = tmp_path / "resultcore" / "core-2026-11-23"
+    manifest_path = core / "manifest.json"
+    core_manifest = json.loads(manifest_path.read_bytes())
+    rel = (
+        "payload/security_market_observation/dwd_index_bar/"
+        "market_date=2026-11-23/part-00000.parquet"
+    )
+    for entry in core_manifest["files"]:
+        if entry["path"] == rel:
+            entry["sha256"] = sha(part.read_bytes())
+            entry["size_bytes"] = part.stat().st_size
+    manifest_path.write_bytes(encoded(core_manifest))
+    index_obj = json.loads(index.read_bytes())
+    index_obj["dates"]["2026-11-23"]["core_manifest_sha256"] = "sha256:" + sha(
+        manifest_path.read_bytes()
+    )
+    index.write_bytes(encoded(index_obj))
+    anchor_result, anchor_root = anchor_files(tmp_path)
+    out = tmp_path / "sealed"
+    receipt = assemble(
+        policy_path=policy_file(tmp_path),
+        inventory_path=inventory,
+        anchor_result_path=anchor_result,
+        anchor_input_root=anchor_root,
+        news_root=news_root,
+        output_root=out,
+        job_index_path=index,
+        result_dates=["2026-11-23", "2026-11-24"],
+        universe_path=universe_file(tmp_path),
+    )
+    assert receipt["status"] == "PARTIAL"
+    absent = [
+        g
+        for g in receipt["gaps"]
+        if g.get("reason") == "IDENTITY_NOT_IN_SOURCE_MEMBER"
+        and (g.get("item") or "").startswith("result-benchmark-projection:2026-11-23")
+    ]
+    assert len(absent) == 2
+    inp, result = manifests(out)
+    input_rows = rows_by_date_and_code(inp["member_projection"])
+    assert sorted(input_rows["2026-11-23"]) == sorted(FROZEN_EQUITIES)
+    benchmark_rows = rows_by_date_and_code(result["benchmark_projection"])
+    assert sorted(benchmark_rows["2026-11-24"]) == ["000300", "399006"]
 
 
 def test_seal_root_rerun_refuses_before_write(tmp_path: Path) -> None:
@@ -558,25 +694,75 @@ def test_seal_root_rerun_refuses_before_write(tmp_path: Path) -> None:
 def test_anchor_original_and_staged_path_same_sha(tmp_path: Path) -> None:
     receipt, out, _s = run_assemble(tmp_path)
     inp, _r = manifests(out)
+    saw_distinct = False
     for anchor in inp["anchors"]:
         if anchor.get("status") == "unavailable":
             continue
         assert anchor["original_path"]
         assert anchor["staged_path"]
-        assert (
-            anchor["original_path"] != anchor["staged_path"]
-            or anchor["original_path"] == anchor["staged_path"]
-        )
+        saw_distinct = saw_distinct or anchor["original_path"] != anchor["staged_path"]
         original = Path(anchor["original_path"])
         staged = Path(anchor["staged_path"])
         # both paths resolve to bytes of the one fixed sha256
         assert sha(original.read_bytes()) == anchor["sha256"]
         assert sha(staged.read_bytes()) == anchor["sha256"]
         assert "same" in anchor["path_binding"]
+    assert saw_distinct
     # at least one successful and one blocked anchor are both path-bound
     classes = {a["source"]: a["capture_class"] for a in inp["anchors"] if "capture_class" in a}
     assert "SUCCESSFUL_RAW_ANCHOR_CAPTURE" in classes.values()
     assert "VENDOR_BLOCKED_REFERENCE_STUB" in classes.values()
+
+
+def test_anchor_staged_missing_is_named_unavailable(tmp_path: Path) -> None:
+    news_root, _s = make_news_root(tmp_path)
+    inventory = make_inventory(tmp_path, ["2026-11-23"])
+    index = make_index(tmp_path, ["2026-11-24"])
+    anchor_result, anchor_root = anchor_files(tmp_path)
+    (anchor_root / "anchor-NVDA.wire").unlink()
+    out = tmp_path / "sealed"
+    receipt = assemble(
+        policy_path=policy_file(tmp_path),
+        inventory_path=inventory,
+        anchor_result_path=anchor_result,
+        anchor_input_root=anchor_root,
+        news_root=news_root,
+        output_root=out,
+        job_index_path=index,
+        result_dates=["2026-11-24"],
+        universe_path=universe_file(tmp_path),
+    )
+    assert receipt["status"] == "PARTIAL"
+    assert any(
+        g.get("item") == "anchor:anchor-NVDA" and g.get("reason") == "STAGED_WIRE_FILE_MISSING"
+        for g in receipt["gaps"]
+    )
+
+
+def test_anchor_original_missing_is_named_unavailable(tmp_path: Path) -> None:
+    news_root, _s = make_news_root(tmp_path)
+    inventory = make_inventory(tmp_path, ["2026-11-23"])
+    index = make_index(tmp_path, ["2026-11-24"])
+    anchor_result, anchor_root = anchor_files(tmp_path)
+    original = json.loads(anchor_result.read_bytes())["snapshots"][0]["raw_path"]
+    Path(original).unlink()
+    out = tmp_path / "sealed"
+    receipt = assemble(
+        policy_path=policy_file(tmp_path),
+        inventory_path=inventory,
+        anchor_result_path=anchor_result,
+        anchor_input_root=anchor_root,
+        news_root=news_root,
+        output_root=out,
+        job_index_path=index,
+        result_dates=["2026-11-24"],
+        universe_path=universe_file(tmp_path),
+    )
+    assert receipt["status"] == "PARTIAL"
+    assert any(
+        g.get("item") == "anchor:anchor-NVDA" and g.get("reason") == "ORIGINAL_WIRE_FILE_MISSING"
+        for g in receipt["gaps"]
+    )
 
 
 def make_revised_news_root(tmp_path: Path) -> tuple[Path, dict]:

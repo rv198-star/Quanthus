@@ -19,7 +19,7 @@ from datetime import datetime
 from threading import Lock
 from typing import Any
 
-from quanthus.p12_paper.quotes import IntradaySeries, QuoteService
+from quanthus.p12_paper.quotes import IntradaySeries, QuoteService, SHANGHAI
 
 
 class Replay:
@@ -43,9 +43,11 @@ class Replay:
         self._tape = tape
         self._day = day
         self._source = source
+        self._contract: dict[str, Any] = dict(tape.get("_contract") or {})
         self._times = {
-            code: [IntradaySeries._minute_end(row["time"]) for row in info["points"]]
+            code: [self._point_visible_at(row) for row in info["points"]]
             for code, info in tape.items()
+            if code != "_contract"
         }
         close = datetime.fromisoformat(day + "T15:00:00+08:00")
         self._timeline = sorted({close, *(t for times in self._times.values() for t in times)})
@@ -101,41 +103,78 @@ class Replay:
         point = info["points"][count - 1]
         fields = [""] * 40
         fields[1:5] = [info["name"], code, point["price"], info["previous_close"]]
-        # Field 5 is the CURRENT session's OPEN print - the bound session's
-        # qualified 09:30 opening price (the continuous-auction open), never a
-        # later last-price tick, an earlier session's print on a multi-day
-        # tape, a PRE-OPEN imprint such as a 09:29 52.00 tick stamped on the
-        # same day (Issue #723 E8 r5 fix-2), or a LATER bar merely stamped at
-        # or after the 09:30 mark (Issue #723 E8 r5 fix-4).  The open must be
-        # the tape's real 09:30 minute-bar - the point whose minute closes at
-        # 09:31 - AND it must already be VISIBLE at the replay clock, so a
-        # later not-yet-visible 09:32 quote never pre-fills the open before
-        # its own timestamp, and a tape that has no true 09:30 bar at all
-        # leaves the open empty for the named rejection.
-        points = info["points"][:count]
-        day_digits = now.strftime("%Y%m%d")
-        # The session's qualified open is the minute-bar that ENDS at 09:31 -
-        # the 09:30-09:31 continuous-auction opening minute.  Comparing the
-        # bar's minute-end keeps it independent of the tape's stored label
-        # convention while still matching exactly one real bar; anything
-        # earlier (pre-open) or later (a 09:32+ last-price tick) is excluded.
-        open_minute_end = datetime(
-            now.year, now.month, now.day, 9, 31, tzinfo=now.tzinfo
-        )
-        open_point = next(
-            (
-                row
-                for row in points
-                if str(row.get("time", "")).startswith(day_digits)
-                and IntradaySeries._minute_end(str(row.get("time", "")))
-                == open_minute_end
-            ),
-            None,
-        )
-        fields[5] = open_point["price"] if open_point is not None else ""
+        # Field 5 is the bound session's NAMED OPEN - the opening price the
+        # tape's versioned source contract explicitly declares, never a value
+        # inferred from a minute label, the earliest visible tick or the
+        # first-minute bar (Issue #723 E8 r5 fix-5, ruling 7153294321).  A
+        # point row declares the open via the field the contract names as
+        # ``open_field``; it must be on the same security and bound day AND
+        # already visible at the replay clock.  No contract, no declared
+        # field, or two conflicting declared opens all leave the field empty
+        # so the order path refuses by name.
+        fields[5] = self._named_open(code, info, count, now)
         fields[6] = point["volume_lots"]
         fields[30] = self._times[code][count - 1].strftime("%Y%m%d%H%M%S")
         return fields, now
+
+    def _point_visible_at(self, row: dict[str, Any]) -> datetime | None:
+        """When a tape point becomes visible on the replay clock.
+
+        ``time_label`` is the source contract's declared meaning of
+        ``point.time``: ``minute_start`` (the Tencent m1 convention - the row
+        covers the minute that OPENS at the label, visible when that minute
+        ends, i.e. label + 1 minute) or ``minute_end`` (the row covers the
+        minute that CLOSES at the label, visible at the label itself).
+        """
+        label = str(row.get("time", ""))
+        if self._contract.get("time_label") == "minute_end":
+            try:
+                return datetime(
+                    int(label[:4]), int(label[4:6]), int(label[6:8]),
+                    int(label[8:10]), int(label[10:12]), tzinfo=SHANGHAI,
+                )
+            except (ValueError, IndexError):
+                return None
+        return IntradaySeries._minute_end(label)
+
+    def _named_open(self, code: str, info: dict[str, Any], count: int, now: datetime) -> str:
+        """The contract-declared bound-day open already visible at ``now``.
+
+        Returns the declared open string, or "" when the contract names no
+        open field, no visible point declares it, or the visible points
+        declare conflicting opens (the confirm path then refuses by name).
+        """
+        day_digits = now.strftime("%Y%m%d")
+        declared: list[str] = []
+        seen: set[str] = set()
+
+        def _note(value) -> None:
+            text = str(value).strip() if value is not None else ""
+            if text and text not in seen:
+                seen.add(text)
+                declared.append(text)
+
+        # Declaration channel 1: a point row on the bound day declares the
+        # session open via the contract's named ``open_field``.
+        open_field = self._contract.get("open_field")
+        if open_field:
+            for row in info["points"][:count]:
+                if not str(row.get("time", "")).startswith(day_digits):
+                    continue
+                _note(row.get(open_field))
+        # Declaration channel 2: the source contract declares the open fact
+        # directly as {security, time, price}; it becomes visible at the same
+        # replay-visible moment as the label it names.
+        for decl in self._contract.get("opens", ()) or ():
+            if decl.get("security") != code:
+                continue
+            label = str(decl.get("time", ""))
+            if not label.startswith(day_digits):
+                continue
+            visible = self._point_visible_at({"time": label})
+            if visible is not None and visible <= now:
+                _note(decl.get("price"))
+        return declared[0] if len(declared) == 1 else ""
 
     def fetch(self, code: str) -> dict[str, Any]:
         now = self.now()

@@ -1,0 +1,37 @@
+{
+  "contract_id": "p12-replay-tape",
+  "version": "1.0.0",
+  "schema_version": "p12-replay-tape.v1",
+  "purpose": "Versioned source contract for a frozen intraday replay tape consumed by the P12 paper bound-session open. A buy confirm uses only the open the source DECLARES by name; it never infers an open from a minute label, the earliest visible tick or the first-minute bar.",
+  "tape_key": "_contract",
+  "fields": {
+    "version": {"required": true, "const": "p12-replay-tape.v1"},
+    "time_label": {
+      "required": true,
+      "enum": ["minute_start", "minute_end"],
+      "note": "minute_start: point.time is the minute the bar OPENS (Tencent m1), visible when that minute ends (label+1min). minute_end: point.time is the minute the bar CLOSES, visible at the label."
+    },
+    "visible_at": {
+      "required": true,
+      "enum": ["label_end", "label_time"],
+      "note": "label_end pairs with minute_start (visible at label+1min); label_time pairs with minute_end (visible at the label)."
+    },
+    "open_field": {
+      "required": false,
+      "type": "string",
+      "note": "When set, a point row on the bound day declares the session open via this named field."
+    },
+    "opens": {
+      "required": false,
+      "type": "array",
+      "items": {"security": "code", "time": "yyyymmddHHMM", "price": "decimal"},
+      "note": "Source-declared named opens; visible at the replay-visible moment of the named label."
+    }
+  },
+  "rules": [
+    "The bound open is a NAMED fact the source declares via open_field rows or contract.opens entries, on the same security and bound day, already visible at the confirm clock.",
+    "Exactly one declared open is used; zero leaves the quote open empty (named refuse), two or more distinct declared values are refused as ambiguous.",
+    "A tape with no _contract, or a contract missing time_label/open declaration, supplies no open and the buy confirm refuses by name.",
+    "Pre-open imprints, the first-minute bar and later last-price ticks keep their own timestamps and are never the open unless the source declares them so."
+  ]
+}

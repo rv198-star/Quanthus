@@ -1,1 +1,930 @@
-{"600000": {"name": "浦发银行", "previous_close": "10.60", "points": [{"time": "202611200930", "price": "10.68", "volume_lots": "5000"}, {"time": "202611200931", "price": "10.68", "volume_lots": "5007"}, {"time": "202611200932", "price": "10.67", "volume_lots": "5014"}, {"time": "202611200933", "price": "10.67", "volume_lots": "5021"}, {"time": "202611200934", "price": "10.66", "volume_lots": "5028"}, {"time": "202611200935", "price": "10.66", "volume_lots": "5035"}, {"time": "202611200936", "price": "10.65", "volume_lots": "5042"}, {"time": "202611200937", "price": "10.65", "volume_lots": "5049"}, {"time": "202611200938", "price": "10.64", "volume_lots": "5056"}, {"time": "202611200939", "price": "10.64", "volume_lots": "5063"}, {"time": "202611200940", "price": "10.64", "volume_lots": "5070"}, {"time": "202611200941", "price": "10.63", "volume_lots": "5077"}, {"time": "202611200942", "price": "10.63", "volume_lots": "5084"}, {"time": "202611200943", "price": "10.62", "volume_lots": "5091"}, {"time": "202611200944", "price": "10.62", "volume_lots": "5098"}, {"time": "202611200945", "price": "10.61", "volume_lots": "5105"}, {"time": "202611200946", "price": "10.61", "volume_lots": "5112"}, {"time": "202611200947", "price": "10.61", "volume_lots": "5119"}, {"time": "202611200948", "price": "10.60", "volume_lots": "5126"}, {"time": "202611200949", "price": "10.60", "volume_lots": "5133"}, {"time": "202611200950", "price": "10.59", "volume_lots": "5140"}, {"time": "202611200951", "price": "10.59", "volume_lots": "5147"}, {"time": "202611200952", "price": "10.58", "volume_lots": "5154"}, {"time": "202611200953", "price": "10.58", "volume_lots": "5161"}, {"time": "202611200954", "price": "10.57", "volume_lots": "5168"}, {"time": "202611200955", "price": "10.57", "volume_lots": "5175"}, {"time": "202611200956", "price": "10.57", "volume_lots": "5182"}, {"time": "202611200957", "price": "10.56", "volume_lots": "5189"}, {"time": "202611200958", "price": "10.56", "volume_lots": "5196"}, {"time": "202611200959", "price": "10.55", "volume_lots": "5203"}, {"time": "202611201000", "price": "10.55", "volume_lots": "5210"}, {"time": "202611201001", "price": "10.56", "volume_lots": "5217"}, {"time": "202611201002", "price": "10.56", "volume_lots": "5224"}, {"time": "202611201003", "price": "10.57", "volume_lots": "5231"}, {"time": "202611201004", "price": "10.58", "volume_lots": "5238"}, {"time": "202611201005", "price": "10.58", "volume_lots": "5245"}, {"time": "202611201006", "price": "10.59", "volume_lots": "5252"}, {"time": "202611201007", "price": "10.59", "volume_lots": "5259"}, {"time": "202611201008", "price": "10.60", "volume_lots": "5266"}, {"time": "202611201009", "price": "10.60", "volume_lots": "5273"}, {"time": "202611201010", "price": "10.61", "volume_lots": "5280"}, {"time": "202611201011", "price": "10.62", "volume_lots": "5287"}, {"time": "202611201012", "price": "10.62", "volume_lots": "5294"}, {"time": "202611201013", "price": "10.63", "volume_lots": "5301"}, {"time": "202611201014", "price": "10.63", "volume_lots": "5308"}, {"time": "202611201015", "price": "10.64", "volume_lots": "5315"}, {"time": "202611201016", "price": "10.65", "volume_lots": "5322"}, {"time": "202611201017", "price": "10.65", "volume_lots": "5329"}, {"time": "202611201018", "price": "10.66", "volume_lots": "5336"}, {"time": "202611201019", "price": "10.66", "volume_lots": "5343"}, {"time": "202611201020", "price": "10.67", "volume_lots": "5350"}, {"time": "202611201021", "price": "10.67", "volume_lots": "5357"}, {"time": "202611201022", "price": "10.68", "volume_lots": "5364"}, {"time": "202611201023", "price": "10.69", "volume_lots": "5371"}, {"time": "202611201024", "price": "10.69", "volume_lots": "5378"}, {"time": "202611201025", "price": "10.70", "volume_lots": "5385"}, {"time": "202611201026", "price": "10.70", "volume_lots": "5392"}, {"time": "202611201027", "price": "10.71", "volume_lots": "5399"}, {"time": "202611201028", "price": "10.71", "volume_lots": "5406"}, {"time": "202611201029", "price": "10.72", "volume_lots": "5413"}]}, "000001": {"name": "平安银行", "previous_close": "11.10", "points": [{"time": "202611200930", "price": "11.15", "volume_lots": "5000"}, {"time": "202611200931", "price": "11.15", "volume_lots": "5007"}, {"time": "202611200932", "price": "11.14", "volume_lots": "5014"}, {"time": "202611200933", "price": "11.14", "volume_lots": "5021"}, {"time": "202611200934", "price": "11.14", "volume_lots": "5028"}, {"time": "202611200935", "price": "11.13", "volume_lots": "5035"}, {"time": "202611200936", "price": "11.13", "volume_lots": "5042"}, {"time": "202611200937", "price": "11.13", "volume_lots": "5049"}, {"time": "202611200938", "price": "11.12", "volume_lots": "5056"}, {"time": "202611200939", "price": "11.12", "volume_lots": "5063"}, {"time": "202611200940", "price": "11.12", "volume_lots": "5070"}, {"time": "202611200941", "price": "11.11", "volume_lots": "5077"}, {"time": "202611200942", "price": "11.11", "volume_lots": "5084"}, {"time": "202611200943", "price": "11.11", "volume_lots": "5091"}, {"time": "202611200944", "price": "11.10", "volume_lots": "5098"}, {"time": "202611200945", "price": "11.10", "volume_lots": "5105"}, {"time": "202611200946", "price": "11.10", "volume_lots": "5112"}, {"time": "202611200947", "price": "11.09", "volume_lots": "5119"}, {"time": "202611200948", "price": "11.09", "volume_lots": "5126"}, {"time": "202611200949", "price": "11.09", "volume_lots": "5133"}, {"time": "202611200950", "price": "11.08", "volume_lots": "5140"}, {"time": "202611200951", "price": "11.08", "volume_lots": "5147"}, {"time": "202611200952", "price": "11.08", "volume_lots": "5154"}, {"time": "202611200953", "price": "11.07", "volume_lots": "5161"}, {"time": "202611200954", "price": "11.07", "volume_lots": "5168"}, {"time": "202611200955", "price": "11.07", "volume_lots": "5175"}, {"time": "202611200956", "price": "11.06", "volume_lots": "5182"}, {"time": "202611200957", "price": "11.06", "volume_lots": "5189"}, {"time": "202611200958", "price": "11.06", "volume_lots": "5196"}, {"time": "202611200959", "price": "11.05", "volume_lots": "5203"}, {"time": "202611201000", "price": "11.05", "volume_lots": "5210"}, {"time": "202611201001", "price": "11.06", "volume_lots": "5217"}, {"time": "202611201002", "price": "11.07", "volume_lots": "5224"}, {"time": "202611201003", "price": "11.08", "volume_lots": "5231"}, {"time": "202611201004", "price": "11.09", "volume_lots": "5238"}, {"time": "202611201005", "price": "11.09", "volume_lots": "5245"}, {"time": "202611201006", "price": "11.10", "volume_lots": "5252"}, {"time": "202611201007", "price": "11.11", "volume_lots": "5259"}, {"time": "202611201008", "price": "11.12", "volume_lots": "5266"}, {"time": "202611201009", "price": "11.12", "volume_lots": "5273"}, {"time": "202611201010", "price": "11.13", "volume_lots": "5280"}, {"time": "202611201011", "price": "11.14", "volume_lots": "5287"}, {"time": "202611201012", "price": "11.15", "volume_lots": "5294"}, {"time": "202611201013", "price": "11.16", "volume_lots": "5301"}, {"time": "202611201014", "price": "11.16", "volume_lots": "5308"}, {"time": "202611201015", "price": "11.17", "volume_lots": "5315"}, {"time": "202611201016", "price": "11.18", "volume_lots": "5322"}, {"time": "202611201017", "price": "11.19", "volume_lots": "5329"}, {"time": "202611201018", "price": "11.19", "volume_lots": "5336"}, {"time": "202611201019", "price": "11.20", "volume_lots": "5343"}, {"time": "202611201020", "price": "11.21", "volume_lots": "5350"}, {"time": "202611201021", "price": "11.22", "volume_lots": "5357"}, {"time": "202611201022", "price": "11.23", "volume_lots": "5364"}, {"time": "202611201023", "price": "11.23", "volume_lots": "5371"}, {"time": "202611201024", "price": "11.24", "volume_lots": "5378"}, {"time": "202611201025", "price": "11.25", "volume_lots": "5385"}, {"time": "202611201026", "price": "11.26", "volume_lots": "5392"}, {"time": "202611201027", "price": "11.26", "volume_lots": "5399"}, {"time": "202611201028", "price": "11.27", "volume_lots": "5406"}, {"time": "202611201029", "price": "11.28", "volume_lots": "5413"}]}, "000858": {"name": "五粮液", "previous_close": "149.80", "points": [{"time": "202611200930", "price": "150.30", "volume_lots": "5000"}, {"time": "202611200931", "price": "150.27", "volume_lots": "5007"}, {"time": "202611200932", "price": "150.25", "volume_lots": "5014"}, {"time": "202611200933", "price": "150.22", "volume_lots": "5021"}, {"time": "202611200934", "price": "150.19", "volume_lots": "5028"}, {"time": "202611200935", "price": "150.16", "volume_lots": "5035"}, {"time": "202611200936", "price": "150.14", "volume_lots": "5042"}, {"time": "202611200937", "price": "150.11", "volume_lots": "5049"}, {"time": "202611200938", "price": "150.08", "volume_lots": "5056"}, {"time": "202611200939", "price": "150.06", "volume_lots": "5063"}, {"time": "202611200940", "price": "150.03", "volume_lots": "5070"}, {"time": "202611200941", "price": "150.00", "volume_lots": "5077"}, {"time": "202611200942", "price": "149.97", "volume_lots": "5084"}, {"time": "202611200943", "price": "149.95", "volume_lots": "5091"}, {"time": "202611200944", "price": "149.92", "volume_lots": "5098"}, {"time": "202611200945", "price": "149.89", "volume_lots": "5105"}, {"time": "202611200946", "price": "149.87", "volume_lots": "5112"}, {"time": "202611200947", "price": "149.84", "volume_lots": "5119"}, {"time": "202611200948", "price": "149.81", "volume_lots": "5126"}, {"time": "202611200949", "price": "149.78", "volume_lots": "5133"}, {"time": "202611200950", "price": "149.76", "volume_lots": "5140"}, {"time": "202611200951", "price": "149.73", "volume_lots": "5147"}, {"time": "202611200952", "price": "149.70", "volume_lots": "5154"}, {"time": "202611200953", "price": "149.68", "volume_lots": "5161"}, {"time": "202611200954", "price": "149.65", "volume_lots": "5168"}, {"time": "202611200955", "price": "149.62", "volume_lots": "5175"}, {"time": "202611200956", "price": "149.59", "volume_lots": "5182"}, {"time": "202611200957", "price": "149.57", "volume_lots": "5189"}, {"time": "202611200958", "price": "149.54", "volume_lots": "5196"}, {"time": "202611200959", "price": "149.51", "volume_lots": "5203"}, {"time": "202611201000", "price": "149.53", "volume_lots": "5210"}, {"time": "202611201001", "price": "149.58", "volume_lots": "5217"}, {"time": "202611201002", "price": "149.64", "volume_lots": "5224"}, {"time": "202611201003", "price": "149.69", "volume_lots": "5231"}, {"time": "202611201004", "price": "149.74", "volume_lots": "5238"}, {"time": "202611201005", "price": "149.80", "volume_lots": "5245"}, {"time": "202611201006", "price": "149.85", "volume_lots": "5252"}, {"time": "202611201007", "price": "149.91", "volume_lots": "5259"}, {"time": "202611201008", "price": "149.96", "volume_lots": "5266"}, {"time": "202611201009", "price": "150.02", "volume_lots": "5273"}, {"time": "202611201010", "price": "150.07", "volume_lots": "5280"}, {"time": "202611201011", "price": "150.12", "volume_lots": "5287"}, {"time": "202611201012", "price": "150.18", "volume_lots": "5294"}, {"time": "202611201013", "price": "150.23", "volume_lots": "5301"}, {"time": "202611201014", "price": "150.29", "volume_lots": "5308"}, {"time": "202611201015", "price": "150.34", "volume_lots": "5315"}, {"time": "202611201016", "price": "150.39", "volume_lots": "5322"}, {"time": "202611201017", "price": "150.45", "volume_lots": "5329"}, {"time": "202611201018", "price": "150.50", "volume_lots": "5336"}, {"time": "202611201019", "price": "150.56", "volume_lots": "5343"}, {"time": "202611201020", "price": "150.61", "volume_lots": "5350"}, {"time": "202611201021", "price": "150.67", "volume_lots": "5357"}, {"time": "202611201022", "price": "150.72", "volume_lots": "5364"}, {"time": "202611201023", "price": "150.77", "volume_lots": "5371"}, {"time": "202611201024", "price": "150.83", "volume_lots": "5378"}, {"time": "202611201025", "price": "150.88", "volume_lots": "5385"}, {"time": "202611201026", "price": "150.94", "volume_lots": "5392"}, {"time": "202611201027", "price": "150.99", "volume_lots": "5399"}, {"time": "202611201028", "price": "151.05", "volume_lots": "5406"}, {"time": "202611201029", "price": "151.10", "volume_lots": "5413"}]}}
+{
+  "600000": {
+    "name": "浦发银行",
+    "previous_close": "10.60",
+    "points": [
+      {
+        "time": "202611200930",
+        "price": "10.68",
+        "volume_lots": "5000",
+        "open": "10.68"
+      },
+      {
+        "time": "202611200931",
+        "price": "10.68",
+        "volume_lots": "5007"
+      },
+      {
+        "time": "202611200932",
+        "price": "10.67",
+        "volume_lots": "5014"
+      },
+      {
+        "time": "202611200933",
+        "price": "10.67",
+        "volume_lots": "5021"
+      },
+      {
+        "time": "202611200934",
+        "price": "10.66",
+        "volume_lots": "5028"
+      },
+      {
+        "time": "202611200935",
+        "price": "10.66",
+        "volume_lots": "5035"
+      },
+      {
+        "time": "202611200936",
+        "price": "10.65",
+        "volume_lots": "5042"
+      },
+      {
+        "time": "202611200937",
+        "price": "10.65",
+        "volume_lots": "5049"
+      },
+      {
+        "time": "202611200938",
+        "price": "10.64",
+        "volume_lots": "5056"
+      },
+      {
+        "time": "202611200939",
+        "price": "10.64",
+        "volume_lots": "5063"
+      },
+      {
+        "time": "202611200940",
+        "price": "10.64",
+        "volume_lots": "5070"
+      },
+      {
+        "time": "202611200941",
+        "price": "10.63",
+        "volume_lots": "5077"
+      },
+      {
+        "time": "202611200942",
+        "price": "10.63",
+        "volume_lots": "5084"
+      },
+      {
+        "time": "202611200943",
+        "price": "10.62",
+        "volume_lots": "5091"
+      },
+      {
+        "time": "202611200944",
+        "price": "10.62",
+        "volume_lots": "5098"
+      },
+      {
+        "time": "202611200945",
+        "price": "10.61",
+        "volume_lots": "5105"
+      },
+      {
+        "time": "202611200946",
+        "price": "10.61",
+        "volume_lots": "5112"
+      },
+      {
+        "time": "202611200947",
+        "price": "10.61",
+        "volume_lots": "5119"
+      },
+      {
+        "time": "202611200948",
+        "price": "10.60",
+        "volume_lots": "5126"
+      },
+      {
+        "time": "202611200949",
+        "price": "10.60",
+        "volume_lots": "5133"
+      },
+      {
+        "time": "202611200950",
+        "price": "10.59",
+        "volume_lots": "5140"
+      },
+      {
+        "time": "202611200951",
+        "price": "10.59",
+        "volume_lots": "5147"
+      },
+      {
+        "time": "202611200952",
+        "price": "10.58",
+        "volume_lots": "5154"
+      },
+      {
+        "time": "202611200953",
+        "price": "10.58",
+        "volume_lots": "5161"
+      },
+      {
+        "time": "202611200954",
+        "price": "10.57",
+        "volume_lots": "5168"
+      },
+      {
+        "time": "202611200955",
+        "price": "10.57",
+        "volume_lots": "5175"
+      },
+      {
+        "time": "202611200956",
+        "price": "10.57",
+        "volume_lots": "5182"
+      },
+      {
+        "time": "202611200957",
+        "price": "10.56",
+        "volume_lots": "5189"
+      },
+      {
+        "time": "202611200958",
+        "price": "10.56",
+        "volume_lots": "5196"
+      },
+      {
+        "time": "202611200959",
+        "price": "10.55",
+        "volume_lots": "5203"
+      },
+      {
+        "time": "202611201000",
+        "price": "10.55",
+        "volume_lots": "5210"
+      },
+      {
+        "time": "202611201001",
+        "price": "10.56",
+        "volume_lots": "5217"
+      },
+      {
+        "time": "202611201002",
+        "price": "10.56",
+        "volume_lots": "5224"
+      },
+      {
+        "time": "202611201003",
+        "price": "10.57",
+        "volume_lots": "5231"
+      },
+      {
+        "time": "202611201004",
+        "price": "10.58",
+        "volume_lots": "5238"
+      },
+      {
+        "time": "202611201005",
+        "price": "10.58",
+        "volume_lots": "5245"
+      },
+      {
+        "time": "202611201006",
+        "price": "10.59",
+        "volume_lots": "5252"
+      },
+      {
+        "time": "202611201007",
+        "price": "10.59",
+        "volume_lots": "5259"
+      },
+      {
+        "time": "202611201008",
+        "price": "10.60",
+        "volume_lots": "5266"
+      },
+      {
+        "time": "202611201009",
+        "price": "10.60",
+        "volume_lots": "5273"
+      },
+      {
+        "time": "202611201010",
+        "price": "10.61",
+        "volume_lots": "5280"
+      },
+      {
+        "time": "202611201011",
+        "price": "10.62",
+        "volume_lots": "5287"
+      },
+      {
+        "time": "202611201012",
+        "price": "10.62",
+        "volume_lots": "5294"
+      },
+      {
+        "time": "202611201013",
+        "price": "10.63",
+        "volume_lots": "5301"
+      },
+      {
+        "time": "202611201014",
+        "price": "10.63",
+        "volume_lots": "5308"
+      },
+      {
+        "time": "202611201015",
+        "price": "10.64",
+        "volume_lots": "5315"
+      },
+      {
+        "time": "202611201016",
+        "price": "10.65",
+        "volume_lots": "5322"
+      },
+      {
+        "time": "202611201017",
+        "price": "10.65",
+        "volume_lots": "5329"
+      },
+      {
+        "time": "202611201018",
+        "price": "10.66",
+        "volume_lots": "5336"
+      },
+      {
+        "time": "202611201019",
+        "price": "10.66",
+        "volume_lots": "5343"
+      },
+      {
+        "time": "202611201020",
+        "price": "10.67",
+        "volume_lots": "5350"
+      },
+      {
+        "time": "202611201021",
+        "price": "10.67",
+        "volume_lots": "5357"
+      },
+      {
+        "time": "202611201022",
+        "price": "10.68",
+        "volume_lots": "5364"
+      },
+      {
+        "time": "202611201023",
+        "price": "10.69",
+        "volume_lots": "5371"
+      },
+      {
+        "time": "202611201024",
+        "price": "10.69",
+        "volume_lots": "5378"
+      },
+      {
+        "time": "202611201025",
+        "price": "10.70",
+        "volume_lots": "5385"
+      },
+      {
+        "time": "202611201026",
+        "price": "10.70",
+        "volume_lots": "5392"
+      },
+      {
+        "time": "202611201027",
+        "price": "10.71",
+        "volume_lots": "5399"
+      },
+      {
+        "time": "202611201028",
+        "price": "10.71",
+        "volume_lots": "5406"
+      },
+      {
+        "time": "202611201029",
+        "price": "10.72",
+        "volume_lots": "5413"
+      }
+    ]
+  },
+  "000001": {
+    "name": "平安银行",
+    "previous_close": "11.10",
+    "points": [
+      {
+        "time": "202611200930",
+        "price": "11.15",
+        "volume_lots": "5000",
+        "open": "11.15"
+      },
+      {
+        "time": "202611200931",
+        "price": "11.15",
+        "volume_lots": "5007"
+      },
+      {
+        "time": "202611200932",
+        "price": "11.14",
+        "volume_lots": "5014"
+      },
+      {
+        "time": "202611200933",
+        "price": "11.14",
+        "volume_lots": "5021"
+      },
+      {
+        "time": "202611200934",
+        "price": "11.14",
+        "volume_lots": "5028"
+      },
+      {
+        "time": "202611200935",
+        "price": "11.13",
+        "volume_lots": "5035"
+      },
+      {
+        "time": "202611200936",
+        "price": "11.13",
+        "volume_lots": "5042"
+      },
+      {
+        "time": "202611200937",
+        "price": "11.13",
+        "volume_lots": "5049"
+      },
+      {
+        "time": "202611200938",
+        "price": "11.12",
+        "volume_lots": "5056"
+      },
+      {
+        "time": "202611200939",
+        "price": "11.12",
+        "volume_lots": "5063"
+      },
+      {
+        "time": "202611200940",
+        "price": "11.12",
+        "volume_lots": "5070"
+      },
+      {
+        "time": "202611200941",
+        "price": "11.11",
+        "volume_lots": "5077"
+      },
+      {
+        "time": "202611200942",
+        "price": "11.11",
+        "volume_lots": "5084"
+      },
+      {
+        "time": "202611200943",
+        "price": "11.11",
+        "volume_lots": "5091"
+      },
+      {
+        "time": "202611200944",
+        "price": "11.10",
+        "volume_lots": "5098"
+      },
+      {
+        "time": "202611200945",
+        "price": "11.10",
+        "volume_lots": "5105"
+      },
+      {
+        "time": "202611200946",
+        "price": "11.10",
+        "volume_lots": "5112"
+      },
+      {
+        "time": "202611200947",
+        "price": "11.09",
+        "volume_lots": "5119"
+      },
+      {
+        "time": "202611200948",
+        "price": "11.09",
+        "volume_lots": "5126"
+      },
+      {
+        "time": "202611200949",
+        "price": "11.09",
+        "volume_lots": "5133"
+      },
+      {
+        "time": "202611200950",
+        "price": "11.08",
+        "volume_lots": "5140"
+      },
+      {
+        "time": "202611200951",
+        "price": "11.08",
+        "volume_lots": "5147"
+      },
+      {
+        "time": "202611200952",
+        "price": "11.08",
+        "volume_lots": "5154"
+      },
+      {
+        "time": "202611200953",
+        "price": "11.07",
+        "volume_lots": "5161"
+      },
+      {
+        "time": "202611200954",
+        "price": "11.07",
+        "volume_lots": "5168"
+      },
+      {
+        "time": "202611200955",
+        "price": "11.07",
+        "volume_lots": "5175"
+      },
+      {
+        "time": "202611200956",
+        "price": "11.06",
+        "volume_lots": "5182"
+      },
+      {
+        "time": "202611200957",
+        "price": "11.06",
+        "volume_lots": "5189"
+      },
+      {
+        "time": "202611200958",
+        "price": "11.06",
+        "volume_lots": "5196"
+      },
+      {
+        "time": "202611200959",
+        "price": "11.05",
+        "volume_lots": "5203"
+      },
+      {
+        "time": "202611201000",
+        "price": "11.05",
+        "volume_lots": "5210"
+      },
+      {
+        "time": "202611201001",
+        "price": "11.06",
+        "volume_lots": "5217"
+      },
+      {
+        "time": "202611201002",
+        "price": "11.07",
+        "volume_lots": "5224"
+      },
+      {
+        "time": "202611201003",
+        "price": "11.08",
+        "volume_lots": "5231"
+      },
+      {
+        "time": "202611201004",
+        "price": "11.09",
+        "volume_lots": "5238"
+      },
+      {
+        "time": "202611201005",
+        "price": "11.09",
+        "volume_lots": "5245"
+      },
+      {
+        "time": "202611201006",
+        "price": "11.10",
+        "volume_lots": "5252"
+      },
+      {
+        "time": "202611201007",
+        "price": "11.11",
+        "volume_lots": "5259"
+      },
+      {
+        "time": "202611201008",
+        "price": "11.12",
+        "volume_lots": "5266"
+      },
+      {
+        "time": "202611201009",
+        "price": "11.12",
+        "volume_lots": "5273"
+      },
+      {
+        "time": "202611201010",
+        "price": "11.13",
+        "volume_lots": "5280"
+      },
+      {
+        "time": "202611201011",
+        "price": "11.14",
+        "volume_lots": "5287"
+      },
+      {
+        "time": "202611201012",
+        "price": "11.15",
+        "volume_lots": "5294"
+      },
+      {
+        "time": "202611201013",
+        "price": "11.16",
+        "volume_lots": "5301"
+      },
+      {
+        "time": "202611201014",
+        "price": "11.16",
+        "volume_lots": "5308"
+      },
+      {
+        "time": "202611201015",
+        "price": "11.17",
+        "volume_lots": "5315"
+      },
+      {
+        "time": "202611201016",
+        "price": "11.18",
+        "volume_lots": "5322"
+      },
+      {
+        "time": "202611201017",
+        "price": "11.19",
+        "volume_lots": "5329"
+      },
+      {
+        "time": "202611201018",
+        "price": "11.19",
+        "volume_lots": "5336"
+      },
+      {
+        "time": "202611201019",
+        "price": "11.20",
+        "volume_lots": "5343"
+      },
+      {
+        "time": "202611201020",
+        "price": "11.21",
+        "volume_lots": "5350"
+      },
+      {
+        "time": "202611201021",
+        "price": "11.22",
+        "volume_lots": "5357"
+      },
+      {
+        "time": "202611201022",
+        "price": "11.23",
+        "volume_lots": "5364"
+      },
+      {
+        "time": "202611201023",
+        "price": "11.23",
+        "volume_lots": "5371"
+      },
+      {
+        "time": "202611201024",
+        "price": "11.24",
+        "volume_lots": "5378"
+      },
+      {
+        "time": "202611201025",
+        "price": "11.25",
+        "volume_lots": "5385"
+      },
+      {
+        "time": "202611201026",
+        "price": "11.26",
+        "volume_lots": "5392"
+      },
+      {
+        "time": "202611201027",
+        "price": "11.26",
+        "volume_lots": "5399"
+      },
+      {
+        "time": "202611201028",
+        "price": "11.27",
+        "volume_lots": "5406"
+      },
+      {
+        "time": "202611201029",
+        "price": "11.28",
+        "volume_lots": "5413"
+      }
+    ]
+  },
+  "000858": {
+    "name": "五粮液",
+    "previous_close": "149.80",
+    "points": [
+      {
+        "time": "202611200930",
+        "price": "150.30",
+        "volume_lots": "5000",
+        "open": "150.30"
+      },
+      {
+        "time": "202611200931",
+        "price": "150.27",
+        "volume_lots": "5007"
+      },
+      {
+        "time": "202611200932",
+        "price": "150.25",
+        "volume_lots": "5014"
+      },
+      {
+        "time": "202611200933",
+        "price": "150.22",
+        "volume_lots": "5021"
+      },
+      {
+        "time": "202611200934",
+        "price": "150.19",
+        "volume_lots": "5028"
+      },
+      {
+        "time": "202611200935",
+        "price": "150.16",
+        "volume_lots": "5035"
+      },
+      {
+        "time": "202611200936",
+        "price": "150.14",
+        "volume_lots": "5042"
+      },
+      {
+        "time": "202611200937",
+        "price": "150.11",
+        "volume_lots": "5049"
+      },
+      {
+        "time": "202611200938",
+        "price": "150.08",
+        "volume_lots": "5056"
+      },
+      {
+        "time": "202611200939",
+        "price": "150.06",
+        "volume_lots": "5063"
+      },
+      {
+        "time": "202611200940",
+        "price": "150.03",
+        "volume_lots": "5070"
+      },
+      {
+        "time": "202611200941",
+        "price": "150.00",
+        "volume_lots": "5077"
+      },
+      {
+        "time": "202611200942",
+        "price": "149.97",
+        "volume_lots": "5084"
+      },
+      {
+        "time": "202611200943",
+        "price": "149.95",
+        "volume_lots": "5091"
+      },
+      {
+        "time": "202611200944",
+        "price": "149.92",
+        "volume_lots": "5098"
+      },
+      {
+        "time": "202611200945",
+        "price": "149.89",
+        "volume_lots": "5105"
+      },
+      {
+        "time": "202611200946",
+        "price": "149.87",
+        "volume_lots": "5112"
+      },
+      {
+        "time": "202611200947",
+        "price": "149.84",
+        "volume_lots": "5119"
+      },
+      {
+        "time": "202611200948",
+        "price": "149.81",
+        "volume_lots": "5126"
+      },
+      {
+        "time": "202611200949",
+        "price": "149.78",
+        "volume_lots": "5133"
+      },
+      {
+        "time": "202611200950",
+        "price": "149.76",
+        "volume_lots": "5140"
+      },
+      {
+        "time": "202611200951",
+        "price": "149.73",
+        "volume_lots": "5147"
+      },
+      {
+        "time": "202611200952",
+        "price": "149.70",
+        "volume_lots": "5154"
+      },
+      {
+        "time": "202611200953",
+        "price": "149.68",
+        "volume_lots": "5161"
+      },
+      {
+        "time": "202611200954",
+        "price": "149.65",
+        "volume_lots": "5168"
+      },
+      {
+        "time": "202611200955",
+        "price": "149.62",
+        "volume_lots": "5175"
+      },
+      {
+        "time": "202611200956",
+        "price": "149.59",
+        "volume_lots": "5182"
+      },
+      {
+        "time": "202611200957",
+        "price": "149.57",
+        "volume_lots": "5189"
+      },
+      {
+        "time": "202611200958",
+        "price": "149.54",
+        "volume_lots": "5196"
+      },
+      {
+        "time": "202611200959",
+        "price": "149.51",
+        "volume_lots": "5203"
+      },
+      {
+        "time": "202611201000",
+        "price": "149.53",
+        "volume_lots": "5210"
+      },
+      {
+        "time": "202611201001",
+        "price": "149.58",
+        "volume_lots": "5217"
+      },
+      {
+        "time": "202611201002",
+        "price": "149.64",
+        "volume_lots": "5224"
+      },
+      {
+        "time": "202611201003",
+        "price": "149.69",
+        "volume_lots": "5231"
+      },
+      {
+        "time": "202611201004",
+        "price": "149.74",
+        "volume_lots": "5238"
+      },
+      {
+        "time": "202611201005",
+        "price": "149.80",
+        "volume_lots": "5245"
+      },
+      {
+        "time": "202611201006",
+        "price": "149.85",
+        "volume_lots": "5252"
+      },
+      {
+        "time": "202611201007",
+        "price": "149.91",
+        "volume_lots": "5259"
+      },
+      {
+        "time": "202611201008",
+        "price": "149.96",
+        "volume_lots": "5266"
+      },
+      {
+        "time": "202611201009",
+        "price": "150.02",
+        "volume_lots": "5273"
+      },
+      {
+        "time": "202611201010",
+        "price": "150.07",
+        "volume_lots": "5280"
+      },
+      {
+        "time": "202611201011",
+        "price": "150.12",
+        "volume_lots": "5287"
+      },
+      {
+        "time": "202611201012",
+        "price": "150.18",
+        "volume_lots": "5294"
+      },
+      {
+        "time": "202611201013",
+        "price": "150.23",
+        "volume_lots": "5301"
+      },
+      {
+        "time": "202611201014",
+        "price": "150.29",
+        "volume_lots": "5308"
+      },
+      {
+        "time": "202611201015",
+        "price": "150.34",
+        "volume_lots": "5315"
+      },
+      {
+        "time": "202611201016",
+        "price": "150.39",
+        "volume_lots": "5322"
+      },
+      {
+        "time": "202611201017",
+        "price": "150.45",
+        "volume_lots": "5329"
+      },
+      {
+        "time": "202611201018",
+        "price": "150.50",
+        "volume_lots": "5336"
+      },
+      {
+        "time": "202611201019",
+        "price": "150.56",
+        "volume_lots": "5343"
+      },
+      {
+        "time": "202611201020",
+        "price": "150.61",
+        "volume_lots": "5350"
+      },
+      {
+        "time": "202611201021",
+        "price": "150.67",
+        "volume_lots": "5357"
+      },
+      {
+        "time": "202611201022",
+        "price": "150.72",
+        "volume_lots": "5364"
+      },
+      {
+        "time": "202611201023",
+        "price": "150.77",
+        "volume_lots": "5371"
+      },
+      {
+        "time": "202611201024",
+        "price": "150.83",
+        "volume_lots": "5378"
+      },
+      {
+        "time": "202611201025",
+        "price": "150.88",
+        "volume_lots": "5385"
+      },
+      {
+        "time": "202611201026",
+        "price": "150.94",
+        "volume_lots": "5392"
+      },
+      {
+        "time": "202611201027",
+        "price": "150.99",
+        "volume_lots": "5399"
+      },
+      {
+        "time": "202611201028",
+        "price": "151.05",
+        "volume_lots": "5406"
+      },
+      {
+        "time": "202611201029",
+        "price": "151.10",
+        "volume_lots": "5413"
+      }
+    ]
+  },
+  "_contract": {
+    "version": "p12-replay-tape.v1",
+    "time_label": "minute_start",
+    "visible_at": "label_end",
+    "open_field": "open",
+    "note": "time is the minute the bar OPENS (Tencent m1); a row declares the bound session named open via the open field."
+  }
+}

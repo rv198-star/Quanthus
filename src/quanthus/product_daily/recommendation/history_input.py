@@ -434,12 +434,8 @@ def load_raw_history(
         )
 
     securities = tuple(_seq(envelope.get("securities"), "securities"))
-    pending_securities = tuple(
-        _seq(envelope.get("pending_securities") or (), "pending_securities")
-    )
-    account_unresolved = tuple(
-        _seq(envelope.get("account_unresolved") or (), "account_unresolved")
-    )
+    pending_securities = tuple(_seq(envelope.get("pending_securities") or (), "pending_securities"))
+    account_unresolved = tuple(_seq(envelope.get("account_unresolved") or (), "account_unresolved"))
     return RawHistory(
         market_date=market_date,
         decision_cutoff=decision_cutoff,
@@ -984,9 +980,7 @@ def _position_facts_from(
     unverifiable: str | None = None
     pf = sec.get("position_facts")
     if pf is not None and isinstance(pf, dict):
-        pf, unverifiable = _adapt_position_facts_dict(
-            pf, sec, allowed_sources=allowed_sources
-        )
+        pf, unverifiable = _adapt_position_facts_dict(pf, sec, allowed_sources=allowed_sources)
     pds = sec.get("prior_deterioration_sessions")
     if pds is not None and (type(pds) is not int or pds < 0):
         _fail(
@@ -996,10 +990,7 @@ def _position_facts_from(
     return pf, pds, unverifiable
 
 
-
-def _same_read_sources(
-    sec: Mapping[str, Any], history: RawHistory
-) -> frozenset[str]:
+def _same_read_sources(sec: Mapping[str, Any], history: RawHistory) -> frozenset[str]:
     """The same-read account/source anchor ids declared on THIS security row
     plus the run-level account/member evidence.  A serializable
     position_facts.evidence.unit_id must resolve to one of these to bind; a
@@ -1041,6 +1032,7 @@ def _same_read_sources(
                 if isinstance(r.get(key), str) and r[key].strip():
                     sources.add(r[key].strip())
     return frozenset(s for s in sources if s)
+
 
 def _position_facts_ref_from_evidence(
     evidence: Any,
@@ -1085,10 +1077,7 @@ def _position_facts_ref_from_evidence(
     version = evidence.get("version")
     digest = evidence.get("digest")
     has_canonical_ref = (
-        kind is not None
-        or evidence_id is not None
-        or version is not None
-        or digest is not None
+        kind is not None or evidence_id is not None or version is not None or digest is not None
     )
     if not has_canonical_ref:
         if unit_id:
@@ -1100,9 +1089,7 @@ def _position_facts_ref_from_evidence(
     if kind != EvidenceKind.SNAPSHOT.value:
         return None, f"position_facts.evidence.kind must be snapshot, got {kind!r}"
     if not isinstance(evidence_id, str) or not evidence_id.startswith("position-facts:"):
-        return None, (
-            "position_facts.evidence.evidence_id must be position-facts:{unit_id}"
-        )
+        return None, ("position_facts.evidence.evidence_id must be position-facts:{unit_id}")
     ref_unit = evidence_id[len("position-facts:") :]
     if unit_id is not None and unit_id != ref_unit:
         return None, (
@@ -1134,8 +1121,7 @@ def _position_facts_ref_from_evidence(
     # never read into this account cannot masquerade as a trusted fact.
     if allowed_sources:
         bound = any(
-            unit_id == anchor or unit_id.startswith(anchor + "-")
-            for anchor in allowed_sources
+            unit_id == anchor or unit_id.startswith(anchor + "-") for anchor in allowed_sources
         )
         if not bound:
             return None, (
@@ -1178,8 +1164,7 @@ def _adapt_position_facts_dict(
     if type(reductions) is not int or reductions < 0:
         _fail(
             "invalid_raw_history",
-            "securities[].position_facts.prior_strategy_reduction_count must be "
-            "a non-negative int",
+            "securities[].position_facts.prior_strategy_reduction_count must be a non-negative int",
         )
     marked = pf.get("marked_return")
     marked_return = None
@@ -1848,6 +1833,7 @@ def run_daily_advice_from_history(
     )
     envelope_identity = raw_history_digest(history)
     bound_receipts = [{**receipt, "raw_history_digest": envelope_identity} for receipt in receipts]
+
     # Convert adapter-level exclusions into the runner's input_exclusions so a bad
     # neighbour is a named isolation inside source_closure, never silently dropped.
     # Adapter-level exclusions are named isolations INSIDE the issued closure,
@@ -1888,9 +1874,7 @@ def run_daily_advice_from_history(
     # pending-isolated; neither admits a new entry or an exit decision for
     # that key.  They are named per-record inside the issued source_closure
     # via the account_unresolved closure field, never silently dropped.
-    account_unresolved_records = [
-        dict(r) for r in history.account_unresolved
-    ]
+    account_unresolved_records = [dict(r) for r in history.account_unresolved]
     if not inputs and not account_unresolved_records:
         raise NoQualifiedRawInputs(
             "raw_history produced no qualified security inputs; this is a shared "

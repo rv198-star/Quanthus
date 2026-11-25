@@ -176,9 +176,7 @@ class PendingSecurityInput:
         # Strict int quantity: bool (True==1), float (1.2) and Decimal are all
         # named rejections, never silently truncated or coerced.
         if self.quantity is not None and (
-            type(self.quantity) is not int
-            or isinstance(self.quantity, bool)
-            or self.quantity < 0
+            type(self.quantity) is not int or isinstance(self.quantity, bool) or self.quantity < 0
         ):
             raise ProductDailyError("invalid_account_quantity", self.security_code)
 
@@ -409,11 +407,7 @@ def _normalize_account_inputs(
         }
     if disposition == "FRESH_NO_BASELINE" and held:
         raise ProductDailyError("fresh_account_has_positions", ",".join(sorted(held)))
-    flat_evidence = [
-        ev
-        for code in sorted(pending_evidence)
-        for ev in pending_evidence[code]
-    ]
+    flat_evidence = [ev for code in sorted(pending_evidence) for ev in pending_evidence[code]]
     return _NormalizedAccount(
         held,
         tuple(sorted(pending)),
@@ -537,8 +531,7 @@ def run_daily_advice_from_raw(
             held_facts.setdefault(key, None)
             held_reasons.setdefault(
                 key,
-                record.get("missing_reason")
-                or "pool_external_listing_identity_unresolved",
+                record.get("missing_reason") or "pool_external_listing_identity_unresolved",
             )
     if not raw and not held_facts:
         raise NoQualifiedRawInputs("no qualified security inputs", caller_input_exclusions or ())

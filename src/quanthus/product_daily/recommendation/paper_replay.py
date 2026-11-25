@@ -794,10 +794,7 @@ def build_replay_envelope(
     # account records (both inside the issued closure, never dropped).
     pending_records: list[dict[str, Any]] = []
     account_unresolved: list[dict[str, Any]] = [
-        dict(r)
-        for r in _seq(
-            request.account.get("unresolved") or (), "account.unresolved"
-        )
+        dict(r) for r in _seq(request.account.get("unresolved") or (), "account.unresolved")
     ]
     default_basis = _text(request.facts_template.get("price_basis"), "facts_template.price_basis")
     for index, sec in enumerate(request.securities):
@@ -979,9 +976,7 @@ def build_replay_envelope(
                     {
                         "account_key": str(pobj.get("order_key") or code),
                         "role": "pending",
-                        "quantity": _pending_qty(
-                            pobj.get("quantity"), "pending[].quantity"
-                        ),
+                        "quantity": _pending_qty(pobj.get("quantity"), "pending[].quantity"),
                         "missing_reason": missing_reason,
                         "source": "securities[].pending",
                         "kind": kind,
@@ -997,9 +992,7 @@ def build_replay_envelope(
                 {
                     "security_code": code,
                     "kind": kind,
-                    "quantity": _pending_qty(
-                        pobj.get("quantity"), "pending[].quantity"
-                    ),
+                    "quantity": _pending_qty(pobj.get("quantity"), "pending[].quantity"),
                     "order_key": pobj.get("order_key"),
                     "source_receipt": pobj.get("source_receipt"),
                     "direction": direction,

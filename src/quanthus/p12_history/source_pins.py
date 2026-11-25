@@ -429,11 +429,21 @@ class SourceMap:
         """
         out = []
 
-        def _probe(artifact, path, declared):
+        def _probe(artifact, path, declared, content_shape=None,
+                   content_identity=None, declared_identity=None):
+            """One frozen-chain link: declaration, hash, content shape and
+            the associated identity all verified before members open.
+
+            content_shape="json_object" requires the bytes to decode to a
+            JSON object.  A hash-verified body that is a JSON array, malformed
+            JSON or a non-object is a named fault (CONTENT_NON_OBJECT /
+            CONTENT_MALFORMED_JSON), never a byte-match pass.
+
+            declared_identity=(key, expected): the file's own identity value
+            must equal the identity the map declared for it.  A mismatch is
+            ASSOCIATED_IDENTITY_MISMATCH - a hash-verified body that names a
+            DIFFERENT package/date than the one it was bound to is refused."""
             verified_at = iso(VerificationClock.now())
-            # Formal update (audit R4 second segment): the chain is
-            # externally FROZEN - a missing declared sha is a defect, not
-            # a pass.  "declared is None" previously slipped to MATCH.
             if declared is None:
                 out.append({"artifact": artifact, "path": str(path) if path else None,
                             "declared_sha256": None, "actual_sha256": None,
@@ -446,7 +456,7 @@ class SourceMap:
                             "status": "NO_PATH", "verified_at": verified_at})
                 return
             try:
-                actual = sha256_file(Path(path))
+                body = Path(path).read_bytes()
             except Exception as exc:  # noqa: BLE001
                 out.append({"artifact": artifact, "path": str(path),
                             "declared_sha256": declared, "actual_sha256": None,
@@ -454,22 +464,67 @@ class SourceMap:
                             "error": f"{type(exc).__name__}: {exc}",
                             "verified_at": verified_at})
                 return
-            ok = actual == declared
+            actual = "sha256:" + hashlib.sha256(body).hexdigest()
+            if actual != declared:
+                out.append({"artifact": artifact, "path": str(path),
+                            "declared_sha256": declared, "actual_sha256": actual,
+                            "status": "SHA_MISMATCH",
+                            "verified_at": verified_at})
+                return
+            doc = None
+            if content_shape is not None or declared_identity is not None:
+                try:
+                    doc = json.loads(body.decode("utf-8"))
+                except Exception as exc:  # noqa: BLE001
+                    out.append({"artifact": artifact, "path": str(path),
+                                "declared_sha256": declared, "actual_sha256": actual,
+                                "status": "CONTENT_MALFORMED_JSON",
+                                "error": f"{type(exc).__name__}: {exc}",
+                                "verified_at": verified_at})
+                    return
+                if content_shape == "json_object" and not isinstance(doc, dict):
+                    out.append({"artifact": artifact, "path": str(path),
+                                "declared_sha256": declared, "actual_sha256": actual,
+                                "status": "CONTENT_NON_OBJECT",
+                                "object_shape": type(doc).__name__,
+                                "verified_at": verified_at})
+                    return
+            if declared_identity is not None:
+                key, expected = declared_identity
+                actual_id = doc.get(key) if isinstance(doc, dict) else None
+                # Only a DECLARED-AND-WRONG identity is a fault: a hash-verified
+                # body that names a different package/date than the one it was
+                # bound to is refused.  A legacy descriptor that simply omits
+                # the identity key (actual_id None) is not an identity
+                # mismatch - its day-scoped admission is governed elsewhere.
+                if (expected is not None and actual_id is not None
+                        and actual_id != expected):
+                    out.append({"artifact": artifact, "path": str(path),
+                                "declared_sha256": declared, "actual_sha256": actual,
+                                "status": "ASSOCIATED_IDENTITY_MISMATCH",
+                                "identity_key": key,
+                                "declared_identity": expected,
+                                "actual_identity": actual_id,
+                                "verified_at": verified_at})
+                    return
             out.append({"artifact": artifact, "path": str(path),
                         "declared_sha256": declared, "actual_sha256": actual,
-                        "status": "MATCH" if ok else "SHA_MISMATCH",
+                        "status": "MATCH",
                         "verified_at": verified_at})
 
         _probe("base_manifest", self._base_doc.get("manifest_path"),
-               self._base_doc.get("manifest_sha256"))
+               self._base_doc.get("manifest_sha256"),
+               content_shape="json_object")
         for day in self.daily_open_days():
             e = self._daily_entries.get(day) or {}
             # Four external frozen links, each verified for its declared
             # identity, a readable JSON-object shape, the external SHA and
             # the associated identity - a non-object descriptor, a missing
-            # path or a wrong-shape link is a NAMED per-link fault, never
-            # silently skipped (audit R4 segment A closeout).
-            def _descriptor_probe(artifact, obj, sha_keys):
+            # path, a non-object/malformed body or a wrong associated
+            # identity is a NAMED per-link fault, never silently skipped
+            # (audit R4 segment A closeout).
+            def _descriptor_probe(artifact, obj, sha_keys, identity_key=None,
+                                  expected_identity=None):
                 verified_at = iso(VerificationClock.now())
                 if not isinstance(obj, dict):
                     out.append({
@@ -479,13 +534,21 @@ class SourceMap:
                         "object_shape": type(obj).__name__,
                         "verified_at": verified_at})
                     return
-                _probe(artifact, obj.get("path"),
-                       next((obj.get(k) for k in sha_keys
-                             if obj.get(k) is not None), None))
+                declared = next((obj.get(k) for k in sha_keys
+                                 if obj.get(k) is not None), None)
+                expected = (expected_identity if expected_identity is not None
+                            else (obj.get(identity_key) if identity_key else None))
+                _probe(artifact, obj.get("path"), declared,
+                       content_shape="json_object",
+                       declared_identity=(identity_key, expected)
+                       if identity_key else None)
             _descriptor_probe(f"dates_index:{day}", e.get("descriptor"),
-                              ("index_sha256", "sha256"))
+                              ("index_sha256", "sha256"),
+                              identity_key="market_date")
             _descriptor_probe(f"daily_manifest:{day}",
-                              e.get("standard_descriptor"), ("sha256",))
+                              e.get("standard_descriptor"), ("sha256",),
+                              identity_key="market_date",
+                              expected_identity=day)
             core = e.get("core_manifest")
             if core is None:
                 out.append({
@@ -501,11 +564,14 @@ class SourceMap:
                     "object_shape": type(core).__name__,
                     "verified_at": iso(VerificationClock.now())})
             else:
-                # A declared digest with no path is a named missing-path
-                # fault; the digest-declared-but-path-absent case must not
-                # slip to a silent skip.
+                # The core manifest's own package_id must equal the identity
+                # the map bound it to - a hash-verified body naming another
+                # package is refused, not adopted.
                 _probe(f"core_manifest:{day}", core.get("path"),
-                       core.get("sha256"))
+                       core.get("sha256"),
+                       content_shape="json_object",
+                       declared_identity=("package_id",
+                                          core.get("package_id")))
         return out
 
     def resolve(self, member_id: str) -> ResolvedMember | None:

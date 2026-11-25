@@ -57,6 +57,20 @@ def _date_iso(value):
         return None
 
 
+def _chain_fault_in_window(fault, needed_days, market_date):
+    """A manifest-chain fault blocks this T only when the link belongs to a
+    session this read actually needs.  A fault on a descriptor or core pinned
+    for a day OUTSIDE the needed window is kept on the chain receipt but must
+    not starve the day (audit R4 segment A closeout).  Links without a day
+    suffix (the Base manifest) always count."""
+    artifact = str(fault.get("artifact") or "")
+    m = re.search(r":(\d{4}-\d{2}-\d{2})$", artifact)
+    if m is None:
+        return True
+    day = m.group(1)
+    return day in needed_days or day == market_date.isoformat()
+
+
 def read_history(
     market_date: date,
     decision_cutoff: datetime,
@@ -218,7 +232,27 @@ def read_history(
         c for c in manifest_chain
         if c.get("status") in ("NO_PATH", "MISSING_DECLARED_SHA256",
                                "NON_OBJECT_DESCRIPTOR", "UNREADABLE",
-                               "SHA_MISMATCH")
+                               "SHA_MISMATCH", "CONTENT_NON_OBJECT",
+                               "CONTENT_MALFORMED_JSON",
+                               "ASSOCIATED_IDENTITY_MISMATCH")
+    ]
+    # Window scope (audit R4 segment A closeout): only a link for a session
+    # this read actually needs is a pre-read block.  A fault pinned for a day
+    # outside the needed window is kept on the chain receipt but must not
+    # starve the day.  The needed window is approximated from the pinned map
+    # (the last BAR_SESSIONS open days at or before T) so this gate still runs
+    # before any member parquet is opened.
+    try:
+        _open_days = [
+            d for d in smap.daily_open_days() if d <= market_date.isoformat()
+        ]
+        _needed_days = set(_open_days[-BAR_SESSIONS:]) | {
+            market_date.isoformat()}
+    except Exception:  # noqa: BLE001
+        _needed_days = {market_date.isoformat()}
+    _chain_faults = [
+        c for c in _chain_faults
+        if _chain_fault_in_window(c, _needed_days, market_date)
     ]
     if _chain_faults:
         return HistoryResult(
@@ -383,6 +417,7 @@ def read_history(
     # the real knowledge clock is used verbatim as before.
     formal = purpose == FORMAL_DAILY_UPDATE
     formal_inadmissible_keys = set()
+    _day_qualified_price_members = {}
     for day in smap.daily_open_days():
         if day > market_date.isoformat():
             continue
@@ -430,6 +465,13 @@ def read_history(
                     formal_inadmissible_keys.add(_member_key(m))
             if rejected_no_proof and formal:
                 formal_inadmissible_keys.add(_member_key(m))
+            elif not late and "dwd_security_bar" in str(m.member_id or ""):
+                # A member admitted for THIS day's price supply (not the
+                # rejected_no_proof path and not late-for-cutoff).  The
+                # shared-scope gate reads whether the session still has a
+                # qualified same-session source to fall back on.
+                _day_qualified_price_members.setdefault(day, []).append(
+                    _member_key(m))
             _reg(
                 m, day_knowledge,
                 date_from=day, date_to=day,
@@ -518,6 +560,20 @@ def read_history(
                     ent["dependency_type"] = dep_type
                     if shared_dep:
                         ent["shared_hard_dependency"] = True
+                        # The session this shared member supplies (its own
+                        # market date) - the outer gate judges whether a
+                        # qualified source actually covered that session.
+                        ent["gap_session_day"] = day
+                elif shared_dep and ent.get("formal_admission") == "late_for_cutoff":
+                    # A genuinely late member supplies its session nothing for
+                    # THIS formal read either - it is a shared-dependency gap
+                    # even though its channel clock is proven (audit R4 segment
+                    # A closeout: a late sole supply misses the block the same
+                    # way an unknown one does).  It is named late on the
+                    # receipt AND enters the shared-gap gate.
+                    ent["dependency_type"] = dep_type
+                    ent["shared_hard_dependency"] = True
+                    ent["gap_session_day"] = day
 
     source_member_entries = list(member_entries.values())
 
@@ -850,8 +906,21 @@ def read_history(
         psid = str(pd.get("security_id") or pd.get("security_code") or "")
         if psid:
             pending_by_sid.setdefault(psid, []).append(pd)
+    # Formal shared-dependency coverage (audit R4 seg-A closeout pass 2):
+    # judge a needed session's price supply by whether a QUALIFIED row
+    # actually survives for the security that needs it - not by whether a
+    # declared member exists.  A session whose only source is channel-
+    # unknown / late / hash-bad and leaves no qualified bar is a gap; a
+    # session covered by an independent qualified backup is supplied.  The
+    # gap is isolated to the securities whose session actually lacks a
+    # qualified row (a single-security gap stays local) while a session
+    # whose qualified source covers the whole needed pool blocks the day.
+    _sec_session_has_rows = {}   # (security_id, session_iso) -> had source rows
+    _sec_session_qualified = {}  # (security_id, session_iso) -> qualified bar survived
+    _member_session_sids = {}    # (member_key, session_iso) -> securities it supplies
     for ident in identities:
         raw_revisions = [
+
             bars_by_listing[ident.listing_id][s]
             for s in sessions_sorted
             if ident.listing_id in bars_by_listing and s in bars_by_listing[ident.listing_id]
@@ -937,9 +1006,17 @@ def read_history(
                     same_clock = [
                         b for b in eligible
                         if parse_ts(b.get("knowledge_from")) == latest_kf]
-                    values = {b.get("close_price") for b in same_clock}
-                    values.discard(None)
-                    if len(values) <= 1:
+                    # Equivalent replicas = the SAME consumed bar fact at the
+                    # same clock, not merely the same close.  Two rows sharing
+                    # close but differing on open/high/volume are a genuine
+                    # conflict - never picked by physical order (audit R4
+                    # seg-A closeout second pass).
+                    def _bar_fact(b, _keys=(
+                            "open_price", "high_price", "low_price",
+                            "close_price", "volume", "amount")):
+                        return tuple(b.get(k) for k in _keys)
+                    facts = {_bar_fact(b) for b in same_clock}
+                    if len(facts) <= 1:
                         # Collapse equivalent replicas: keep the newest
                         # source_revision at the same clock.
                         chosen = same_clock[-1]
@@ -948,7 +1025,14 @@ def read_history(
                         formal_ineligible_sessions.append({
                             "session_date": ordered[-1]["session_date"],
                             "ambiguity": "same_knowledge_conflicting_values",
-                            "conflicting_values": sorted(str(v) for v in values),
+                            "conflicting_values": sorted(
+                                str(b.get("close_price"))
+                                for b in same_clock),
+                            "conflicting_facts": [
+                                {k: b.get(k) for k in (
+                                    "open_price", "high_price", "low_price",
+                                    "close_price", "volume", "amount")}
+                                for b in same_clock],
                             "rejected_rows": [
                                 {
                                     "source_revision": b.get("source_revision"),
@@ -967,6 +1051,28 @@ def read_history(
                     and parse_ts(chosen.get("knowledge_from")) > decision_cutoff
                 )
                 sec_bars.append(chosen)
+            # Coverage bookkeeping for the shared-scope decision: a session
+            # that produced a chosen bar is supplied for THIS security; a
+            # session whose whole revision set was rejected is a gap for it.
+            _sess_iso = ordered[-1].get("session_date")
+            _sec_session_has_rows[(ident.security_id, _sess_iso)] = True
+            # Which securities each member physically supplies on the
+            # session - a member covering ONE security scopes its gap to
+            # that security; a member covering the whole pool scopes it to
+            # the session (audit R4 segment A closeout: a single-security
+            # gap stays local, a pool-wide supply failure is shared).
+            for _b in ordered:
+                _mk = _b.get("member_key")
+                if _mk:
+                    _member_session_sids.setdefault(
+                        (_mk, _sess_iso), set()).add(ident.security_id)
+            # A qualified bar for this session is one the formal read could
+            # actually select - its member is channel/knowledge-admissible,
+            # not merely present.  A bar carried only by an inadmissible
+            # member does NOT count as qualified supply for the session.
+            _sec_session_qualified[(ident.security_id, _sess_iso)] = (
+                chosen is not None
+                and chosen.get("member_key") not in formal_inadmissible_keys)
             # The revision/rejection chain keeps EVERY physical row for
             # the session (late, withdrawn, channel-ineligible), flagged -
             # even when no row was selected for this formal read.
@@ -1508,7 +1614,13 @@ def read_history(
         c for c in manifest_chain
         if c.get("status") in ("NO_PATH", "MISSING_DECLARED_SHA256",
                                "NON_OBJECT_DESCRIPTOR", "UNREADABLE",
-                               "SHA_MISMATCH")
+                               "SHA_MISMATCH", "CONTENT_NON_OBJECT",
+                               "CONTENT_MALFORMED_JSON",
+                               "ASSOCIATED_IDENTITY_MISMATCH")
+    ]
+    chain_faults = [
+        c for c in chain_faults
+        if _chain_fault_in_window(c, sessions_needed, market_date)
     ]
     if chain_faults and day_block is None:
         day_block = {
@@ -1529,22 +1641,123 @@ def read_history(
     # isolated to its own dependency so a qualified neighbour keeps
     # working - those are named on coverage.named_input_gaps, not here.
     if day_block is None and purpose == FORMAL_DAILY_UPDATE:
-        _shared_gap = [
+        # Judge a needed session's shared price supply by whether a
+        # QUALIFIED bar actually survived for the security that needs it,
+        # not by whether a declared member exists (audit R4 seg-A closeout
+        # pass 2).  A session covered by an independent qualified backup is
+        # supplied even when another source for it is channel-unknown or
+        # late; a single-security gap stays local; a session whose only
+        # supply leaves some securities without a qualified bar blocks the
+        # day only for the securities it actually starves.
+        _gap_members = [
             e for e in source_member_entries
-            if e.get("named_input_gap") and e.get("shared_hard_dependency")
+            if e.get("shared_hard_dependency")
+            and (e.get("named_input_gap")
+                 or e.get("formal_admission") in ("late_for_cutoff",
+                                                 "rejected_no_channel_proof"))
         ]
-        if _shared_gap:
+        # Securities whose NEEDED sessions ended with NO qualified bar are
+        # the actually-blocked set.  A session that still produced a chosen
+        # bar for this security (qualified backup / qualified replica) is
+        # supplied for it regardless of a sibling member's gap.
+        # For each gapped shared member, the session it supplies must still
+        # have produced a QUALIFIED bar for every needed security; a session
+        # where some needed security has source rows but no qualified bar is
+        # starved for that security (qualified backup covers the rest, a
+        # single-security gap starves only that security).
+        # A needed session's shared price supply fails when its OWN day's
+        # registered price member is gapped AND no same-session qualified
+        # member covers it.  A Base month's aggregate member is a separate
+        # provenance, not a same-session registered backup; an independent
+        # qualified same-session member (a backup in the same Daily package)
+        # does cover.  The starved securities are the ones that session left
+        # with rows but no qualified bar.
+        # A needed session's shared price supply fails when its OWN day's
+        # registered price member is gapped AND no same-session qualified
+        # member covers it.  A Base month's aggregate member is a separate
+        # provenance, not a same-session registered backup; an independent
+        # qualified same-session member does cover.  The starved securities
+        # are the ones the failed session left with rows but no qualified
+        # bar (a single-security gap starves only that security).
+        # Scope per gapped member by the securities it physically supplies on
+        # its session.  A pool-wide supply member whose session has no
+        # qualified same-session backup starves every needed security -> a
+        # whole-day block.  A member covering a single security isolates the
+        # gap to that security's own dependency so a qualified neighbour and
+        # an independently-held security keep working (audit R4 segment A
+        # closeout: single-security gap must not block the whole day).
+        _starved_set = set()
+        _failed_days = []
+        _shared_failed = []          # members whose gap is pool-wide
+        _local_gaps = []             # (member, [starved security ids])
+        for e in _gap_members:
+            _gday = e.get("gap_session_day")
+            if _day_qualified_price_members.get(_gday):
+                continue  # same-session qualified backup covers it
+            _mk = e.get("member_key") or e.get("package_key")
+            _declared_rows = _member_session_sids.get((_mk, _gday)) or set()
+            _declared_pool = not _declared_rows
+            supplied = _declared_rows
+            if _declared_pool:
+                # The member declares supply for this session but admits no
+                # rows at all (sha-bad, unreadable or channel-rejected before
+                # a single row surfaces): it is a DECLARED pool supply whose
+                # whole coverage is unproven, so the session's supply is the
+                # full security universe, not a single local gap.
+                supplied = {ident.security_id for ident in identities}
+            starved_here = sorted(
+                sid for sid in supplied
+                if not _sec_session_qualified.get((sid, _gday)))
+            if _gday == market_date.isoformat():
+                # A gap on T's OWN session is always shared - a formal
+                # update whose declared T supply has no proven channel or
+                # is genuinely late cannot open new entries, regardless of
+                # whether a monthly aggregate happens to carry a T row.
+                _shared_failed.append(e)
+                _failed_days.append(_gday)
+                _starved_set.update(
+                    ident.security_id for ident in identities
+                    if not _sec_session_qualified.get(
+                        (ident.security_id, _gday)))
+            elif not starved_here:
+                continue
+            elif len(supplied) <= 1 and not _declared_pool:
+                # Single-security supply on a PRIOR day: the gap is local
+                # to that security's dependency, not a whole-day block.
+                _local_gaps.append((e, starved_here))
+                _starved_set.update(starved_here)
+            else:
+                _shared_failed.append(e)
+                _failed_days.append(_gday)
+                _starved_set.update(starved_here)
+        _starved = sorted(_starved_set)
+        if _shared_failed and _failed_days:
             day_block = {
                 "reason_code": "SHARED_INPUT_GAP",
                 "detail": (
-                    "a shared hard dependency has no proven channel/"
-                    "knowledge clock for this formal read"
+                    "a shared hard dependency left needed sessions without "
+                    "a qualified source for this formal read"
                 ),
                 "affected_scope": "whole_day",
                 "failed_members": [e.get("package_key") or e.get("member_key")
-                                   for e in _shared_gap],
+                                   for e in _shared_failed],
+                "affected_securities": _starved,
                 "disposition": "block_new_entries",
             }
+        elif _local_gaps:
+            # A local single-security gap is NOT a whole-day block: record
+            # the isolated dependency so the consumer blocks only the
+            # affected security's new entries while a qualified neighbour
+            # (and an independently-held security) keeps working.
+            coverage["isolated_input_gaps"] = [
+                {"member_key": e.get("package_key") or e.get("member_key"),
+                 "member_id": e.get("member_id"),
+                 "session_date": e.get("gap_session_day"),
+                 "gap": e.get("named_input_gap") or "LATE_FOR_CUTOFF",
+                 "affected_securities": sids,
+                 "disposition": "block_new_entries_for_security"}
+                for e, sids in _local_gaps
+            ]
 
     # Listing or all-qualified-price collapse is also a whole-day block:
     # "zero listings" (nothing can be a candidate) and "every bar member

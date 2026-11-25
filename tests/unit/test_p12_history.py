@@ -2265,6 +2265,122 @@ def test_segA_manifest_chain_probes_nonobject_and_missing_core(tmp_path):
     assert by_art["core_manifest:2026-11-24"]["status"] == "NO_PATH"
 
 
+def _segA_chain_fixture(tmp_path, day="2026-11-24"):
+    """A manifest-chain fixture whose four links are real files: the caller
+    mutates ONE link's bytes to a non-object, malformed body or a wrong
+    associated identity while keeping the declared sha honest."""
+    smap = _build_map(tmp_path)
+    dm = _formal_daily_member(tmp_path, day)
+    smap._daily = {day: [dm]}
+    base_m = tmp_path / "base-manifest.json"
+    base_m.write_text(json.dumps({"package_id": "base-x"}))
+    dates_f = tmp_path / "dates.json"
+    dates_f.write_text(json.dumps({"market_date": day}))
+    std_f = tmp_path / "std.json"
+    std_f.write_text(json.dumps({"market_date": day}))
+    core_f = tmp_path / "core.json"
+    core_f.write_text(json.dumps({"package_id": "daily-" + day}))
+    def _d(p):
+        return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+    smap._base_doc = {"manifest_path": str(base_m),
+                      "manifest_sha256": _d(base_m)}
+    smap._daily_entries = {
+        day: {
+            "descriptor": {"path": str(dates_f), "index_sha256": _d(dates_f)},
+            "standard_descriptor": {"path": str(std_f), "sha256": _d(std_f)},
+            "core_manifest": {"path": str(core_f), "sha256": _d(core_f),
+                              "package_id": "daily-" + day},
+        },
+    }
+    return smap, {"base": base_m, "dates": dates_f, "std": std_f,
+                  "core": core_f}
+
+
+def test_segA_chain_malformed_body_named_fault(tmp_path):
+    """Class 1 closeout: a hash-verified body that is not parseable JSON is
+    a named CONTENT_MALFORMED_JSON fault, never a byte-match MATCH."""
+    smap, files = _segA_chain_fixture(tmp_path)
+    for key in ("base", "dates", "std", "core"):
+        files[key].write_text("{ not valid json")
+        # Keep the declared digest honest over the malformed bytes.
+        d = "sha256:" + hashlib.sha256(files[key].read_bytes()).hexdigest()
+        if key == "base":
+            smap._base_doc["manifest_sha256"] = d
+        elif key == "dates":
+            smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+        elif key == "std":
+            smap._daily_entries["2026-11-24"]["standard_descriptor"]["sha256"] = d
+        else:
+            smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+        chain = SourceMap.manifest_chain(smap)
+        assert any(c["status"] == "CONTENT_MALFORMED_JSON"
+                   for c in chain), key
+
+
+def test_segA_chain_nonobject_body_named_fault(tmp_path):
+    """Class 1 closeout: a hash-verified JSON ARRAY is not a usable object -
+    CONTENT_NON_OBJECT, not a MATCH."""
+    smap, files = _segA_chain_fixture(tmp_path)
+    for key in ("base", "dates", "std", "core"):
+        files[key].write_text("[]")
+        d = "sha256:" + hashlib.sha256(files[key].read_bytes()).hexdigest()
+        if key == "base":
+            smap._base_doc["manifest_sha256"] = d
+        elif key == "dates":
+            smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+        elif key == "std":
+            smap._daily_entries["2026-11-24"]["standard_descriptor"]["sha256"] = d
+        else:
+            smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+        chain = SourceMap.manifest_chain(smap)
+        assert any(c["status"] == "CONTENT_NON_OBJECT"
+                   for c in chain), key
+
+
+def test_segA_chain_associated_identity_named_fault(tmp_path):
+    """Class 1 closeout: a hash-verified core manifest that names a
+    DIFFERENT package_id than the map bound it to is refused -
+    ASSOCIATED_IDENTITY_MISMATCH in BOTH directions (map id wrong, file id
+    wrong), and a Standard descriptor whose market_date disagrees."""
+    smap, files = _segA_chain_fixture(tmp_path)
+    # File carries a different package_id than the map declares.
+    files["core"].write_text(json.dumps({"package_id": "other-pkg"}))
+    d = "sha256:" + hashlib.sha256(files["core"].read_bytes()).hexdigest()
+    smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+    chain = SourceMap.manifest_chain(smap)
+    assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+               for c in chain)
+    # Map declares a different package_id than the file carries.
+    smap2, _ = _segA_chain_fixture(tmp_path)
+    smap2._daily_entries["2026-11-24"]["core_manifest"]["package_id"] = "map-other"
+    chain2 = SourceMap.manifest_chain(smap2)
+    assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+               for c in chain2)
+    # Standard descriptor date disagrees with its bound day.
+    smap3, files3 = _segA_chain_fixture(tmp_path)
+    files3["std"].write_text(json.dumps({"market_date": "2026-11-23"}))
+    d3 = "sha256:" + hashlib.sha256(files3["std"].read_bytes()).hexdigest()
+    smap3._daily_entries["2026-11-24"]["standard_descriptor"]["sha256"] = d3
+    chain3 = SourceMap.manifest_chain(smap3)
+    assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+               for c in chain3)
+
+
+def test_segA_chain_fault_blocks_read_before_members(tmp_path):
+    """Class 1 closeout: a CONTENT_MALFORMED_JSON chain fault is a hard
+    pre-read gate - INPUT_BLOCKED with ZERO member opens."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap, files = _segA_chain_fixture(tmp_path)
+    files["base"].write_text("{ bad json")
+    smap._base_doc["manifest_sha256"] = (
+        "sha256:" + hashlib.sha256(files["base"].read_bytes()).hexdigest())
+    res = _formal_read(smap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert res.coverage["member_consumption"]["members_opened"] == 0
+
+
 def test_segA_null_row_knowledge_rejected_formal(tmp_path):
     T = date(2026, 11, 24)
     CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
@@ -2320,6 +2436,17 @@ def test_segA_prior_window_day_shared_gap_blocks(tmp_path):
     CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
     smap = _build_map(tmp_path)
     members = smap._members_by_table
+    # The prior Daily is the pool's SOLE source for 11-23: the Base monthly
+    # member must not also carry that session's row or the member is not
+    # exclusive (a qualified same-session backup is a different case the
+    # audit keeps readable).
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != "2026-11-23"]
+    _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet",
+           _bar_table(cal_only))
+    members["dwd_security_bar"] = [
+        _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")
+    ]
     dm = _formal_daily_member(tmp_path, "2026-11-23")
     clocks = {"2026-11-23": {"knowledge": None, "producer": None,
                              "channel": None}}
@@ -2345,3 +2472,122 @@ def test_segA_out_of_window_day_gap_does_not_block(tmp_path):
     res = _formal_read(fmap, tmp_path, T, CUT)
     assert res.status == "READ"
     assert res.coverage["day_block"] is None
+
+
+def test_segA_same_clock_conflict_other_fact_no_bar(tmp_path):
+    """Class 2 closeout: two rows at the SAME knowledge clock that agree on
+    close_price but disagree on open/high/volume are a named ambiguity in
+    BOTH physical orders - the equivalence/conflict test compares the full
+    consumed bar fact, not just the close."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    for field, delta in (("high", 10.0), ("open", 0.5), ("volume", 900.0)):
+        for order in (0, 1):
+            smap = _build_map(tmp_path)
+            members = smap._members_by_table
+            days = _sessions(330)
+            rows = _bar_table(days).to_pylist()
+            kf = datetime(2026, 11, 24, 10, 0, tzinfo=UTC)
+            left = dict(rows[-1], close=61.0, source_revision="L",
+                        knowledge_from=kf)
+            right = dict(rows[-1], close=61.0, source_revision="R",
+                         knowledge_from=kf)
+            right[field] += delta
+            pair = [left, right] if order == 0 else [right, left]
+            all_rows = rows[:-1] + pair
+            rel = ("payload/dwd_security_bar/interval_size=1d/"
+                   "observation_start_year=2026/observation_start_month=11/"
+                   "part-0.parquet")
+            pq.write_table(pa.table({k: [r.get(k) for r in all_rows]
+                                     for k in rows[0].keys()}), tmp_path / rel)
+            members["dwd_security_bar"] = [_member(tmp_path, rel)]
+            res = _formal_read(StubSourceMap(members, {}), tmp_path, T, CUT)
+            sec = next(x for x in res.raw_history["securities"]
+                       if x["identity"]["security_id"] == "security-600000")
+            last_sessions = {x["session_date"] for x in sec["bars"]}
+            assert days[-1].isoformat() not in last_sessions, (field, order)
+            assert "same_knowledge_conflicting_values" in json.dumps(
+                sec["dependency_reasons"], default=str), (field, order)
+
+
+def test_segA_prior_day_late_sole_supply_blocks(tmp_path):
+    """Class 3 closeout: a prior in-window session whose sole Daily source
+    is genuinely LATE (qualified channel clock after the cutoff) starves
+    the same way an UNKNOWN one does - SHARED_INPUT_GAP."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != "2026-11-23"]
+    _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet",
+           _bar_table(cal_only))
+    members["dwd_security_bar"] = [
+        _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")
+    ]
+    dm = _formal_daily_member(tmp_path, "2026-11-23")
+    clocks = {"2026-11-23": {"knowledge": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+                             "producer": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+                             "channel": datetime(2026, 11, 24, 16, 0, tzinfo=UTC)}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_INPUT_GAP"
+
+
+def test_segA_prior_day_qualified_backup_does_not_block(tmp_path):
+    """Class 3 closeout: a prior-day Daily member whose channel is UNKNOWN
+    does NOT block when the session is still priced by an independent
+    qualified same-session member - the Base monthly aggregate supplies a
+    real qualified bar for the same session."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # Base monthly member still carries a qualified 11-23 row for 600000.
+    dm = _formal_daily_member(tmp_path, "2026-11-23")
+    clocks = {"2026-11-23": {"knowledge": None, "producer": None,
+                             "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+
+
+def test_segA_single_security_gap_isolated_not_day_block(tmp_path):
+    """Class 3 closeout: a prior-day Daily member covering ONE security and
+    channel-unknown isolates its gap to that security - a qualified
+    neighbour keeps working and the whole day is not blocked."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # The prior Daily is the ONLY source for 600000's 11-23 row - drop that
+    # session from the Base monthly member so the single-security supply is
+    # genuinely the only registered source for that session.
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != "2026-11-23"]
+    _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet",
+           _bar_table(cal_only))
+    members["dwd_security_bar"] = [
+        _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")
+    ]
+    # The prior Daily supplies ONLY 600000's prior row (single security);
+    # 600000's own qualified neighbour stays readable.
+    rows = _bar_table(days).to_pylist()
+    only_prior = [r for r in rows if str(
+        r["observation_end"].date()) == "2026-11-23"]
+    rel = "payload/dwd_security_bar/day=2026-11-23/dwd_security_bar.parquet"
+    _write(tmp_path / rel, pa.table(
+        {k: [r.get(k) for r in only_prior] for k in rows[0].keys()}))
+    dm = _member(tmp_path, rel, package_id="daily-2026-11-23",
+                 kind="daily", market_date="2026-11-23")
+    clocks = {"2026-11-23": {"knowledge": None, "producer": None,
+                             "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+    assert res.coverage["isolated_input_gaps"]
+    assert res.coverage["isolated_input_gaps"][0]["affected_securities"] == [
+        "security-600000"]

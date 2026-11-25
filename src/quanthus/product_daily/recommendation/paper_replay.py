@@ -781,6 +781,15 @@ def build_replay_envelope(
     securities: list[dict[str, Any]] = []
     delivered: dict[str, dict[str, Any]] = {}
     coverage_exclusions: list[dict[str, Any]] = []
+    # B-segment: per-order typed pending facts + pool-external unresolved
+    # account records (both inside the issued closure, never dropped).
+    pending_records: list[dict[str, Any]] = []
+    account_unresolved: list[dict[str, Any]] = [
+        dict(r)
+        for r in _seq(
+            request.account.get("unresolved") or (), "account.unresolved"
+        )
+    ]
     default_basis = _text(request.facts_template.get("price_basis"), "facts_template.price_basis")
     for index, sec in enumerate(request.securities):
         sec_o = _obj(sec, f"securities[{index}]")
@@ -892,6 +901,94 @@ def build_replay_envelope(
             filtered["actions"] = _dedupe_action_rows(filtered["actions"])
         securities.append(filtered)
         bar_dates = {_isodate(_obj(b, "bar").get("session_date"), "bar.session_date") for b in bars}
+        # B-segment consumption projection: per-order typed pending facts on
+        # securities[].pending[] become the versioned pending_securities list;
+        # a sell order keeps its own direction/quantity verbatim.  A nested
+        # securities[].account block is only an unresolved candidate: when it
+        # contradicts the row-level held/pending markers the row wins and the
+        # raw nested row is named and refused as projection evidence; when it
+        # is the ONLY account signal it stays pool-external (never an entry).
+        nested_account = sec_o.get("account")
+        if nested_account is not None:
+            nested_o = _obj(nested_account, f"securities[{index}].account")
+            nested_role = nested_o.get("account_role")
+            conflict = (
+                (nested_role == "held" and not held_member)
+                or (
+                    nested_role == "held"
+                    and held_member
+                    and nested_o.get("held_quantity") is not None
+                    and sec_o.get("held_quantity") is not None
+                    and nested_o.get("held_quantity") != sec_o.get("held_quantity")
+                )
+            )
+            if conflict:
+                _fail(
+                    "account_projection_conflict",
+                    f"securities[{index}] nested account block contradicts the "
+                    f"row-level held/pending markers: {nested_o!r}",
+                )
+            if not held_member:
+                # A bare nested account block is NOT fill evidence: it cannot
+                # admit a held review or a new entry on its own.  It lands on
+                # the versioned account-unresolved detail instead.
+                account_unresolved.append(
+                    {
+                        "account_key": str(nested_o.get("account_key") or code),
+                        "role": str(nested_role or "held"),
+                        "quantity": nested_o.get("held_quantity"),
+                        "missing_reason": "nested_account_block_only_no_row_markers",
+                        "source": "securities[].account",
+                        "raw": dict(nested_o),
+                        "security_code": code,
+                        "scope": "account_unresolved",
+                    }
+                )
+                continue  # never reaches the securities[] scan list
+        # Per-order pending projection: each securities[].pending[] record is a
+        # typed PendingSecurityInput (kind/quantity verbatim); the row-level
+        # pending_kind/pending_quantity remain the single-record projection.
+        for po in _seq(sec_o.get("pending") or (), f"securities[{index}].pending"):
+            pobj = _obj(po, f"securities[{index}].pending[]")
+            kind = _text(pobj.get("kind"), "pending[].kind")
+            if kind == "sell":
+                # A sell order keeps direction + quantity verbatim but needs an
+                # explicit consumer disposition: it lands on the versioned
+                # account-unresolved list (role=pending, direction=sell),
+                # never folded into a buy-side PendingSecurityInput.
+                account_unresolved.append(
+                    {
+                        "account_key": str(pobj.get("order_key") or code),
+                        "role": "pending",
+                        "quantity": (
+                            int(pobj["quantity"])
+                            if pobj.get("quantity") is not None
+                            else None
+                        ),
+                        "missing_reason": "sell_order_requires_explicit_disposition",
+                        "source": "securities[].pending",
+                        "direction": "sell",
+                        "order_key": pobj.get("order_key"),
+                        "source_receipt": pobj.get("source_receipt"),
+                        "security_code": code,
+                        "scope": "account_unresolved",
+                    }
+                )
+                continue
+            pending_records.append(
+                {
+                    "security_code": code,
+                    "kind": kind,
+                    "quantity": (
+                        int(pobj["quantity"])
+                        if pobj.get("quantity") is not None
+                        else None
+                    ),
+                    "order_key": pobj.get("order_key"),
+                    "source_receipt": pobj.get("source_receipt"),
+                    "direction": pobj.get("direction"),
+                }
+            )
         delivered[code] = {
             "bar_rows": len(bars),
             "window_sessions": len(window),
@@ -934,6 +1031,14 @@ def build_replay_envelope(
         "calendar_rows": [dict(r) for r in calendar_rows],
         "listing_rows": [dict(r) for r in request.listing_rows],
         "securities": securities,
+        # B-segment: per-order typed pending facts (sell orders keep their
+        # direction/quantity verbatim; never summed or last-one-wins).
+        "pending_securities": pending_records,
+        # Pool-external account records with no resolvable listing identity:
+        # named per-record inside the issued closure; a held role surfaces a
+        # hold_alert, a pending role stays pending-isolated, neither admits
+        # any new entry or exit decision for that key.
+        "account_unresolved": account_unresolved,
     }
     window_info = {
         "bar_context_sessions": len(window),

@@ -409,6 +409,10 @@ def run_daily_advice_from_raw(
     # a real held member stays held.
     pending_security_codes: Sequence[str] | None = None,
     pending_securities: Sequence[PendingSecurityInput] | None = None,
+    # Pool-external unresolved account records (B-segment): a held role
+    # surfaces its own hold review, a pending role stays pending-isolated;
+    # neither admits any new entry or exit decision for that key.
+    account_unresolved: Sequence[Mapping[str, Any]] | None = None,
     # Account read disposition from P12: "ok" | "FRESH_NO_BASELINE" |
     # "ACCOUNT_FACTS_UNAVAILABLE".  A failed/unknown account read is a shared
     # whole-day block, never a manufactured empty-positions success. A missing ledger
@@ -785,6 +789,7 @@ def run_daily_advice_from_raw(
         pending_security_codes=account_view.pending_codes,
         held_unavailable_reasons_by_security=held_reasons,
         account_membership=account_view.provenance,
+        account_unresolved=account_unresolved,
         raw_security_inputs_digest=sha256_digest(raw_closures),
         account_disposition=account_disposition,
         shared_prereq_ok=shared_prereq_ok,

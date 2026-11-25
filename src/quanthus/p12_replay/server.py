@@ -141,14 +141,14 @@ tabs{display:flex;gap:0;margin-bottom:0}
   <div class=disc>历史回放 · 模拟，不代表策略评估</div>
  </div>
  <div class=card><h2>推进</h2>
-  <p class=note>结束当前交易时段：持仓与资金进入下一交易日，未成交委托按当日规则失效。</p>
-  <button class=next id=adv>下一交易日 →</button>
-  <div class=auto>
+  <p class=note id=advancenote data-write>结束当前交易时段：持仓与资金进入下一交易日，未成交委托按当日规则失效。</p>
+  <button class=next id=adv data-write>下一交易日 →</button>
+  <div class=auto data-write>
    <input type=date id=auto-date>
    <button id=autobtn>自动执行到此日</button>
   </div>
-  <p class=note>自动执行：逐日确认全部建议并推进，随时可停在一天再手动操作。</p>
-  <div style="margin-top:12px"><button id=reset>重置回放</button></div>
+  <p class=note id=autonote data-write>自动执行：逐日确认全部建议并推进，随时可停在一天再手动操作。</p>
+  <div style="margin-top:12px" data-write><button id=reset>重置回放</button></div>
  </div>
  <div class=card><h2>包 / 回执</h2><div id=pkg style="font:11px/1.6 ui-monospace,monospace;word-break:break-all">—</div></div>
 </aside>
@@ -174,6 +174,7 @@ function renderCoverage(){
   for(const r of rows){
    const evd=!!r.evaluated;const st=r.state||'';const tag=evd?'<span class="covtag cov-eval">已评估</span>':(st==='blocked'?'<span class="covtag cov-block">时钟阻断</span>':'<span class="covtag cov-pend">待核</span>');const verdict=evd&&r.verdict?'<span class=v>'+esc(r.verdict)+'</span>':'';const srl=evd&&r.scan_reason?esc(r.scan_reason):(evd?'':esc(r.scan_reason||'未评估'));
     h+='<div class=covrow><span class=c>'+esc(r.security_code)+'</span>'+tag+verdict+(srl?'<span class=r>'+srl+'</span>':'')+'</div>';   const sd=r.scan_detail||null;   if(sd){    let dh='<div class=covdetail>';    if((sd.gates
+||[]).length){dh+='<span class=gates>'+sd.gates.map(esc).join(' · ')+'</span>'}    for(const ck of (sd.checks||[])){dh+='<span class="chk '+(ck.passed?'pass':'fail')+'">'+esc(ck.label)+' 实测 '+esc(ck.actual)+(ck.passed?' ✓':' ✗')+'</span>'}    if(sd.verdict){dh+='<span class=gates>判定 '+esc(sd.verdict)+'</span>'}    dh+='</div>';h+=dh;   }
   }
   h+='</div>'
  }

@@ -167,7 +167,12 @@ def read_p1_exceptions(source_map: SourceMap, market_date: date):
     except Exception as exc:  # noqa: BLE001
         reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "UNREADABLE", "error": str(exc)})
         return {"p1_exceptions": []}, {"reads": reads, "p1_unverified": True}
-    reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
+    # Named declared-vs-actual digest pair for the consumer closure
+    # (P11 E1 reads p1_exceptions verbatim): the declared pin, the
+    # recomputed digest, the match flag and the verification clock are
+    # all carried so a missing/bad ledger is distinguishable from a
+    # verified one without re-hashing.
+    reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(recs), "sha256": member.sha256, "declared_sha256": member.sha256, "actual_sha256": verify.get("actual_sha256"), "sha_match": True, "verified_at": verify.get("verified_at")})
     return {"p1_exceptions": recs}, {"reads": reads}
 
 

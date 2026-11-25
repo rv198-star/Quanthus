@@ -274,8 +274,10 @@ def test_b_r1_pool_external_held_surfaces_hold_alert(assets):
 
 
 def test_b_r1_position_facts_without_source_refused(assets):
-    """A serializable position_facts with no evidence.unit_id cannot invent
-    a same-read source; it is a named invalid_raw_history."""
+    """A serializable position_facts whose evidence cannot bind a same-read
+    source cannot drive an exit -- but it must not abort the day either: the
+    member degrades to a named hold_alert with the original reason, never a
+    fabricated exit or a whole-day invalid_raw_history block."""
     sec = f._security("600000", _DAYS)
     sec.update(
         held_membership=True,
@@ -287,9 +289,13 @@ def test_b_r1_position_facts_without_source_refused(assets):
         },
     )
     out = e_run_e1_replay(_req([sec]), f.T1, assets)
-    block = out.get("day_block") or {}
-    assert block.get("reason") == "invalid_raw_history"
-    assert "unit_id" in block.get("detail", "")
+    # No whole-day block: the member stays an isolated hold_alert.
+    assert not (out.get("day_block") or {}).get("reason")
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
+    memb = [m for m in out["source_closure"]["account_membership"]
+            if m.get("security_code") == "600000"]
+    assert memb and "evidence" in (memb[0].get("unavailable_reason") or "")
 
 
 def test_b_r1_buy_pending_evidence_in_closure(assets):

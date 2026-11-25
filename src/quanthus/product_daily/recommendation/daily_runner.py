@@ -387,11 +387,7 @@ def _normalize_account_inputs(
             else "unavailable",
             "membership_source": (
                 "filled_position_evidence"
-                if (
-                    has_facts
-                    or item.held_membership is True
-                    or positive_quantity
-                )
+                if (has_facts or item.held_membership is True or positive_quantity)
                 else "held_membership_unverified"
             )
             if is_held

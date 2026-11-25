@@ -874,7 +874,6 @@ def test_c8_r4_source_closure_digest_recomputes(assets):
     assert receipt.get("source_closure_digest") == sha256_digest(out["source_closure"])
 
 
-
 def test_c8_r4_typed_held_position_facts_keeps_verified_provenance(runner, resources):
     """An already-typed HeldPositionFacts is the SAME-READ verified snapshot:
     it produces the legal exit_plan AND keeps membership_source=

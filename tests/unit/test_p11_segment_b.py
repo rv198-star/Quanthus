@@ -769,6 +769,9 @@ def test_c8_r4_position_facts_only_blocks_entry_holds(assets):
     assert memb and memb[0].get("held") is True
     assert memb[0].get("held_quantity") is None
     assert memb[0].get("held_membership_unverified") is True
+    # The dict is the SOLE evidence of a position: membership_source is the
+    # unverified-held record, not a verified fill.
+    assert memb[0].get("membership_source") == "held_membership_unverified"
     assert memb[0].get("unavailable_reason")
     # Qualified neighbour keeps its real entry.
     assert "entry_plan" in _stages(out, "600001")
@@ -788,23 +791,29 @@ def test_c8_r4_position_facts_only_bad_market_digest_still_alerts(assets):
 
 
 def test_c8_r4_dict_with_held_membership_false_is_contradiction(assets):
-    """Declared-held dict + explicit held_membership=False restores the
-    contradictory_account_membership refusal (not a silent pass)."""
+    """Declared-held dict + explicit held_membership=False refuses the day
+    with the exact contradictory_account_membership reason; the detail
+    locates the target security."""
     sec = _dict_only_held()
     sec["held_membership"] = False
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
-    # The conflict refuses the day; the account conflict is locatable to the
-    # security and its original field.
-    assert out.get("disposition") == "blocked" or (out.get("day_block") or {}).get("reason")
+    receipt = out.get("receipt") or out
+    block = receipt.get("day_block") or {}
+    assert block.get("reason") == "contradictory_account_membership", receipt
+    assert "600000" in str(block.get("detail") or block)
 
 
 def test_c8_r4_dict_with_zero_quantity_is_contradiction(assets):
-    """Declared-held dict + explicit held_quantity=0 restores the same
-    contradictory refusal - existence and a zero quantity cannot coexist."""
+    """Declared-held dict + explicit held_quantity=0 refuses with the exact
+    contradictory_account_membership reason - existence and a zero quantity
+    cannot coexist."""
     sec = _dict_only_held()
     sec["held_quantity"] = 0
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
-    assert out.get("disposition") == "blocked" or (out.get("day_block") or {}).get("reason")
+    receipt = out.get("receipt") or out
+    block = receipt.get("day_block") or {}
+    assert block.get("reason") == "contradictory_account_membership", receipt
+    assert "600000" in str(block.get("detail") or block)
 
 
 def test_c8_r4_legitimate_empty_and_not_held_pass(assets):
@@ -826,15 +835,20 @@ def test_c8_r4_legitimate_empty_and_not_held_pass(assets):
 
 
 def test_c8_r4_dict_plus_positive_quantity_keeps_verified_member(assets):
-    """A declared-held dict alongside a positive quantity keeps the original
-    member and quantity; only the unverified RISK path stays a hold_alert
-    (existence does not conjure a legal exit)."""
+    """A confirmed fill (positive held_quantity) alongside an unqualified risk
+    dict keeps the original membership source and quantity - the membership is
+    verified by the fill evidence, only the risk ACTION degrades to hold_alert.
+    Existence does not conjure a legal exit."""
     sec = _dict_only_held()
     sec["held_quantity"] = 1200
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
     assert _held_action(out) == ["hold_alert"]
     memb = _membership(out)
     assert memb and memb[0].get("held") is True and memb[0].get("held_quantity") == 1200
+    # Membership confirmed by the positive quantity: source stays the verified
+    # fill evidence even though the risk dict is unverified.
+    assert memb[0].get("membership_source") == "filled_position_evidence"
+    assert memb[0].get("held_membership_unverified") is True
 
 
 def test_c8_r4_unverifiable_non_dict_position_facts_alerts(assets):
@@ -858,3 +872,49 @@ def test_c8_r4_source_closure_digest_recomputes(assets):
     out = e_run_e1_replay(_req([_dict_only_held(), f._security("600001", _DAYS)]), f.T1, assets)
     receipt = out.get("receipt") or {}
     assert receipt.get("source_closure_digest") == sha256_digest(out["source_closure"])
+
+
+
+def test_c8_r4_typed_held_position_facts_keeps_verified_provenance(runner, resources):
+    """An already-typed HeldPositionFacts is the SAME-READ verified snapshot:
+    it produces the legal exit_plan AND keeps membership_source=
+    filled_position_evidence with held_membership_unverified False - never
+    mislabelled as an unverified record even though an exit results."""
+    from decimal import Decimal
+
+    from quanthus.expert_strategy.position_risk import HeldPositionFacts
+    from quanthus.expert_strategy.runner import position_facts_evidence
+    from quanthus.product_daily.recommendation.history_input import (
+        run_daily_advice_from_history,
+    )
+
+    sec = _security_entry(_raw_security("600000"))
+    sec.update(
+        held_membership=True,
+        held_quantity=1200,
+        position_facts=HeldPositionFacts(
+            holding_sessions=40,
+            marked_return=Decimal("0.05"),
+            prior_strategy_reduction_count=0,
+            evidence=position_facts_evidence(
+                unit_id="acct-snap-600000",
+                holding_sessions=40,
+                marked_return=Decimal("0.05"),
+                prior_strategy_reduction_count=0,
+            ),
+        ),
+    )
+    env = _envelope(
+        [sec, _security_entry(_raw_security("600001"))],
+        calendar=None,
+        listing=[_listing("security-600000"), _listing("security-600001")],
+    )
+    out = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    held = [d for d in out.seam.held_decisions if d.security_code == "600000"]
+    assert held and held[0].action == "exit"
+    memb = [
+        m for m in out.source_closure["account_membership"] if m.get("security_code") == "600000"
+    ]
+    assert memb
+    assert memb[0].get("membership_source") == "filled_position_evidence"
+    assert memb[0].get("held_membership_unverified") is False

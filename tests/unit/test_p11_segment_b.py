@@ -51,8 +51,9 @@ def _decisions(out):
 
 
 def test_b_held_with_serializable_position_facts(assets):
-    """A serializable position_facts dict is adapted into HeldPositionFacts;
-    the held decision still fires and the neighbour keeps entry_plan."""
+    """A serializable position_facts dict carries no same-read verified
+    account snapshot, so it can never qualify an exit -- the member degrades
+    to a named hold_alert and the neighbour keeps entry_plan."""
     sec = f._security("600000", _DAYS)
     sec.update(
         held_membership=True,
@@ -67,6 +68,8 @@ def test_b_held_with_serializable_position_facts(assets):
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
     assert ("600000", "holding") in _decisions(out)
     assert ("600001", "entry_plan") in _decisions(out)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
 
 
 def test_b_held_unknown_quantity_and_no_bars(assets):
@@ -447,10 +450,47 @@ def test_b_752_missing_digest_mixed_also_isolated(assets):
     assert ("600000", "entry_plan") in _decisions(out)
 
 
-# ---- C8 fix R1: position_facts evidence must verify as a same-read ref -------
+# ---- C8 fix R1/R2/R3: serializable position_facts can never qualify an exit --
+#
+# A JSON-serializable position_facts dict carries NO same-read verified
+# account snapshot: a caller-declared account_id, a bare security field, a
+# pool-external unresolved key, a neighbour's member or a generic member id
+# are all self-reported strings, never an independently-read account fact.
+# Only an already-typed HeldPositionFacts (the P12 verified snapshot
+# projection) may drive the legal held exit.  Every wire dict - whatever its
+# evidence block claims - degrades to a named hold_alert, and the held
+# member/account facts are preserved verbatim.
 
 
-def _pf(holding=40, marked="0.05", reductions=0, evidence=None):
+def _typed_held(code="600000", holding=40, marked="0.05", reductions=0):
+    """A held security whose position_facts arrives already-typed: the same
+    trusted internal path the P12 RunnerRequest projection uses."""
+    from quanthus.expert_strategy.runner import position_facts_evidence
+
+    sec = f._security(code, _DAYS)
+    sec.update(
+        held_membership=True,
+        held_quantity=1200,
+        position_facts=type("_PF", (), {})(),  # placeholder, replaced below
+    )
+    from quanthus.expert_strategy.position_risk import HeldPositionFacts
+    from decimal import Decimal
+
+    sec["position_facts"] = HeldPositionFacts(
+        holding_sessions=holding,
+        marked_return=Decimal(marked) if marked is not None else None,
+        prior_strategy_reduction_count=reductions,
+        evidence=position_facts_evidence(
+            unit_id=f"acct-snap-{code}",
+            holding_sessions=holding,
+            marked_return=Decimal(marked) if marked is not None else None,
+            prior_strategy_reduction_count=reductions,
+        ),
+    )
+    return sec
+
+
+def _serializable_pf(evidence=None, holding=40, marked="0.05", reductions=0):
     return {
         "holding_sessions": holding,
         "marked_return": marked,
@@ -459,189 +499,117 @@ def _pf(holding=40, marked="0.05", reductions=0, evidence=None):
     }
 
 
-def _digest_payload(unit_id, holding, marked, reductions):
-    from quanthus.expert_evaluation.serialization import digest_value
-
-    return digest_value(
-        {
-            "unit_id": unit_id,
-            "holding_sessions": holding,
-            "marked_return": marked,
-            "prior_strategy_reduction_count": reductions,
-        }
-    )
-
-
-def _canonical_ref(unit_id, holding=40, marked="0.05", reductions=0):
-    return {
-        "kind": "snapshot",
-        "evidence_id": f"position-facts:{unit_id}",
-        "version": "1.0.0",
-        "digest": _digest_payload(unit_id, holding, marked, reductions),
-    }
-
-
-def _held_sec(code="600000", evidence=None, holding=40):
+def _serializable_held(code="600000", evidence=None, holding=40, account=None):
     sec = f._security(code, _DAYS)
     sec.update(
         held_membership=True,
         held_quantity=1200,
-        position_facts=_pf(holding=holding, evidence=evidence),
+        position_facts=_serializable_pf(evidence=evidence, holding=holding),
     )
+    if account is not None:
+        sec["account"] = account
     return sec
 
 
-def _held_sec_with_account(account_id, **kw):
-    """A held security carrying the SAME account snapshot id its position
-    facts were read into -- the same-account same-security anchor the frozen
-    B v1 contract requires (not a pool-external / neighbour / generic id)."""
-    sec = _held_sec(**kw)
-    sec["account"] = {"account_id": account_id}
-    return sec
-
-
-def test_c8_r1_legal_ref_with_bound_anchor_still_exits(assets):
-    """A canonical four-field ExpertEvidenceRef whose digest recomputes over
-    the declared value payload AND whose unit_id binds THIS security's own
-    same-read account snapshot still drives the legal held exit (positive
-    control)."""
-    unit_id = "acct-spdb-20261008-snap"
-    sec = _held_sec_with_account(unit_id, evidence=_canonical_ref(unit_id))
+def test_c8_r3_typed_held_position_facts_still_exits(assets):
+    """Trusted internal path: an already-typed HeldPositionFacts (verified P12
+    snapshot projection) drives the legal held exit - real action, not a bare
+    hold_alert."""
+    sec = _typed_held("600000", holding=40)
     req = _req([sec, f._security("600001", _DAYS)])
     out = e_run_e1_replay(req, f.T1, assets)
     stages = {c: s for c, s in _decisions(out)}
     assert stages.get("600000") == "exit_plan"
-    # The held review produced a real expert decision, not a bare hold_alert.
     held = [h for h in out.get("held_signals", []) if h.get("security_code") == "600000"]
     assert held and held[0].get("action") == "exit"
-    # The member keeps a real unavailable_reason=None (no degrade).
     memb = [
         m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
     ]
     assert memb and memb[0].get("unavailable_reason") is None
 
 
-def test_c8_r2_pool_external_source_does_not_qualify(assets):
-    """R1 hole: a pool-external unresolved 'source' that merely PREFIX-matches
-    the unit_id can never qualify the position facts (caller-declared, not an
-    independently-read account fact)."""
-    sec = _held_sec(evidence=_canonical_ref("ledger-snapshot-x"))
-    req = _req([sec, f._security("600001", _DAYS)])
-    req["account"]["unresolved"] = [
-        {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
-    ]
-    out = e_run_e1_replay(req, f.T1, assets)
-    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
-    assert ("600000", "hold_alert") in held
-    memb = [
-        m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
-    ]
-    assert memb and "same-read" in (memb[0].get("unavailable_reason") or "")
-
-
-def test_c8_r2_neighbour_member_does_not_qualify(assets):
-    """R1 hole: a member bound only through a NEIGHBOUR's depends_on_member_ids
-    is not this security's same-read account source (prefix share refused)."""
-    sec = _held_sec(evidence=_canonical_ref("only-600001-x"))
-    req = _req([sec, f._security("600001", _DAYS)])
-    req["securities"][1]["identity"]["depends_on_member_ids"] = ["only-600001"]
-    req["source_members"].append(
-        dict(req["source_members"][0], member_id="only-600001", member_path="nb.parquet")
+def test_c8_r3_serializable_dict_same_account_id_alerts(assets):
+    """R2 hole now closed: a serializable dict whose evidence.unit_id matches
+    the caller-declared account.account_id is still untrusted - the string
+    name is not a verified snapshot.  hold_alert, never an exit."""
+    sec = _serializable_held(
+        evidence={"unit_id": "acct-spdb-20261008-snap"},
+        account={"account_id": "acct-spdb-20261008-snap"},
     )
+    req = _req([sec, f._security("600001", _DAYS)])
     out = e_run_e1_replay(req, f.T1, assets)
     held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
     assert ("600000", "hold_alert") in held
+    assert not any(
+        d.get("stage") == "exit_plan"
+        for ds in out["package"]["decision_sets"]
+        for d in ds.get("decisions", [])
+        if d.get("security_code") == "600000"
+    )
 
 
-def test_c8_r2_generic_member_does_not_qualify(assets):
-    """R1 hole: a generic shared market/source member id is a pool-wide source,
-    never this security's account snapshot."""
-    sec = _held_sec(evidence=_canonical_ref("synthetic-daily-1d"))
+def test_c8_r3_serializable_dict_single_field_alerts(assets):
+    """A serializable dict whose evidence names only ONE security field
+    (security_id / venue_id) is still untrusted: the field is a self-reported
+    identity, not a verified account snapshot."""
+    for evidence in (
+        {"unit_id": "security-600000"},
+        {"unit_id": "SSE"},
+        {"unit_id": "600000"},
+    ):
+        sec = _serializable_held(evidence=evidence)
+        req = _req([sec, f._security("600001", _DAYS)])
+        out = e_run_e1_replay(req, f.T1, assets)
+        held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+        assert ("600000", "hold_alert") in held
+
+
+def test_c8_r3_serializable_dict_pool_external_alerts(assets):
+    """Pool-external unresolved source, neighbour member and generic member
+    ids stay untrusted even when the dict declares a matching evidence id."""
+    for evidence in (
+        {"unit_id": "ledger-snapshot-x"},
+        {"unit_id": "only-600001-x"},
+        {"unit_id": "synthetic-daily-1d"},
+    ):
+        sec = _serializable_held(evidence=evidence)
+        req = _req([sec, f._security("600001", _DAYS)])
+        req["account"]["unresolved"] = [
+            {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
+        ]
+        out = e_run_e1_replay(req, f.T1, assets)
+        held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+        assert ("600000", "hold_alert") in held
+
+
+def test_c8_r3_serializable_dict_changed_value_alerts(assets):
+    """A changed declared value (or a recomputed self-consistent digest) still
+    cannot qualify: the wire shape itself is unverifiable, so it always
+    degrades to hold_alert."""
+    sec = _serializable_held(evidence={"unit_id": "acct-spdb"}, holding=41)
     req = _req([sec, f._security("600001", _DAYS)])
     out = e_run_e1_replay(req, f.T1, assets)
     held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
     assert ("600000", "hold_alert") in held
 
 
-def test_c8_r2_order_source_does_not_qualify(assets):
-    """R1 hole: a pending order source_receipt is a caller-declared field, not
-    an independently-read account fact."""
-    sec = _held_sec(evidence=_canonical_ref("src.b1"))
-    sec["pending"] = [
-        {"kind": "open_buy_order", "quantity": 5, "order_key": "ord1", "source_receipt": "src.b"}
-    ]
-    req = _req([sec, f._security("600001", _DAYS)])
-    out = e_run_e1_replay(req, f.T1, assets)
-    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
-    assert ("600000", "hold_alert") in held
-
-
-def test_c8_r2_same_account_prefix_is_rejected(assets):
-    """A bare prefix share of the same account id (acct-x vs acct) never
-    binds: the match is exact on the same-read unit."""
-    sec = _held_sec_with_account("acct", evidence=_canonical_ref("acct-x"))
-    req = _req([sec, f._security("600001", _DAYS)])
-    out = e_run_e1_replay(req, f.T1, assets)
-    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
-    assert ("600000", "hold_alert") in held
-
-
-def test_c8_r1_wrong_digest_only_alerts(assets):
-    """A canonical-shaped ref whose digest does NOT recompute over the
-    declared value payload cannot drive an exit: the member degrades to a
-    named hold_alert."""
-    unit_id = "acct-spdb-20261008-snap"
-    ref = _canonical_ref(unit_id)
-    ref["digest"] = "sha256:" + "0" * 64  # bogus digest, same source
-    sec = _held_sec_with_account(unit_id, evidence=ref)
-    req = _req([sec, f._security("600001", _DAYS)])
-    out = e_run_e1_replay(req, f.T1, assets)
-    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
-    assert ("600000", "hold_alert") in held
-    memb = [
-        m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
-    ]
-    assert memb and "digest" in (memb[0].get("unavailable_reason") or "")
-
-
-def test_c8_r1_self_consistent_digest_unbound_source_alerts(assets):
-    """Changing the source and recomputing a self-consistent digest does NOT
-    launder an unbound source: a unit that is not an account anchor still
-    only alerts, never exits."""
-    unit_id = "forged-source-not-the-account"
-    ref = _canonical_ref(unit_id)  # digest recomputes, but unit not bound
-    sec = _held_sec(evidence=ref)
-    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
-    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
-    assert ("600000", "hold_alert") in held
-
-
-def test_c8_r1_ref_without_unit_id_recovers_when_bound(assets):
-    """A canonical ref carrying only kind/evidence_id/version/digest (no
-    non-standard unit_id) recovers the unit from evidence_id and binds the
-    account anchor -- the legal shape the audit named."""
-    unit_id = "acct-spdb-20261008-snap"
-    ref = _canonical_ref(unit_id)
-    # do NOT pass unit_id on the wire; it is recovered from evidence_id
-    sec = _held_sec_with_account(unit_id, evidence=ref)
+def test_c8_r3_serializable_dict_preserves_account_facts(assets):
+    """The held member and its original account facts are preserved verbatim:
+    membership stays a real held row, the degrade reason is named, the
+    account_member does not disappear."""
+    sec = _serializable_held(
+        evidence={"unit_id": "acct-spdb"},
+        account={"account_id": "acct-spdb"},
+    )
     req = _req([sec, f._security("600001", _DAYS)])
     out = e_run_e1_replay(req, f.T1, assets)
     memb = [
         m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
     ]
-    assert memb and memb[0].get("unavailable_reason") is None
-
-
-def test_c8_r1_changed_value_same_digest_alerts(assets):
-    """Changing the value but keeping the original digest is a payload
-    mismatch: named hold_alert, never an exit."""
-    unit_id = "acct-spdb-20261008-snap"
-    ref = _canonical_ref(unit_id, holding=40)  # digest computed for holding=40
-    sec = _held_sec_with_account(unit_id, evidence=ref, holding=41)  # declared value differs
-    req = _req([sec, f._security("600001", _DAYS)])
-    out = e_run_e1_replay(req, f.T1, assets)
-    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
-    assert ("600000", "hold_alert") in held
+    assert memb and memb[0].get("unavailable_reason") is not None
+    assert "hold_alert" in [
+        h.get("action") for h in out.get("held_signals", []) if h.get("security_code") == "600000"
+    ]
 
 
 # ---- C8 fix R3: pending kind/direction is never silently rewritten -----------

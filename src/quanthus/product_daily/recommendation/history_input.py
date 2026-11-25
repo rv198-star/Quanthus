@@ -964,8 +964,6 @@ def history_receipt_for_security(
 
 def _position_facts_from(
     sec: Mapping[str, Any],
-    *,
-    allowed_sources: frozenset[str] = frozenset(),
 ) -> tuple[Any, int | None, str | None]:
     """Project the caller-declared position facts through, unchanged.
 
@@ -980,7 +978,7 @@ def _position_facts_from(
     unverifiable: str | None = None
     pf = sec.get("position_facts")
     if pf is not None and isinstance(pf, dict):
-        pf, unverifiable = _adapt_position_facts_dict(pf, sec, allowed_sources=allowed_sources)
+        pf, unverifiable = _adapt_position_facts_dict(pf, sec)
     pds = sec.get("prior_deterioration_sessions")
     if pds is not None and (type(pds) is not int or pds < 0):
         _fail(
@@ -989,164 +987,20 @@ def _position_facts_from(
         )
     return pf, pds, unverifiable
 
-
-def _same_read_sources(sec: Mapping[str, Any], history: RawHistory) -> frozenset[str]:
-    """The same-read anchors that may bind THIS security's position_facts.
-
-    The trusted anchor must name the SAME account on the SAME security triple
-    (security_id / listing_id / venue_id) that this run actually verified - it
-    can never be a pool-external unresolved key, another security's member, a
-    pending-order receipt, or a generic market/source member id (all caller-
-    declared fields, never an independently-read account fact).
-
-    Admissible anchors, all exact (never a prefix share):
-      * this security's own nested account snapshot id (account.account_id) -
-        the same-account same-security snapshot unit the position facts were
-        read into;
-      * this security's three-key identity (security_id / listing_id /
-        venue_id / listing_code): the position-facts snapshot unit may name
-        the security it describes, never a shared pool or neighbour id.
-
-    A market member (source_members / depends_on_member_ids / member_evidence)
-    is a pool content source, not an account snapshot: it carries no
-    account/position identity, so it can never qualify an exit disposition.
-    Any other source id - an empty anchor set, a neighbour's member, a pending
-    order key, a generic member/package id or a pool-external unresolved
-    source - is not bound to this security's account and cannot qualify the
-    position facts for an exit disposition.
-    """
-    sources: set[str] = set()
-    acct = sec.get("account") or {}
-    if isinstance(acct.get("account_id"), str) and acct["account_id"].strip():
-        sources.add(acct["account_id"].strip())
-    ident = sec.get("identity") or {}
-    if isinstance(ident, Mapping):
-        for key in ("security_id", "listing_id", "venue_id", "listing_code"):
-            v = ident.get(key)
-            if isinstance(v, str) and v.strip():
-                sources.add(v.strip())
-    return frozenset(s for s in sources if s)
-
-
-def _position_facts_ref_from_evidence(
-    evidence: Any,
-    *,
-    holding: int,
-    marked_return: Decimal | None,
-    reductions: int,
-    allowed_sources: frozenset[str] = frozenset(),
-) -> tuple[Any | None, str | None]:
-    """Verify a serializable position_facts.evidence block against the
-    existing ExpertEvidenceRef contract.
-
-    Returns (ref, None) on a fully bound same-read reference, else
-    (None, named_reason) so the caller degrades the member to a hold_alert
-    rather than a whole-day block.  The verification never fabricates a
-    digest to wash a source clean:
-
-    * kind must be the canonical snapshot kind;
-    * evidence_id must be position-facts:{unit_id} (unit_id recovered from
-      it when the wire carries only the four canonical fields);
-    * version must be the position-facts contract version 1.0.0;
-    * digest must be a sha256 that recomputes EXACTLY over the declared
-      value payload {unit_id, holding_sessions, marked_return,
-      prior_strategy_reduction_count}; a changed value with an unchanged or
-      bogus digest fails;
-    * the bound unit_id must name a same-read account/source anchor declared
-      by THIS run's account/unresolved/pending/member evidence
-      (``allowed_sources``); a self-consistent digest over a source id that
-      is not bound to this account is still rejected.
-    """
-    from quanthus.expert_evaluation.serialization import digest_value
-    from quanthus.expert_protocols import EvidenceKind
-    from quanthus.expert_strategy.runner import position_facts_evidence
-
-    if not isinstance(evidence, Mapping):
-        return None, "position_facts.evidence is not a same-read reference"
-    unit_id = evidence.get("unit_id")
-    if isinstance(unit_id, str) and not unit_id.strip():
-        unit_id = None
-    kind = evidence.get("kind")
-    evidence_id = evidence.get("evidence_id")
-    version = evidence.get("version")
-    digest = evidence.get("digest")
-    has_canonical_ref = (
-        kind is not None or evidence_id is not None or version is not None or digest is not None
-    )
-    if not has_canonical_ref:
-        if unit_id:
-            return None, (
-                "position_facts.evidence.unit_id alone cannot bind the "
-                "same-read account source (needs kind/evidence_id/version/digest)"
-            )
-        return None, "position_facts.evidence is missing the same-read reference"
-    if kind != EvidenceKind.SNAPSHOT.value:
-        return None, f"position_facts.evidence.kind must be snapshot, got {kind!r}"
-    if not isinstance(evidence_id, str) or not evidence_id.startswith("position-facts:"):
-        return None, ("position_facts.evidence.evidence_id must be position-facts:{unit_id}")
-    ref_unit = evidence_id[len("position-facts:") :]
-    if unit_id is not None and unit_id != ref_unit:
-        return None, (
-            "position_facts.evidence.unit_id disagrees with evidence_id "
-            "(same-read source must be one identity)"
-        )
-    unit_id = unit_id or ref_unit
-    if version != "1.0.0":
-        return None, f"position_facts.evidence.version must be 1.0.0, got {version!r}"
-    if not isinstance(digest, str) or not digest.startswith("sha256:"):
-        return None, "position_facts.evidence.digest must be a sha256 digest"
-    expected = digest_value(
-        {
-            "unit_id": unit_id,
-            "holding_sessions": holding,
-            "marked_return": None if marked_return is None else str(marked_return),
-            "prior_strategy_reduction_count": reductions,
-        }
-    )
-    if digest != expected:
-        return None, (
-            "position_facts.evidence.digest does not recompute over the declared "
-            "value payload (wrong digest or changed value)"
-        )
-    # The declared unit must be a same-read source actually bound to THIS
-    # security's account on the SAME three-key identity.  An empty anchor set
-    # never qualifies: there is nothing the read verified, so a position fact
-    # cannot masquerade as trusted on a bare caller self-declaration.  The
-    # match is EXACT (never a prefix share): a pool-external source, a
-    # neighbour's member, a pending order or a generic member/package id is
-    # not this account's position snapshot.
-    if not allowed_sources or unit_id not in allowed_sources:
-        return None, (
-            f"position_facts.evidence unit {unit_id!r} is not a same-read "
-            "account/source anchor bound to this security's verified account "
-            "(exact match on the same-read account/three-key member required)"
-        )
-    ref = position_facts_evidence(
-        unit_id=unit_id,
-        holding_sessions=holding,
-        marked_return=marked_return,
-        prior_strategy_reduction_count=reductions,
-    )
-    return ref, None
-
-
 def _adapt_position_facts_dict(
     pf: Mapping[str, Any],
     sec: Mapping[str, Any],
-    *,
-    allowed_sources: frozenset[str] = frozenset(),
 ) -> tuple[Any | None, str | None]:
-    """Adapt a versioned serializable position_facts dict to HeldPositionFacts.
+    """A serializable wire dict can never qualify an exit disposition.
 
-    Returns (HeldPositionFacts, None) when the declared evidence verifies as
-    a same-read ExpertEvidenceRef; returns (None, named_reason) when the
-    evidence cannot be bound so the member degrades to a hold_alert rather
+    Returns (None, named_reason): the dict shape carries no same-read verified
+    account snapshot behind it, so the member degrades to a hold_alert rather
     than fabricating an exit or aborting the day.  The three numeric fields
-    keep their original strictness: a missing/invalid holding_sessions or
-    prior_strategy_reduction_count is a contract breach, not a degrade.
+    keep their strictness: a missing/invalid holding_sessions or
+    prior_strategy_reduction_count is a contract breach, not a degrade.  An
+    already-typed HeldPositionFacts (the P12 verified snapshot projection)
+    passes through unchanged upstream and never reaches this adapter.
     """
-    from quanthus.expert_strategy.position_risk import HeldPositionFacts
-
     holding = pf.get("holding_sessions")
     if type(holding) is not int or holding <= 0:
         _fail(
@@ -1174,21 +1028,19 @@ def _adapt_position_facts_dict(
                 "invalid_raw_history",
                 "securities[].position_facts.marked_return must be finite",
             )
-    ref, unverifiable = _position_facts_ref_from_evidence(
-        pf.get("evidence"),
-        holding=holding,
-        marked_return=marked_return,
-        reductions=reductions,
-        allowed_sources=allowed_sources,
+    # A serializable wire dict can NEVER qualify an exit disposition: there is
+    # no same-read verified account snapshot behind it (a caller-declared
+    # account_id / a bare security field is not an independently-read fact).
+    # The position-facts evidence must arrive already-typed (the P12
+    # RunnerRequest projection passes the real HeldPositionFacts object built
+    # from a verified account snapshot).  Keep the strict numeric field checks
+    # above; the member then degrades to a named hold_alert, never an exit.
+    return (
+        None,
+        "position_facts arrived as a serializable wire dict with no same-read "
+        "verified account snapshot behind it; a dict can never qualify an "
+        "exit disposition (typed HeldPositionFacts only)",
     )
-    if ref is None:
-        return None, unverifiable
-    return HeldPositionFacts(
-        holding_sessions=holding,
-        marked_return=marked_return,
-        prior_strategy_reduction_count=reductions,
-        evidence=ref,
-    ), None
 
 
 def raw_security_inputs_from_history(
@@ -1229,14 +1081,12 @@ def raw_security_inputs_from_history(
         # rather than collapse into a bare securities[i] exclusion.  Account
         # facts are the caller-declared truth for this read; a broken market
         # row never fabricates a legal identity or a scan entry.
-        # Same-read account/source anchors declared by THIS run: the scenario
-        # account id, every account.unresolved[].source, every
-        # pending[].source_receipt and every member_evidence id are the only
-        # source identities a serializable position_facts.evidence may bind.
-        allowed_sources = _same_read_sources(sec_o, history)
-        position_facts, prior_det, pf_unverifiable = _position_facts_from(
-            sec_o, allowed_sources=allowed_sources
-        )
+        # A serializable position_facts dict can never qualify an exit: it
+        # carries no same-read verified account snapshot (a caller-declared
+        # account_id or bare security field is not an independently-read
+        # fact).  Degrade to a named hold_alert; a typed HeldPositionFacts
+        # passes through unchanged.
+        position_facts, prior_det, pf_unverifiable = _position_facts_from(sec_o)
         held_membership = _bool3(sec_o.get("held_membership"), "securities[].held_membership")
         pending_kind = (
             _text(sec_o["pending_kind"], "securities[].pending_kind")

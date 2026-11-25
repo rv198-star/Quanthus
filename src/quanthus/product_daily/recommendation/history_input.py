@@ -25,7 +25,10 @@ from zoneinfo import ZoneInfo
 
 from quanthus.product_daily.contracts import ProductDailyError
 from quanthus.product_daily.recommendation.contracts import NoQualifiedRawInputs
-from quanthus.product_daily.recommendation.daily_runner import RawSecurityInput
+from quanthus.product_daily.recommendation.daily_runner import (
+    PendingSecurityInput,
+    RawSecurityInput,
+)
 from quanthus.product_daily.recommendation.feature_adapter import (
     CorporateAction,
     DailyBar,
@@ -274,6 +277,11 @@ class RawHistory:
     listing_rows: tuple[ListingRow, ...]
     securities: tuple[dict[str, Any], ...]
     source_members_by_id: Mapping[str, SourceMember]
+    # B-segment: per-order typed pending facts (sell orders keep direction +
+    # quantity verbatim) and pool-external unresolved account records.  Both
+    # default to empty for strict/daily envelopes that never carried them.
+    pending_securities: tuple[dict[str, Any], ...] = ()
+    account_unresolved: tuple[dict[str, Any], ...] = ()
 
 
 # --- strict loader ------------------------------------------------------------------
@@ -417,6 +425,12 @@ def load_raw_history(
         )
 
     securities = tuple(_seq(envelope.get("securities"), "securities"))
+    pending_securities = tuple(
+        _seq(envelope.get("pending_securities") or (), "pending_securities")
+    )
+    account_unresolved = tuple(
+        _seq(envelope.get("account_unresolved") or (), "account_unresolved")
+    )
     return RawHistory(
         market_date=market_date,
         decision_cutoff=decision_cutoff,
@@ -425,6 +439,8 @@ def load_raw_history(
         listing_rows=tuple(listing_rows),
         securities=securities,
         source_members_by_id={m.member_id: m for m in members},
+        pending_securities=pending_securities,
+        account_unresolved=account_unresolved,
     )
 
 
@@ -945,16 +961,16 @@ def _position_facts_from(sec: Mapping[str, Any]) -> tuple[Any, int | None]:
     """Project the caller-declared position facts through, unchanged.
 
     position_facts arrives already typed (the P12 RunnerRequest projection passes
-    the real HeldPositionFacts object); a bare dict would lose its bound evidence
-    and is rejected.  prior_deterioration_sessions is a strict non-negative int.
+    the real HeldPositionFacts object).  A versioned serializable dict is the
+    B-segment wire shape: it is adapted into a typed HeldPositionFacts when it
+    carries the required named fields (holding_sessions int > 0, optional
+    marked_return, prior_strategy_reduction_count int >= 0, and an evidence
+    unit_id); an unqualified dict stays a contract breach.  An already-typed
+    object passes through unchanged.
     """
     pf = sec.get("position_facts")
     if pf is not None and isinstance(pf, dict):
-        _fail(
-            "invalid_raw_history",
-            "securities[].position_facts must be a HeldPositionFacts object, "
-            "not a dict (it would lose its bound evidence)",
-        )
+        pf = _adapt_position_facts_dict(pf, sec)
     pds = sec.get("prior_deterioration_sessions")
     if pds is not None and (type(pds) is not int or pds < 0):
         _fail(
@@ -962,6 +978,78 @@ def _position_facts_from(sec: Mapping[str, Any]) -> tuple[Any, int | None]:
             "securities[].prior_deterioration_sessions must be a non-negative int",
         )
     return pf, pds
+
+
+def _adapt_position_facts_dict(
+    pf: Mapping[str, Any], sec: Mapping[str, Any]
+) -> Any:
+    """Adapt a versioned serializable position_facts dict to HeldPositionFacts.
+
+    The B-segment wire shape carries the P12 scenario ledger's position facts:
+    holding_sessions (int > 0), marked_return (decimal string or null),
+    prior_strategy_reduction_count (int >= 0) and a same-read evidence
+    reference (evidence.unit_id or the security's own identity).  A dict that
+    misses the required fields is a contract breach, never silently adapted.
+    """
+    from quanthus.expert_strategy.position_risk import HeldPositionFacts
+    from quanthus.expert_strategy.runner import position_facts_evidence
+
+    holding = pf.get("holding_sessions")
+    if type(holding) is not int or holding <= 0:
+        _fail(
+            "invalid_raw_history",
+            "securities[].position_facts.holding_sessions must be a positive int",
+        )
+    reductions = pf.get("prior_strategy_reduction_count")
+    if type(reductions) is not int or reductions < 0:
+        _fail(
+            "invalid_raw_history",
+            "securities[].position_facts.prior_strategy_reduction_count must be "
+            "a non-negative int",
+        )
+    marked = pf.get("marked_return")
+    marked_return = None
+    if marked is not None:
+        try:
+            marked_return = Decimal(str(marked))
+        except Exception:
+            _fail(
+                "invalid_raw_history",
+                "securities[].position_facts.marked_return must be decimal-parseable",
+            )
+        if not marked_return.is_finite():
+            _fail(
+                "invalid_raw_history",
+                "securities[].position_facts.marked_return must be finite",
+            )
+    # Evidence binds the SAME-READ source: a serializable position_facts must
+    # carry its own evidence.unit_id naming the account/read it came from.
+    # A missing or non-mapping evidence block is a named invalid_raw_history -
+    # never a security-code or 'unknown' synthetic source.
+    evidence = pf.get("evidence")
+    unit_id = (
+        evidence.get("unit_id")
+        if isinstance(evidence, Mapping)
+        else None
+    )
+    if not isinstance(unit_id, str) or not unit_id.strip():
+        _fail(
+            "invalid_raw_history",
+            "securities[].position_facts.evidence.unit_id must name the "
+            "same-read account source (never a fabricated identity)",
+        )
+    ref = position_facts_evidence(
+        unit_id=unit_id.strip(),
+        holding_sessions=holding,
+        marked_return=marked_return,
+        prior_strategy_reduction_count=reductions,
+    )
+    return HeldPositionFacts(
+        holding_sessions=holding,
+        marked_return=marked_return,
+        prior_strategy_reduction_count=reductions,
+        evidence=ref,
+    )
 
 
 def raw_security_inputs_from_history(
@@ -1285,6 +1373,7 @@ def raw_security_inputs_from_history(
                 held_unavailable_reason=held_reason,
                 held_quantity=held_qty,
                 pending_quantity=pending_qty,
+                scan_eligible=sec_o.get("scan_eligible") is not False,
             )
         )
     return inputs, receipts
@@ -1551,7 +1640,15 @@ def run_daily_advice_from_history(
         )
     ]
     runner_exclusions = [*(adapter_exclusions), *(kwargs.pop("input_exclusions", None) or ())]
-    if not inputs:
+    # B-segment pool-external account records: a held role surfaces a hold
+    # review (hold_alert with the raw key named), a pending role stays
+    # pending-isolated; neither admits a new entry or an exit decision for
+    # that key.  They are named per-record inside the issued source_closure
+    # via the account_unresolved closure field, never silently dropped.
+    account_unresolved_records = [
+        dict(r) for r in history.account_unresolved
+    ]
+    if not inputs and not account_unresolved_records:
         raise NoQualifiedRawInputs(
             "raw_history produced no qualified security inputs; this is a shared "
             "block, never a fabricated qualified-empty day",
@@ -1628,6 +1725,35 @@ def run_daily_advice_from_history(
                     "price_inputs": price_inputs,
                 },
             }
+    # Per-order typed pending facts stay verbatim (never summed or last-one-
+    # wins); the runner merges them into the same account-membership audit.
+    # Per-order pending evidence (order_key/source_receipt/direction) binds
+    # the same-read order identity into the issued closure.  A fractional,
+    # bool or negative quantity is a named invalid_pending_quantity on the
+    # typed boundary, never silently truncated.
+    pending_descriptors = [
+        PendingSecurityInput(
+            security_code=_text(p.get("security_code"), "pending_securities[].security_code"),
+            kind=_text(p.get("kind"), "pending_securities[].kind"),
+            quantity=p.get("quantity"),
+            order_key=(
+                _text(p.get("order_key"), "pending_securities[].order_key")
+                if p.get("order_key") is not None
+                else None
+            ),
+            source_receipt=(
+                _text(p.get("source_receipt"), "pending_securities[].source_receipt")
+                if p.get("source_receipt") is not None
+                else None
+            ),
+            direction=(
+                _text(p.get("direction"), "pending_securities[].direction")
+                if p.get("direction") is not None
+                else None
+            ),
+        )
+        for p in history.pending_securities
+    ]
     output = run_daily_advice_from_raw(
         raw=inputs,
         history_receipts=bound_receipts,
@@ -1636,6 +1762,8 @@ def run_daily_advice_from_history(
         numeric_context=replay_token,
         scan_trading_dates=scan_trading_dates,
         as_observed_at=as_observed_at if replay_token is not None else None,
+        pending_securities=[*pending_descriptors, *(kwargs.pop("pending_securities", None) or ())],
+        account_unresolved=account_unresolved_records,
         **kwargs,
     )
     # The issued receipt's digest must match the closure actually carried on the

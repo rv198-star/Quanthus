@@ -1234,6 +1234,12 @@ def run_daily_advice(
     input_exclusions: Sequence[dict[str, Any]] | None = None,
     raw_security_inputs_digest: str | None = None,
     pending_security_codes: Sequence[str] | None = None,
+    # Pool-external unresolved account records (B-segment): named per-record
+    # inside the issued source_closure; never silently dropped.
+    # Per-order pending evidence bound into the issued closure: kind/quantity
+    # plus order_key/source_receipt/direction verbatim.
+    pending_evidence: Sequence[Mapping[str, Any]] | None = None,
+    account_unresolved: Sequence[Mapping[str, Any]] | None = None,
     account_disposition: str | None = None,
     shared_prereq_ok: bool = True,
     shared_prereq_reason: str | None = None,
@@ -1446,6 +1452,13 @@ def run_daily_advice(
         "pending_security_codes": sorted(pending_security_codes or ()),
         "account_disposition": account_disposition,
         "account_membership": [dict(item) for item in (account_membership or ())],
+        # Pool-external unresolved account records, named verbatim inside the
+        # issued closure: a held role surfaces a hold review, a pending role
+        # stays pending-isolated, neither admits entry/exit for that key.
+        "account_unresolved": [dict(item) for item in (account_unresolved or ())],
+        # Per-order pending evidence: verbatim order identity bound into the
+        # issued closure (kind/quantity/order_key/source_receipt/direction).
+        "pending_evidence": [dict(item) for item in (pending_evidence or ())],
         "entry_decisions": [
             {
                 "security_code": d.security_code,

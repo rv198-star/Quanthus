@@ -755,6 +755,15 @@ def _p1_price_input(
     }, reason
 
 
+def _pending_qty(value, label):
+    """Strict pending quantity: non-negative int, never truncated or coerced."""
+    if value is None:
+        return None
+    if type(value) is not int or isinstance(value, bool) or value < 0:
+        _fail("invalid_pending_quantity", f"{label} must be a non-negative int, not {value!r}")
+    return value
+
+
 def build_replay_envelope(
     request: ReplayRequest,
     market_date: date,
@@ -781,6 +790,15 @@ def build_replay_envelope(
     securities: list[dict[str, Any]] = []
     delivered: dict[str, dict[str, Any]] = {}
     coverage_exclusions: list[dict[str, Any]] = []
+    # B-segment: per-order typed pending facts + pool-external unresolved
+    # account records (both inside the issued closure, never dropped).
+    pending_records: list[dict[str, Any]] = []
+    account_unresolved: list[dict[str, Any]] = [
+        dict(r)
+        for r in _seq(
+            request.account.get("unresolved") or (), "account.unresolved"
+        )
+    ]
     default_basis = _text(request.facts_template.get("price_basis"), "facts_template.price_basis")
     for index, sec in enumerate(request.securities):
         sec_o = _obj(sec, f"securities[{index}]")
@@ -890,8 +908,105 @@ def build_replay_envelope(
         # multiplicity conflict the coverage join isolates.
         if filtered.get("actions"):
             filtered["actions"] = _dedupe_action_rows(filtered["actions"])
-        securities.append(filtered)
         bar_dates = {_isodate(_obj(b, "bar").get("session_date"), "bar.session_date") for b in bars}
+        # B-segment consumption projection: per-order typed pending facts on
+        # securities[].pending[] become the versioned pending_securities list;
+        # a sell order keeps its own direction/quantity verbatim.  A nested
+        # securities[].account block is only an unresolved candidate: when it
+        # contradicts the row-level held/pending markers the row wins and the
+        # raw nested row is named and refused as projection evidence; when it
+        # is the ONLY account signal it stays pool-external (never an entry).
+        nested_account = sec_o.get("account")
+        if nested_account is not None:
+            nested_o = _obj(nested_account, f"securities[{index}].account")
+            nested_role = nested_o.get("account_role")
+            # Only an actual value divergence against the row-level held
+            # markers is a projection conflict.  A bare nested account block
+            # on a row with NO held/pending markers is never fill evidence and
+            # lands on account_unresolved below (never an entry).
+            conflict = (
+                nested_role == "held"
+                and held_member
+                and nested_o.get("held_quantity") is not None
+                and sec_o.get("held_quantity") is not None
+                and int(nested_o["held_quantity"]) != int(sec_o["held_quantity"])
+            )
+            if conflict:
+                _fail(
+                    "account_projection_conflict",
+                    f"securities[{index}] nested account block contradicts the "
+                    f"row-level held/pending markers: {nested_o!r}",
+                )
+            if not held_member:
+                # A bare nested account block is NOT fill evidence: it cannot
+                # admit a held review or a new entry on its own.  It lands on
+                # the versioned account-unresolved detail instead.
+                account_unresolved.append(
+                    {
+                        "account_key": str(nested_o.get("account_key") or code),
+                        "role": str(nested_role or "held"),
+                        "quantity": nested_o.get("held_quantity"),
+                        "missing_reason": "nested_account_block_only_no_row_markers",
+                        "source": "securities[].account",
+                        "raw": dict(nested_o),
+                        "security_code": code,
+                        "scope": "account_unresolved",
+                    }
+                )
+                continue  # never reaches the securities[] scan list
+        # Per-order pending projection: each securities[].pending[] record is a
+        # typed PendingSecurityInput (kind/quantity verbatim); the row-level
+        # pending_kind/pending_quantity remain the single-record projection.
+        entry_blocked_by_unresolved_direction = False
+        for po in _seq(sec_o.get("pending") or (), f"securities[{index}].pending"):
+            pobj = _obj(po, f"securities[{index}].pending[]")
+            kind = _text(pobj.get("kind"), "pending[].kind")
+            if kind == "sell":
+                entry_blocked_by_unresolved_direction = True
+                # A sell order keeps direction + quantity verbatim but needs an
+                # explicit consumer disposition: it lands on the versioned
+                # account-unresolved list (role=pending, direction=sell),
+                # never folded into a buy-side PendingSecurityInput.
+                account_unresolved.append(
+                    {
+                        "account_key": str(pobj.get("order_key") or code),
+                        "role": "pending",
+                        "quantity": _pending_qty(
+                            pobj.get("quantity"), "pending[].quantity"
+                        ),
+                        "missing_reason": "sell_order_requires_explicit_disposition",
+                        "source": "securities[].pending",
+                        "direction": "sell",
+                        "order_key": pobj.get("order_key"),
+                        "source_receipt": pobj.get("source_receipt"),
+                        "security_code": code,
+                        "scope": "account_unresolved",
+                    }
+                )
+                continue
+            pending_records.append(
+                {
+                    "security_code": code,
+                    "kind": kind,
+                    "quantity": _pending_qty(
+                        pobj.get("quantity"), "pending[].quantity"
+                    ),
+                    "order_key": pobj.get("order_key"),
+                    "source_receipt": pobj.get("source_receipt"),
+                    "direction": pobj.get("direction"),
+                }
+            )
+        if entry_blocked_by_unresolved_direction:
+            # The sell direction is an unresolved account disposition; the
+            # security never receives a new entry on this run.  Keep held
+            # facts so an existing position still surfaces its hold review.
+            filtered["bars"] = []
+            filtered["actions"] = []
+            filtered["limits"] = []
+            filtered["close_at_by_date"] = {}
+            filtered["knowledge_cutoff_by_date"] = {}
+            filtered["scan_eligible"] = False
+        securities.append(filtered)
         delivered[code] = {
             "bar_rows": len(bars),
             "window_sessions": len(window),
@@ -934,6 +1049,14 @@ def build_replay_envelope(
         "calendar_rows": [dict(r) for r in calendar_rows],
         "listing_rows": [dict(r) for r in request.listing_rows],
         "securities": securities,
+        # B-segment: per-order typed pending facts (sell orders keep their
+        # direction/quantity verbatim; never summed or last-one-wins).
+        "pending_securities": pending_records,
+        # Pool-external account records with no resolvable listing identity:
+        # named per-record inside the issued closure; a held role surfaces a
+        # hold_alert, a pending role stays pending-isolated, neither admits
+        # any new entry or exit decision for that key.
+        "account_unresolved": account_unresolved,
     }
     window_info = {
         "bar_context_sessions": len(window),

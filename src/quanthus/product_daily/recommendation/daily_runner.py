@@ -163,12 +163,23 @@ class PendingSecurityInput:
     security_code: str
     kind: str
     quantity: int | None
+    # Per-order evidence: order_key and source_receipt bind the same-read
+    # order identity into the issued closure; direction keeps sell verbatim.
+    order_key: str | None = None
+    source_receipt: str | None = None
+    direction: str | None = None
 
     def __post_init__(self) -> None:
         require_text(self.security_code, "pending.security_code")
         if not isinstance(self.kind, str) or self.kind not in PENDING_KINDS:
             raise ProductDailyError("invalid_pending_kind", self.security_code)
-        if self.quantity is not None and (type(self.quantity) is not int or self.quantity < 0):
+        # Strict int quantity: bool (True==1), float (1.2) and Decimal are all
+        # named rejections, never silently truncated or coerced.
+        if self.quantity is not None and (
+            type(self.quantity) is not int
+            or isinstance(self.quantity, bool)
+            or self.quantity < 0
+        ):
             raise ProductDailyError("invalid_account_quantity", self.security_code)
 
 
@@ -247,6 +258,9 @@ class _NormalizedAccount:
     pending_codes: tuple[str, ...]
     unavailable_reasons: dict[str, str]
     provenance: tuple[dict[str, Any], ...]
+    # Per-order pending evidence bound into the issued closure: kind/quantity
+    # plus order_key/source_receipt/direction verbatim, never collapsed.
+    pending_evidence: tuple[dict[str, Any], ...] = ()
 
 
 def _normalize_account_inputs(
@@ -267,13 +281,24 @@ def _normalize_account_inputs(
         raise ProductDailyError("invalid_account_disposition", str(disposition))
     pending = set(pending_security_codes or ())
     pending_details: dict[str, list[dict[str, Any]]] = {}
+    pending_evidence: dict[str, list[dict[str, Any]]] = {}
     for descriptor in pending_securities or ():
         if not isinstance(descriptor, PendingSecurityInput):
             raise ProductDailyError("invalid_pending_descriptor", "typed pending fact required")
         pending.add(descriptor.security_code)
-        pending_details.setdefault(descriptor.security_code, []).append(
-            {"kind": descriptor.kind, "quantity": descriptor.quantity}
-        )
+        detail = {"kind": descriptor.kind, "quantity": descriptor.quantity}
+        pending_details.setdefault(descriptor.security_code, []).append(detail)
+        # Per-order evidence (order_key/source_receipt/direction) is bound into
+        # the issued closure so the same-read order identity recomputes the
+        # digest; it never silently collapses to a bare kind/quantity pair.
+        ev = {
+            "kind": descriptor.kind,
+            "quantity": descriptor.quantity,
+            "order_key": descriptor.order_key,
+            "source_receipt": descriptor.source_receipt,
+            "direction": descriptor.direction,
+        }
+        pending_evidence.setdefault(descriptor.security_code, []).append(ev)
     hints = set(account.active_or_reserved_security_codes)
     for code in pending | hints:
         require_text(code, "account.security_code")
@@ -384,8 +409,17 @@ def _normalize_account_inputs(
         }
     if disposition == "FRESH_NO_BASELINE" and held:
         raise ProductDailyError("fresh_account_has_positions", ",".join(sorted(held)))
+    flat_evidence = [
+        ev
+        for code in sorted(pending_evidence)
+        for ev in pending_evidence[code]
+    ]
     return _NormalizedAccount(
-        held, tuple(sorted(pending)), reasons, tuple(records[code] for code in sorted(records))
+        held,
+        tuple(sorted(pending)),
+        reasons,
+        tuple(records[code] for code in sorted(records)),
+        tuple(flat_evidence),
     )
 
 
@@ -409,6 +443,10 @@ def run_daily_advice_from_raw(
     # a real held member stays held.
     pending_security_codes: Sequence[str] | None = None,
     pending_securities: Sequence[PendingSecurityInput] | None = None,
+    # Pool-external unresolved account records (B-segment): a held role
+    # surfaces its own hold review, a pending role stays pending-isolated;
+    # neither admits any new entry or exit decision for that key.
+    account_unresolved: Sequence[Mapping[str, Any]] | None = None,
     # Account read disposition from P12: "ok" | "FRESH_NO_BASELINE" |
     # "ACCOUNT_FACTS_UNAVAILABLE".  A failed/unknown account read is a shared
     # whole-day block, never a manufactured empty-positions success. A missing ledger
@@ -485,6 +523,23 @@ def run_daily_advice_from_raw(
     )
     held_facts = dict(account_view.held_facts)
     held_reasons = dict(account_view.unavailable_reasons)
+    # Pool-external held unresolved records: register the account key as held
+    # evidence with its named missing reason so the held-review loop produces
+    # a hold_alert (never a silent drop and never a fabricated market
+    # identity).  quantity=None stays explicitly unavailable.
+    for record in account_unresolved or ():
+        if record.get("role") == "held":
+            key = str(record.get("account_key") or "")
+            if not key:
+                raise ProductDailyError(
+                    "invalid_account_unresolved", "held unresolved record needs account_key"
+                )
+            held_facts.setdefault(key, None)
+            held_reasons.setdefault(
+                key,
+                record.get("missing_reason")
+                or "pool_external_listing_identity_unresolved",
+            )
     if not raw and not held_facts:
         raise NoQualifiedRawInputs("no qualified security inputs", caller_input_exclusions or ())
     features_by_security: dict[str, SecurityFeatureFacts] = {}
@@ -790,6 +845,8 @@ def run_daily_advice_from_raw(
         pending_security_codes=account_view.pending_codes,
         held_unavailable_reasons_by_security=held_reasons,
         account_membership=account_view.provenance,
+        pending_evidence=account_view.pending_evidence,
+        account_unresolved=account_unresolved,
         raw_security_inputs_digest=sha256_digest(raw_closures),
         account_disposition=account_disposition,
         shared_prereq_ok=shared_prereq_ok,

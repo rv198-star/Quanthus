@@ -675,6 +675,56 @@ def bar_context_window(open_sessions: tuple[date, ...], market_date: date) -> tu
     return tuple(upto[-BAR_CONTEXT:])
 
 
+def _p1_price_input(
+    security: Mapping[str, Any],
+    bars: Sequence[Mapping[str, Any]],
+    default_basis: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Check the actual window before DailyBar drops the source price-basis field.
+
+    The fixed release builds holder returns from native prices plus signed
+    distribution terms. An adjusted price cannot be substituted even when
+    its exception ledger was available.
+    """
+    dependencies = security.get("dependency_reasons") or {}
+    p1 = {
+        k: dependencies[k]
+        for k in ("p1_factor_ledger", "factor_dependent_actions")
+        if isinstance(dependencies, Mapping) and k in dependencies
+    }
+    incompatible = []
+    for bar in bars:
+        # Older #749 projected rows inherit the batch basis. An explicit null
+        # is unknown, and must not inherit a native basis.
+        basis = bar.get("price_basis", default_basis)
+        if basis not in ("none", "NONE", "UNADJUSTED"):
+            incompatible.append({"session_date": bar["session_date"], "price_basis": basis})
+    if not incompatible and not p1:
+        return None, None
+    reason = None
+    if incompatible:
+        if (
+            p1.get("p1_factor_ledger") == "unverified_or_missing"
+            or p1.get("factor_dependent_actions") == "blocked"
+        ):
+            reason = "p1_factor_ledger_unverified"
+        elif any(
+            isinstance(row, Mapping) and row.get("ledger") == "P1_factor_pit_exception"
+            for row in security.get("exceptions") or ()
+        ):
+            reason = "p1_factor_visibility_restricted"
+        else:
+            reason = "replay_price_basis_not_admitted"
+    return {
+        "contract": "p11.october-price-basis.v1",
+        "security_code": security["identity"]["listing_code"],
+        "input_default_basis": default_basis,
+        "dependency_reasons": p1,
+        "non_native_bars": incompatible,
+        "disposition": reason or "native_prices_independent",
+    }, reason
+
+
 def build_replay_envelope(
     request: ReplayRequest,
     market_date: date,
@@ -701,6 +751,7 @@ def build_replay_envelope(
     securities: list[dict[str, Any]] = []
     delivered: dict[str, dict[str, Any]] = {}
     coverage_exclusions: list[dict[str, Any]] = []
+    default_basis = _text(request.facts_template.get("price_basis"), "facts_template.price_basis")
     for index, sec in enumerate(request.securities):
         sec_o = _obj(sec, f"securities[{index}]")
         identity = _obj(sec_o.get("identity"), f"securities[{index}].identity")
@@ -759,21 +810,35 @@ def build_replay_envelope(
         unresolvable_aside = any(
             a.get("disposition") in _UNRESOLVABLE_ACTION_DISPOSITIONS for a in action_aside
         )
+        filtered.pop("replay_p1_price_input", None)
+        p1_evidence, p1_block = _p1_price_input(sec_o, bars, default_basis)
+        if p1_evidence is not None:
+            filtered["replay_p1_price_input"] = p1_evidence
         # This gate owns new-entry action coverage only. Other evidence,
         # including the separately sourced P1 factor ledger, passes to H1.
-        if not held_member and (
-            (unresolvable_aside and _unresolvable_action_affects_window(
-                action_aside, request.open_sessions, market_date
-            ))
+        action_block = not held_member and (
+            (
+                unresolvable_aside
+                and _unresolvable_action_affects_window(
+                    action_aside, request.open_sessions, market_date
+                )
+            )
             or not _action_coverage_ok(request, filtered, code, market_date)
-        ):
+        )
+        if action_block or p1_block:
             isolation: dict[str, Any] = {
                 "security_code": code,
-                "reason": "replay_action_coverage_unknown",
-                "member_or_field": "securities[].actions",
+                "reason": p1_block or "replay_action_coverage_unknown",
+                "member_or_field": "securities[].bars.price_basis"
+                if p1_block
+                else "securities[].actions",
                 "at": market_date.isoformat(),
                 "scope": "per_security",
             }
+            if p1_block:
+                isolation["p1_price_input"] = p1_evidence
+                if action_block:
+                    isolation["action_coverage_reason"] = "replay_action_coverage_unknown"
             if sec_o.get("exceptions"):
                 isolation["source_exceptions"] = sec_o["exceptions"]
             coverage_exclusions.append(isolation)
@@ -2396,7 +2461,8 @@ def _facts_for_day(request: ReplayRequest, market_date: date) -> DailyFactsView:
         source_id=_text(ft.get("source_id"), "facts_template.source_id"),
         source_version=_text(ft.get("source_version"), "facts_template.source_version"),
         calendar_version=_text(ft.get("calendar_version"), "facts_template.calendar_version"),
-        price_basis=_text(ft.get("price_basis"), "facts_template.price_basis"),
+        # The projection above allows only native bar inputs into the rule.
+        price_basis="none",
         members=request.member_evidence,
         required_member_ids=request.required_member_ids,
         intake_receipt_id=_text(ft.get("intake_receipt_id"), "facts_template.intake_receipt_id"),

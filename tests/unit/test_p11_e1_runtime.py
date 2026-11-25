@@ -720,3 +720,59 @@ def test_october_factor_ledger_survives_action_isolation(assets, unknown_impleme
     assert closed["consumption_evidence"]["p1_factor_visibility"]["restrictions"] == [
         {"security_code": "600001", "source_row": row}
     ]
+
+
+@pytest.mark.parametrize(
+    "subject_basis,ledger_failure,expected",
+    [
+        ("qfq", "missing", "p1_factor_ledger_unverified"),
+        ("hfq", "bad_sha", "p1_factor_ledger_unverified"),
+        ("qfq", None, "replay_price_basis_not_admitted"),
+        (None, "bad_sha", "p1_factor_ledger_unverified"),
+        ("none", "missing", "native_prices_independent"),
+        ("UNADJUSTED", "bad_sha", "native_prices_independent"),
+    ],
+)
+def test_public_replay_checks_price_inputs_before_entry(
+    assets, subject_basis, ledger_failure, expected
+):
+    from tests.unit import test_p11_paper_replay as f
+
+    days = tuple(d for d in f.SESSION_DAYS if d <= f.T1)
+    subject, neighbor = (f._security(c, days) for c in ("600000", "600001"))
+    req = f._request(market_dates=(f.T1,), securities=[subject, neighbor], coverage="verified")
+    req["listing_rows"].append(f._listing("security-600001"))
+    req["facts_template"]["price_basis"] = "qfq"
+    for sec in (subject, neighbor):
+        for bar in sec["bars"]:
+            bar["price_basis"] = "none"
+    subject["bars"][-2]["price_basis"] = subject_basis
+    if ledger_failure:
+        subject["dependency_reasons"] = {
+            "p1_factor_ledger": "unverified_or_missing",
+            "factor_dependent_actions": "blocked",
+        }
+    stamp = "2026-11-25T00:34:06.373370Z"
+    read = {
+        "member_id": "ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet",
+        "status": "SHA_MISMATCH" if ledger_failure else "READ",
+        "actual_sha256": None if ledger_failure == "missing" else "sha256:" + "e" * 64,
+        "verified_at": stamp,
+    }
+    day = e_run_e1_replay(req, f.T1, assets, p12_evidence={"p1_exceptions": {"reads": [read]}})
+    admitted = expected == "native_prices_independent"
+    assert day["publishable"] and day["delivered"]["600001"]["entry_eligible"]
+    assert day["delivered"]["600000"]["entry_eligible"] is admitted
+    entries = {d["security_code"] for d in day["entry_decisions"] if d["status"] == "entry"}
+    assert entries == ({"600000", "600001"} if admitted else {"600001"})
+    closure = day["source_closure"]
+    assert closure["price_basis"] == "none"
+    ce = closure["consumption_evidence"]
+    assert ce["p12"]["p1_exceptions"]["reads"] == [read]
+    (item,) = ce["p1_factor_visibility"]["price_inputs"]
+    assert item["disposition"] == expected
+    assert item["dependency_reasons"] == subject.get("dependency_reasons", {})
+    assert day["receipt"]["source_closure_digest"] == sha256_digest(closure)
+    if not admitted:
+        (isolation,) = day["coverage_exclusions"]
+        assert isolation["reason"] == expected and isolation in closure["exclusions"]

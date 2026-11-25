@@ -11,6 +11,7 @@ carried, with UNKNOWN where coverage is unproven.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -731,7 +732,22 @@ def read_history(
         # the expected sha comes from the VERIFIED snapshot bytes.  Its
         # bytes must hash to that pinned sha, else a named refusal.
         caller_gr = (snap.get("generation_receipt") or {})
-        gr_path = gr.get("path") or caller_gr.get("path")
+        # The expected sha comes from the VERIFIED snapshot bytes; the
+        # receipt is a SEPARATE file whose absolute path the caller names.
+        # A relative path inside the snapshot resolves against the
+        # caller's declared path first (the verified sha governs what the
+        # bytes must be), then against the snapshot's own directory.
+        gr_path = None
+        snap_gr_rel = gr.get("path")
+        if snap_gr_rel and os.path.isabs(snap_gr_rel):
+            gr_path = snap_gr_rel
+        elif caller_gr.get("path") and os.path.isabs(caller_gr["path"]):
+            gr_path = caller_gr["path"]
+        elif snap_gr_rel:
+            gr_path = os.path.join(
+                os.path.dirname(str(snap_path)), snap_gr_rel)
+        else:
+            gr_path = caller_gr.get("path")
         if gr_path and gr.get("sha256"):
             try:
                 actual_gr = sha256_file(gr_path)

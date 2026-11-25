@@ -130,13 +130,16 @@ class RawSecurityInput:
     # entries but does not establish a fill. Explicit membership, qualified position
     # facts or positive held quantity establish a held review, even with bad market.
     held_membership: bool | None = None
-    # Declared-held existence whose risk facts could NOT be verified: a
-    # serializable wire position_facts dict marks a real held record, but its
-    # sessions/return/reduction counts carry no same-read verified account
-    # snapshot, so they are degraded (position_facts=None) and the member is
-    # held-blocked via this flag rather than the risk object.  This keeps the
-    # held EXISTENCE (entry block + named hold_alert) separate from the
-    # unverified RISK values (which only the typed internal path may supply).
+    # The declared position_facts arrived UNVERIFIED (a wire dict or other
+    # non-typed shape): it marks a real held record, but its sessions/return /
+    # reduction counts carry no same-read verified account snapshot, so they
+    # are degraded (position_facts=None) and the risk ACTION is held-blocked
+    # via this flag rather than the risk object.  An already-typed
+    # HeldPositionFacts (the trusted internal path) leaves this False, so a
+    # verified fill keeps membership_source=filled_position_evidence and a
+    # legal exit.  This flag records the RISK-facts verification state; held
+    # EXISTENCE is decided by held_membership / positive quantity / this flag,
+    # and membership_source records which evidence actually confirmed the fill.
     held_membership_unverified: bool = False
     # Pending kind from the P12 RunnerRequest.pending_securities projection
     # (open_buy_order | reserved_bucket | unconfirmed_fill): it blocks a new entry for
@@ -382,10 +385,16 @@ def _normalize_account_inputs(
             "pending_quantity_state": "known"
             if details and all(d["quantity"] is not None for d in details)
             else "unavailable",
-            "membership_source": "filled_position_evidence"
-            if (is_held and not item.held_membership_unverified)
-            else "held_membership_unverified"
-            if item.held_membership_unverified
+            "membership_source": (
+                "filled_position_evidence"
+                if (
+                    has_facts
+                    or item.held_membership is True
+                    or positive_quantity
+                )
+                else "held_membership_unverified"
+            )
+            if is_held
             else "pending_descriptor"
             if details
             else "combined_account_hint"

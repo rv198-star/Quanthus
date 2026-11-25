@@ -989,17 +989,20 @@ def _position_facts_from(
     """
     unverifiable: str | None = None
     pf = sec.get("position_facts")
-    # A declared position_facts value marks a held-existence record whose risk
-    # fields cannot be verified.  Only an already-typed HeldPositionFacts (the
-    # P12 verified snapshot projection) passes through unchanged; a wire dict
-    # or any other unverifiable shape is degraded to None below (never a
-    # fabricated HeldPositionFacts), but the member is still a declared-held
-    # account record, not an ordinary not-held security.  Track that existence
-    # separately from the resulting facts value.
-    declared_position_facts = pf is not None
+    # Held EXISTENCE, verification state and risk qualification are three
+    # separate facts.  An already-typed HeldPositionFacts (the P12 verified
+    # snapshot projection) carries a same-read verified account snapshot, so
+    # it passes through unchanged AND stays a verified fill - never flagged
+    # unverified.  A wire dict or any other unverifiable shape declares a held
+    # record whose risk values cannot be trusted: it is degraded to
+    # position_facts=None below (never a fabricated HeldPositionFacts) and
+    # marked held-existence-unverified so the member stays a declared-held
+    # account record, not an ordinary not-held security.
+    is_typed_facts = pf is not None and _is_typed_position_facts(pf)
+    declared_position_facts = pf is not None and not is_typed_facts
     if pf is not None and isinstance(pf, dict):
         pf, unverifiable = _adapt_position_facts_dict(pf, sec)
-    elif pf is not None and not _is_typed_position_facts(pf):
+    elif pf is not None and not is_typed_facts:
         # An unverifiable non-dict shape (a bare list/string/number/bool is not
         # a snapshot of held-risk facts): degrade to the declared-held-only
         # path, never a pass-through that would crash the closure or leak into

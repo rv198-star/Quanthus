@@ -28,6 +28,58 @@ ADMITTED_PRICE_BASIS = {"UNADJUSTED", "none", "NONE"}
 ADMITTED_CURRENCY = {"CNY"}
 BAR_SESSIONS = 61
 
+# Versioned consumed-bar-field contract (audit R4 seg-A hardgate closeout):
+# one authoritative declaration of every source-row field the consumer
+# actually reads off an admitted bar record, mapped to the consumer-side
+# key or admission role it feeds.  This is the single checklist the
+# contract test binds against the REAL consumed set - the test runs the
+# consumer over a recording Mapping and asserts the set of keys the
+# consumer code physically reads equals this declared set, never two
+# fixed literals compared to each other.  A consumer change that reads a
+# new field, stops reading a declared field, or reads a field under a
+# different name (volume -> volume_adjusted) changes the observed set and
+# MUST fail the contract test until the contract is re-versioned.
+#
+# Shape: {source_key: {"role": ..., "produces": emitted_key_or_None}}
+#   role "gate"    - read to ADMIT/DROP the row (predicate field)
+#   role "fact"    - read into the emitted bar's business fact tuple
+#   role "lineage" - read for source/member provenance on the bar
+BAR_FIELD_CONTRACT = {
+    # gate fields - read to admit or drop the row before it projects
+    "price_basis":    {"role": "gate", "produces": None},
+    "currency":       {"role": "gate", "produces": None},
+    "interval_size":  {"role": "gate", "produces": None},
+    "observation_end":{"role": "gate", "produces": "observation_end"},
+    "listing_id":     {"role": "gate", "produces": None},
+    # business fact fields - read into the emitted bar's OHLCVA fact
+    "open":   {"role": "fact", "produces": "open_price"},
+    "high":   {"role": "fact", "produces": "high_price"},
+    "low":    {"role": "fact", "produces": "low_price"},
+    "close":  {"role": "fact", "produces": "close_price"},
+    "volume": {"role": "fact", "produces": "volume"},
+    "turnover": {"role": "fact", "produces": "amount"},
+    # lineage fields - read for per-row source/member provenance
+    "source_record_id": {"role": "lineage", "produces": "source_record_id"},
+    "source_revision":  {"role": "lineage", "produces": "source_revision"},
+    "record_source":    {"role": "lineage", "produces": "record_source"},
+    "knowledge_from":   {"role": "lineage", "produces": "knowledge_from"},
+    "knowledge_to":     {"role": "lineage", "produces": "knowledge_to"},
+}
+
+# The set of source-row keys the consumer reads - derived from the single
+# contract above, never a second literal.  The contract test asserts the
+# observed consumed set equals THIS set.
+BAR_CONSUMED_SOURCE_KEYS = frozenset(BAR_FIELD_CONTRACT)
+
+# The produced business-fact fields - the emitted keys the consumer's
+# same-clock equivalence/conflict check reads (_bar_fact).  Derived from
+# the contract so the produced set and the consumed set stay bound to one
+# declaration.
+BAR_PRODUCED_FACT_KEYS = frozenset(
+    v["produces"] for v in BAR_FIELD_CONTRACT.values()
+    if v["role"] == "fact" and v["produces"] is not None
+)
+
 _COLUMNS = [
     "source_record_id", "observation_end", "listing_id", "calendar_session_id",
     "interval_size", "price_basis", "currency",

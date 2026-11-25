@@ -10,6 +10,9 @@ carried, with UNKNOWN where coverage is unproven.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -19,11 +22,26 @@ from quanthus.p12_history import calendar_listing as cal_mod
 from quanthus.p12_history import envelope as env_mod
 from quanthus.p12_history import identity as id_mod
 from quanthus.p12_history import supplements as sup_mod
-from quanthus.p12_history.clocks import REPLAY_AS_OBSERVED, iso, parse_ts, utcnow
+from quanthus.p12_history.clocks import FORMAL_DAILY_UPDATE, REPLAY_AS_OBSERVED, iso, parse_ts, utcnow
 from quanthus.p12_history.source_pins import BASE_BUSINESS_THROUGH, SourceMap, sha256_file
 
 BAR_SESSIONS = bars_mod.BAR_SESSIONS
 LISTING_PROOF_SESSIONS = cal_mod.LISTING_PROOF_SESSIONS
+
+# Versioned whole-bar consumed-fact contract (audit R4 seg-A hardgate
+# closeout): ``BAR_FACT_KEYS`` is bound to the SINGLE versioned consumed-bar
+# field contract in ``bars_mod.BAR_FIELD_CONTRACT`` - the set of produced
+# fact keys the consumer reads to judge one bar's business fact at a
+# knowledge clock.  ``_bar_fact`` collapses equivalent same-clock replicas
+# ONLY over exactly this set; two rows that differ on any consumed field
+# are a genuine conflict, never picked by physical order.  The tuple order
+# follows the contract's declaration order so the collapse comparator and
+# the consumer's emitted-bar fact fields stay bound to ONE declaration
+# (a produced-field change must re-version the contract AND the comparator).
+BAR_FACT_KEYS = tuple(
+    v["produces"] for v in bars_mod.BAR_FIELD_CONTRACT.values()
+    if v["role"] == "fact" and v["produces"] is not None
+)
 
 
 @dataclass
@@ -54,12 +72,28 @@ def _date_iso(value):
         return None
 
 
+def _chain_fault_in_window(fault, needed_days, market_date):
+    """A manifest-chain fault blocks this T only when the link belongs to a
+    session this read actually needs.  A fault on a descriptor or core pinned
+    for a day OUTSIDE the needed window is kept on the chain receipt but must
+    not starve the day (audit R4 segment A closeout).  Links without a day
+    suffix (the Base manifest) always count."""
+    artifact = str(fault.get("artifact") or "")
+    m = re.search(r":(\d{4}-\d{2}-\d{2})$", artifact)
+    if m is None:
+        return True
+    day = m.group(1)
+    return day in needed_days or day == market_date.isoformat()
+
+
 def read_history(
     market_date: date,
     decision_cutoff: datetime,
     *,
     holdings=(),
     pending=(),
+    account_snapshot=None,
+    expected_account_id=None,
     source_map: SourceMap | None = None,
     observed_at: datetime | None = None,
     replay_exclusion: dict | None = None,
@@ -200,6 +234,83 @@ def read_history(
             manifest_chain = [{"artifact": "manifest_chain", "status": "UNAVAILABLE",
                                "error": f"{type(exc).__name__}: {exc}"}]
 
+    # A failed fixed-summary link is a hard pre-read gate (audit 749 R4
+    # second segment): the Base manifest, the DATES index and the day's
+    # descriptors are verified BEFORE any member is trusted, so a broken
+    # / wrong / unreadable link blocks the whole day without opening a
+    # single market member.  Formal update (audit R4 second segment):
+    # the four external frozen links must each be present, declared,
+    # readable and sha-matched - a missing path, a missing declared sha,
+    # an unreadable link or a wrong sha is the block.  UNAVAILABLE stays
+    # advisory only when the stub cannot expose a chain at all.
+    _chain_faults = [
+        c for c in manifest_chain
+        if c.get("status") in ("NO_PATH", "MISSING_DECLARED_SHA256",
+                               "NON_OBJECT_DESCRIPTOR", "UNREADABLE",
+                               "SHA_MISMATCH", "CONTENT_NON_OBJECT",
+                               "CONTENT_MALFORMED_JSON",
+                               "CONTENT_MISSING_IDENTITY_FIELD",
+                               "ASSOCIATED_IDENTITY_MISMATCH",
+                               "CONTENT_IDENTITY_VALUE_INVALID",
+                               "CHAIN_ASSOCIATION_MISMATCH")
+    ]
+    # Window scope (audit R4 segment A closeout): only a link for a session
+    # this read actually needs is a pre-read block.  A fault pinned for a day
+    # outside the needed window is kept on the chain receipt but must not
+    # starve the day.  The needed window is approximated from the pinned map
+    # (the last BAR_SESSIONS open days at or before T) so this gate still runs
+    # before any member parquet is opened.
+    try:
+        _open_days = [
+            d for d in smap.daily_open_days() if d <= market_date.isoformat()
+        ]
+        _needed_days = set(_open_days[-BAR_SESSIONS:]) | {
+            market_date.isoformat()}
+    except Exception:  # noqa: BLE001
+        _needed_days = {market_date.isoformat()}
+    _chain_faults = [
+        c for c in _chain_faults
+        if _chain_fault_in_window(c, _needed_days, market_date)
+    ]
+    if _chain_faults:
+        return HistoryResult(
+            raw_history={
+                "schema_version": "p11.raw-history-input.v1",
+                "market_date": market_date.isoformat(),
+                "decision_cutoff": iso(decision_cutoff),
+                "source_members": [], "calendar_rows": [],
+                "listing_rows": [], "securities": [],
+            },
+            coverage={
+                "read_at": read_at,
+                "visible_at_label": purpose,
+                "market_date": market_date.isoformat(),
+                "manifest_chain": manifest_chain,
+                "calendar": {"reads": []}, "listing": {"reads": []},
+                "universe": {"reads": [], "pool_size": 0},
+                "bars": {"reads": []}, "actions": {},
+                "exceptions": {"reads": []}, "limits": {"reads": []},
+                "security_count": 0,
+                "late_visible_members": [],
+                "member_consumption": {
+                    "consumed_member_count": 0, "consumed_for_T_count": 0,
+                    "base_member_count": 0, "daily_member_count": 0,
+                    "sha_all_match": True, "members": [],
+                    "registered_member_count": 0, "registered_not_read": [],
+                    "november_partitions_not_used": [], "run_read_at": read_at,
+                    "members_opened": 0,
+                },
+                "day_block": {
+                    "reason_code": "SUMMARY_CHAIN_FAULT",
+                    "detail": "a declared manifest/dates/descriptor link failed hash or was unreadable before any member was opened",
+                    "affected_scope": "whole_day",
+                    "failed_members": [c.get("artifact") for c in _chain_faults],
+                    "disposition": "block_new_entries",
+                },
+            },
+            read_at=read_at, status="INPUT_BLOCKED",
+        )
+
     calendar_rows, cal_cov = cal_mod.read_calendar_rows(smap, market_date)
     listing_rows, list_cov = cal_mod.read_listing_rows(smap, market_date)
     # The venue's real native open instant for T (audit 749-03): the
@@ -236,6 +347,7 @@ def read_history(
 
     # ---- assemble source_members (unique members actually opened) ----
     member_entries = {}
+    pending_aliases = {}
     def _member_key(member):
         # Package-qualified member key (audit 749-01): two daily packages
         # can ship the same relative member path (same-member-path.parquet
@@ -243,15 +355,47 @@ def read_history(
         # member_id would collide and keep only the first; the composite
         # package_id::member_id keeps both registered and resolvable.
         return f"{member.package_id}::{member.member_id}"
-    def _reg(member, knowledge_at, date_from=None, date_to=None, visible_at=None):
+    def _reg(member, knowledge_at, date_from=None, date_to=None, visible_at=None,
+             producer_completed_at=None, channel_visible_at=None,
+             keep_null_visible=False):
+        # A P10 calendar-map daily alias is the SAME physical member as
+        # the formal daily-core calendar member it points at (P10
+        # ruling).  Register it as an alias ON the formal identity - it
+        # must NOT open a separate entry clocked at base_knowledge, which
+        # would let the alias bypass the formal channel-admission gate.
+        if getattr(member, "alias_of", None):
+            target = member_entries.get(member.alias_of)
+            alias_rec = {
+                "member_key": _member_key(member),
+                "member_id": member.member_id,
+                "package_id": member.package_id,
+                "sha256": member.sha256,
+                "abs_path": str(member.abs_path),
+            }
+            if target is not None:
+                target.setdefault("aliases", []).append(alias_rec)
+            else:
+                pending_aliases.setdefault(member.alias_of, []).append(alias_rec)
+            return
         key = _member_key(member)
         if key not in member_entries:
+            # keep_null_visible: a formal read whose channel is UNKNOWN
+            # keeps visible_at null (a named gap) instead of back-filling
+            # the member's own knowledge clock.
+            eff_visible = (
+                visible_at if (visible_at is not None or keep_null_visible)
+                else knowledge_at
+            )
             e = env_mod.member_entry(
                 member, knowledge_at,
-                visible_at if visible_at is not None else knowledge_at,
+                eff_visible,
                 date_from, date_to,
+                producer_completed_at=producer_completed_at,
+                channel_visible_at=channel_visible_at,
             )
             e["package_key"] = key
+            for alias_rec in pending_aliases.pop(key, []):
+                e.setdefault("aliases", []).append(alias_rec)
             member_entries[key] = e
     # P11 裁定 (OCTOBER-REPLAY-TIME-v1): the original member clock is
     # carried verbatim - visible_at equals the member's own knowledge_at
@@ -282,6 +426,15 @@ def read_history(
     # the consumed member to be supplied).
     p1_member = smap.p1_exception_member()
     _reg(p1_member, base_knowledge, visible_at=base_knowledge)
+    # Second-segment formal update: production-complete and channel-
+    # visible are separate instants (audit 749 R4).  Under FORMAL_DAILY_
+    # UPDATE a package is admissible only when its QUALIFIED channel
+    # visibility is at or before the cutoff - a member that completed
+    # production early but only became channel-visible after the cutoff
+    # is named late and contributes nothing.  Under the October replay
+    # the real knowledge clock is used verbatim as before.
+    formal = purpose == FORMAL_DAILY_UPDATE
+    formal_inadmissible_keys = set()
     for day in smap.daily_open_days():
         if day > market_date.isoformat():
             continue
@@ -294,15 +447,144 @@ def read_history(
         # still registered (its knowledge_at stays None) so the consumer
         # sees the gap rather than a guessed cutoff-pass.
         day_knowledge = smap.daily_knowledge_at(day)
-        day_visible = smap.daily_visible_at(day)
+        day_producer = smap.daily_producer_completed_at(day)
+        # Channel visibility for a FORMAL read only counts the qualified
+        # publication/withdrawal chain - never the producer-completion
+        # fallback (audit R4 second segment: a member with no channel
+        # proof is a named gap, not silently admitted).  The October
+        # replay still consumes the real clock via daily_visible_at.
+        day_channel = (
+            smap.daily_channel_visible_at(day)
+            if formal else smap.daily_visible_at(day)
+        )
+        # Formal admission is judged on the channel-visible instant and
+        # splits two DISTINCT states (audit R4 second segment):
+        #   * rejected_no_channel_proof - the channel clock is UNKNOWN
+        #     (no qualified publication/withdrawal event); the member is
+        #     rejected for lack of proof, NOT merely late.  Its
+        #     visible_at stays null (never back-filled from knowledge).
+        #   * late_for_cutoff - a qualified channel clock exists and is
+        #     genuinely after the decision cutoff.
+        admissible_instant = day_channel if formal else day_knowledge
         for m in pkg.members:
-            if day_knowledge is not None and day_knowledge > decision_cutoff:
+            rejected_no_proof = False
+            late = False
+            if formal:
+                if day_channel is None:
+                    rejected_no_proof = True   # channel UNKNOWN -> reject
+                elif day_channel > decision_cutoff:
+                    late = True              # qualified but genuinely late
+            elif admissible_instant is not None and admissible_instant > decision_cutoff:
+                late = True
+            if late:
                 late_visible_members.append(_member_key(m))
+                if formal:
+                    formal_inadmissible_keys.add(_member_key(m))
+            if rejected_no_proof and formal:
+                formal_inadmissible_keys.add(_member_key(m))
             _reg(
                 m, day_knowledge,
                 date_from=day, date_to=day,
-                visible_at=day_visible if day_visible is not None else day_knowledge,
+                # channel UNKNOWN keeps visible_at null under a formal
+                # read - the receipt shows the gap, never a guess.  The
+                # replay still uses the real clock verbatim.
+                visible_at=(day_channel if formal
+                            else (day_channel if day_channel is not None else day_knowledge)),
+                producer_completed_at=day_producer,
+                channel_visible_at=day_channel,
+                keep_null_visible=formal,
             )
+            if formal:
+                # Late-for-cutoff receipt + the named input gap a P10
+                # shared-source proof must fill (audit R4 second
+                # segment): a member with no proven channel/knowledge
+                # clock is named, never silently qualified.  A gap on a
+                # shared hard dependency (venue calendar, shared listing
+                # identity, a needed price source, or the fixed summary
+                # chain) blocks the whole day for new entries; a single-
+                # security or single-action gap is isolated to that
+                # dependency so a qualified neighbour keeps working.
+                ent = member_entries[_member_key(m)]
+                ent["formal_admission"] = (
+                    "rejected_no_channel_proof" if rejected_no_proof
+                    else ("late_for_cutoff" if late else "admitted"))
+                mid_l = str(m.member_id or "")
+                # Dependency type per P10 MEMBER-GAPS: the T shared
+                # price and the native T session/calendar are shared
+                # hard dependencies (their gap blocks the whole day);
+                # listing/identity/security extensions and tradability
+                # are conditional (applied only to a use that actually
+                # depends on the member); audit/universe/other members
+                # are declared-not-read.
+                # Window scoping (audit R4 second segment): only THIS T's
+                # package member is an actual shared dependency - a member
+                # declared for a different day (market_date != T) is an
+                # out-of-window registration whose gap is kept for the
+                # record but must NOT block this T's day.
+                # Shared-dependency scope (audit R4 segment A closeout):
+                # a member is a shared hard dependency when its day is one
+                # of THIS read's actually-needed sessions - not only the
+                # market_date.  A prior in-window trading day whose Daily
+                # price/calendar member is the pool's sole source for that
+                # session and is channel-unknown or late blocks new
+                # entries.  Members for days outside the needed window are
+                # kept for the record but do not block.
+                needed_days = {
+                    (d.isoformat() if hasattr(d, "isoformat") else str(d))
+                    for d in sessions_needed
+                }
+                in_t_window = (
+                    day in needed_days or day == market_date.isoformat())
+
+                # dwd_security_valuation is a DECLARED_NOT_READ_ONLY
+                # member per the P10 named supply - it only shares the
+                # "dwd_security" PREFIX, so it is tested before the
+                # dwd_security identity branch.
+                if "dwd_security_valuation" in mid_l:
+                    dep_type = "DECLARED_NOT_READ_ONLY"
+                    shared_dep = False
+                elif "dwd_security_bar" in mid_l:
+                    dep_type = "SHARED_T_PRICE"
+                    shared_dep = in_t_window
+                elif "dwd_trading_calendar" in mid_l:
+                    dep_type = "NATIVE_T_SESSION_AND_TIME"
+                    shared_dep = in_t_window
+                elif "dwd_tradability_state" in mid_l:
+                    dep_type = "CONDITIONAL_T_TRADABILITY"
+                    shared_dep = False
+                elif ("dwd_listing" in mid_l or "dwd_security" in mid_l
+                      or "dwd_listed_company" in mid_l
+                      or "dwd_company_identifier" in mid_l):
+                    dep_type = "CONDITIONAL_T_IDENTITY"
+                    shared_dep = False
+                else:
+                    dep_type = "DECLARED_NOT_READ_ONLY"
+                    shared_dep = False
+                if day_channel is None and day_knowledge is None:
+                    ent["named_input_gap"] = (
+                        "NO_PROVEN_CHANNEL_OR_KNOWLEDGE_CLOCK"
+                    )
+                elif day_channel is None:
+                    ent["named_input_gap"] = "NO_CHANNEL_VISIBILITY_PROOF"
+                if ent.get("named_input_gap"):
+                    ent["dependency_type"] = dep_type
+                    if shared_dep:
+                        ent["shared_hard_dependency"] = True
+                        # The session this shared member supplies (its own
+                        # market date) - the outer gate judges whether a
+                        # qualified source actually covered that session.
+                        ent["gap_session_day"] = day
+                elif shared_dep and ent.get("formal_admission") == "late_for_cutoff":
+                    # A genuinely late member supplies its session nothing for
+                    # THIS formal read either - it is a shared-dependency gap
+                    # even though its channel clock is proven (audit R4 segment
+                    # A closeout: a late sole supply misses the block the same
+                    # way an unknown one does).  It is named late on the
+                    # receipt AND enters the shared-gap gate.
+                    ent["dependency_type"] = dep_type
+                    ent["shared_hard_dependency"] = True
+                    ent["gap_session_day"] = day
+
     source_member_entries = list(member_entries.values())
 
     # ---- per-security entries ----
@@ -429,6 +711,281 @@ def read_history(
     # holdings and pending from securities[], so a held or pending
     # security carries its real quantity/kind on its own entry - an empty
     # account and a populated one must not produce the same envelope.
+    # Account-input binding (audit 749 R4 segment B): a production read
+    # binds the SAME account input to a scenario account, its original
+    # as_of instant, the snapshot sha and the generation receipt BEFORE
+    # the account facts are projected.  A different account swapped in, a
+    # future-dated snapshot, a security/listing/venue three-key conflict
+    # or a wrong snapshot sha is a NAMED rejection - the account branch is
+    # refused, never silently accepted.
+    account_binding = {
+        "bound": False,
+        "account_id": None,
+        "scenario": None,
+        "account_mode": None,
+        "environment": None,
+        "as_of": None,
+        "snapshot_path": None,
+        "source_databases": None,
+        "nested_account": None,
+        "declared_snapshot_sha256": None,
+        "actual_snapshot_sha256": None,
+        "generation_receipt_sha256": None,
+        "rejections": [],
+    }
+    if account_snapshot is not None:
+        snap = account_snapshot
+        account_binding["bound"] = True
+        account_binding["account_id"] = snap.get("account_id")
+        # P11 segment-B contract: keep the scenario namespace, the raw
+        # account mode/environment and the source databases verbatim so
+        # the consumer re-pairs the bound input inside the closure.
+        account_binding["scenario"] = snap.get("scenario")
+        account_binding["account_mode"] = snap.get("account_mode")
+        account_binding["environment"] = snap.get("environment")
+        account_binding["as_of"] = snap.get("as_of")
+        account_binding["source_databases"] = snap.get("source_databases")
+        # Original nested account fields preserved verbatim for forensics.
+        account_binding["nested_account"] = snap.get("account")
+        snap_path = snap.get("snapshot_path")
+        snap_sha = snap.get("snapshot_sha256") or snap.get("sha256")
+        account_binding["snapshot_path"] = str(snap_path) if snap_path else None
+        account_binding["declared_snapshot_sha256"] = snap_sha
+        # Same-bytes binding (audit R4 seg-B second pass): when a snapshot
+        # path is bound we verify ITS sha, then decode THAT SAME byte
+        # content and project the account facts from the verified bytes -
+        # never from the caller-supplied mapping.  A mapping whose
+        # holdings/pending/as_of were cleared or re-pointed while still
+        # borrowing the real file's sha is a refusal, not a verified
+        # empty account.
+        snap_v = None
+        if snap_path and snap_sha:
+            # Same-bytes closeout: read the bound snapshot ONCE - the single
+            # in-memory bytes feed both the sha256 and the decode, so verify
+            # and project never re-open the path for a swapped second read.
+            # Binding-window identity (closeout pass 2): the path may be
+            # atomically replaced or rewritten in place AFTER the bytes are
+            # read.  Hold one fd, fstat before and after the read, and stat
+            # the path again at bind completion; any change in
+            # st_dev/st_ino/st_size/st_mtime_ns/st_ctime_ns is a named
+            # ACCOUNT_SNAPSHOT_PATH_CHANGED refusal.  Verification and
+            # decode still act ONLY on the first in-memory bytes.
+            _STAT_KEYS = ("st_dev", "st_ino", "st_size",
+                          "st_mtime_ns", "st_ctime_ns")
+
+            def _stat_sig(st):
+                return {k: getattr(st, k, None) for k in _STAT_KEYS}
+
+            snap_bytes = None
+            _pre_sig = _post_sig = _final_sig = None
+            try:
+                _fd = os.open(snap_path, os.O_RDONLY)
+                try:
+                    _pre_sig = _stat_sig(os.fstat(_fd))
+                    _chunks = []
+                    while True:
+                        _c = os.read(_fd, 1 << 20)
+                        if not _c:
+                            break
+                        _chunks.append(_c)
+                    snap_bytes = b"".join(_chunks)
+                    _post_sig = _stat_sig(os.fstat(_fd))
+                finally:
+                    os.close(_fd)
+            except Exception as exc:  # noqa: BLE001
+                snap_bytes = None
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_SNAPSHOT_UNREADABLE",
+                    "detail": f"account snapshot could not be opened: {type(exc).__name__}: {exc}",
+                })
+            if snap_bytes is not None:
+                actual_snap = "sha256:" + hashlib.sha256(snap_bytes).hexdigest()
+                account_binding["actual_snapshot_sha256"] = actual_snap
+                if (str(actual_snap).split(":", 1)[-1]
+                        != str(snap_sha).split(":", 1)[-1]):
+                    account_binding["rejections"].append({
+                        "reason_code": "ACCOUNT_SNAPSHOT_SHA_MISMATCH",
+                        "detail": f"account snapshot sha256 {actual_snap} != pinned {snap_sha}",
+                    })
+                else:
+                    # sha matched: decode the SAME bytes already in memory.
+                    try:
+                        snap_v = json.loads(snap_bytes.decode("utf-8"))
+                        if not isinstance(snap_v, dict):
+                            snap_v = None
+                            account_binding["rejections"].append({
+                                "reason_code": "ACCOUNT_SNAPSHOT_MALFORMED",
+                                "detail": "verified snapshot bytes did not decode to a JSON object",
+                            })
+                    except Exception as exc:  # noqa: BLE001
+                        account_binding["rejections"].append({
+                            "reason_code": "ACCOUNT_SNAPSHOT_MALFORMED",
+                            "detail": f"verified snapshot bytes failed to parse: {type(exc).__name__}: {exc}",
+                        })
+        elif snap_path and not snap_sha:
+            # A bound path with no declared sha cannot be proven - refuse.
+            account_binding["rejections"].append({
+                "reason_code": "ACCOUNT_SNAPSHOT_NO_DECLARED_SHA",
+                "detail": "account snapshot path is bound but no pinned sha256 is declared",
+            })
+        # Use the verified decoded snapshot (snap_v) when a path was bound;
+        # otherwise fall back to the in-memory mapping (engineering path).
+        src = snap_v if snap_v is not None else snap
+        account_binding["scenario"] = src.get("scenario")
+        account_binding["account_mode"] = src.get("account_mode")
+        account_binding["environment"] = src.get("environment")
+        account_binding["as_of"] = src.get("as_of")
+        account_binding["source_databases"] = src.get("source_databases")
+        account_binding["nested_account"] = src.get("account")
+        account_binding["account_id"] = src.get("account_id")
+        gr = src.get("generation_receipt") or {}
+        account_binding["generation_receipt_sha256"] = gr.get("sha256")
+        # Generation receipt actually verified (audit): the receipt is a
+        # SEPARATE file - its path comes from the bound caller input while
+        # the expected sha comes from the VERIFIED snapshot bytes.  Its
+        # bytes must hash to that pinned sha, else a named refusal.
+        caller_gr = (snap.get("generation_receipt") or {})
+        # The expected sha comes from the VERIFIED snapshot bytes; the
+        # receipt is a SEPARATE file whose absolute path the caller names.
+        # A relative path inside the snapshot resolves against the
+        # caller's declared path first (the verified sha governs what the
+        # bytes must be), then against the snapshot's own directory.
+        gr_path = None
+        snap_gr_rel = gr.get("path")
+        if snap_gr_rel and os.path.isabs(snap_gr_rel):
+            gr_path = snap_gr_rel
+        elif caller_gr.get("path") and os.path.isabs(caller_gr["path"]):
+            gr_path = caller_gr["path"]
+        elif snap_gr_rel:
+            gr_path = os.path.join(
+                os.path.dirname(str(snap_path)), snap_gr_rel)
+        else:
+            gr_path = caller_gr.get("path")
+        if gr_path and gr.get("sha256"):
+            try:
+                actual_gr = sha256_file(gr_path)
+            except Exception as exc:  # noqa: BLE001
+                actual_gr = None
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_RECEIPT_UNREADABLE",
+                    "detail": f"generation receipt could not be opened: {type(exc).__name__}: {exc}",
+                })
+            def _hex(v):
+                return str(v or "").split(":", 1)[-1].strip()
+            if actual_gr is not None and _hex(actual_gr) != _hex(gr.get("sha256")):
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_RECEIPT_SHA_MISMATCH",
+                    "detail": f"generation receipt sha256 {actual_gr} != pinned {gr.get('sha256')}",
+                })
+            if actual_gr is not None:
+                account_binding["generation_receipt_sha256"] = actual_gr
+        # A different account swapped in -> named rejection.
+        if (expected_account_id is not None
+                and src.get("account_id") != expected_account_id):
+            account_binding["rejections"].append({
+                "reason_code": "ACCOUNT_ID_MISMATCH",
+                "detail": (
+                    f"bound account_id {src.get('account_id')} != expected "
+                    f"{expected_account_id} for this read"
+                ),
+            })
+        # A future-dated snapshot -> named rejection.
+        as_of_ts = parse_ts(src.get("as_of"))
+        if as_of_ts is not None and as_of_ts > decision_cutoff:
+            account_binding["rejections"].append({
+                "reason_code": "ACCOUNT_SNAPSHOT_FUTURE",
+                "detail": (
+                    f"snapshot as_of {src.get('as_of')} post-dates the "
+                    f"decision cutoff {iso(decision_cutoff)}"
+                ),
+            })
+        # security/listing/venue three-key conflict between the bound
+        # snapshot's security_identity and the effective identity -> named
+        # rejection.  The snapshot's declared identity must agree with the
+        # security_id its holdings/pending actually carry.
+        s_ident = src.get("security_identity") or {}
+        snap_sids = {
+            str(h.get("security_id") or h.get("security_code") or "")
+            for h in src.get("holdings") or ()
+        } | {
+            str(p.get("security_id") or p.get("security_code") or "")
+            for p in src.get("pending") or ()
+        }
+        snap_sids.discard("")
+        declared_sid = str(s_ident.get("security_id") or "")
+        if (declared_sid and snap_sids
+                and snap_sids != {declared_sid}
+                and len(snap_sids & ({declared_sid} if declared_sid else set())) == 0):
+            account_binding["rejections"].append({
+                "reason_code": "ACCOUNT_IDENTITY_KEY_CONFLICT",
+                "detail": (
+                    f"snapshot security_identity security_id {declared_sid} "
+                    f"does not match the held/pending security_ids "
+                    f"{sorted(snap_sids)}"
+                ),
+            })
+        # Bind-completion path identity (audit R4 seg-B binding-completion):
+        # the FINAL path.stat happens only now - AFTER the single in-memory
+        # bytes were hashed and decoded, the account/scenario/as_of fields
+        # were projected, the generation receipt was re-hashed and the
+        # three-key identity was checked, but BEFORE the account facts are
+        # committed.  A path replaced or rewritten in ANY of those binding
+        # stages (decode, receipt verification, identity checks) is a named
+        # ACCOUNT_SNAPSHOT_PATH_CHANGED refusal here.  The three identity
+        # signatures (pre-read fstat, post-read fstat, bind-completion
+        # path.stat) and the real read/hash evidence are recorded on the
+        # binding receipt, not just held in locals.
+        if snap_path and snap_sha and snap_bytes is not None:
+            _final_sig = None
+            try:
+                _final_sig = _stat_sig(os.stat(snap_path))
+            except Exception as exc:  # noqa: BLE001
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_SNAPSHOT_PATH_CHANGED",
+                    "detail": (
+                        "account snapshot path disappeared inside the "
+                        f"binding window: {type(exc).__name__}: {exc}"),
+                })
+            _fd_diff = [k for k in _STAT_KEYS
+                        if _pre_sig is not None
+                        and _post_sig is not None
+                        and _pre_sig[k] != _post_sig[k]]
+            _path_diff = [k for k in _STAT_KEYS
+                          if _pre_sig is not None
+                          and _final_sig is not None
+                          and _pre_sig[k] != _final_sig[k]]
+            # Persist the three identity signatures + read/hash evidence on
+            # the binding receipt so the refusal is auditable, not local-only.
+            account_binding["path_identity"] = {
+                "stat_fields": list(_STAT_KEYS),
+                "pre_read_fstat": _pre_sig,
+                "post_read_fstat": _post_sig,
+                "bind_completion_path_stat": _final_sig,
+                "fd_drift_fields": _fd_diff,
+                "path_drift_fields": _path_diff,
+                "read_bytes_sha256": account_binding.get(
+                    "actual_snapshot_sha256"),
+                "declared_sha256": snap_sha,
+            }
+            if _fd_diff or _path_diff:
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_SNAPSHOT_PATH_CHANGED",
+                    "detail": (
+                        "account snapshot path changed inside the "
+                        "binding window (fd-drift fields "
+                        f"{_fd_diff or '[]'}, path-drift fields "
+                        f"{_path_diff or '[]'}); verified bytes are the "
+                        "first read only"),
+                })
+        # Use the snapshot's own holdings/pending for the projection when
+        # it supplies them; a rejected snapshot contributes NO account
+        # facts (the named rejection stands instead).
+        if not account_binding["rejections"]:
+            holdings = tuple(src.get("holdings") or ())
+            pending = tuple(src.get("pending") or ())
+        else:
+            holdings = ()
+            pending = ()
     holdings_by_sid = {}
     for h in holdings or ():
         hsid = str(h.get("security_id") or h.get("security_code") or "")
@@ -439,8 +996,29 @@ def read_history(
         psid = str(pd.get("security_id") or pd.get("security_code") or "")
         if psid:
             pending_by_sid.setdefault(psid, []).append(pd)
+    # Formal shared-dependency coverage (audit R4 seg-A closeout pass 2):
+    # judge a needed session's price supply by whether a QUALIFIED row
+    # actually survives for the security that needs it - not by whether a
+    # declared member exists.  A session whose only source is channel-
+    # unknown / late / hash-bad and leaves no qualified bar is a gap; a
+    # session covered by an independent qualified backup is supplied.  The
+    # gap is isolated to the securities whose session actually lacks a
+    # qualified row (a single-security gap stays local) while a session
+    # whose qualified source covers the whole needed pool blocks the day.
+    _sec_session_has_rows = {}   # (security_id, session_iso) -> had source rows
+    _sec_session_qualified = {}  # (security_id, session_iso) -> qualified bar survived
+    _member_session_sids = {}    # (member_key, session_iso) -> securities it supplies
+    # Row-level post-admission coverage (audit R4 seg-A final-qualified-
+    # coverage closeout): the shared-scope decision must see a session whose
+    # rows all FAILED row PIT/channel gates even though the member itself
+    # READ and was channel-admitted.  Record, per (member_key, session_iso),
+    # the securities whose rows that member physically surfaced and then had
+    # rejected, with the actual rejection reasons, so the coverage matrix can
+    # name the member that left a needed session without a qualified bar.
+    _member_session_row_gaps = {}  # (member_key, session_iso) -> {"securities":set,"reasons":set,"rows":[]}
     for ident in identities:
         raw_revisions = [
+
             bars_by_listing[ident.listing_id][s]
             for s in sessions_sorted
             if ident.listing_id in bars_by_listing and s in bars_by_listing[ident.listing_id]
@@ -453,6 +1031,7 @@ def read_history(
         # preserved verbatim, never silently overwritten.
         sec_bars = []
         bar_revision_chain = {}
+        formal_ineligible_sessions = []
         for sess_revs in raw_revisions:
             ordered = sorted(
                 sess_revs,
@@ -467,21 +1046,172 @@ def read_history(
             # in the chain verbatim but does not win the select; a row
             # whose source clock post-dates the cutoff is recorded in the
             # chain and flagged late, never selected for a formal read.
-            eligible = [
-                b for b in ordered
-                if (parse_ts(b.get("knowledge_from")) is None
-                    or parse_ts(b.get("knowledge_from")) <= decision_cutoff)
-                and (parse_ts(b.get("knowledge_to")) is None
-                    or parse_ts(b.get("knowledge_to")) > decision_cutoff)
-            ]
-            chosen = (eligible or ordered)[-1]
-            chosen["late_for_cutoff"] = bool(
-                parse_ts(chosen.get("knowledge_from"))
-                and parse_ts(chosen.get("knowledge_from")) > decision_cutoff
-            )
-            sec_bars.append(chosen)
-            if len(ordered) > 1:
-                bar_revision_chain[chosen["session_date"]] = [
+            def _row_eligible(b):
+                kf = parse_ts(b.get("knowledge_from"))
+                # Null row-knowledge is REJECTED under a formal read -
+                # it cannot be proven known by the cutoff.
+                if formal and kf is None:
+                    return False
+                if kf is not None and kf > decision_cutoff:
+                    return False
+                kt = parse_ts(b.get("knowledge_to"))
+                if kt is not None and kt <= decision_cutoff:
+                    return False
+                if formal and b.get("member_key") in formal_inadmissible_keys:
+                    return False
+                return True
+            eligible = [b for b in ordered if _row_eligible(b)]
+            # Formal read (audit R4 second segment): when NO revision is
+            # eligible - every row is late, withdrawn or channel-ineligible
+            # - the reader emits NO selected bar for this session.  The
+            # rows stay on the auditable revision/rejection chain verbatim
+            # and the affected dependency is named; a production read must
+            # never fall back to an ineligible row merely because it is the
+            # physical last one.  Under a non-formal read the last-known
+            # row is still exposed for the H1 shape.
+            if not eligible and formal:
+                chosen = None
+                # Rows exist but none is eligible - the session's price
+                # supply failed PIT/channel admission.  Name the actual
+                # rejected clocks so the named block carries real instants.
+                formal_ineligible_sessions.append({
+                    "session_date": ordered[-1]["session_date"],
+                    "rejected_rows": [
+                        {
+                            "source_revision": b.get("source_revision"),
+                            "knowledge_from": b.get("knowledge_from"),
+                            "knowledge_to": b.get("knowledge_to"),
+                            "member_key": b.get("member_key"),
+                        }
+                        for b in ordered
+                    ],
+                })
+            else:
+                # Same-clock equivalent replicas collapse to one before
+                # conflict detection (audit R4 segment A closeout): among
+                # eligible rows sharing the LATEST knowledge clock, rows
+                # carrying the same value are one business fact - fold
+                # them to the newest source_revision, keeping the original
+                # row sources.  Two different values at the SAME latest
+                # clock are a genuine ambiguity: record it per security
+                # and session for BOTH physical orders, emit NO chosen
+                # bar - never pick by physical order.
+                chosen = None
+                if eligible:
+                    latest_kf = max(
+                        parse_ts(b.get("knowledge_from"))
+                        for b in eligible)
+                    same_clock = [
+                        b for b in eligible
+                        if parse_ts(b.get("knowledge_from")) == latest_kf]
+                    # Equivalent replicas = the SAME consumed bar fact at the
+                    # same clock, not merely the same close.  Two rows sharing
+                    # close but differing on open/high/volume are a genuine
+                    # conflict - never picked by physical order (audit R4
+                    # seg-A closeout second pass).
+                    def _bar_fact(b, _keys=BAR_FACT_KEYS):
+                        return tuple(b.get(k) for k in _keys)
+                    facts = {_bar_fact(b) for b in same_clock}
+                    if len(facts) <= 1:
+                        # Collapse equivalent replicas: keep the newest
+                        # source_revision at the same clock.
+                        chosen = same_clock[-1]
+                    else:
+                        chosen = None
+                        formal_ineligible_sessions.append({
+                            "session_date": ordered[-1]["session_date"],
+                            "ambiguity": "same_knowledge_conflicting_values",
+                            "conflicting_values": sorted(
+                                str(b.get("close_price"))
+                                for b in same_clock),
+                            "conflicting_facts": [
+                                {k: b.get(k) for k in (
+                                    "open_price", "high_price", "low_price",
+                                    "close_price", "volume", "amount")}
+                                for b in same_clock],
+                            "rejected_rows": [
+                                {
+                                    "source_revision": b.get("source_revision"),
+                                    "knowledge_from": b.get("knowledge_from"),
+                                    "close_price": b.get("close_price"),
+                                    "member_key": b.get("member_key"),
+                                }
+                                for b in same_clock
+                            ],
+                        })
+                elif not formal and ordered:
+                    chosen = ordered[-1]
+            if chosen is not None:
+                chosen["late_for_cutoff"] = bool(
+                    parse_ts(chosen.get("knowledge_from"))
+                    and parse_ts(chosen.get("knowledge_from")) > decision_cutoff
+                )
+                sec_bars.append(chosen)
+            # Coverage bookkeeping for the shared-scope decision: a session
+            # that produced a chosen bar is supplied for THIS security; a
+            # session whose whole revision set was rejected is a gap for it.
+            _sess_iso = ordered[-1].get("session_date")
+            _sec_session_has_rows[(ident.security_id, _sess_iso)] = True
+            # Which securities each member physically supplies on the
+            # session - a member covering ONE security scopes its gap to
+            # that security; a member covering the whole pool scopes it to
+            # the session (audit R4 segment A closeout: a single-security
+            # gap stays local, a pool-wide supply failure is shared).
+            for _b in ordered:
+                _mk = _b.get("member_key")
+                if _mk:
+                    _member_session_sids.setdefault(
+                        (_mk, _sess_iso), set()).add(ident.security_id)
+            # A qualified bar for this session is one the formal read could
+            # actually select - its member is channel/knowledge-admissible,
+            # not merely present.  A bar carried only by an inadmissible
+            # member does NOT count as qualified supply for the session.
+            _sec_session_qualified[(ident.security_id, _sess_iso)] = (
+                chosen is not None
+                and chosen.get("member_key") not in formal_inadmissible_keys)
+            # Final qualified coverage (audit R4 seg-A final-qualified-
+            # coverage closeout): when THIS security's session ended with NO
+            # selected bar under a formal read, record every member that
+            # physically surfaced a row for the session together with the
+            # actual row-rejection reasons, so the coverage matrix can bind
+            # the gap to the member that left the session starved - the
+            # member READ and was channel-admitted, so it never reached the
+            # physical/channel failure ledger on its own.
+            if formal and chosen is None:
+                for _b in ordered:
+                    _mk = _b.get("member_key")
+                    if not _mk:
+                        continue
+                    _rg = _member_session_row_gaps.setdefault(
+                        (_mk, _sess_iso),
+                        {"securities": set(), "reasons": set(), "rows": []})
+                    _rg["securities"].add(ident.security_id)
+                    _bkf = parse_ts(_b.get("knowledge_from"))
+                    _bkt = parse_ts(_b.get("knowledge_to"))
+                    if _mk in formal_inadmissible_keys:
+                        _rg["reasons"].add("CHANNEL_INADMISSIBLE")
+                    elif _bkf is None:
+                        _rg["reasons"].add("NULL_KNOWLEDGE_CLOCK")
+                    elif _bkf > decision_cutoff:
+                        _rg["reasons"].add("LATE_FOR_CUTOFF")
+                    elif _bkt is not None and _bkt <= decision_cutoff:
+                        _rg["reasons"].add("WITHDRAWN_BEFORE_CUTOFF")
+                    else:
+                        # Eligible individually but lost the same-clock
+                        # ambiguity - the conflicting revision kept it out.
+                        _rg["reasons"].add("SAME_KNOWLEDGE_CONFLICT")
+                    _rg["rows"].append({
+                        "security_id": ident.security_id,
+                        "source_revision": _b.get("source_revision"),
+                        "knowledge_from": _b.get("knowledge_from"),
+                        "knowledge_to": _b.get("knowledge_to"),
+                    })
+            # The revision/rejection chain keeps EVERY physical row for
+            # the session (late, withdrawn, channel-ineligible), flagged -
+            # even when no row was selected for this formal read.
+            if len(ordered) > 1 or (formal and not eligible):
+                chain_date = (chosen or ordered[-1])["session_date"]
+                bar_revision_chain[chain_date] = [
                     {
                         "source_record_id": b.get("source_record_id"),
                         "source_revision": b.get("source_revision"),
@@ -553,7 +1283,21 @@ def read_history(
         # empty", never a silent gap.
         dep_reasons = {}
         if not sec_bars:
-            dep_reasons["bars"] = "no_qualified_1d_rows"
+            # Formal read (audit R4 second segment): distinguish "no source
+            # rows" from "rows present but every revision ineligible" - the
+            # latter keeps the actual rejected clocks on the dependency so
+            # the named block is auditable, not a generic empty.
+            if formal_ineligible_sessions:
+                dep_reasons["bars"] = "no_qualified_formal_revision"
+                dep_reasons["bar_rejections"] = formal_ineligible_sessions
+            else:
+                dep_reasons["bars"] = "no_qualified_1d_rows"
+        elif formal_ineligible_sessions:
+            # A formal read with SOME eligible sessions still names each
+            # session whose whole revision set was ineligible - the
+            # affected dependency (that session's price) is named with the
+            # real rejected clocks, never silently dropped.
+            dep_reasons["bar_rejections"] = formal_ineligible_sessions
         # P1 factor-PIT ledger missing or failed sha (audit R4 item 2a):
         # actions that consume the factor evidence must see a named
         # block, never a silently-empty exception list on a security
@@ -574,24 +1318,49 @@ def read_history(
             dep_reasons["price_limit_regime"] = "no_price_limit_regime_rows"
         if not any(k[0] == ident.listing_id for k in exc_by_listing):
             dep_reasons["quality_exceptions"] = "no_exception_rows"
-        # Account facts for this security (audit 749-04): held quantity and
-        # typed pending travel on the wire so the rule can issue an
-        # independent hold_alert / qualified exit - never left to coverage
-        # counters alone.
+        # Account facts for this security (audit 749-04 / P11 segment-B
+        # contract): held / typed-pending facts travel as SIBLING
+        # top-level fields on securities[] - held_membership,
+        # held_quantity, held_unavailable_reason, pending_kind,
+        # pending_quantity and the per-record pending_records list.  The
+        # nested "account" block keeps the raw snapshot detail verbatim
+        # for forensics; the rule consumes the flat fields so a real
+        # account issues a hold_alert / qualified exit and never
+        # collapses back into empty-account semantics.
         hold = holdings_by_sid.get(ident.security_id)
         pends = pending_by_sid.get(ident.security_id) or []
+        # Each in-flight order keeps its own order key, kind, remaining
+        # quantity and source receipt - never summed, never collapsed to
+        # a last record.  An unsupported kind (e.g. a sell order whose
+        # enum is sell/5) keeps its original kind string and direction.
+        pending_records = [
+            {
+                "order_id": p.get("order_id") or p.get("receipt_id"),
+                "pending_kind": p.get("pending_kind") or p.get("kind"),
+                "pending_quantity": p.get("pending_quantity") or p.get("quantity"),
+                "receipt_id": p.get("receipt_id"),
+                "source": p.get("source"),
+            }
+            for p in pends
+        ]
+        held_qty = hold.get("quantity") if hold else None
+        held_unavailable_reason = None
+        if hold is not None and held_qty is None:
+            # Quantity unknown: keep the original null and name why the
+            # held fact cannot be projected - never fabricate a number.
+            held_unavailable_reason = "held_quantity_unavailable"
+        if hold is not None and hold.get("history_unavailable"):
+            # Missing held history: a named gap kept verbatim - the rule
+            # keeps the held review (hold_alert) rather than a silent pass.
+            held_unavailable_reason = (
+                (held_unavailable_reason + ";" if held_unavailable_reason else "")
+                + "held_history_unavailable")
         account = {
             "account_role": (
                 "held" if hold is not None else ("pending" if pends else "candidate")
             ),
-            "held_quantity": (hold.get("quantity") if hold else None),
-            "pending": [
-                {
-                    "pending_kind": p.get("pending_kind") or p.get("kind"),
-                    "pending_quantity": p.get("pending_quantity") or p.get("quantity"),
-                }
-                for p in pends
-            ],
+            "held_quantity": held_qty,
+            "pending": pending_records,
         }
         securities.append(
             env_mod.security_entry(
@@ -602,6 +1371,20 @@ def read_history(
                 bar_revisions=bar_revision_chain,
                 dependency_reasons=dep_reasons,
                 account=account,
+                held_membership=hold is not None,
+                held_quantity=held_qty,
+                held_unavailable_reason=held_unavailable_reason,
+                pending_kind=(
+                    pending_records[0]["pending_kind"]
+                    if len(pending_records) == 1 else (
+                        "multiple" if pending_records else None
+                    )
+                ),
+                pending_quantity=(
+                    pending_records[0]["pending_quantity"]
+                    if len(pending_records) == 1 else None
+                ),
+                pending_records=pending_records,
             )
         )
 
@@ -614,8 +1397,50 @@ def read_history(
     # order, never dropped silently.
     pool_sids = {i.security_id for i in identities}
     extra_account_sids = sorted(
-        set(holdings_by_sid) | set(pending_by_sid) - pool_sids
+        (set(holdings_by_sid) | set(pending_by_sid)) - pool_sids
     )
+    # Three-key alignment (audit 749 R4 segment B): the bound snapshot's
+    # declared security_identity is verified against the EFFECTIVE pool
+    # identity actually selected - a snapshot whose declared
+    # security_id / listing_id / venue_id disagrees with the resolved
+    # pool member is a named rejection, never silently accepted.
+    if account_snapshot is not None and not account_binding["rejections"]:
+        s_ident = account_snapshot.get("security_identity") or {}
+        want_sid = str(s_ident.get("security_id") or "")
+        want_lid = str(s_ident.get("listing_id") or "")
+        want_ven = str(s_ident.get("venue_id") or "")
+        if want_sid:
+            pool_ident = next(
+                (i for i in identities if i.security_id == want_sid), None)
+            if pool_ident is not None:
+                mism = []
+                if want_lid and pool_ident.listing_id != want_lid:
+                    mism.append(f"listing_id {pool_ident.listing_id} != {want_lid}")
+                if want_ven and pool_ident.venue_id != want_ven:
+                    mism.append(f"venue_id {pool_ident.venue_id} != {want_ven}")
+                account_binding["identity_alignment"] = {
+                    "security_id": want_sid,
+                    "in_pool": True,
+                    "aligned": not mism,
+                    "conflicts": mism,
+                }
+                if mism:
+                    account_binding["rejections"].append({
+                        "reason_code": "ACCOUNT_IDENTITY_KEY_CONFLICT",
+                        "detail": "; ".join(mism),
+                    })
+                    holdings = ()
+                    pending = ()
+                    holdings_by_sid = {}
+                    pending_by_sid = {}
+                    extra_account_sids = []
+            else:
+                account_binding["identity_alignment"] = {
+                    "security_id": want_sid,
+                    "in_pool": False,
+                    "aligned": False,
+                    "conflicts": ["security_id not in resolved pool"],
+                }
     for sid in extra_account_sids:
         if sid in pool_sids:
             continue
@@ -637,22 +1462,61 @@ def read_history(
             source_evidence_digest="",
             late_visible=False,
         )
+        # Per-record in-flight orders keep their original order key, kind,
+        # quantity and source receipt verbatim - a sell/5 order keeps its
+        # own direction and enum, never rewritten to a supported buy.
+        op_pending_records = [
+            {
+                "order_id": p.get("order_id") or p.get("receipt_id"),
+                "pending_kind": p.get("pending_kind") or p.get("kind"),
+                "pending_quantity": p.get("pending_quantity") or p.get("quantity"),
+                "receipt_id": p.get("receipt_id"),
+                "source": p.get("source"),
+            }
+            for p in pends
+        ]
+        op_held_qty = hold.get("quantity") if hold else None
+        op_held_unavailable = None
+        if hold is not None and op_held_qty is None:
+            op_held_unavailable = "held_quantity_unavailable"
+        if hold is not None and hold.get("history_unavailable"):
+            op_held_unavailable = (
+                (op_held_unavailable + ";" if op_held_unavailable else "")
+                + "held_history_unavailable")
         securities.append(
             env_mod.security_entry(
                 pseudo, [], [], [], [], {}, {},
                 bar_revisions={},
-                dependency_reasons={"identity": "out_of_pool_account_member"},
+                # P11 fixed contract (audit 749 R4 segment B): an
+                # out-of-pool held/pending member carries its account facts
+                # on a NAMED risk branch - "held_risk" for a holding with
+                # no listing anchor, "pending_risk" for an in-flight order
+                # - never a fabricated listing_id (kept empty/UNKNOWN).
+                dependency_reasons={
+                    "identity": "out_of_pool_account_member",
+                    "account_branch": (
+                        "held_risk" if hold is not None else "pending_risk"
+                    ),
+                },
                 account={
                     "account_role": ("held" if hold is not None else "pending"),
-                    "held_quantity": (hold.get("quantity") if hold else None),
-                    "pending": [
-                        {
-                            "pending_kind": p.get("pending_kind") or p.get("kind"),
-                            "pending_quantity": p.get("pending_quantity") or p.get("quantity"),
-                        }
-                        for p in pends
-                    ],
+                    "held_quantity": op_held_qty,
+                    "pending": op_pending_records,
                 },
+                held_membership=hold is not None,
+                held_quantity=op_held_qty,
+                held_unavailable_reason=op_held_unavailable,
+                pending_kind=(
+                    op_pending_records[0]["pending_kind"]
+                    if len(op_pending_records) == 1 else (
+                        "multiple" if op_pending_records else None
+                    )
+                ),
+                pending_quantity=(
+                    op_pending_records[0]["pending_quantity"]
+                    if len(op_pending_records) == 1 else None
+                ),
+                pending_records=op_pending_records,
             )
         )
 
@@ -791,10 +1655,60 @@ def read_history(
         "limits": lim_cov,
         "p1_exceptions": p1_exc_cov,
         "security_count": len(securities),
+        "account_binding": account_binding,
+        # P11 segment-B contract row 4: account members that have only an
+        # account key and no valid listing identity are kept in a
+        # VERSIONED unresolved-detail list - each record carries the raw
+        # account key, role, quantity, the named missing reason and its
+        # source, never a fabricated listing_id or a rewritten enum.
+        "unresolved_account_details": [
+            {
+                "security_id": s["identity"]["security_id"],
+                "account_role": s["account"]["account_role"],
+                "held_quantity": s.get("held_quantity"),
+                "held_unavailable_reason": s.get("held_unavailable_reason"),
+                "pending_records": s.get("pending_records") or [],
+                "missing_reason": s["dependency_reasons"]["identity"],
+                "account_branch": s["dependency_reasons"]["account_branch"],
+                "source": "account_snapshot",
+            }
+            for s in securities
+            if (s.get("dependency_reasons") or {}).get("identity")
+            == "out_of_pool_account_member"
+        ],
         "bar_sessions": BAR_SESSIONS,
         "listing_proof_sessions": LISTING_PROOF_SESSIONS,
         "late_visible_members": late_visible_members,
+        "named_input_gaps": [
+            {"member_key": e["package_key"], "member_id": e["member_id"],
+             "package_id": e["package_id"], "gap": e["named_input_gap"],
+             "dependency_type": e.get("dependency_type"),
+             "shared_hard_dependency": bool(e.get("shared_hard_dependency"))}
+            for e in source_member_entries if e.get("named_input_gap")
+        ] if (purpose == FORMAL_DAILY_UPDATE) else [],
         "member_consumption": member_consumption,
+        "formal_not_read_dependency_set": (
+            # P10 ruling (audit 749 R4 second segment): the registered-but-
+            # not-read members for THIS T under a formal update, each
+            # carrying its P10 dependency_type so the named-gap
+            # dispositions bind to the actual selected/excluded dependency
+            # set.  Only members carrying a named input gap count - the
+            # sealed-October base and other-day partitions are out of
+            # scope.  Only THIS T's package members (date_from == the
+            # market_date) - the other-day formal gaps are not in scope.
+            [
+                {
+                    "member_key": e["package_key"],
+                    "member_id": e["member_id"],
+                    "package_id": e["package_id"],
+                    "dependency_type": e.get("dependency_type"),
+                    "gap": e.get("named_input_gap"),
+                }
+                for e in source_member_entries
+                if e.get("named_input_gap") and e["package_key"] in not_read
+                and e.get("date_from") == market_date.isoformat()
+            ]
+        ) if (purpose == FORMAL_DAILY_UPDATE) else [],
         "note": (
             "Corporate-action/exception completeness for the covered window is "
             "UNKNOWN (0 securities proven; 2026-11 deltas SOURCE_NOT_REFRESHED). "
@@ -833,7 +1747,27 @@ def read_history(
             "disposition": "block_new_entries",
         }
     coverage["manifest_chain"] = manifest_chain
-    chain_faults = [c for c in manifest_chain if c.get("status") not in ("MATCH", "NO_PATH", "UNAVAILABLE")]
+    # Formal update (audit R4 second segment): the four external frozen
+    # links (Base manifest, DATES index, Standard descriptor, Core
+    # manifest) must each be present, readable and sha-matched BEFORE
+    # any member is opened.  A missing path (NO_PATH), a missing declared
+    # sha (MISSING_DECLARED_SHA256), an unreadable link (UNREADABLE) or a
+    # wrong sha (SHA_MISMATCH) is a named whole-day fault - never a MATCH.
+    chain_faults = [
+        c for c in manifest_chain
+        if c.get("status") in ("NO_PATH", "MISSING_DECLARED_SHA256",
+                               "NON_OBJECT_DESCRIPTOR", "UNREADABLE",
+                               "SHA_MISMATCH", "CONTENT_NON_OBJECT",
+                               "CONTENT_MALFORMED_JSON",
+                               "CONTENT_MISSING_IDENTITY_FIELD",
+                               "ASSOCIATED_IDENTITY_MISMATCH",
+                               "CONTENT_IDENTITY_VALUE_INVALID",
+                               "CHAIN_ASSOCIATION_MISMATCH")
+    ]
+    chain_faults = [
+        c for c in chain_faults
+        if _chain_fault_in_window(c, sessions_needed, market_date)
+    ]
     if chain_faults and day_block is None:
         day_block = {
             "reason_code": "SUMMARY_CHAIN_FAULT",
@@ -845,6 +1779,522 @@ def read_history(
             "failed_members": [c.get("artifact") for c in chain_faults],
             "disposition": "block_new_entries",
         }
+    # Formal-update shared-hard-dependency gap (audit R4 second
+    # segment): a member with NO proven channel/knowledge clock that is
+    # a shared hard dependency (venue calendar, shared listing identity,
+    # a needed price source, the fixed summary chain) blocks the whole
+    # day for new entries.  A single-security or single-action gap is
+    # isolated to its own dependency so a qualified neighbour keeps
+    # working - those are named on coverage.named_input_gaps, not here.
+    if day_block is None and purpose == FORMAL_DAILY_UPDATE:
+        # Judge a needed session's shared price supply by whether a
+        # QUALIFIED bar actually survived for the security that needs it,
+        # not by whether a declared member exists (audit R4 seg-A closeout
+        # pass 2).  A session covered by an independent qualified backup is
+        # supplied even when another source for it is channel-unknown or
+        # late; a single-security gap stays local; a session whose only
+        # supply leaves some securities without a qualified bar blocks the
+        # day only for the securities it actually starves.
+        # Unified gap ledger (audit R4 seg-A unified closeout): EVERY
+        # admission failure folds into one per-member ledger - a declared
+        # channel/knowledge gap (named_input_gap), a formal channel-
+        # admission rejection (late_for_cutoff / rejected_no_channel_proof)
+        # AND a member's own physical read/verify failure (sha mismatch,
+        # unreadable, corrupt parquet) are all recorded on the same entry
+        # before the coverage matrix is judged.  A physical read failure is
+        # a supply gap too: the member's rows never reach the candidate
+        # set, so a session whose ONLY registered supplier failed its sha
+        # is starved exactly like a channel-unknown one.
+        _member_read_failures = {}
+        for _sec_reads in (bar_cov, cal_cov, list_cov, uni_cov):
+            for _r in (_sec_reads or {}).get("reads") or []:
+                _st = _r.get("status")
+                if _st in ("SHA_MISMATCH", "UNREADABLE") and _r.get("member_key"):
+                    _member_read_failures[_r["member_key"]] = _st
+        needed_day_set = {
+            (d.isoformat() if hasattr(d, "isoformat") else str(d))
+            for d in sessions_needed}
+        for e in source_member_entries:
+            _mk = e.get("package_key") or e.get("member_key")
+            if _mk not in _member_read_failures or e.get("shared_hard_dependency"):
+                continue
+            _df = e.get("date_from")
+            _df_iso = (_df.isoformat() if hasattr(_df, "isoformat") else str(_df))
+            _mid_first = str(e.get("member_id") or "")
+            if _df_iso not in needed_day_set:
+                # A monthly Base partition member carries no pinned day
+                # (date_from is None), so the day-membership gate below can
+                # never admit it.  It is still the pool's registered aggregate
+                # supply for every in-month needed session; when it physically
+                # fails (sha mismatch / unreadable) the in-month sessions are
+                # starved exactly like a channel-unknown day member.  Promote
+                # it as a shared price dependency keyed by its partition month
+                # so the per-session required-cells attribution below can place
+                # its failure on the real session intersection instead of
+                # dropping it off the ledger (audit R4 seg-A required-cells
+                # successor closeout).
+                if not ("dwd_security_bar" in _mid_first
+                        and "dwd_security_valuation" not in _mid_first):
+                    continue
+                _ymf = re.search(
+                    r"observation_start_year=(\d{4})/"
+                    r"observation_start_month=(\d+)", _mid_first)
+                if not _ymf:
+                    continue
+                _in_window = False
+                for _nd in needed_day_set:
+                    try:
+                        _yy, _mm, _dd = str(_nd).split("-")
+                    except ValueError:
+                        continue
+                    if (int(_yy), int(_mm)) == (
+                            int(_ymf.group(1)), int(_ymf.group(2))):
+                        _in_window = True
+                        break
+                if not _in_window:
+                    continue
+                e["dependency_type"] = "SHARED_T_PRICE"
+                e["shared_hard_dependency"] = True
+                e["base_partition_month"] = (
+                    f"{_ymf.group(1)}-{int(_ymf.group(2)):02d}")
+                e.setdefault("named_input_gap",
+                             "MEMBER_" + _member_read_failures[_mk])
+                continue
+            # Only a shared T / prior-session PRICE member whose own day is
+            # one of THIS read's needed sessions can starve the pool.  The
+            # dependency class is derived from the member id (the same rule
+            # the registration loop applies) because a channel-admitted yet
+            # physically-failed member never earned a stored dependency_type.
+            # A failed member pinned for an out-of-window day is kept on the
+            # named-gap receipt but must not block this T.
+            _mid = str(e.get("member_id") or "")
+            if _df_iso not in needed_day_set:
+                continue
+            if ("dwd_security_bar" in _mid
+                    and "dwd_security_valuation" not in _mid):
+                e["dependency_type"] = "SHARED_T_PRICE"
+                e["shared_hard_dependency"] = True
+                e["gap_session_day"] = _df
+                e.setdefault("named_input_gap",
+                             "MEMBER_" + _member_read_failures[_mk])
+        _gap_members = [
+            e for e in source_member_entries
+            if e.get("shared_hard_dependency")
+            and (e.get("named_input_gap")
+                 or e.get("formal_admission") in ("late_for_cutoff",
+                                                 "rejected_no_channel_proof")
+                 or (e.get("package_key") or e.get("member_key"))
+                 in _member_read_failures)
+        ]
+        # ONE judgement: the post-admission qualified-coverage matrix -
+        # needed sessions x active-pool securities.  After every admitted
+        # source (qualified backups included) ran the full gate chain, a
+        # session is starved for exactly the securities that ended with NO
+        # qualified bar.  A whole-day block fires ONLY when the session has
+        # NO common coverage left (every pool security starved) - the cause
+        # (channel UNKNOWN, proven late, member sha mismatch, unreadable) is
+        # kept on the ledger, not used to widen the radius.  A session that
+        # kept ANY qualified bar stays READ with the genuinely starved
+        # securities isolated to their own gap (a partial backup never
+        # balloons into whole_day, a shared pool-wide collapse is never
+        # mistaken for an isolated gap).
+        _pool_sids = {ident.security_id for ident in identities}
+        _starved_set = set()
+        _failed_days = []
+        _shared_failed = []          # members whose gap is pool-wide
+        _local_gaps = []             # (member, [starved security ids])
+        # Final qualified coverage (audit R4 seg-A final-qualified-coverage
+        # closeout): a member that READ and was channel-admitted still fails
+        # the session's real supply when EVERY row it surfaced lost its row
+        # PIT gate - null knowledge, a late source clock, a withdrawal before
+        # the cutoff, or the latest same-clock conflict.  Those members never
+        # reached _gap_members because they carry no named_input_gap and no
+        # physical read failure.  Fold each (member, session) whose rows left
+        # pool securities starved into the SAME unified ledger as a supply
+        # gap, keyed on the session it actually serves - the radius judgement
+        # below then decides shared vs isolated exactly as a channel gap.
+        _gap_member_keys = {
+            (e.get("package_key") or e.get("member_key"),
+             (e.get("gap_session_day").isoformat()
+              if hasattr(e.get("gap_session_day"), "isoformat")
+              else str(e.get("gap_session_day"))))
+            for e in _gap_members
+        }
+        _entries_by_key = {
+            (e.get("package_key") or e.get("member_key")): e
+            for e in source_member_entries
+        }
+        # Members already on the unified ledger (channel gap, physical read
+        # failure, late admission) already carry the session's supply gap on
+        # their own gap_session_day - do not inject a second row-level entry
+        # for the same member.  The cell matrix below only names members
+        # whose starved cells have NO ledger entry yet.
+        _gap_member_ids = {
+            e.get("package_key") or e.get("member_key") for e in _gap_members
+        }
+        # Required-cells coverage (audit R4 seg-A final-qualified-coverage
+        # fix1): the final matrix starts from the actual needed
+        # sessions x active-pool identities, not from a member that already
+        # carries a failed row or gap flag.  A member that READ and was
+        # channel-admitted but surfaced NO usable rows for a needed session
+        # (an empty table, or only the other security's rows) still starves
+        # the cell it was registered to supply.  Attribute each starved
+        # session to the member(s) that were registered for it: a Daily
+        # member pinned for that day, or a window member that physically
+        # surfaced rows for that session, plus every row-gap ledger member
+        # recorded above.  The radius judgement below then decides shared vs
+        # isolated exactly as a channel gap - a pool-wide collapse names
+        # SHARED_INPUT_GAP, a partial one isolates the actually-starved
+        # securities.
+        _pool_sids0 = {ident.security_id for ident in identities}
+        # For each needed session compute the pool cells that ended with no
+        # qualified bar, then attribute them to the member(s) registered to
+        # supply them: the Daily member pinned for that exact session, a
+        # member that physically surfaced rows for a starved security there
+        # (row-PIT failures already recorded above), or - when a starved
+        # security had NO row at all - the in-window Base month member that
+        # was the pool's declared aggregate supply for the session.
+        for _sess_iso in sorted(needed_day_set):
+            _starved_here = {
+                sid for sid in _pool_sids0
+                if not _sec_session_qualified.get((sid, _sess_iso))
+            }
+            if not _starved_here:
+                continue
+            _attributed = []
+            for e in source_member_entries:
+                _mk = e.get("package_key") or e.get("member_key")
+                _mid_l = str(e.get("member_id") or "")
+                if not ("dwd_security_bar" in _mid_l
+                        and "dwd_security_valuation" not in _mid_l):
+                    continue
+                if (e.get("named_input_gap")
+                        or e.get("formal_admission") in (
+                            "late_for_cutoff", "rejected_no_channel_proof")
+                        or _mk in _member_read_failures
+                        or _mk in _gap_member_ids):
+                    continue
+                _df = e.get("date_from")
+                _df_iso = (_df.isoformat()
+                           if hasattr(_df, "isoformat") else str(_df))
+                _declared_sids = _member_session_sids.get(
+                    (_mk, _sess_iso)) or set()
+                _is_pinned_daily = (_df_iso == _sess_iso)
+                _supplies_starved = bool(_starved_here & _declared_sids)
+                if _is_pinned_daily or _supplies_starved:
+                    _attributed.append(e)
+            if not _attributed and not any(
+                    _sec_session_has_rows.get((sid, _sess_iso))
+                    for sid in _starved_here):
+                # No Daily pinned, no member surfaced a starved row, and the
+                # starved securities carried NO physical row on the session
+                # at all - fall back to the in-window Base month member(s)
+                # that were the declared aggregate supply for the session's
+                # month.  Starved cells that DID carry rows are already
+                # named by the row-gap ledger / channel member above.
+                for e in source_member_entries:
+                    _mk = e.get("package_key") or e.get("member_key")
+                    _mid_l = str(e.get("member_id") or "")
+                    if not ("dwd_security_bar" in _mid_l
+                            and "dwd_security_valuation" not in _mid_l):
+                        continue
+                    if (e.get("named_input_gap")
+                            or e.get("formal_admission") in (
+                                "late_for_cutoff",
+                                "rejected_no_channel_proof")
+                            or _mk in _member_read_failures
+                            or _mk in _gap_member_ids):
+                        continue
+                    _ym = re.search(
+                        r"observation_start_year=(\d{4})/"
+                        r"observation_start_month=(\d+)",
+                        _mid_l)
+                    if not _ym:
+                        continue
+                    try:
+                        _yy, _mm, _ = _sess_iso.split("-")
+                    except ValueError:
+                        continue
+                    if (int(_yy), int(_mm)) == (
+                            int(_ym.group(1)), int(_ym.group(2))):
+                        _attributed.append(e)
+            if not _attributed:
+                # Unregistered required-month supply (independent audit 749A
+                # 1bf71583 P1): the starved session has NO registered member to
+                # attribute - no pinned Daily, no member surfaced a row, and no
+                # in-window Base month partition member exists at all (the whole
+                # required month was never registered).  The empty/sha/unreadable
+                # controls still carry a registered member so they reach the
+                # fallback above; a missing month reaches NONE of these.
+                #
+                # The placeholder must fire ONLY when the session's month is
+                # genuinely unregistered - no Base month partition member and no
+                # pinned Daily member exists in the pinned map at all for it.
+                # A session whose month DOES have a registered member (even one
+                # that is channel-unknown, physically failed, or simply carried
+                # no row for this exact day) is already attributed to THAT real
+                # member by the ledger above; adding the placeholder there would
+                # mis-widen a real narrower gap into a fabricated pool collapse.
+                try:
+                    _yy, _mm, _ = _sess_iso.split("-")
+                    _missing_month = f"{_yy}-{int(_mm):02d}"
+                except (ValueError, IndexError):
+                    _missing_month = str(_sess_iso)
+                _month_registered = False
+                for _e in source_member_entries:
+                    _mid_chk = str(_e.get("member_id") or "")
+                    if ("dwd_security_bar" not in _mid_chk
+                            or "dwd_security_valuation" in _mid_chk):
+                        continue
+                    _df_c = _e.get("date_from")
+                    _df_c_iso = (_df_c.isoformat()
+                                 if hasattr(_df_c, "isoformat") else str(_df_c))
+                    if _df_c_iso == _sess_iso:
+                        # a pinned Daily member is registered for this session
+                        _month_registered = True
+                        break
+                    _ymc = re.search(
+                        r"observation_start_year=(\d{4})/"
+                        r"observation_start_month=(\d+)", _mid_chk)
+                    if _ymc and f"{_ymc.group(1)}-{int(_ymc.group(2)):02d}" == _missing_month:
+                        # a Base month partition member is registered for the month
+                        _month_registered = True
+                        break
+                if _month_registered:
+                    # the month has a real registered member - the starved cells
+                    # are that member's narrower gap, not an unregistered month.
+                    continue
+                _placeholder = {
+                    "member_key": None,
+                    "package_key": None,
+                    "member_id": (
+                        "unregistered-required-month:"
+                        + _missing_month),
+                    "dependency_type": "SHARED_T_PRICE",
+                    "shared_hard_dependency": True,
+                    "gap_session_day": _sess_iso,
+                    "named_input_gap": "MISSING_REQUIRED_MONTH_SUPPLY",
+                    "unregistered_supply": True,
+                    "missing_month": _missing_month,
+                    "starved_securities": sorted(_starved_here),
+                }
+                _gap_members.append(_placeholder)
+            for _e in _attributed:
+                _mk = _e.get("package_key") or _e.get("member_key")
+                _rg = _member_session_row_gaps.get((_mk, _sess_iso)) or {}
+                _inj = dict(_e)
+                _inj["dependency_type"] = "SHARED_T_PRICE"
+                _inj["shared_hard_dependency"] = True
+                _inj["gap_session_day"] = _sess_iso
+                _inj["named_input_gap"] = "NO_QUALIFIED_FORMAL_REVISION"
+                if _rg.get("reasons"):
+                    _inj["row_rejection_reasons"] = sorted(_rg["reasons"])
+                if _rg.get("rows"):
+                    _inj["row_rejected_rows"] = _rg["rows"]
+                _gap_members.append(_inj)
+        for e in _gap_members:
+            _gday = e.get("gap_session_day")
+            _gday_iso = (_gday.isoformat()
+                         if hasattr(_gday, "isoformat") else str(_gday))
+            # A monthly Base partition member is not pinned to one session -
+            # its real radius is the intersection of its partition month with
+            # THIS read's needed sessions.  Evaluate the member once per
+            # covered needed session so a qualified backup that re-covered
+            # one session is honoured there while a still-starved session
+            # keeps the failure on the ledger (audit R4 seg-A required-cells
+            # successor closeout).
+            if e.get("base_partition_month") and e.get("dependency_type") == "SHARED_T_PRICE":
+                _covered = []
+                for _nd in sorted(needed_day_set):
+                    try:
+                        _yy, _mm, _dd = str(_nd).split("-")
+                    except ValueError:
+                        continue
+                    if f"{_yy}-{_mm}" == e["base_partition_month"]:
+                        _covered.append(_nd)
+                _any_starved = False
+                for _sess in _covered:
+                    starved_sess = sorted(
+                        sid for sid in _pool_sids
+                        if not _sec_session_qualified.get((sid, _sess)))
+                    if not starved_sess:
+                        # a qualified backup re-covered the whole pool here
+                        continue
+                    # Radius precision (audit R4 seg-A required-cells successor
+                    # closeout): the month member owns ONLY the sessions where
+                    # it is the pool's sole registered supply.  When a pinned
+                    # Daily member is registered for this exact session - even
+                    # one that re-covered only part of the pool - the starved
+                    # cells are already attributed to THAT member by the
+                    # per-session row loop (its failure to surface the starved
+                    # security is the real, narrower supply gap).  Adding the
+                    # month member there would double-count one gap as two.
+                    # The month member therefore only owns sessions with no
+                    # Daily bar member pinned for the day at all.
+                    _has_daily = any(
+                        ((de.get("date_from").isoformat()
+                          if hasattr(de.get("date_from"), "isoformat")
+                          else str(de.get("date_from"))) == str(_sess))
+                        and "dwd_security_bar" in str(de.get("member_id") or "")
+                        and "dwd_security_valuation" not in str(de.get("member_id") or "")
+                        and "observation_start_year=" not in str(de.get("member_id") or "")
+                        for de in source_member_entries)
+                    if _has_daily:
+                        continue
+                    _any_starved = True
+                    _mk = e.get("package_key") or e.get("member_key")
+                    _declared_sids = _member_session_sids.get((_mk, _sess)) or set()
+                    _single_security_supply = (
+                        len(_declared_sids) == 1 and len(starved_sess) == 1)
+                    _sess_e = dict(e)
+                    _sess_e["gap_session_day"] = _sess
+                    if len(starved_sess) == len(_pool_sids) and not _single_security_supply:
+                        _shared_failed.append(_sess_e)
+                        _failed_days.append(_sess)
+                        _starved_set.update(starved_sess)
+                    else:
+                        _local_gaps.append((_sess_e, starved_sess))
+                        _starved_set.update(starved_sess)
+                continue
+            if e.get("dependency_type") != "SHARED_T_PRICE":
+                # A non-price shared hard dependency (the T session/calendar,
+                # the fixed summary chain) has no qualified-backup concept -
+                # a channel-unknown or late member on a needed session is an
+                # unconditional whole-day block, T and prior alike.
+                _shared_failed.append(e)
+                _failed_days.append(_gday)
+                _starved_set.update(
+                    ident.security_id for ident in identities)
+                continue
+            # Post-admission coverage on this needed session: the securities
+            # that ended with NO qualified bar are the session's real gap.
+            starved_here = sorted(
+                sid for sid in _pool_sids
+                if not _sec_session_qualified.get((sid, _gday_iso)))
+            if not starved_here:
+                # A qualified backup (an independent same-session member or
+                # a qualified base aggregate row the formal read could
+                # select) covered the whole pool for this session - the
+                # member's gap left nothing starved, no block.
+                continue
+            # The failed member's own supply radius: the securities it
+            # physically surfaced rows for on this session.  A member that
+            # only ever supplies ONE security can never be a shared pool
+            # supply - its gap stays isolated to that security even on a
+            # one-security pool.  A member with NO readable rows (sha-bad,
+            # unreadable, or every row rejected before surfacing) has an
+            # UNPROVEN declared radius - it is treated as the session's
+            # shared pool supply, never narrowed to a single local gap.
+            _mk = e.get("package_key") or e.get("member_key")
+            _declared_sids = _member_session_sids.get((_mk, _gday_iso)) or set()
+            _single_security_supply = (
+                len(_declared_sids) == 1 and len(starved_here) == 1)
+            if len(starved_here) == len(_pool_sids) and not _single_security_supply:
+                # The session's merged admitted sources left the WHOLE pool
+                # without a qualified bar - a shared pool-wide collapse,
+                # whatever the member's failure cause.
+                _shared_failed.append(e)
+                _failed_days.append(_gday)
+                _starved_set.update(starved_here)
+            else:
+                # Some pool securities kept a qualified bar (a qualified
+                # backup covered part of the pool) - isolate the gap to the
+                # securities that actually starved; never widen a partial
+                # coverage into a whole-day block, and never drop a real
+                # starved set back to READ.
+                _local_gaps.append((e, starved_here))
+                _starved_set.update(starved_here)
+        # One supply gap per (member, session): the physical-failure month
+        # expansion and the row-level / no-qualified-row attribution can both
+        # name the SAME member for the SAME session when a backup re-covered
+        # only part of the pool.  Collapse such duplicates here, keeping the
+        # richest row detail, so a partial backup isolates exactly the
+        # genuinely starved securities once - never double-counted (audit R4
+        # seg-A required-cells successor closeout).
+        if _local_gaps:
+            _merged = {}
+            _order = []
+            for _ge, _gsids in _local_gaps:
+                _gk = ((_ge.get("package_key") or _ge.get("member_key")),
+                       str(_ge.get("gap_session_day")))
+                if _gk not in _merged:
+                    _merged[_gk] = [_ge, set(_gsids)]
+                    _order.append(_gk)
+                else:
+                    _merged[_gk][1].update(_gsids)
+                    # prefer the entry carrying row-level detail when present
+                    if (_ge.get("row_rejection_reasons")
+                            and not _merged[_gk][0].get("row_rejection_reasons")):
+                        _merged[_gk][0] = _ge
+            _local_gaps = [
+                (_merged[_gk][0], sorted(_merged[_gk][1])) for _gk in _order]
+        _starved = sorted(_starved_set)
+        if _shared_failed and _failed_days:
+            # Terminal-guard precedence (audit 749-05 preservation): when EVERY
+            # declared bar member already failed hash or was unreadable, the
+            # named SHARED_PRICE_UNAVAILABLE collapse below is the precise
+            # receipt - the required-cells month attribution must not pre-empt
+            # it with the more generic SHARED_INPUT_GAP.  Only a partial
+            # supply failure (some members READ, or no member at all read but
+            # not a total physical collapse) is reported as SHARED_INPUT_GAP.
+            _bar_reads_here = bar_cov.get("reads") or []
+            _total_price_collapse = bool(_bar_reads_here) and all(
+                r.get("status") in ("SHA_MISMATCH", "UNREADABLE")
+                for r in _bar_reads_here if r.get("member_id"))
+            if not _total_price_collapse:
+                # Report each distinct failed/missing supply once while keeping
+                # the real per-session scope.  An unregistered required month
+                # yields one ledger placeholder per starved session; collapse
+                # those to a single named supply but record the actual missing
+                # months / sessions / securities so the receipt names the real
+                # gap instead of a fabricated member sha or source clock.
+                _fm_keys = []
+                for _e in _shared_failed:
+                    _fk = (_e.get("package_key") or _e.get("member_key")
+                           or _e.get("member_id"))
+                    if _fk not in _fm_keys:
+                        _fm_keys.append(_fk)
+                _missing_sessions = sorted({
+                    str(_e.get("gap_session_day"))
+                    for _e in _shared_failed if _e.get("unregistered_supply")
+                })
+                _missing_months = sorted({
+                    str(_e.get("missing_month"))
+                    for _e in _shared_failed if _e.get("missing_month")
+                })
+                day_block = {
+                    "reason_code": "SHARED_INPUT_GAP",
+                    "detail": (
+                        "a shared hard dependency left needed sessions without "
+                        "a qualified source for this formal read"
+                    ),
+                    "affected_scope": "whole_day",
+                    "failed_members": _fm_keys,
+                    "affected_securities": _starved,
+                    "disposition": "block_new_entries",
+                }
+                if _missing_months:
+                    day_block["missing_months"] = _missing_months
+                if _missing_sessions:
+                    day_block["missing_sessions"] = _missing_sessions
+        elif _local_gaps:
+            # A local single-security gap is NOT a whole-day block: record
+            # the isolated dependency so the consumer blocks only the
+            # affected security's new entries while a qualified neighbour
+            # (and an independently-held security) keeps working.
+            coverage["isolated_input_gaps"] = [
+                {"member_key": e.get("package_key") or e.get("member_key"),
+                 "member_id": e.get("member_id"),
+                 "session_date": e.get("gap_session_day"),
+                 "gap": e.get("named_input_gap") or "LATE_FOR_CUTOFF",
+                 **({"row_rejection_reasons": e["row_rejection_reasons"],
+                     "row_rejected_rows": e["row_rejected_rows"]}
+                    if e.get("row_rejection_reasons") else {}),
+                 "affected_securities": sids,
+                 "disposition": "block_new_entries_for_security"}
+                for e, sids in _local_gaps
+            ]
+
     # Listing or all-qualified-price collapse is also a whole-day block:
     # "zero listings" (nothing can be a candidate) and "every bar member
     # failed" are input failures, distinct from a real zero-signal day.

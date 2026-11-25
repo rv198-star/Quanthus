@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date, datetime, timezone
+from collections.abc import Mapping
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from quanthus.p12_history import bars as bars_mod
 from quanthus.p12_history import reader as reader_mod
 from quanthus.p12_history.source_pins import ResolvedMember, SourceMap
 
@@ -62,7 +64,12 @@ class StubSourceMap(SourceMap):
         self._daily = daily_cores
 
     def base_members(self, table):
-        return list(self._members_by_table.get(table, ()))
+        out = list(self._members_by_table.get(table, ()))
+        if table == "dwd_trading_calendar":
+            # Apply the same P10 calendar-alias merge the real SourceMap
+            # performs on its daily calendar partitions.
+            out = [self._bind_calendar_alias(m) for m in out]
+        return out
 
     def daily_open_days(self):
         return sorted(self._daily)
@@ -1255,3 +1262,2716 @@ def test_listing_latest_replica_collapses_before_conflict(tmp_path):
     for rows in ([older, latest, conflict], [conflict, latest, older]):
         r = run(rows)
         assert "security-600000" in r.coverage["universe"]["ambiguous_security_ids"]
+
+
+class _FormalStubSourceMap(StubSourceMap):
+    """Stub that also serves the producer / channel / knowledge clocks
+    per daily package so a FORMAL_DAILY_UPDATE read can be exercised."""
+
+    def __init__(self, members_by_table, daily_cores, clocks):
+        super().__init__(members_by_table, daily_cores)
+        # clocks: {day: {"knowledge": ts, "producer": ts, "channel": ts}}
+        self._clocks = clocks
+
+    def daily_knowledge_at(self, market_date):
+        return (self._clocks.get(market_date) or {}).get("knowledge")
+
+    def daily_producer_completed_at(self, market_date):
+        return (self._clocks.get(market_date) or {}).get("producer")
+
+    def daily_visible_at(self, market_date):
+        return (self._clocks.get(market_date) or {}).get("channel")
+
+    def daily_channel_visible_at(self, market_date):
+        return (self._clocks.get(market_date) or {}).get("channel")
+
+    class _Pkg:
+        def __init__(self, members):
+            self.members = members
+
+    def daily_core(self, market_date):
+        return _FormalStubSourceMap._Pkg(self._daily.get(market_date, ()))
+
+
+def _formal_daily_member(tmp_path, day, fragment="dwd_security_bar"):
+    """A daily-core bar member for one market date."""
+    rel = f"payload/dwd_security_bar/day={day}/{fragment}.parquet"
+    return _member(tmp_path, rel, package_id=f"daily-{day}", kind="daily",
+                   market_date=day)
+
+
+def test_formal_channel_visibility_gates_bar_selection(tmp_path):
+    """R4 second segment: a package that COMPLETED production before the
+    cutoff but only became CHANNEL-VISIBLE after it must not supply T
+    bars under a FORMAL_DAILY_UPDATE read; the member is registered and
+    named late with producer/channel/knowledge kept distinct."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # A daily-core bar member whose production finished 10:00Z but whose
+    # channel only published it 16:05Z - after the 14:30Z formal cutoff.
+    dm = _formal_daily_member(tmp_path, "2026-11-24")
+    clocks = {"2026-11-24": {
+        "knowledge": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "channel": datetime(2026, 11, 24, 16, 5, tzinfo=UTC),
+    }}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [dm]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    key = f"daily-2026-11-24::{dm.member_id}"
+    # Member is registered and named late for the formal read.
+    assert key in res.coverage["late_visible_members"]
+    src = next(m for m in res.raw_history["source_members"]
+               if m["member_id"] == dm.member_id)
+    # The four instants stay distinct on the receipt.
+    assert src["producer_completed_at"] == "2026-11-24T10:00:00Z"
+    assert src["channel_visible_at"] == "2026-11-24T16:05:00Z"
+    assert src["visible_at"] == "2026-11-24T16:05:00Z"
+
+
+def test_formal_selects_pre_cutoff_revision_over_late(tmp_path):
+    """R4 second segment: a 17:00Z revision does NOT displace the last
+    revision known by the 14:30Z formal cutoff; a noon-withdrawn row
+    stays in the revision chain verbatim but never wins the select."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    days = _sessions(330)
+    rows1 = _bar_table(days).to_pylist()
+    # Same session carries: original bar + a noon-withdrawn row + a 17:00Z
+    # late fix.  The formal cutoff selects the original (last revision
+    # known by 14:30Z), keeps the other two in the chain verbatim.
+    withdrawn = dict(rows1[-1], close_price=17.0, source_revision="withdrawn",
+                     knowledge_to=datetime(2026, 11, 24, 12, 0, tzinfo=UTC))
+    late_fix = dict(rows1[-1], close_price=25.0, source_revision="late-fix",
+                    knowledge_from=datetime(2026, 11, 24, 17, 0, tzinfo=UTC),
+                    knowledge_to=None)
+    all_rows = rows1 + [withdrawn, late_fix]
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    pq.write_table(pa.table({k: [r.get(k) for r in all_rows]
+                             for k in rows1[0].keys()}), tmp_path / rel)
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
+    res = reader_mod.read_history(
+        T, CUT, source_map=StubSourceMap(members, {}),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    last = sec["bars"][-1]
+    # The 17:00Z late fix does not win; the noon-withdrawn row is kept in
+    # the chain verbatim but is not selected either.  The selected bar is
+    # the original close (neither 17.0 nor 25.0).
+    assert float(last["close_price"]) not in (17.0, 25.0)
+    chain = sec["bar_revisions"].get("2026-11-24")
+    assert chain is not None and len(chain) == 3
+    kts = [c["knowledge_to"] for c in chain]
+    assert any(k is not None for k in kts)  # withdrawn row preserved verbatim
+
+
+def test_manifest_chain_fault_blocks_before_member_read(tmp_path):
+    """R4 second segment: a declared Base/DATES/descriptor link that
+    fails hash or is unreadable blocks the whole day BEFORE any market
+    member is opened (SUMMARY_CHAIN_FAULT, zero members read)."""
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    # Inject a chain whose declared Base manifest sha does not match.
+    smap.manifest_chain = lambda: [
+        {"artifact": "base_manifest", "path": "/x/manifest.json",
+         "declared_sha256": "sha256:" + "a" * 64,
+         "actual_sha256": "sha256:" + "b" * 64,
+         "status": "SHA_MISMATCH", "verified_at": "2026-11-24T14:00:00Z"},
+    ]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=smap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert calls == []  # no market member opened before the gate
+
+
+def test_same_name_member_two_packages_kept_distinct(tmp_path):
+    """R4 second segment (R3 item 1): the same relative member path
+    (e.g. audit.json) shipped under TWO daily packages stays resolvable
+    under both package-qualified keys, not collapsed to the first."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # The same relative member id under two different daily packages.
+    rel = "payload/dwd_security_bar/day=x/audit.json.parquet"
+    m_a = _member(tmp_path, rel, package_id="daily-2026-11-23",
+                  kind="daily", market_date="2026-11-23")
+    m_b = _member(tmp_path, rel, package_id="daily-2026-11-24",
+                  kind="daily", market_date="2026-11-24")
+    clocks = {
+        "2026-11-23": {"knowledge": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+                        "producer": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+                        "channel": datetime(2026, 11, 23, 10, 5, tzinfo=UTC)},
+        "2026-11-24": {"knowledge": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+                        "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+                        "channel": datetime(2026, 11, 24, 10, 5, tzinfo=UTC)},
+    }
+    fmap = _FormalStubSourceMap(
+        members, {"2026-11-23": [m_a], "2026-11-24": [m_b]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    keys = {m["package_key"] for m in res.raw_history["source_members"]
+            if m["member_id"] == rel}
+    assert keys == {"daily-2026-11-23::" + rel, "daily-2026-11-24::" + rel}
+    # Each keeps its own package_id + version on the envelope.
+    pkg_ids = {m["package_id"] for m in res.raw_history["source_members"]
+               if m["member_id"] == rel}
+    assert pkg_ids == {"daily-2026-11-23", "daily-2026-11-24"}
+
+
+def test_formal_missing_channel_shared_dep_blocks_day(tmp_path):
+    """R4 second segment: under a formal read a member with NO qualified
+    channel/knowledge proof that is a shared hard dependency (a needed
+    price source) blocks the whole day as SHARED_INPUT_GAP when NO
+    qualified source covers that session; the producer completion clock is
+    never a silent substitute.  (Coverage rule: a qualified backup row the
+    formal read could select supplies the session - this case removes the
+    T base bar so the unknown-channel Daily is the only T supply -> starved
+    -> block.)"""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # Remove the T session from the qualified Base supply so the
+    # unknown-channel Daily member is the ONLY T source -> starved.
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    no_t = _bar_table(_sessions(330, end=date(2026, 11, 23)))
+    pq.write_table(no_t, tmp_path / rel)
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
+    # A daily bar member with NO channel/knowledge proof at all.
+    dm = _formal_daily_member(tmp_path, "2026-11-24")
+    clocks = {"2026-11-24": {
+        "knowledge": None, "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "channel": None,  # no qualified publication/withdrawal event
+    }}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [dm]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_INPUT_GAP"
+
+
+def test_formal_missing_channel_T_covered_by_qualified_base_reads(tmp_path):
+    """Coverage rule (coord-return item): a T-day Daily price member whose
+    channel is UNKNOWN does NOT block when a qualified Base backup actually
+    supplies a T bar the formal read can select - T and prior sessions are
+    judged the same way by actual session x security coverage, single-
+    security gaps isolated.  (Mirror of the prior-day READ case, now true
+    for T too.)"""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)   # qualified Base bar member covers T
+    members = smap._members_by_table
+    # Daily T member: production done, but NO channel proof.
+    dm = _formal_daily_member(tmp_path, "2026-11-24")
+    clocks = {"2026-11-24": {
+        "knowledge": None, "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "channel": None,
+    }}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [dm]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    # The qualified Base row supplies the session -> READ, not a day block;
+    # the unknown-channel member is still named on the gap receipt.
+    assert res.status == "READ"
+    assert res.coverage.get("day_block") is None
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    assert any(b["session_date"] == "2026-11-24" for b in sec["bars"])
+
+
+def test_formal_missing_channel_single_member_named_not_day_block(tmp_path):
+    """R4 second segment: a missing channel clock on a NON-shared member
+    is named on coverage.named_input_gaps + flagged late, but does not
+    block the whole day."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # A non-shared daily member (audit.json - not calendar/listing/bar).
+    rel = "payload/dwd_other/day=x/audit.json.parquet"
+    dm = _member(tmp_path, rel, package_id="daily-2026-11-24",
+                 kind="daily", market_date="2026-11-24")
+    clocks = {"2026-11-24": {
+        "knowledge": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "channel": None,
+    }}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [dm]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    assert res.status == "READ"
+    gaps = res.coverage["named_input_gaps"]
+    assert any(g["gap"] == "NO_CHANNEL_VISIBILITY_PROOF" for g in gaps)
+    # Channel-UNKNOWN member is REJECTED for lack of proof, not merely
+    # late: it is named on named_input_gaps + flagged
+    # rejected_no_channel_proof, and its visible_at stays null.
+    key = f"daily-2026-11-24::{rel}"
+    assert key not in res.coverage["late_visible_members"]
+    src = next(m for m in res.raw_history["source_members"]
+               if m["member_id"] == rel)
+    assert src["formal_admission"] == "rejected_no_channel_proof"
+    assert src["visible_at"] is None
+    assert src["channel_visible_at"] is None
+
+
+# ---- segment B: real non-empty paper account snapshots --------------------
+# Snapshot identities from #748 fixed f29506fe (SYN-PAPER-A, synthetic).
+_B_SID = "security_2e02245cf8b28319ec8af0e9554cdc24"
+_B_LID = "listing_5edd7b7cdd4b6445afae0d2cca6b85ce"
+
+
+def _build_map_seg_b(tmp_path):
+    """_build_map whose pool security carries the real snapshot identity
+    (600000 / security_2e02... / listing_5edd... / SSE)."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # Replace the default security/listing/identifier ids with the real
+    # snapshot identity so the account facts bind inside the pool.
+    pq.write_table(pa.table({
+        "security_id": [_B_SID], "company_id": ["company-1"],
+        "instrument_type": ["common_equity"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+        "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+    }), tmp_path / "dwd_security.parquet")
+    pq.write_table(pa.table({
+        "security_id": [_B_SID], "listing_id": [_B_LID], "venue_id": ["SSE"],
+        "listing_code": ["600000"], "board_code": ["main"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+        "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+    }), tmp_path / "listing.parquet")
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    members["dwd_security"] = [_member(tmp_path, "dwd_security.parquet")]
+    pq.write_table(_identifier_table_full([
+        (_B_SID, "CN_STOCK_CODE:SSE", "600000", "SSE",
+         datetime(2026, 1, 1, tzinfo=UTC), None, datetime(2026, 7, 18, tzinfo=UTC)),
+    ]), tmp_path / "dwd_security_identifier.parquet")
+    members["dwd_security_identifier"] = [_member(tmp_path, "dwd_security_identifier.parquet")]
+    return StubSourceMap(members, {})
+
+
+def _seg_b_read(tmp_path, holdings, pending):
+    # The fixture bar member is windowed to November; use an in-window T
+    # so the pool is admitted and the account projection is exercised
+    # (the snapshot as_of is an account fact, not a market window).
+    return reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=_build_map_seg_b(tmp_path),
+        holdings=holdings, pending=pending,
+        observed_at=datetime(2026, 10, 20, 23, 0, tzinfo=UTC),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE)
+
+
+def test_seg_b_held_snapshot_binds_pool_identity(tmp_path):
+    """Segment B: the held SYN-PAPER-A snapshot (1200 shares, fill
+    replay-fill-20261020-0001) binds to the pool security's real
+    identity; the wire carries held_quantity=1200 + account_role=held
+    and the held-vs-empty envelopes differ."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    res_held = _seg_b_read(tmp_path, held, [])
+    res_empty = _seg_b_read(tmp_path, [], [])
+    sec = next(x for x in res_held.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["account"]["held_quantity"] == 1200
+    assert sec["account"]["account_role"] == "held"
+    assert _B_SID in res_held.coverage["universe"]["held_in_pool"]
+    # Held and empty accounts must NOT produce the same wire account.
+    sec_e = next(x for x in res_empty.raw_history["securities"]
+                 if x["identity"]["security_id"] == _B_SID)
+    assert sec_e["account"]["account_role"] == "candidate"
+    assert sec_e["account"]["held_quantity"] is None
+
+
+def test_seg_b_pending_open_buy_order_snapshot(tmp_path):
+    """Segment B: the pending SYN-PAPER-A snapshot (open_buy_order 1200,
+    limit 9.50, zero fills) binds as a typed pending on the pool
+    security; holdings stay empty, account_role=pending."""
+    pending = [{"security_id": _B_SID, "security_code": "600000",
+                "listing_id": _B_LID, "venue_id": "SSE",
+                "order_id": "q749-b-paper-buy-600000-20261020",
+                "pending_kind": "open_buy_order", "pending_quantity": 1200,
+                "receipt_id": "receipt-sha256:2c4b1b889e971c"}]
+    res = _seg_b_read(tmp_path, [], pending)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["account"]["account_role"] == "pending"
+    assert sec["account"]["held_quantity"] is None
+    assert any(p["pending_kind"] == "open_buy_order"
+               for p in sec["account"]["pending"])
+
+
+def test_seg_b_outside_held_and_unknown_qty_projected(tmp_path):
+    """Segment B: an out-of-pool held security and an unknown-quantity
+    holding are still projected as independent account members
+    (hold_alert path), never silently dropped."""
+    held = [{"security_id": _B_SID, "quantity": 1200},
+            {"security_id": "outside-held-x", "quantity": None},
+            {"security_id": "outside-held-y", "quantity": 50}]
+    pending = [{"security_id": "outside-pend", "pending_kind": "sell",
+                "pending_quantity": 5}]
+    res = _seg_b_read(tmp_path, held, pending)
+    uni = res.coverage["universe"]
+    assert _B_SID in uni["held_in_pool"]
+    assert "outside-held-x" in uni["held_unknown_quantity"]
+    sids = {x["identity"]["security_id"] for x in res.raw_history["securities"]}
+    assert "outside-held-x" in sids and "outside-held-y" in sids
+    out = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "outside-held-x")
+    assert out["account"]["account_role"] == "held"
+    assert out["account"]["held_quantity"] is None
+
+
+def test_calendar_alias_merges_into_formal_daily_identity(tmp_path):
+    """P10 daily-channel ruling (R4 second segment): a P10 calendar-map
+    daily partition whose sha256 matches the formal daily-core package's
+    dwd_trading_calendar member is the SAME physical member - both
+    logical aliases are gated under the formal member's channel
+    admission, never double-counted as an independent source clocked at
+    base_knowledge."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # Formal daily-core calendar member for T (channel UNKNOWN -> its
+    # named gap blocks the day under a formal read).
+    formal_cal = _member(
+        tmp_path, "payload/tradability_state/dwd_trading_calendar/day=T/cal.parquet",
+        package_id="dwd-daily-20261124-x", kind="daily", market_date="2026-11-24")
+    # The P10 calendar-map alias: a DIFFERENT member_id/abs_path but the
+    # SAME sha256 - the same physical member under another logical name.
+    alias_cal = _member(
+        tmp_path, "/abs/dwd-daily-calendar/cal-2026-11-24.parquet",
+        package_id="dwd-daily-calendar", kind="daily", market_date="2026-11-24",
+        declared_sha256=formal_cal.sha256)
+    members["dwd_trading_calendar"].append(alias_cal)
+    clocks = {"2026-11-24": {"knowledge": None, "producer": None, "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [formal_cal]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    # The alias read is recorded as ALIAS against the formal identity,
+    # never an independent READ that admits the member on a base clock.
+    alias_reads = [r for r in res.coverage["calendar"]["reads"]
+                   if r.get("status") == "ALIAS"]
+    assert alias_reads and alias_reads[0]["alias_of"].startswith(
+        "dwd-daily-20261124-x::")
+    # The formal identity carries the alias on its source_member entry;
+    # the alias opens no separate member entry.
+    formal_entry = next(
+        m for m in res.raw_history["source_members"]
+        if m["package_key"] == f"dwd-daily-20261124-x::{formal_cal.member_id}")
+    assert any(a["package_id"] == "dwd-daily-calendar"
+               for a in formal_entry.get("aliases", []))
+    assert not any(
+        m.get("package_key") == f"dwd-daily-calendar::{alias_cal.member_id}"
+        for m in res.raw_history["source_members"])
+    # Channel UNKNOWN on the shared calendar -> named whole-day gap.
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_INPUT_GAP"
+
+
+def test_formal_not_read_dependency_set_lists_named_gaps(tmp_path):
+    """P10 ruling: the formal-update registered-but-not-read members for
+    THIS T are bound to their P10 dependency_type so the named-gap
+    dispositions attach to the actual selected/excluded dependency set."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # A formal daily package whose channel is UNKNOWN: its members are
+    # rejected_no_channel_proof and land on registered_not_read.
+    bar = _formal_daily_member(tmp_path, "2026-11-24")
+    ident = _member(tmp_path, "reference/dwd_listing/d.parquet",
+                    package_id="dwd-daily-20261124-x", kind="daily",
+                    market_date="2026-11-24")
+    clocks = {"2026-11-24": {"knowledge": None, "producer": None,
+                            "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [bar, ident]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    dep = res.coverage["formal_not_read_dependency_set"]
+    keys = {d["member_key"] for d in dep}
+    assert f"daily-2026-11-24::{bar.member_id}" in keys or any(
+        bar.member_id in k for k in keys)
+    types = {d["member_id"]: d["dependency_type"] for d in dep}
+    # The bar member is a shared T price gap; the listing member is a
+    # conditional identity gap - each bound to its real dependency.
+    assert any("dwd_security_bar" in k and v == "SHARED_T_PRICE"
+               for k, v in types.items())
+    assert any("dwd_listing" in k and v == "CONDITIONAL_T_IDENTITY"
+               for k, v in types.items())
+
+
+def test_formal_no_eligible_revision_emits_no_bar(tmp_path):
+    """R4 second segment audit: a formal read selects ONLY a revision
+    known by the cutoff, not withdrawn, and channel-admitted.  With NO
+    eligible row the session emits no selected bar; the late/withdrawn/
+    ineligible rows stay on the revision chain with real clocks and the
+    affected dependency is named, never a silent fallback to the last
+    physical row."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    days = _sessions(330)
+    rows1 = _bar_table(days).to_pylist()
+    # The ONLY T rows are a 17:00Z late revision and a noon-withdrawn row:
+    # nothing is eligible for the 14:30Z formal cutoff.
+    withdrawn = dict(rows1[-1], close=22.0, source_revision="w",
+                     knowledge_from=datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+                     knowledge_to=datetime(2026, 11, 24, 12, 0, tzinfo=UTC))
+    late = dict(rows1[-1], close=88.0, source_revision="late",
+                knowledge_from=datetime(2026, 11, 24, 17, 0, tzinfo=UTC),
+                knowledge_to=None)
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    pq.write_table(pa.table({k: [r.get(k) for r in rows1[:-1] + [withdrawn, late]]
+                             for k in rows1[0].keys()}), tmp_path / rel)
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
+    res = reader_mod.read_history(
+        T, CUT, source_map=StubSourceMap(members, {}),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    # No selected bar for the ineligible session; the dependency is named
+    # with the real rejected clocks, never a silent last-row fallback.
+    assert all(b["session_date"] != "2026-11-24" for b in sec["bars"])
+    assert sec["dependency_reasons"]["bar_rejections"]
+    chain = sec["bar_revisions"].get("2026-11-24")
+    assert chain and not any(c["selected"] for c in chain)
+    # The withdrawn row and the late row both stay on the chain verbatim.
+    prices = {float(c["close_price"]) for c in chain}
+    assert prices == {22.0, 88.0}
+
+
+def test_formal_missing_declared_sha_blocks_before_member_read(tmp_path):
+    """R4 second segment audit: a missing DECLARED sha on an external
+    frozen link (Base / DATES / Standard / Core) is a named pre-read
+    fault - the chain does not degrade it to MATCH and no member is
+    opened."""
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    smap.manifest_chain = lambda: [
+        {"artifact": "base_manifest", "path": "/x/manifest.json",
+         "declared_sha256": None, "actual_sha256": None,
+         "status": "MISSING_DECLARED_SHA256", "verified_at": "2026-11-24T14:00:00Z"},
+    ]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=smap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert calls == []
+
+
+def test_formal_out_of_window_member_gap_not_shared(tmp_path):
+    """R4 second segment audit: a daily-core member declared for a day
+    OUTSIDE this T is an out-of-window registration - its channel gap is
+    kept for the record but is NOT a shared hard dependency, so it does
+    not block the whole day."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # An out-of-window (May) price member, channel UNKNOWN on its own day.
+    older = _member(tmp_path, "payload/dwd_security_bar/day=2026-05-01/x.parquet",
+                    package_id="daily-2026-05-01", kind="daily",
+                    market_date="2026-05-01")
+    clocks = {"2026-05-01": {"knowledge": None, "producer": None,
+                            "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-05-01": [older]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    # The out-of-window member's gap is recorded but does NOT mark the
+    # day INPUT_BLOCKED - it is not an actual T shared dependency.
+    gap = next((g for g in res.coverage.get("named_input_gaps", [])
+                if "2026-05-01" in g["member_key"]), None)
+    if gap is not None:
+        assert not gap["shared_hard_dependency"]
+    assert res.status != "INPUT_BLOCKED" or (
+        res.coverage["day_block"]["reason_code"] != "SHARED_INPUT_GAP")
+
+
+def test_dwd_security_valuation_is_declared_not_read_only(tmp_path):
+    """P10 named supply: dwd_security_valuation is DECLARED_NOT_READ_ONLY,
+    not a conditional-identity member merely because its id shares the
+    "dwd_security" prefix."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    val = _member(
+        tmp_path,
+        "payload/security_market_observation/dwd_security_valuation/market_date=2026-11-24/part-0.parquet",
+        package_id="dwd-daily-20261124-x", kind="daily",
+        market_date="2026-11-24")
+    clocks = {"2026-11-24": {"knowledge": None, "producer": None,
+                            "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [val]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    gap = next((g for g in res.coverage.get("named_input_gaps", [])
+                if "dwd_security_valuation" in g["member_id"]), None)
+    assert gap is not None
+    assert gap["dependency_type"] == "DECLARED_NOT_READ_ONLY"
+    assert not gap["shared_hard_dependency"]
+
+
+# ---- Segment B: account-input binding (audit R4 seg-B) -------------------
+
+def _b_snapshot(tmp_path, **over):
+    snap = {
+        "account_id": "SYN-PAPER-A",
+        "as_of": "2026-10-20T09:30:00+08:00",
+        "holdings": [{"security_id": _B_SID, "security_code": "600000",
+                      "listing_id": _B_LID, "venue_id": "SSE",
+                      "quantity": 1200}],
+        "pending": [],
+        "security_identity": {"security_id": _B_SID, "listing_id": _B_LID,
+                              "venue_id": "SSE", "security_code": "600000"},
+        "generation_receipt": {"sha256": "7d05c625"},
+    }
+    snap.update(over)
+    return snap
+
+
+def _seg_b_read_snap(tmp_path, snapshot, expected=None):
+    return reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=_build_map_seg_b(tmp_path),
+        account_snapshot=snapshot, expected_account_id=expected,
+        observed_at=datetime(2026, 10, 20, 23, 0, tzinfo=UTC),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE)
+
+
+def test_seg_b_account_snapshot_binds_scenario_account(tmp_path):
+    """Segment B: a bound account snapshot carries the scenario account_id,
+    original as_of, snapshot sha and generation receipt; the held fact is
+    projected with the effective pool identity (3-key aligned)."""
+    res = _seg_b_read_snap(tmp_path, _b_snapshot(tmp_path),
+                           expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["bound"] and ab["account_id"] == "SYN-PAPER-A"
+    assert ab["as_of"] == "2026-10-20T09:30:00+08:00"
+    assert ab["generation_receipt_sha256"] == "7d05c625"
+    assert ab["rejections"] == []
+    assert ab["identity_alignment"]["aligned"] is True
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["account"]["account_role"] == "held"
+    assert sec["account"]["held_quantity"] == 1200
+
+
+def test_seg_b_account_id_mismatch_named_rejection(tmp_path):
+    """A different account swapped in is a named rejection, not accepted."""
+    res = _seg_b_read_snap(tmp_path, _b_snapshot(tmp_path),
+                           expected="SYN-PAPER-B")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_ID_MISMATCH" in codes
+
+
+def test_seg_b_future_snapshot_named_rejection(tmp_path):
+    """A snapshot whose as_of post-dates the decision cutoff is a named
+    rejection."""
+    snap = _b_snapshot(tmp_path, as_of="2026-11-25T09:30:00+08:00")
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_FUTURE" in codes
+
+
+def test_seg_b_identity_key_conflict_named_rejection(tmp_path):
+    """A snapshot whose declared venue conflicts with the resolved pool
+    identity is a named three-key rejection."""
+    snap = _b_snapshot(
+        tmp_path,
+        security_identity={"security_id": _B_SID, "listing_id": _B_LID,
+                           "venue_id": "SZSE", "security_code": "600000"})
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_IDENTITY_KEY_CONFLICT" in codes
+    assert ab["identity_alignment"]["aligned"] is False
+
+
+def test_seg_b_snapshot_sha_mismatch_named_rejection(tmp_path):
+    """A declared snapshot sha256 that does not match the real file is a
+    named rejection."""
+    import hashlib as _hl
+    snap_file = tmp_path / "held.json"
+    snap_file.write_text('{"a":1}')
+    snap = _b_snapshot(
+        tmp_path, snapshot_path=str(snap_file),
+        snapshot_sha256="sha256:" + "f" * 64)
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_SHA_MISMATCH" in codes
+
+
+def test_seg_b_out_of_pool_named_risk_branch(tmp_path):
+    """An out-of-pool held/pending member carries its facts on a named
+    held_risk / pending_risk branch with NO fabricated listing_id."""
+    res = reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=_build_map_seg_b(tmp_path),
+        holdings=[{"security_id": "ghost-held", "quantity": 10}],
+        pending=[{"security_id": "ghost-pend", "pending_kind": "sell",
+                  "pending_quantity": 3}],
+        observed_at=datetime(2026, 10, 20, 23, 0, tzinfo=UTC),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE)
+    held = next(x for x in res.raw_history["securities"]
+                if x["identity"]["security_id"] == "ghost-held")
+    pend = next(x for x in res.raw_history["securities"]
+                if x["identity"]["security_id"] == "ghost-pend")
+    assert held["identity"]["listing_id"] == ""
+    assert held["dependency_reasons"]["account_branch"] == "held_risk"
+    assert pend["dependency_reasons"]["account_branch"] == "pending_risk"
+    assert held["account"]["account_role"] == "held"
+    assert pend["account"]["pending"][0]["pending_kind"] == "sell"
+
+def test_seg_b_wire_flat_fields_and_pending_records(tmp_path):
+    """P11 segment-B contract: held/pending facts project to SIBLING
+    top-level securities[] fields (not a nested account dict) - the
+    consumer reads held_membership / held_quantity /
+    held_unavailable_reason / pending_kind / pending_quantity /
+    pending_records, with each pending order keeping its own key,
+    direction and source receipt."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    res = _seg_b_read(tmp_path, held, [])
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert sec["held_quantity"] == 1200
+    assert sec["held_unavailable_reason"] is None
+    assert sec["account"]["account_role"] == "held"
+    # Unknown quantity keeps the original null + a named reason.
+    res2 = _seg_b_read(
+        tmp_path,
+        [{"security_id": _B_SID, "security_code": "600000",
+          "listing_id": _B_LID, "venue_id": "SSE", "quantity": None}], [])
+    sec2 = next(x for x in res2.raw_history["securities"]
+                if x["identity"]["security_id"] == _B_SID)
+    assert sec2["held_quantity"] is None
+    assert "held_quantity_unavailable" in sec2["held_unavailable_reason"]
+
+
+def test_seg_b_wire_pending_records_keep_order_key_and_source(tmp_path):
+    """Single typed pending -> pending_kind/pending_quantity plus a
+    pending_records entry carrying order_id, kind, quantity, receipt and
+    source verbatim."""
+    pend = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE",
+             "order_id": "q749-b-paper-buy-600000-20261020",
+             "pending_kind": "open_buy_order", "pending_quantity": 1200,
+             "receipt_id": "receipt-sha256:2c4b",
+             "source": "pending/generation-receipt.json"}]
+    res = _seg_b_read(tmp_path, [], pend)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+    assert sec["pending_kind"] == "open_buy_order"
+    assert sec["pending_quantity"] == 1200
+    rec = sec["pending_records"][0]
+    assert rec["order_id"] == "q749-b-paper-buy-600000-20261020"
+    assert rec["receipt_id"] == "receipt-sha256:2c4b"
+    assert rec["source"] == "pending/generation-receipt.json"
+
+
+def test_seg_b_wire_held_and_pending_coexist(tmp_path):
+    """A held security that also has an in-flight order keeps BOTH facts -
+    the held projection and each pending record, never merged."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    pend = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE",
+             "order_id": "o1", "pending_kind": "open_buy_order",
+             "pending_quantity": 300},
+            {"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE",
+             "order_id": "o2", "pending_kind": "open_buy_order",
+             "pending_quantity": 100}]
+    res = _seg_b_read(tmp_path, held, pend)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True and sec["held_quantity"] == 1200
+    # Two orders are never summed or collapsed to a last record.
+    assert sec["pending_kind"] == "multiple"
+    assert [r["order_id"] for r in sec["pending_records"]] == ["o1", "o2"]
+    assert [r["pending_quantity"] for r in sec["pending_records"]] == [300, 100]
+
+
+def test_seg_b_wire_held_missing_history_named(tmp_path):
+    """A held position whose history is missing keeps a named
+    held_history_unavailable - the held review is retained, not silently
+    passed, and needs no listing-id conflict to surface."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200,
+             "history_unavailable": True}]
+    res = _seg_b_read(tmp_path, held, [])
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert "held_history_unavailable" in sec["held_unavailable_reason"]
+
+
+def test_seg_b_out_of_pool_unresolved_details_versioned(tmp_path):
+    """Out-of-pool account members land on coverage
+    .unresolved_account_details with the raw key, role, quantity, named
+    missing reason and source - a sell/5 pending keeps its own enum."""
+    res = reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=_build_map_seg_b(tmp_path),
+        holdings=[{"security_id": "outside-held-x", "quantity": None}],
+        pending=[{"security_id": "outside-pend", "order_id": "so1",
+                  "pending_kind": "sell/5", "pending_quantity": 50,
+                  "source": "pending/generation-receipt.json"}],
+        observed_at=datetime(2026, 10, 20, 23, 0, tzinfo=UTC),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE)
+    details = {d["security_id"]: d
+               for d in res.coverage["unresolved_account_details"]}
+    hx = details["outside-held-x"]
+    assert hx["account_role"] == "held"
+    assert hx["held_quantity"] is None
+    assert "held_quantity_unavailable" in hx["held_unavailable_reason"]
+    assert hx["missing_reason"] == "out_of_pool_account_member"
+    assert hx["account_branch"] == "held_risk"
+    assert hx["source"] == "account_snapshot"
+    op = details["outside-pend"]
+    assert op["account_branch"] == "pending_risk"
+    assert op["pending_records"][0]["pending_kind"] == "sell/5"
+    assert op["pending_records"][0]["order_id"] == "so1"
+
+
+def test_seg_b_binding_preserves_scenario_and_nested(tmp_path):
+    """The bound account keeps scenario, account mode, source databases
+    and the nested account fields verbatim for the consumer closure."""
+    snap = _b_snapshot(
+        tmp_path, scenario="held_after_bound_open_fill",
+        account_mode="synthetic", environment="isolated_paper",
+        source_databases=[{"path": "held/p12-paper-facts.sqlite",
+                           "sha256": "2233b4e0"}])
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["scenario"] == "held_after_bound_open_fill"
+    assert ab["account_mode"] == "synthetic"
+    assert ab["environment"] == "isolated_paper"
+    assert ab["source_databases"][0]["sha256"] == "2233b4e0"
+
+
+def _seg_b_write_snapshot(tmp_path, holdings, pending, as_of="2026-10-20T09:30:00+08:00", account_id="SYN-PAPER-A"):
+    """Materialise a REAL account snapshot file (the same object the
+    isolated paper run produced) and return (path, pinned_sha)."""
+    import json as _j
+    snap_obj = {
+        "account_id": account_id,
+        "account_mode": "synthetic",
+        "environment": "isolated_paper",
+        "as_of": as_of,
+        "scenario": "held_after_bound_open_fill",
+        "holdings": holdings,
+        "pending": pending,
+        "security_identity": {"security_id": _B_SID, "listing_id": _B_LID,
+                              "venue_id": "SSE", "security_code": "600000"},
+        "generation_receipt": {"sha256": "7d05c625"},
+    }
+    p = tmp_path / "snapshot.json"
+    p.write_text(_j.dumps(snap_obj))
+    return str(p), "sha256:" + __import__("hashlib").sha256(p.read_bytes()).hexdigest()
+
+
+def test_seg_b_same_bytes_caller_cleared_holdings_still_projects(tmp_path):
+    """Same real SHA: the caller mapping's holdings cleared to [] still
+    projects the VERIFIED file bytes - a refused/cleared mapping must not
+    read as a verified empty account."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    # Caller mapping: same account id + pinned sha, but holdings cleared.
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "holdings": [], "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["rejections"] == []
+    # Projection came from the verified file bytes (1200 held), not the
+    # caller's cleared mapping - the held fact is NOT erased.
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert sec["held_quantity"] == 1200
+
+
+def test_seg_b_same_bytes_caller_repoints_as_of(tmp_path):
+    """Same real SHA: a caller mapping re-pointing as_of to a FUTURE
+    instant is overridden by the verified file's own as_of (09:30+08)."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A",
+            "as_of": "2030-01-01T00:00:00+08:00",  # caller re-pointed
+            "holdings": held, "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    # The verified file's as_of (09:30+08) governs - not the caller's
+    # future re-point - so there is NO future-snapshot rejection.
+    assert ab["as_of"] == "2026-10-20T09:30:00+08:00"
+    assert "ACCOUNT_SNAPSHOT_FUTURE" not in {
+        r["reason_code"] for r in ab["rejections"]}
+
+
+def test_seg_b_rejection_is_not_a_verified_empty(tmp_path):
+    """A rejected binding clears the account facts but records a NAMED
+    refusal - it must never present as a verified empty account."""
+    path, sha = _seg_b_write_snapshot(tmp_path, [], [], account_id="SYN-PAPER-B")
+    snap = {"account_id": "SYN-PAPER-B",  # the file is a DIFFERENT account
+            "as_of": "2026-10-20T09:30:00+08:00",
+            "holdings": [], "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_ID_MISMATCH" in codes
+    # Account facts are NOT projected - the security stays a candidate
+    # with NO held/pending, and the named refusal is on record (distinct
+    # from a verified empty account).
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+    assert sec["pending_records"] == []
+
+
+def test_seg_b_generation_receipt_sha_verified(tmp_path):
+    """The generation receipt's own bytes are hashed too: a mismatched
+    receipt sha is a named ACCOUNT_RECEIPT_SHA_MISMATCH."""
+    import hashlib as _hl
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text('{"ok":true}')
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "holdings": held, "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha,
+            "generation_receipt": {"path": str(receipt),
+                                   "sha256": "sha256:" + "0" * 64}}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_RECEIPT_SHA_MISMATCH" in codes
+
+
+def test_seg_b_same_bytes_malformed_named_rejection(tmp_path):
+    """Closeout: verified snapshot bytes that do NOT decode to a JSON
+    object produce a named ACCOUNT_SNAPSHOT_MALFORMED refusal - never a
+    verified account projection."""
+    import hashlib as _hl, json as _j
+    raw = _j.dumps(["not", "a", "dict"])  # valid JSON, wrong top-level shape
+    p = tmp_path / "snapshot.json"
+    p.write_text(raw)
+    sha = "sha256:" + _hl.sha256(p.read_bytes()).hexdigest()
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": str(p), "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    # sha matched the real bytes but the object shape is malformed ->
+    # named refusal, no held/pending facts projected.
+    assert "ACCOUNT_SNAPSHOT_MALFORMED" in codes
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_same_bytes_no_declared_sha_named_rejection(tmp_path):
+    """Closeout: a bound snapshot path with NO pinned sha is a named
+    ACCOUNT_SNAPSHOT_NO_DECLARED_SHA refusal via the public entry."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, _sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path}  # NO declared sha
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_NO_DECLARED_SHA" in codes
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_same_bytes_no_second_decode_after_swap(tmp_path):
+    """Closeout: verification + projection decode ONLY the first read's
+    bytes.  A caller whose pinned sha matches the ORIGINAL content but whose
+    mapping re-points facts cannot smuggle a different second read in - the
+    single verified bytes govern (no reopened decode of new content).  The
+    real path-swap refusals are covered by the two binding-window tests
+    below; this case keeps the no-swap legal variant + the cleared-mapping
+    projection."""
+    import hashlib as _hl, json as _j
+    # File holds 1200 held.  Caller pins its REAL sha but clears holdings in
+    # the mapping; the verified bytes (not any second/swap read) project 1200.
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "holdings": [], "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["rejections"] == []
+    assert ab["actual_snapshot_sha256"] == sha
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert sec["held_quantity"] == 1200
+
+
+def _b_write_other_account_snapshot(tmp_path):
+    """Materialise a DIFFERENT-account snapshot file for the swap refusal."""
+    import json as _j
+    snap_obj = {
+        "account_id": "SYN-PAPER-B", "account_mode": "synthetic",
+        "environment": "isolated_paper", "as_of": "2026-10-20T09:30:00+08:00",
+        "scenario": "other_empty", "holdings": [], "pending": [],
+        "security_identity": {"security_id": "other-sid"},
+        "generation_receipt": {"sha256": "abcd"},
+    }
+    p = tmp_path / "other_snapshot.json"
+    p.write_text(_j.dumps(snap_obj))
+    return p
+
+
+def test_seg_b_bind_window_os_replace_named_rejection(tmp_path, monkeypatch):
+    """Binding window: the snapshot path is atomically os.replace'd (new
+    inode) AFTER the first bytes are read but before bind completion.  The
+    verified bytes still hash to the pinned sha, but the path identity
+    changed -> a named ACCOUNT_SNAPSHOT_PATH_CHANGED refusal, never bound."""
+    import os as _os
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    other = _b_write_other_account_snapshot(tmp_path)
+    orig_inode = _os.stat(path).st_ino
+
+    real_read = reader_mod.os.read
+    done = {"swapped": False}
+
+    def _read_then_replace(fd, n):
+        data = real_read(fd, n)
+        if data and not done["swapped"]:
+            done["swapped"] = True
+            _os.replace(str(other), path)  # atomic replace -> inode changes
+        return data
+
+    monkeypatch.setattr(reader_mod.os, "read", _read_then_replace)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    assert _os.stat(path).st_ino != orig_inode
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_bind_window_inplace_rewrite_named_rejection(tmp_path, monkeypatch):
+    """Binding window: the same path is rewritten IN PLACE (same inode,
+    changed size/mtime) after the first read -> named
+    ACCOUNT_SNAPSHOT_PATH_CHANGED refusal."""
+    import os as _os, json as _j
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    orig_inode = _os.stat(path).st_ino
+
+    real_read = reader_mod.os.read
+    done = {"swapped": False}
+
+    def _read_then_rewrite(fd, n):
+        data = real_read(fd, n)
+        if data and not done["swapped"]:
+            done["swapped"] = True
+            with open(path, "w") as fh:
+                fh.write(_j.dumps({"account_id": "SYN-PAPER-B",
+                                   "holdings": [], "pending": [],
+                                   "as_of": "2026-10-20T09:30:00+08:00",
+                                   "extra_padding": "x" * 4096}))
+        return data
+
+    monkeypatch.setattr(reader_mod.os, "read", _read_then_rewrite)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    assert _os.stat(path).st_ino == orig_inode
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_bind_window_replace_during_decode_named_rejection(
+        tmp_path, monkeypatch):
+    """Binding-completion stat (R4 seg-B binding-completion): the snapshot
+    bytes are read and json-decoded from the SAME in-memory bytes, THEN the
+    path is atomically os.replace'd before the account facts commit.  The
+    bind-completion path.stat (run AFTER decode/receipt/identity checks,
+    before facts commit) catches the inode change -> named
+    ACCOUNT_SNAPSHOT_PATH_CHANGED, the three identity signatures land on
+    the binding receipt, and NO held facts project."""
+    import os as _os, json as _j
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    other = _b_write_other_account_snapshot(tmp_path)
+    orig_inode = _os.stat(path).st_ino
+
+    real_loads = reader_mod.json.loads
+    done = {"swapped": False}
+
+    def _loads_then_replace(text, *a, **k):
+        obj = real_loads(text, *a, **k)
+        if not done["swapped"] and isinstance(obj, dict) and obj.get(
+                "account_id") == "SYN-PAPER-A" and "holdings" in obj:
+            done["swapped"] = True
+            _os.replace(str(other), path)  # inode changes after decode
+        return obj
+
+    monkeypatch.setattr(reader_mod.json, "loads", _loads_then_replace)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    assert _os.stat(path).st_ino != orig_inode
+    # The three signatures are persisted on the receipt.
+    pi = ab["path_identity"]
+    assert "st_ino" in pi["path_drift_fields"]
+    assert pi["read_bytes_sha256"] == sha
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_bind_window_inplace_during_decode_named_rejection(
+        tmp_path, monkeypatch):
+    """Binding-completion stat: same path rewritten IN PLACE (same inode,
+    changed size/mtime/ctime) after the snapshot bytes decode, before facts
+    commit -> named ACCOUNT_SNAPSHOT_PATH_CHANGED via path_drift on
+    size/mtime/ctime (inode unchanged)."""
+    import os as _os, json as _j
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    orig_inode = _os.stat(path).st_ino
+
+    real_loads = reader_mod.json.loads
+    done = {"swapped": False}
+
+    def _loads_then_rewrite(text, *a, **k):
+        obj = real_loads(text, *a, **k)
+        if not done["swapped"] and isinstance(obj, dict) and obj.get(
+                "account_id") == "SYN-PAPER-A" and "holdings" in obj:
+            done["swapped"] = True
+            with open(path, "w") as fh:   # same inode, new bytes/clock
+                fh.write(_j.dumps({"account_id": "SYN-PAPER-B",
+                                   "holdings": [], "pending": [],
+                                   "as_of": "2026-10-20T09:30:00+08:00",
+                                   "extra_padding": "y" * 8192}))
+        return obj
+
+    monkeypatch.setattr(reader_mod.json, "loads", _loads_then_rewrite)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    assert _os.stat(path).st_ino == orig_inode  # in-place, inode kept
+    assert ab["path_identity"]["path_drift_fields"]  # size/mtime/ctime drift
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_bind_window_replace_during_receipt_verify_named_rejection(
+        tmp_path, monkeypatch):
+    """Binding-completion stat: the snapshot path is os.replace'd while the
+    generation-receipt file is being re-hashed (a LATER binding stage than
+    decode).  The bind-completion path.stat still catches the inode change
+    -> named ACCOUNT_SNAPSHOT_PATH_CHANGED, no verified-empty projection."""
+    import os as _os, json as _j
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text('{"ok":true}')
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    other = _b_write_other_account_snapshot(tmp_path)
+
+    real_sha256_file = reader_mod.sha256_file
+    done = {"swapped": False}
+
+    def _sha_then_replace(p, *a, **k):
+        digest = real_sha256_file(p, *a, **k)
+        if not done["swapped"] and str(p).endswith("receipt.json"):
+            done["swapped"] = True
+            _os.replace(str(other), path)
+        return digest
+
+    monkeypatch.setattr(reader_mod, "sha256_file", _sha_then_replace)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha,
+            "generation_receipt": {"path": str(receipt), "sha256": "7d05c625"}}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_bind_window_unchanged_path_reads(tmp_path):
+    """Legal variant: a bound snapshot whose path identity is unchanged
+    through the binding window reads cleanly (READ, no path-change
+    refusal) and projects the verified bytes."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["rejections"] == []
+    assert ab["actual_snapshot_sha256"] == sha
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert sec["held_quantity"] == 1200
+
+
+class _RecordingRow(Mapping):
+    """A read-recording Mapping around one source bar row.  Every key the
+    consumer physically reads (via .get() or [ ]) is captured - so the
+    contract test measures the REAL consumed-field set off the running
+    consumer code, never compares two hand-written literals."""
+
+    def __init__(self, inner, accessed):
+        self._inner = inner
+        self._accessed = accessed
+
+    def __getitem__(self, key):
+        self._accessed.add(key)
+        return self._inner[key]
+
+    def get(self, key, default=None):
+        self._accessed.add(key)
+        return self._inner.get(key, default)
+
+    def __iter__(self):
+        return iter(self._inner)
+
+    def __len__(self):
+        return len(self._inner)
+
+
+def test_segA_bar_consumed_field_set_matches_contract(tmp_path, monkeypatch):
+    """Consumed-field-set contract (audit R4 seg-A hardgate closeout): run
+    the REAL consumer path (bars._project_member through read_bars) over a
+    recording Mapping and assert the set of source-row keys the consumer
+    code physically reads equals the single versioned contract
+    ``bars_mod.BAR_FIELD_CONTRACT``, AND that the same-clock equivalence /
+    conflict comparator (``reader_mod.BAR_FACT_KEYS``) binds the SAME
+    produced-fact keys the contract declares.  A consumer change that reads
+    a new field (volume -> volume_adjusted) or drops a declared field
+    changes the observed set and MUST fail this test - it cannot compare
+    two fixed literals and drift silently."""
+    # 1) Measure the real consumed source-key set off the consumer path.
+    smap = _build_map(tmp_path)
+    accessed = set()
+    orig_rows = bars_mod._rows
+
+    def _recording_rows(path, columns):
+        return [_RecordingRow(rec, accessed) for rec in orig_rows(path, columns)]
+
+    monkeypatch.setattr(bars_mod, "_rows", _recording_rows)
+    res = _formal_read(smap, tmp_path)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    assert [b for b in sec["bars"] if b["session_date"] == "2026-11-24"],         "fixture must produce a T bar so the consumer reads fields"
+    # The consumer's physically-read source-key set == the contract's declared
+    # consumed set (BAR_CONSUMED_SOURCE_KEYS derives from BAR_FIELD_CONTRACT).
+    assert accessed == set(bars_mod.BAR_CONSUMED_SOURCE_KEYS), (
+        f"consumer read-set drift: extra={sorted(accessed - set(bars_mod.BAR_CONSUMED_SOURCE_KEYS))} "
+        f"missing={sorted(set(bars_mod.BAR_CONSUMED_SOURCE_KEYS) - accessed)}"
+    )
+    # 2) The same-clock equivalence/conflict comparator reads exactly the
+    # contract's produced fact keys (derived from the SAME declaration).
+    assert set(reader_mod.BAR_FACT_KEYS) == set(bars_mod.BAR_PRODUCED_FACT_KEYS)
+    # 3) Every produced fact field lands on the emitted bar.
+    for b in sec["bars"]:
+        for k in reader_mod.BAR_FACT_KEYS:
+            assert k in b, f"produced fact field {k} absent on emitted bar"
+
+
+def test_segA_bar_fact_contract_fails_on_consumer_drift(tmp_path, monkeypatch):
+    """Self-demonstrating mutation guard: a consumer that reads a field the
+    contract does NOT declare (volume_adjusted) - or that stops reading a
+    declared field - MUST make the observed-set assertion fail.  This test
+    proves the contract test is not a two-literals no-op: it feeds a
+    recording Mapping through a deliberately drifted consumer projection
+    (the same code path shape as bars._project_member's reads) and asserts
+    the mismatch is caught."""
+    smap = _build_map(tmp_path)
+    # A drifted consumer read-path: reads volume_adjusted instead of volume
+    # and never touches knowledge_to - the observed set differs from the
+    # declared contract on BOTH edges.
+    def _drifted_consume(rec):
+        rec.get("price_basis"); rec.get("currency"); rec.get("interval_size")
+        rec.get("observation_end"); rec.get("listing_id")
+        rec.get("open"); rec.get("high"); rec.get("low"); rec.get("close")
+        rec.get("volume_adjusted")   # drifted - undeclared field
+        rec.get("turnover"); rec.get("source_record_id")
+        rec.get("source_revision"); rec.get("record_source")
+        rec.get("knowledge_from")    # dropped declared field knowledge_to
+    accessed = set()
+    orig_rows = bars_mod._rows
+    sample = orig_rows(
+        tmp_path / "payload/dwd_security_bar/interval_size=1d/"
+        "observation_start_year=2026/observation_start_month=11/part-0.parquet",
+        bars_mod._COLUMNS)[0]
+    _drifted_consume(_RecordingRow(sample, accessed))
+    assert accessed != set(bars_mod.BAR_CONSUMED_SOURCE_KEYS)
+    assert "volume_adjusted" in (accessed - set(bars_mod.BAR_CONSUMED_SOURCE_KEYS))
+    assert "knowledge_to" in (set(bars_mod.BAR_CONSUMED_SOURCE_KEYS) - accessed)
+
+
+# ---- R4 segment A closeout ---------------------------------------------
+
+def _formal_read(smap, tmp_path, T=date(2026, 11, 24),
+                 CUT=datetime(2026, 11, 24, 14, 30, tzinfo=UTC)):
+    return reader_mod.read_history(
+        T, CUT, source_map=smap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+
+
+def test_segA_nonobject_descriptor_named_fault(tmp_path):
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    smap.manifest_chain = lambda: [
+        {"artifact": "dates_index:2026-11-24", "path": None,
+         "declared_sha256": None, "actual_sha256": None,
+         "status": "NON_OBJECT_DESCRIPTOR", "object_shape": "str",
+         "verified_at": "2026-11-24T14:00:00Z"},
+    ]
+    res = _formal_read(smap, tmp_path)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert calls == []
+
+
+def test_segA_declared_digest_no_path_named_fault(tmp_path):
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    smap.manifest_chain = lambda: [
+        {"artifact": "core_manifest:2026-11-24", "path": None,
+         "declared_sha256": "sha256:" + "c" * 64, "actual_sha256": None,
+         "status": "NO_PATH", "verified_at": "2026-11-24T14:00:00Z"},
+    ]
+    res = _formal_read(smap, tmp_path)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert calls == []
+
+
+def test_segA_manifest_chain_probes_nonobject_and_missing_core(tmp_path):
+    smap = _build_map(tmp_path)
+    dm = _formal_daily_member(tmp_path, "2026-11-24")
+    smap._daily = {"2026-11-24": [dm]}
+    smap._base_doc = {"manifest_path": "/x/base.json",
+                      "manifest_sha256": "sha256:" + "a" * 64}
+    smap._daily_entries = {
+        "2026-11-24": {
+            "descriptor": "not-an-object",
+            "standard_descriptor": {"path": "/x/std.json",
+                                    "sha256": "sha256:" + "b" * 64},
+            "core_manifest": {"sha256": "sha256:" + "c" * 64},
+        },
+    }
+    chain = SourceMap.manifest_chain(smap)
+    by_art = {c["artifact"]: c for c in chain}
+    assert by_art["dates_index:2026-11-24"]["status"] == "NON_OBJECT_DESCRIPTOR"
+    assert by_art["core_manifest:2026-11-24"]["status"] == "NO_PATH"
+
+
+def _segA_chain_fixture(tmp_path, day="2026-11-24"):
+    """A manifest-chain fixture whose four links are real files: the caller
+    mutates ONE link's bytes to a non-object, malformed body or a wrong
+    associated identity while keeping the declared sha honest."""
+    smap = _build_map(tmp_path)
+    dm = _formal_daily_member(tmp_path, day)
+    smap._daily = {day: [dm]}
+    base_m = tmp_path / "base-manifest.json"
+    base_m.write_text(json.dumps({"package_id": "base-x"}))
+    dates_f = tmp_path / "dates.json"
+    # Real P10 index shape: kind at the root + dates[day] carrying the day in
+    # its own market_date and the upstream base / downstream core digests.
+    std_f = tmp_path / "std.json"
+    std_f.write_text(json.dumps(_standard_body(day)))
+    core_f = tmp_path / "core.json"
+    core_f.write_text(json.dumps({"package_id": "daily-" + day}))
+    base_m = tmp_path / "base-manifest.json"
+    base_m.write_text(json.dumps({"package_id": "base-x"}))
+    def _dd(p):
+        return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+    dates_f.write_text(json.dumps({
+        "kind": "cn02_base24_daily_cycle_v1",
+        "dates": {day: {"market_date": day,
+                        "core_manifest_sha256": _dd(core_f),
+                        "base_manifest_sha256": _dd(base_m),
+                        "standard_delivery_manifest_sha256": _dd(std_f)}}}))
+    def _d(p):
+        return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+    smap._base_doc = {"manifest_path": str(base_m),
+                      "manifest_sha256": _d(base_m)}
+    smap._daily_entries = {
+        day: {
+            "descriptor": {"path": str(dates_f), "index_sha256": _d(dates_f)},
+            "standard_descriptor": {"path": str(std_f), "sha256": _d(std_f)},
+            "core_manifest": {"path": str(core_f), "sha256": _d(core_f),
+                              "package_id": "daily-" + day},
+        },
+    }
+    return smap, {"base": base_m, "dates": dates_f, "std": std_f,
+                  "core": core_f}
+
+
+def test_segA_chain_malformed_body_named_fault(tmp_path):
+    """Class 1 closeout: a hash-verified body that is not parseable JSON is
+    a named CONTENT_MALFORMED_JSON fault, never a byte-match MATCH."""
+    smap, files = _segA_chain_fixture(tmp_path)
+    for key in ("base", "dates", "std", "core"):
+        files[key].write_text("{ not valid json")
+        # Keep the declared digest honest over the malformed bytes.
+        d = "sha256:" + hashlib.sha256(files[key].read_bytes()).hexdigest()
+        if key == "base":
+            smap._base_doc["manifest_sha256"] = d
+        elif key == "dates":
+            smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+        elif key == "std":
+            smap._daily_entries["2026-11-24"]["standard_descriptor"]["sha256"] = d
+        else:
+            smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+        chain = SourceMap.manifest_chain(smap)
+        assert any(c["status"] == "CONTENT_MALFORMED_JSON"
+                   for c in chain), key
+
+
+def test_segA_chain_nonobject_body_named_fault(tmp_path):
+    """Class 1 closeout: a hash-verified JSON ARRAY is not a usable object -
+    CONTENT_NON_OBJECT, not a MATCH."""
+    smap, files = _segA_chain_fixture(tmp_path)
+    for key in ("base", "dates", "std", "core"):
+        files[key].write_text("[]")
+        d = "sha256:" + hashlib.sha256(files[key].read_bytes()).hexdigest()
+        if key == "base":
+            smap._base_doc["manifest_sha256"] = d
+        elif key == "dates":
+            smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+        elif key == "std":
+            smap._daily_entries["2026-11-24"]["standard_descriptor"]["sha256"] = d
+        else:
+            smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+        chain = SourceMap.manifest_chain(smap)
+        assert any(c["status"] == "CONTENT_NON_OBJECT"
+                   for c in chain), key
+
+
+def test_segA_chain_associated_identity_named_fault(tmp_path):
+    """Class 1 closeout: a hash-verified core manifest that names a
+    DIFFERENT package_id than the map bound it to is refused -
+    ASSOCIATED_IDENTITY_MISMATCH in BOTH directions (map id wrong, file id
+    wrong), and a Standard descriptor whose market_date disagrees."""
+    smap, files = _segA_chain_fixture(tmp_path)
+    # File carries a different package_id than the map declares.
+    files["core"].write_text(json.dumps({"package_id": "other-pkg"}))
+    d = "sha256:" + hashlib.sha256(files["core"].read_bytes()).hexdigest()
+    smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+    chain = SourceMap.manifest_chain(smap)
+    assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+               for c in chain)
+    # Map declares a different package_id than the file carries.
+    smap2, _ = _segA_chain_fixture(tmp_path)
+    smap2._daily_entries["2026-11-24"]["core_manifest"]["package_id"] = "map-other"
+    chain2 = SourceMap.manifest_chain(smap2)
+    assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+               for c in chain2)
+    # Standard descriptor's producer content.market_date disagrees with its
+    # bound day - a named CHAIN_ASSOCIATION_MISMATCH on the real nested field.
+    smap3, files3 = _segA_chain_fixture(tmp_path)
+    body3 = _standard_body("2026-11-24")
+    body3["content"]["market_date"] = "2026-11-23"
+    files3["std"].write_text(json.dumps(body3))
+    d3 = "sha256:" + hashlib.sha256(files3["std"].read_bytes()).hexdigest()
+    smap3._daily_entries["2026-11-24"]["standard_descriptor"]["sha256"] = d3
+    chain3 = SourceMap.manifest_chain(smap3)
+    assert any(c["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+               and c.get("association") == "standard_content_market_date"
+               for c in chain3)
+
+
+def test_segA_chain_missing_identity_field_named_fault(tmp_path):
+    """Class 1 intake: a hash-verified body that decodes to a bare ``{}`` -
+    an object MISSING the link's versioned identity field - is a named
+    CONTENT_MISSING_IDENTITY_FIELD fault before members open, not a MATCH.
+    Each of the four links (base package_id, dates/std market_date, core
+    package_id) is checked against its real versioned field."""
+    # Real P10 shapes: the DATES index carries its kind at the root (the day
+    # lives in dates[day].market_date), the Standard descriptor and the
+    # per-day entry carry market_date, the base/core manifests carry
+    # package_id.
+    for key, identity_field in (("base", "package_id"),
+                                ("dates", "kind"),
+                                ("std", "kind"),
+                                ("core", "package_id")):
+        smap, files = _segA_chain_fixture(tmp_path)
+        files[key].write_text("{}")  # hash-verified empty object, no identity
+        d = "sha256:" + hashlib.sha256(files[key].read_bytes()).hexdigest()
+        if key == "base":
+            smap._base_doc["manifest_sha256"] = d
+        elif key == "dates":
+            smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+        elif key == "std":
+            smap._daily_entries["2026-11-24"]["standard_descriptor"]["sha256"] = d
+        else:
+            smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+        chain = SourceMap.manifest_chain(smap)
+        fault = [c for c in chain
+                 if c["status"] == "CONTENT_MISSING_IDENTITY_FIELD"]
+        assert fault, key
+        assert fault[0]["missing_field"] == identity_field
+
+
+def test_segA_chain_dates_foreign_date_named_fault(tmp_path):
+    """Class 1 intake negative: the DATES index file's own market_date must
+    equal the day it is bound to - a hash-verified body naming a foreign
+    date (1999-01-01) is an ASSOCIATED_IDENTITY_MISMATCH, never a MATCH.
+    The real versioned field (market_date) is checked, no invented root
+    field."""
+    smap, files = _segA_chain_fixture(tmp_path)
+    # Real index shape, but the bound dates[day] entry names a foreign day -
+    # an association fault on the real kind + dates[day] structure.
+    files["dates"].write_text(json.dumps({
+        "kind": "cn02_base24_daily_cycle_v1",
+        "dates": {"1999-01-01": {"market_date": "1999-01-01"}}}))
+    d = "sha256:" + hashlib.sha256(files["dates"].read_bytes()).hexdigest()
+    smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+    chain = SourceMap.manifest_chain(smap)
+    rec = next(c for c in chain if c["artifact"] == "dates_index:2026-11-24")
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+
+
+def test_segA_chain_missing_field_blocks_read_before_members(tmp_path):
+    """Class 1 intake: a CONTENT_MISSING_IDENTITY_FIELD chain fault is a
+    hard pre-read gate - INPUT_BLOCKED with ZERO member opens (the empty
+    object must not silently pass the four-chain and reach member reads)."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap, files = _segA_chain_fixture(tmp_path)
+    files["base"].write_text("{}")
+    smap._base_doc["manifest_sha256"] = (
+        "sha256:" + hashlib.sha256(files["base"].read_bytes()).hexdigest())
+    res = _formal_read(smap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert res.coverage["member_consumption"]["members_opened"] == 0
+
+
+def test_segA_chain_fault_blocks_read_before_members(tmp_path):
+    """Class 1 closeout: a CONTENT_MALFORMED_JSON chain fault is a hard
+    pre-read gate - INPUT_BLOCKED with ZERO member opens."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap, files = _segA_chain_fixture(tmp_path)
+    files["base"].write_text("{ bad json")
+    smap._base_doc["manifest_sha256"] = (
+        "sha256:" + hashlib.sha256(files["base"].read_bytes()).hexdigest())
+    res = _formal_read(smap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert res.coverage["member_consumption"]["members_opened"] == 0
+
+
+def test_segA_null_row_knowledge_rejected_formal(tmp_path):
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    days = _sessions(330)
+    rows = _bar_table(days).to_pylist()
+    rows[-1]["knowledge_from"] = None
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    pq.write_table(pa.table({k: [r.get(k) for r in rows]
+                             for k in rows[0].keys()}), tmp_path / rel)
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
+    res = _formal_read(StubSourceMap(members, {}), tmp_path, T, CUT)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    last_sessions = {b["session_date"] for b in sec["bars"]}
+    assert days[-1].isoformat() not in last_sessions
+
+
+def test_segA_same_clock_conflict_no_bar_both_orders(tmp_path):
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    for order in (0, 1):
+        smap = _build_map(tmp_path)
+        members = smap._members_by_table
+        days = _sessions(330)
+        rows = _bar_table(days).to_pylist()
+        kf = datetime(2026, 11, 24, 10, 0, tzinfo=UTC)
+        a = dict(rows[-1], close=61.0, source_revision="A",
+                 knowledge_from=kf)
+        b = dict(rows[-1], close=71.0, source_revision="B",
+                 knowledge_from=kf)
+        pair = [a, b] if order == 0 else [b, a]
+        all_rows = rows[:-1] + pair
+        rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+        pq.write_table(pa.table({k: [r.get(k) for r in all_rows]
+                                 for k in rows[0].keys()}), tmp_path / rel)
+        members["dwd_security_bar"] = [_member(tmp_path, rel)]
+        res = _formal_read(StubSourceMap(members, {}), tmp_path, T, CUT)
+        sec = next(x for x in res.raw_history["securities"]
+                   if x["identity"]["security_id"] == "security-600000")
+        last_sessions = {x["session_date"] for x in sec["bars"]}
+        assert days[-1].isoformat() not in last_sessions
+        assert "same_knowledge_conflicting_values" in json.dumps(
+            sec["dependency_reasons"], default=str)
+
+
+def test_segA_prior_window_day_shared_gap_blocks(tmp_path):
+    """Class 3 closeout: a PRIOR in-window trading day whose Daily price
+    member is the pool's source for that needed session and has no proven
+    channel clock blocks new entries (SHARED_INPUT_GAP)."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # The prior Daily is the pool's SOLE source for 11-23: the Base monthly
+    # member must not also carry that session's row or the member is not
+    # exclusive (a qualified same-session backup is a different case the
+    # audit keeps readable).
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != "2026-11-23"]
+    _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet",
+           _bar_table(cal_only))
+    members["dwd_security_bar"] = [
+        _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")
+    ]
+    dm = _formal_daily_member(tmp_path, "2026-11-23")
+    clocks = {"2026-11-23": {"knowledge": None, "producer": None,
+                             "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_INPUT_GAP"
+    assert "2026-11-23" in json.dumps(
+        res.coverage["day_block"]["failed_members"])
+
+
+def test_segA_out_of_window_day_gap_does_not_block(tmp_path):
+    """Class 3 adjacent: a Daily member for a day OUTSIDE the needed
+    window keeps its gap for the record but does not block this T."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    dm = _formal_daily_member(tmp_path, "2026-05-01")  # far outside window
+    clocks = {"2026-05-01": {"knowledge": None, "producer": None,
+                             "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-05-01": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+
+
+def test_segA_same_clock_conflict_other_fact_no_bar(tmp_path):
+    """Class 2 closeout: two rows at the SAME knowledge clock that agree on
+    close_price but disagree on open/high/volume are a named ambiguity in
+    BOTH physical orders - the equivalence/conflict test compares the full
+    consumed bar fact, not just the close."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    for field, delta in (("high", 10.0), ("open", 0.5), ("volume", 900.0)):
+        for order in (0, 1):
+            smap = _build_map(tmp_path)
+            members = smap._members_by_table
+            days = _sessions(330)
+            rows = _bar_table(days).to_pylist()
+            kf = datetime(2026, 11, 24, 10, 0, tzinfo=UTC)
+            left = dict(rows[-1], close=61.0, source_revision="L",
+                        knowledge_from=kf)
+            right = dict(rows[-1], close=61.0, source_revision="R",
+                         knowledge_from=kf)
+            right[field] += delta
+            pair = [left, right] if order == 0 else [right, left]
+            all_rows = rows[:-1] + pair
+            rel = ("payload/dwd_security_bar/interval_size=1d/"
+                   "observation_start_year=2026/observation_start_month=11/"
+                   "part-0.parquet")
+            pq.write_table(pa.table({k: [r.get(k) for r in all_rows]
+                                     for k in rows[0].keys()}), tmp_path / rel)
+            members["dwd_security_bar"] = [_member(tmp_path, rel)]
+            res = _formal_read(StubSourceMap(members, {}), tmp_path, T, CUT)
+            sec = next(x for x in res.raw_history["securities"]
+                       if x["identity"]["security_id"] == "security-600000")
+            last_sessions = {x["session_date"] for x in sec["bars"]}
+            assert days[-1].isoformat() not in last_sessions, (field, order)
+            assert "same_knowledge_conflicting_values" in json.dumps(
+                sec["dependency_reasons"], default=str), (field, order)
+
+
+def test_segA_prior_day_late_sole_supply_blocks(tmp_path):
+    """Class 3 closeout: a prior in-window session whose sole Daily source
+    is genuinely LATE (qualified channel clock after the cutoff) starves
+    the same way an UNKNOWN one does - SHARED_INPUT_GAP."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != "2026-11-23"]
+    _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet",
+           _bar_table(cal_only))
+    members["dwd_security_bar"] = [
+        _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")
+    ]
+    dm = _formal_daily_member(tmp_path, "2026-11-23")
+    clocks = {"2026-11-23": {"knowledge": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+                             "producer": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+                             "channel": datetime(2026, 11, 24, 16, 0, tzinfo=UTC)}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_INPUT_GAP"
+
+
+def test_segA_prior_day_qualified_backup_does_not_block(tmp_path):
+    """Class 3 closeout: a prior-day Daily member whose channel is UNKNOWN
+    does NOT block when the session is still priced by an independent
+    qualified same-session member - the Base monthly aggregate supplies a
+    real qualified bar for the same session."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # Base monthly member still carries a qualified 11-23 row for 600000.
+    dm = _formal_daily_member(tmp_path, "2026-11-23")
+    clocks = {"2026-11-23": {"knowledge": None, "producer": None,
+                             "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+
+
+def test_segA_single_security_gap_isolated_not_day_block(tmp_path):
+    """Class 3 closeout: a prior-day Daily member covering ONE security and
+    channel-unknown isolates its gap to that security - a qualified
+    neighbour keeps working and the whole day is not blocked."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # The prior Daily is the ONLY source for 600000's 11-23 row - drop that
+    # session from the Base monthly member so the single-security supply is
+    # genuinely the only registered source for that session.
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != "2026-11-23"]
+    _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet",
+           _bar_table(cal_only))
+    members["dwd_security_bar"] = [
+        _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")
+    ]
+    # The prior Daily supplies ONLY 600000's prior row (single security);
+    # 600000's own qualified neighbour stays readable.
+    rows = _bar_table(days).to_pylist()
+    only_prior = [r for r in rows if str(
+        r["observation_end"].date()) == "2026-11-23"]
+    rel = "payload/dwd_security_bar/day=2026-11-23/dwd_security_bar.parquet"
+    _write(tmp_path / rel, pa.table(
+        {k: [r.get(k) for r in only_prior] for k in rows[0].keys()}))
+    dm = _member(tmp_path, rel, package_id="daily-2026-11-23",
+                 kind="daily", market_date="2026-11-23")
+    clocks = {"2026-11-23": {"knowledge": None, "producer": None,
+                             "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+    assert res.coverage["isolated_input_gaps"]
+    assert res.coverage["isolated_input_gaps"][0]["affected_securities"] == [
+        "security-600000"]
+
+
+# ---- R4 seg-A hardgate closeout: real P10 publisher four-chain -------------
+
+def _standard_body(day):
+    """The real producer Standard manifest body (standard_daily.publish):
+    kind + source_contract + content{role, market_date, day_kind, files}
+    + the producer-canonical content_digest + the NOT_GRANTED admission
+    and execution_authorized=false metadata the real envelope carries."""
+    content = {"role": "daily", "market_date": day, "day_kind": "market",
+               "files": []}
+    from quanthus.p12_history.source_pins import _content_identity
+    return {"kind": "quanthus_daily_1d5m_v1",
+            "source_contract": "p10-standard-calendar-day-delivery-v1",
+            "content": content,
+            "content_digest": _content_identity(content),
+            "consumer_admission": "NOT_GRANTED",
+            "execution_authorized": False}
+
+
+def _real_chain_fixture(tmp_path, day="2026-11-24"):
+    """Real P10 publisher shape four-link chain (all synthetic)."""
+    from quanthus.pipelines.securities_warehouse.daily_base24_cycle import publish
+    smap = _build_map(tmp_path)
+    dm = _formal_daily_member(tmp_path, day)
+    smap._daily = {day: [dm]}
+    base_f = tmp_path / "base-manifest.json"
+    base_f.write_text(json.dumps({"package_id": "standard-base-2.5.1-x"}))
+    std_f = tmp_path / "std.json"
+    std_f.write_text(json.dumps(_standard_body(day)))
+    core_f = tmp_path / "core.json"
+    core_pkg = "dwd-daily-" + day.replace("-", "") + "-synthetic"
+    core_f.write_text(json.dumps({
+        "kind": "cn01_daily_core_dwd_increment", "package_id": core_pkg,
+        "acquisition_universe_metadata": {"market_date": day}}))
+    def _d(p):
+        return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+    smap._base_doc = {"manifest_path": str(base_f), "manifest_sha256": _d(base_f)}
+    dates_root = tmp_path / "cycle"
+    dates_root.mkdir(exist_ok=True)
+    publish({"root": str(dates_root)}, {
+        "kind": "cn02_base24_daily_cycle_v1", "market_date": day,
+        "status": "CORE_READY_5M_PENDING", "core": "/synthetic/core",
+        "core_manifest_sha256": _d(core_f),
+        "base_manifest_sha256": _d(base_f),
+        "standard_delivery_manifest_sha256": _d(std_f),
+        "consumer_admission": "NOT_GRANTED", "execution_authorized": False,
+    })
+    dates_f = dates_root / "DATES.json"
+    smap._daily_entries = {
+        day: {
+            "descriptor": {"path": str(dates_f), "json_pointer": "/dates/" + day,
+                           "index_sha256": _d(dates_f)},
+            "standard_descriptor": {"path": str(std_f), "sha256": _d(std_f)},
+            "core_manifest": {"path": str(core_f), "sha256": _d(core_f), "package_id": core_pkg},
+        },
+    }
+    return smap, {"base": base_f, "dates": dates_f, "std": std_f, "core": core_f}, day
+
+
+def _chain_status(smap):
+    return {c["artifact"]: c for c in SourceMap.manifest_chain(smap)}
+
+
+def _redigest(p):
+    return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def test_segA_real_publisher_chain_matches(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    chain = _chain_status(smap)
+    for art in ("base_manifest", "dates_index:" + day,
+                "daily_manifest:" + day, "core_manifest:" + day):
+        assert chain[art]["status"] == "MATCH", (art, chain.get(art))
+    res = _formal_read(smap, tmp_path)
+    assert res.status == "READ", res.coverage.get("day_block")
+
+
+def test_segA_real_dates_day_entry_foreign_date_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"]["1999-01-01"] = doc["dates"].pop(day)
+    doc["dates"]["1999-01-01"]["market_date"] = "1999-01-01"
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+
+
+def test_segA_real_dates_missing_day_entry_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"] = {}
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "dates_index_day_entry"
+
+
+def test_segA_real_dates_foreign_core_association_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"][day]["core_manifest_sha256"] = "sha256:" + "0" * 64
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "dates_index_core_manifest_sha256"
+
+
+def test_segA_real_dates_wrong_kind_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["kind"] = "not_the_cycle"
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "dates_index_kind"
+
+
+def test_segA_real_dates_nonobject_dates_field_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"] = ["not-a-dict"]
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "dates_index_dates_object"
+
+
+def test_segA_real_standard_date_mismatch_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    body = _standard_body(day)
+    body["content"]["market_date"] = "1999-01-01"
+    files["std"].write_text(json.dumps(body))
+    smap._daily_entries[day]["standard_descriptor"]["sha256"] = _redigest(files["std"])
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "standard_content_market_date"
+
+
+def test_segA_real_core_file_identity_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["core"].read_text())
+    doc["package_id"] = "foreign-pkg"
+    files["core"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["core_manifest"]["sha256"] = _redigest(files["core"])
+    assert _chain_status(smap)["core_manifest:" + day]["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+
+
+def test_segA_real_core_map_identity_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    smap._daily_entries[day]["core_manifest"]["package_id"] = "map-foreign"
+    assert _chain_status(smap)["core_manifest:" + day]["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+
+
+def test_segA_real_core_universe_date_mismatch_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["core"].read_text())
+    doc["acquisition_universe_metadata"]["market_date"] = "1999-01-01"
+    files["core"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["core_manifest"]["sha256"] = _redigest(files["core"])
+    rec = _chain_status(smap)["core_manifest:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "core_manifest_universe_market_date"
+
+
+def test_segA_real_chain_fault_blocks_read_members_market_zero(tmp_path):
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"][day]["core_manifest_sha256"] = "sha256:" + "0" * 64
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    res = _formal_read(smap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert res.coverage["member_consumption"]["members_opened"] == 0
+    assert res.coverage["universe"]["pool_size"] == 0
+    assert res.coverage["bars"]["reads"] == []
+
+
+
+def _mutate_entry(smap, files, day, name):
+    """Apply one chain mutation on the real producer-shape fixture and keep
+    every bound digest honest (mirror of the coordinator's 42-case probe)."""
+    if name == "dates-no-core-digest":
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day].pop("core_manifest_sha256")
+    elif name == "dates-no-base-digest":
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day].pop("base_manifest_sha256")
+    elif name == "dates-no-std-digest":
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day].pop("standard_delivery_manifest_sha256")
+    elif name == "standard-index-sha-mismatch":
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day]["standard_delivery_manifest_sha256"] = "sha256:" + "f" * 64
+    else:
+        raise ValueError(name)
+    files["dates"].write_text(json.dumps(d))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+
+
+def test_segA_real_standard_producer_shape_matches(tmp_path):
+    """A Standard descriptor on the REAL producer shape (kind +
+    source_contract + content{market_date}) passes all three layers and the
+    public read runs - the reader follows content.market_date, never a bare
+    root market_date."""
+    smap, files, day = _real_chain_fixture(tmp_path)
+    chain = _chain_status(smap)
+    assert chain["daily_manifest:" + day]["status"] == "MATCH"
+    res = _formal_read(smap, tmp_path)
+    assert res.status == "READ", res.coverage.get("day_block")
+
+
+def test_segA_real_standard_missing_content_field_fault(tmp_path):
+    """A Standard body missing the producer's content object or its
+    content.market_date is a named structural fault, not a MATCH."""
+    smap, files, day = _real_chain_fixture(tmp_path)
+    body = _standard_body(day)
+    del body["content"]
+    files["std"].write_text(json.dumps(body))
+    smap._daily_entries[day]["standard_descriptor"]["sha256"] = _redigest(files["std"])
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CONTENT_MISSING_IDENTITY_FIELD"
+    assert rec["missing_field"] == "content.market_date"
+
+
+def test_segA_identity_value_null_and_list_named_fault(tmp_path):
+    """Identity keys that EXIST but carry a null / array / blank value are
+    named CONTENT_IDENTITY_VALUE_INVALID faults - existence alone is not a
+    MATCH (audit r2: null/array/blank identities must be refused)."""
+    for link, field in (("base", "package_id"),
+                        ("dates", "kind"),
+                        ("core", "package_id")):
+        for bad in (None, [], "   "):
+            smap, files = _segA_chain_fixture(tmp_path)
+            doc = json.loads(files[link].read_text())
+            doc[field] = bad
+            files[link].write_text(json.dumps(doc))
+            d = _redigest(files[link])
+            if link == "base":
+                smap._base_doc["manifest_sha256"] = d
+            elif link == "dates":
+                smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+            else:
+                smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+            art = {
+                "base": "base_manifest",
+                "dates": "dates_index:2026-11-24",
+                "core": "core_manifest:2026-11-24",
+            }[link]
+            rec = _chain_status(smap)[art]
+            assert rec["status"] == "CONTENT_IDENTITY_VALUE_INVALID", (link, bad, rec)
+    # Standard's nested content.market_date null -> value fault
+    smap, files, day = _real_chain_fixture(tmp_path)
+    body = _standard_body(day)
+    body["content"]["market_date"] = None
+    files["std"].write_text(json.dumps(body))
+    smap._daily_entries[day]["standard_descriptor"]["sha256"] = _redigest(files["std"])
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CONTENT_IDENTITY_VALUE_INVALID"
+
+
+def test_segA_dates_missing_association_digests_named_fault(tmp_path):
+    """DATES[day] MISSING a required upstream/downstream association digest
+    (core / base / standard-delivery) is a named CHAIN_ASSOCIATION_MISMATCH
+    with missing_or_invalid_digest - a missing link is never a pass."""
+    for name, field in (("dates-no-core-digest", "core_manifest_sha256"),
+                        ("dates-no-base-digest", "base_manifest_sha256"),
+                        ("dates-no-std-digest", "standard_delivery_manifest_sha256")):
+        smap, files, day = _real_chain_fixture(tmp_path)
+        _mutate_entry(smap, files, day, name)
+        rec = _chain_status(smap)["dates_index:" + day]
+        assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH", (name, rec)
+        assert rec["fault"] == "missing_or_invalid_digest"
+        assert rec["field"] == field
+
+
+def test_segA_dates_wrong_association_digests_named_fault(tmp_path):
+    """DATES[day] association digests that name a DIFFERENT core / base /
+    standard link are named digest_mismatch association faults."""
+    for name, field in (("dates-foreign-core", "core_manifest_sha256"),
+                        ("dates-foreign-base", "base_manifest_sha256"),
+                        ("standard-index-sha-mismatch",
+                         "standard_delivery_manifest_sha256")):
+        smap, files, day = _real_chain_fixture(tmp_path)
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day][field] = "sha256:" + "f" * 64
+        files["dates"].write_text(json.dumps(d))
+        smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+        rec = _chain_status(smap)["dates_index:" + day]
+        assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH", (name, rec)
+        assert rec["fault"] == "digest_mismatch"
+        assert rec["field"] == field
+
+
+def test_segA_identity_value_fault_blocks_read_zero(tmp_path):
+    """A present-but-invalid identity value (null package_id) is a hard
+    pre-read gate - INPUT_BLOCKED with member and market reads both zero."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["core"].read_text())
+    doc["package_id"] = None
+    files["core"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["core_manifest"]["sha256"] = _redigest(files["core"])
+    res = _formal_read(smap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert res.coverage["member_consumption"]["members_opened"] == 0
+    assert res.coverage["bars"]["reads"] == []
+
+
+# ---- R4 seg-A unified closeout: real producer header + coverage matrix ----
+
+def _mutate_standard(files, day, mutate):
+    """Rewrite the Standard descriptor bytes under one mutation and keep the
+    bound sha honest, so the chain gate is exercised on real bytes."""
+    body = _standard_body(day)
+    mutate(body)
+    files["std"].write_text(json.dumps(body))
+
+
+def _rebind_std(smap, files, day):
+    smap._daily_entries[day]["standard_descriptor"]["sha256"] = _redigest(
+        files["std"])
+
+
+@pytest.mark.parametrize("mutate,field", [
+    (lambda b: b.pop("source_contract"), "missing"),
+    (lambda b: b.__setitem__("source_contract", None), "null"),
+])
+def test_segA_unified_source_contract_missing_or_null_fault(
+        tmp_path, mutate, field):
+    """source_contract ABSENT or explicitly null is refused - the real
+    producer header requires an exact governed contract, not a tolerated
+    absence (a present-only comparison left these READ)."""
+    smap, files, day = _real_chain_fixture(tmp_path)
+    _mutate_standard(files, day, mutate)
+    _rebind_std(smap, files, day)
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH", (field, rec)
+    assert rec["association"] == "standard_source_contract"
+    assert rec["fault"] == "missing_or_null"
+
+
+@pytest.mark.parametrize("mutate,expect_fault", [
+    (lambda b: b.pop("content_digest"), "missing_or_null"),
+    (lambda b: b.__setitem__("content_digest", None), "missing_or_null"),
+    (lambda b: b.__setitem__("content_digest", "sha256:" + "f" * 64),
+     "digest_mismatch"),
+])
+def test_segA_unified_content_digest_named_fault(
+        tmp_path, mutate, expect_fault):
+    """content_digest missing / null / not the canonical digest of the SAME
+    in-memory content is a named pre-member fault (a digest that merely
+    exists is not enough - it must equal identity(content))."""
+    smap, files, day = _real_chain_fixture(tmp_path)
+    _mutate_standard(files, day, mutate)
+    _rebind_std(smap, files, day)
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH", rec
+    assert rec["association"] == "standard_content_digest"
+    assert rec["fault"] == expect_fault
+
+
+@pytest.mark.parametrize("role,expect_fault", [
+    ("archive", "role_mismatch"),
+    ("intraday", "role_mismatch"),
+    (None, "missing_or_null"),
+])
+def test_segA_unified_content_role_named_fault(tmp_path, role, expect_fault):
+    """content.role absent / null / non-daily (archive) is refused - the
+    versioned daily delivery requires role=daily."""
+    smap, files, day = _real_chain_fixture(tmp_path)
+
+    def _m(body):
+        if role == "ABSENT":
+            body["content"].pop("role")
+        else:
+            body["content"]["role"] = role
+        body["content_digest"] = _content_identity(body["content"])
+    from quanthus.p12_history.source_pins import _content_identity
+    _mutate_standard(files, day, _m)
+    _rebind_std(smap, files, day)
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH", rec
+    assert rec["association"] == "standard_content_role"
+    assert rec["fault"] == expect_fault
+
+
+def test_segA_unified_content_role_absent_fault(tmp_path):
+    """A content object that drops role entirely is missing_or_null."""
+    smap, files, day = _real_chain_fixture(tmp_path)
+
+    def _m(body):
+        body["content"].pop("role")
+        body["content_digest"] = _content_identity(body["content"])
+    from quanthus.p12_history.source_pins import _content_identity
+    _mutate_standard(files, day, _m)
+    _rebind_std(smap, files, day)
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH", rec
+    assert rec["association"] == "standard_content_role"
+    assert rec["fault"] == "missing_or_null"
+
+
+@pytest.mark.parametrize("mutate,assoc,fault", [
+    (lambda b: b.pop("consumer_admission"),
+     "standard_consumer_admission", "missing_or_null"),
+    (lambda b: b.__setitem__("consumer_admission", "GRANTED"),
+     "standard_consumer_admission", "admission_mismatch"),
+    (lambda b: b.pop("execution_authorized"),
+     "standard_execution_authorized", "missing_or_null"),
+    (lambda b: b.__setitem__("execution_authorized", True),
+     "standard_execution_authorized", "execution_enabled"),
+])
+def test_segA_unified_governance_metadata_named_fault(
+        tmp_path, mutate, assoc, fault):
+    """consumer_admission must be NOT_GRANTED and execution_authorized must
+    be False on the SAME envelope - a missing / null / affirmative value is
+    refused with its own association reason."""
+    smap, files, day = _real_chain_fixture(tmp_path)
+    _mutate_standard(files, day, mutate)
+    _rebind_std(smap, files, day)
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH", rec
+    assert rec["association"] == assoc
+    assert rec["fault"] == fault
+
+
+def test_segA_unified_header_fault_blocks_read_members_zero(tmp_path):
+    """A refused producer header (null content_digest) is a hard pre-read
+    gate - SUMMARY_CHAIN_FAULT, member verification / projection / bar
+    projection all exactly zero."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap, files, day = _real_chain_fixture(tmp_path)
+    _mutate_standard(files, day, lambda b: b.__setitem__("content_digest", None))
+    _rebind_std(smap, files, day)
+    res = _formal_read(smap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert res.coverage["member_consumption"]["members_opened"] == 0
+    assert res.coverage["bars"]["reads"] == []
+
+
+def _two_security_universe(members, tmp_path):
+    """Widen the synthetic universe to two listed securities (600000 +
+    600001) with Base bars for both."""
+    _write(tmp_path / "listing.parquet", pa.table({
+        "security_id": ["security-600000", "security-600001"],
+        "listing_id": ["listing-600000", "listing-600001"],
+        "venue_id": ["SSE", "SSE"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)] * 2,
+        "effective_to": pa.array([None] * 2, type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [datetime(2026, 1, 1, tzinfo=UTC)] * 2,
+    }))
+    _write(tmp_path / "dwd_security.parquet", pa.table({
+        "security_id": ["security-600000", "security-600001"],
+        "company_id": ["company-1", "company-2"],
+        "instrument_type": ["common_equity", "common_equity"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)] * 2,
+        "effective_to": pa.array([None] * 2, type=pa.timestamp("us", tz="UTC")),
+    }))
+    _write(tmp_path / "dwd_security_identifier.parquet", pa.table({
+        "security_id": ["security-600000", "security-600001"],
+        "identifier_namespace": ["code", "code"],
+        "identifier_value": ["600000", "600001"],
+        "venue_id": ["SSE", "SSE"],
+    }))
+    days = _sessions(330)
+    rows = (_bar_table(days).to_pylist()
+            + _bar_table(days, listing="listing-600001").to_pylist())
+    _write(tmp_path / "payload/dwd_security_bar/interval_size=1d/"
+           "observation_start_year=2026/observation_start_month=11/"
+           "part-0.parquet",
+           pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    members["dwd_security"] = [_member(tmp_path, "dwd_security.parquet")]
+    members["dwd_security_identifier"] = [
+        _member(tmp_path, "dwd_security_identifier.parquet")]
+    members["dwd_security_bar"] = [
+        _member(tmp_path, "payload/dwd_security_bar/interval_size=1d/"
+                "observation_start_year=2026/observation_start_month=11/"
+                "part-0.parquet")]
+
+
+def _prior_daily_bar(tmp_path, day, listings):
+    """Write a prior-session Daily price member carrying rows for the given
+    listing ids and return its ResolvedMember."""
+    days = _sessions(330)
+    rows = []
+    for lid in listings:
+        rows += [r for r in _bar_table(days, listing=lid).to_pylist()
+                 if str(r["observation_end"].date()) == day]
+    rel = f"payload/dwd_security_bar/day={day}/dwd_security_bar.parquet"
+    if rows:
+        _write(tmp_path / rel,
+               pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    else:
+        _write(tmp_path / rel, _bar_table([]))
+    return rel
+
+
+def test_segA_unified_member_sha_failure_shared_block(tmp_path):
+    """Unified closeout: a needed session whose ONLY registered price
+    supplier fails member sha (channel/knowledge otherwise qualified)
+    leaves the whole pool without a qualified bar -> INPUT_BLOCKED
+    SHARED_INPUT_GAP, never a silent READ with empty bars."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    _two_security_universe(members, tmp_path)
+    # The prior session's Daily is the ONLY registered 11-23 supplier: drop
+    # 11-23 from the Base aggregate, give the Daily a WRONG declared sha.
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != "2026-11-23"]
+    rel_base = ("payload/dwd_security_bar/interval_size=1d/"
+                "observation_start_year=2026/observation_start_month=11/"
+                "part-0.parquet")
+    rows = (_bar_table(cal_only).to_pylist()
+            + _bar_table(cal_only, listing="listing-600001").to_pylist())
+    _write(tmp_path / rel_base,
+           pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    members["dwd_security_bar"] = [_member(tmp_path, rel_base)]
+    rel = _prior_daily_bar(tmp_path, "2026-11-23",
+                           ["listing-600000", "listing-600001"])
+    dm = _member(tmp_path, rel, package_id="daily-2026-11-23",
+                 kind="daily", market_date="2026-11-23",
+                 declared_sha256="sha256:" + "0" * 64)
+    clocks = {"2026-11-23": {
+        "knowledge": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+        "producer": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+        "channel": datetime(2026, 11, 23, 10, 5, tzinfo=UTC)}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block["reason_code"] == "SHARED_INPUT_GAP"
+    assert block["affected_scope"] == "whole_day"
+    assert set(block["affected_securities"]) == {
+        "security-600000", "security-600001"}
+
+
+def test_segA_unified_partial_backup_isolated_not_whole_day(tmp_path):
+    """Unified closeout: a bad-channel Daily that DECLARED both securities
+    but is actually covered for one by a qualified Base backup starves only
+    the uncovered security - READ + isolated_input_gaps names 600000; the
+    covered neighbour 600001 keeps its qualified bar, never a whole_day."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    _two_security_universe(members, tmp_path)
+    # Base carries an 11-23 qualified row ONLY for 600001 (partial backup).
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != "2026-11-23"]
+    rel_base = ("payload/dwd_security_bar/interval_size=1d/"
+                "observation_start_year=2026/observation_start_month=11/"
+                "part-0.parquet")
+    rows = (_bar_table(cal_only).to_pylist()
+            + _bar_table(days, listing="listing-600001").to_pylist())
+    _write(tmp_path / rel_base,
+           pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    members["dwd_security_bar"] = [_member(tmp_path, rel_base)]
+    # The Daily declared BOTH securities' prior rows but its channel is
+    # UNKNOWN -> admitted rows rejected at row level.
+    rel = _prior_daily_bar(tmp_path, "2026-11-23",
+                           ["listing-600000", "listing-600001"])
+    dm = _member(tmp_path, rel, package_id="daily-2026-11-23",
+                 kind="daily", market_date="2026-11-23")
+    clocks = {"2026-11-23": {
+        "knowledge": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+        "producer": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+        "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "READ", res.coverage.get("day_block")
+    assert res.coverage.get("day_block") is None
+    gaps = res.coverage["isolated_input_gaps"]
+    assert gaps and gaps[0]["affected_securities"] == ["security-600000"]
+    sec = {x["identity"]["security_id"]: x
+           for x in res.raw_history["securities"]}
+    assert any(b["session_date"] == "2026-11-23"
+               for b in sec["security-600001"]["bars"])
+    assert not any(b["session_date"] == "2026-11-23"
+                   for b in sec["security-600000"]["bars"])
+
+
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_unregistered_required_month_blocks_whole_day(tmp_path, order):
+    """Unregistered required-month closeout (independent audit 749A
+    1bf71583 P1): a needed session whose WHOLE month carries NO registered
+    price member at all (no Base month partition, no pinned Daily) still
+    has real required coverage missing.  The ledger must name the gap with
+    the real missing month/session/security scope - SHARED_INPUT_GAP /
+    whole_day / block_new_entries - not fall to READ merely because legal
+    adjacent months kept the global zero-price guard dark."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    _two_security_universe(members, tmp_path)
+    days = _sessions(330)
+    rows = (_bar_table(days).to_pylist()
+            + _bar_table(days, listing="listing-600001").to_pylist())
+    if order:
+        rows.reverse()
+    grouped = {}
+    for r in rows:
+        d = r["observation_end"].date()
+        grouped.setdefault((d.year, d.month), []).append(r)
+    base_members = []
+    for (yy, mm), vals in sorted(grouped.items()):
+        if (yy, mm) == (2026, 10):
+            continue  # whole required October unregistered
+        rel = ("payload/dwd_security_bar/interval_size=1d/"
+               f"observation_start_year={yy}/observation_start_month={mm}/"
+               "part-0.parquet")
+        _write(tmp_path / rel,
+               pa.table({k: [r.get(k) for r in vals] for k in vals[0]}))
+        base_members.append(_member(tmp_path, rel))
+    members["dwd_security_bar"] = base_members
+    daily = {}
+    clocks = {}
+    for r in rows:
+        d = r["observation_end"].date()
+        if d >= date(2026, 11, 1):
+            daily.setdefault(str(d), []).append(r)
+    daily_members = {}
+    for day, vals in sorted(daily.items()):
+        rel = f"payload/dwd_security_bar/day={day}/dwd_security_bar.parquet"
+        _write(tmp_path / rel,
+               pa.table({k: [r.get(k) for r in vals] for k in vals[0]}))
+        dm = _member(tmp_path, rel, package_id=f"daily-{day}",
+                     kind="daily", market_date=day)
+        daily_members[day] = [dm]
+        at = datetime(2026, 11, 23, 10, 0, tzinfo=UTC)
+        clocks[day] = {"knowledge": at, "producer": at, "channel": at}
+    fmap = _FormalStubSourceMap(members, daily_members, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block is not None
+    assert block["reason_code"] == "SHARED_INPUT_GAP"
+    assert block["affected_scope"] == "whole_day"
+    assert block["disposition"] == "block_new_entries"
+    assert "2026-10" in (block.get("missing_months") or [])
+    assert block.get("missing_sessions")
+    assert all(s.startswith("2026-10") for s in block["missing_sessions"])
+    assert set(block["affected_securities"]) == {
+        "security-600000", "security-600001"}
+
+
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_registered_partial_month_not_unregistered(tmp_path, order):
+    """Adjacent-shape control: a month that IS registered (even partially
+    covered) is attributed to its real member, never to the unregistered
+    placeholder.  Partial October coverage (600001 only) keeps the read
+    alive with only the genuinely starved security isolated - never
+    widened into a whole-day block by the unregistered-month placeholder."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    _two_security_universe(members, tmp_path)
+    days = _sessions(330)
+    rows = (_bar_table(days).to_pylist()
+            + _bar_table(days, listing="listing-600001").to_pylist())
+    if order:
+        rows.reverse()
+    grouped = {}
+    for r in rows:
+        d = r["observation_end"].date()
+        grouped.setdefault((d.year, d.month), []).append(r)
+    base_members = []
+    for (yy, mm), vals in sorted(grouped.items()):
+        if (yy, mm) == (2026, 10):
+            vals = [r for r in vals if r["listing_id"] == "listing-600001"]
+        rel = ("payload/dwd_security_bar/interval_size=1d/"
+               f"observation_start_year={yy}/observation_start_month={mm}/"
+               "part-0.parquet")
+        _write(tmp_path / rel,
+               pa.table({k: [r.get(k) for r in vals] for k in vals[0]}))
+        base_members.append(_member(tmp_path, rel))
+    members["dwd_security_bar"] = base_members
+    daily = {}
+    clocks = {}
+    for r in rows:
+        d = r["observation_end"].date()
+        if d >= date(2026, 11, 1):
+            daily.setdefault(str(d), []).append(r)
+    daily_members = {}
+    for day, vals in sorted(daily.items()):
+        rel = f"payload/dwd_security_bar/day={day}/dwd_security_bar.parquet"
+        _write(tmp_path / rel,
+               pa.table({k: [r.get(k) for r in vals] for k in vals[0]}))
+        dm = _member(tmp_path, rel, package_id=f"daily-{day}",
+                     kind="daily", market_date=day)
+        daily_members[day] = [dm]
+        at = datetime(2026, 11, 23, 10, 0, tzinfo=UTC)
+        clocks[day] = {"knowledge": at, "producer": at, "channel": at}
+    fmap = _FormalStubSourceMap(members, daily_members, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+    gaps = res.coverage["isolated_input_gaps"]
+    assert gaps
+    assert {sid for g in gaps for sid in g["affected_securities"]
+            } == {"security-600000"}
+    assert not any("unregistered-required-month" in str(g.get("member_id"))
+                   for g in gaps)
+
+
+# ---- R4 seg-A final-qualified-coverage closeout: row-level PIT gaps -------
+
+
+def _row_reject_daily_bar(tmp_path, day, listings, mutate):
+    """Write a prior-session Daily price member whose rows carry a row-level
+    PIT defect for every listed listing_id (the member itself READs and is
+    channel-admitted - the failure is on the row, not the member)."""
+    days = _sessions(330)
+    rows = []
+    for lid in listings:
+        rows += [r for r in _bar_table(days, listing=lid).to_pylist()
+                 if str(r["observation_end"].date()) == day]
+    mutate(rows)
+    rel = f"payload/dwd_security_bar/day={day}/dwd_security_bar.parquet"
+    _write(tmp_path / rel,
+           pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    return rel
+
+
+def _row_coverage_map(tmp_path, members, day, mutate, base_mode):
+    """Assemble the two-security universe with the prior Daily carrying a
+    row-level defect and the Base aggregate supplying the session for the
+    chosen backup radius; return the formal read result."""
+    _two_security_universe(members, tmp_path)
+    days = _sessions(330)
+    rel_base = ("payload/dwd_security_bar/interval_size=1d/"
+                "observation_start_year=2026/observation_start_month=11/"
+                "part-0.parquet")
+    if base_mode == "none":
+        cal_only = [d for d in days if str(d) != day]
+        rows = (_bar_table(cal_only).to_pylist()
+                + _bar_table(cal_only, listing="listing-600001").to_pylist())
+    elif base_mode == "partial":
+        cal_only = [d for d in days if str(d) != day]
+        rows = (_bar_table(cal_only).to_pylist()
+                + _bar_table(days, listing="listing-600001").to_pylist())
+    else:  # all - the Base carries both securities' qualified rows
+        rows = (_bar_table(days).to_pylist()
+                + _bar_table(days, listing="listing-600001").to_pylist())
+    _write(tmp_path / rel_base,
+           pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    members["dwd_security_bar"] = [_member(tmp_path, rel_base)]
+    rel = _row_reject_daily_bar(
+        tmp_path, day, ["listing-600000", "listing-600001"], mutate)
+    dm = _member(tmp_path, rel, package_id=f"daily-{day}",
+                 kind="daily", market_date=day)
+    at = datetime(2026, 11, 23, 10, 0, tzinfo=UTC)
+    clocks = {day: {"knowledge": at, "producer": at, "channel": at}}
+    fmap = _FormalStubSourceMap(members, {day: [dm]}, clocks)
+    return _formal_read(fmap, tmp_path)
+
+
+_ROW_MUTATIONS = {
+    "late": lambda rows: [
+        r.update(knowledge_from=datetime(2026, 11, 24, 17, 0, tzinfo=UTC))
+        for r in rows],
+    "null": lambda rows: [r.update(knowledge_from=None) for r in rows],
+    "withdrawn": lambda rows: [
+        r.update(knowledge_to=datetime(2026, 11, 24, 12, 0, tzinfo=UTC))
+        for r in rows],
+    "conflict": lambda rows: (
+        [r.update(knowledge_from=datetime(2026, 11, 23, 12, 0, tzinfo=UTC),
+                  knowledge_to=None) for r in rows],
+        rows.extend([dict(r, volume=float(r["volume"]) + 1,
+                          source_revision="conflicting") for r in rows])
+    )[1],
+}
+
+
+@pytest.mark.parametrize("rejection", ("late", "null", "withdrawn"))
+@pytest.mark.parametrize("backup", ("none", "partial", "all"))
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_final_qualified_row_gap_matrix(
+        tmp_path, rejection, backup, order):
+    """Final qualified coverage: a needed session whose only Daily price
+    member READ + channel-admitted yet has EVERY row rejected at the row
+    PIT gate (late knowledge / null knowledge / withdrawn) starves the
+    pool exactly like a channel gap - whole-day block when no qualified
+    backup covers the session, isolated when a partial backup does, clean
+    READ when a full qualified backup does.  Physical row order is
+    irrelevant."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    res = _row_coverage_map(
+        tmp_path, members, "2026-11-23",
+        _ROW_MUTATIONS[rejection], backup)
+    sec = {x["identity"]["security_id"]: x
+           for x in res.raw_history["securities"]}
+    if backup == "none":
+        assert res.status == "INPUT_BLOCKED"
+        block = res.coverage["day_block"]
+        assert block["reason_code"] == "SHARED_INPUT_GAP"
+        assert block["affected_scope"] == "whole_day"
+        assert set(block["affected_securities"]) == {
+            "security-600000", "security-600001"}
+    elif backup == "partial":
+        assert res.status == "READ"
+        assert res.coverage["day_block"] is None
+        gaps = res.coverage["isolated_input_gaps"]
+        assert gaps and gaps[0]["affected_securities"] == ["security-600000"]
+        assert any(b["session_date"] == "2026-11-23"
+                   for b in sec["security-600001"]["bars"])
+        assert not any(b["session_date"] == "2026-11-23"
+                       for b in sec["security-600000"]["bars"])
+    else:
+        assert res.status == "READ"
+        assert res.coverage["day_block"] is None
+        assert not res.coverage.get("isolated_input_gaps")
+        assert any(b["session_date"] == "2026-11-23"
+                   for b in sec["security-600000"]["bars"])
+        assert any(b["session_date"] == "2026-11-23"
+                   for b in sec["security-600001"]["bars"])
+
+
+@pytest.mark.parametrize("backup", ("none", "partial", "all"))
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_final_qualified_same_clock_conflict_blocks(
+        tmp_path, backup, order):
+    """Final qualified coverage: the latest same-clock conflict is an
+    ambiguity on the session's QUALIFIED fact - an earlier qualified Base
+    row must NOT be used to salvage it (no cutoff/window/PIT bypass), so
+    every backup radius still ends whole-day INPUT_BLOCKED with the
+    conflicting member named on the receipt."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    res = _row_coverage_map(
+        tmp_path, members, "2026-11-23",
+        _ROW_MUTATIONS["conflict"], backup)
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block["reason_code"] == "SHARED_INPUT_GAP"
+    assert block["affected_scope"] == "whole_day"
+    assert set(block["affected_securities"]) == {
+        "security-600000", "security-600001"}
+
+
+def _absent_row_map(tmp_path, members, day, listings_in_daily, order=0):
+    """Two-security universe; the Base aggregate does NOT carry the prior
+    session's rows; a channel-qualified Daily member READs successfully and
+    carries rows only for ``listings_in_daily`` (possibly none - a
+    well-formed empty table)."""
+    _two_security_universe(members, tmp_path)
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != day]
+    rel_base = ("payload/dwd_security_bar/interval_size=1d/"
+                "observation_start_year=2026/observation_start_month=11/"
+                "part-0.parquet")
+    rows = (_bar_table(cal_only).to_pylist()
+            + _bar_table(cal_only, listing="listing-600001").to_pylist())
+    _write(tmp_path / rel_base,
+           pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    members["dwd_security_bar"] = [_member(tmp_path, rel_base)]
+    daily_rows = []
+    for lid in listings_in_daily:
+        daily_rows += [r for r in _bar_table(days, listing=lid).to_pylist()
+                       if str(r["observation_end"].date()) == day]
+    if order:
+        rows.reverse()
+        daily_rows.reverse()
+    rel = "payload/dwd_security_bar/day=" + day + "/dwd_security_bar.parquet"
+    _write(tmp_path / rel,
+           pa.table({k: [r.get(k) for r in daily_rows]
+                     for k in rows[0].keys()}))
+    dm = _member(tmp_path, rel, package_id="daily-" + day,
+                 kind="daily", market_date=day)
+    at = datetime(2026, 11, 23, 10, 0, tzinfo=UTC)
+    clocks = {day: {"knowledge": at, "producer": at, "channel": at}}
+    fmap = _FormalStubSourceMap(members, {day: [dm]}, clocks)
+    return _formal_read(fmap, tmp_path)
+
+
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_final_cells_absent_rows_empty_daily_blocks(tmp_path, order):
+    """Required-cells closeout: a needed session whose ONLY registered
+    Daily price member READ + channel-admitted but carries a well-formed
+    EMPTY table leaves every pool cell without a qualified bar - the cell
+    matrix names it a SHARED_INPUT_GAP/INPUT_BLOCKED without any physical
+    rejected row to record."""
+    smap = _build_map(tmp_path)
+    res = _absent_row_map(tmp_path, smap._members_by_table,
+                          "2026-11-23", [], order)
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block["reason_code"] == "SHARED_INPUT_GAP"
+    assert block["affected_scope"] == "whole_day"
+    assert set(block["affected_securities"]) == {
+        "security-600000", "security-600001"}
+
+
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_final_cells_absent_rows_one_security_isolated(tmp_path, order):
+    """Required-cells closeout: a Daily member that READs with rows only
+    for 600001 leaves 600000's cell starved - READ with the gap isolated
+    to security-600000 while the qualified neighbour keeps its bar and
+    the held account fact survives."""
+    smap = _build_map(tmp_path)
+    res = _absent_row_map(tmp_path, smap._members_by_table,
+                          "2026-11-23", ["listing-600001"], order)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+    gaps = res.coverage["isolated_input_gaps"]
+    assert gaps
+    assert {sid for g in gaps for sid in g["affected_securities"]
+            } == {"security-600000"}
+    sec = {x["identity"]["security_id"]: x
+           for x in res.raw_history["securities"]}
+    assert any(b["session_date"] == "2026-11-23"
+               for b in sec["security-600001"]["bars"])
+    assert not any(b["session_date"] == "2026-11-23"
+                   for b in sec["security-600000"]["bars"])

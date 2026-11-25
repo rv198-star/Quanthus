@@ -961,12 +961,20 @@ def build_replay_envelope(
         for po in _seq(sec_o.get("pending") or (), f"securities[{index}].pending"):
             pobj = _obj(po, f"securities[{index}].pending[]")
             kind = _text(pobj.get("kind"), "pending[].kind")
-            if kind == "sell":
+            direction = pobj.get("direction")
+            # A kind/direction conflict is a named unresolved disposition,
+            # never a silent rewrite: the original kind AND the original
+            # direction are both kept verbatim.  kind=sell admits direction
+            # sell or absent; a buy-side kind admits direction buy or absent.
+            expected_dir = "sell" if kind == "sell" else "buy"
+            direction_conflict = direction is not None and direction != expected_dir
+            if kind == "sell" or direction_conflict:
                 entry_blocked_by_unresolved_direction = True
-                # A sell order keeps direction + quantity verbatim but needs an
-                # explicit consumer disposition: it lands on the versioned
-                # account-unresolved list (role=pending, direction=sell),
-                # never folded into a buy-side PendingSecurityInput.
+                missing_reason = (
+                    "sell_order_requires_explicit_disposition"
+                    if kind == "sell" and not direction_conflict
+                    else "pending_kind_direction_conflict"
+                )
                 account_unresolved.append(
                     {
                         "account_key": str(pobj.get("order_key") or code),
@@ -974,9 +982,10 @@ def build_replay_envelope(
                         "quantity": _pending_qty(
                             pobj.get("quantity"), "pending[].quantity"
                         ),
-                        "missing_reason": "sell_order_requires_explicit_disposition",
+                        "missing_reason": missing_reason,
                         "source": "securities[].pending",
-                        "direction": "sell",
+                        "kind": kind,
+                        "direction": direction,
                         "order_key": pobj.get("order_key"),
                         "source_receipt": pobj.get("source_receipt"),
                         "security_code": code,
@@ -993,7 +1002,7 @@ def build_replay_envelope(
                     ),
                     "order_key": pobj.get("order_key"),
                     "source_receipt": pobj.get("source_receipt"),
-                    "direction": pobj.get("direction"),
+                    "direction": direction,
                 }
             )
         if entry_blocked_by_unresolved_direction:

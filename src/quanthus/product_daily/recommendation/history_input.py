@@ -96,6 +96,15 @@ def _text(value: Any, label: str) -> str:
     return str(value)
 
 
+def _text_or_unknown(value: Any, placeholder: str) -> str:
+    """Lenient identity field for the account-member preservation path only:
+    the caller's own value when present, else a named unknown placeholder.
+    Never fabricates a scan/entry identity -- scan stays ineligible."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return f"unknown:{placeholder}"
+
+
 def _sha256(value: Any, label: str) -> str:
     text_value = _text(value, label)
     body = text_value[len("sha256:") :] if text_value.startswith("sha256:") else text_value
@@ -957,7 +966,9 @@ def history_receipt_for_security(
     }
 
 
-def _position_facts_from(sec: Mapping[str, Any]) -> tuple[Any, int | None]:
+def _position_facts_from(
+    sec: Mapping[str, Any],
+) -> tuple[Any, int | None, str | None]:
     """Project the caller-declared position facts through, unchanged.
 
     position_facts arrives already typed (the P12 RunnerRequest projection passes
@@ -968,31 +979,124 @@ def _position_facts_from(sec: Mapping[str, Any]) -> tuple[Any, int | None]:
     unit_id); an unqualified dict stays a contract breach.  An already-typed
     object passes through unchanged.
     """
+    unverifiable: str | None = None
     pf = sec.get("position_facts")
     if pf is not None and isinstance(pf, dict):
-        pf = _adapt_position_facts_dict(pf, sec)
+        pf, unverifiable = _adapt_position_facts_dict(pf, sec)
     pds = sec.get("prior_deterioration_sessions")
     if pds is not None and (type(pds) is not int or pds < 0):
         _fail(
             "invalid_raw_history",
             "securities[].prior_deterioration_sessions must be a non-negative int",
         )
-    return pf, pds
+    return pf, pds, unverifiable
+
+
+def _position_facts_ref_from_evidence(
+    evidence: Any,
+    *,
+    holding: int,
+    marked_return: Decimal | None,
+    reductions: int,
+) -> tuple[Any | None, str | None]:
+    """Verify a serializable position_facts.evidence block against the
+    existing ExpertEvidenceRef contract.
+
+    Returns (ref, None) on a fully bound same-read reference, else
+    (None, named_reason) so the caller degrades the member to a hold_alert
+    rather than a whole-day block.  The verification never fabricates a
+    digest to wash a source clean:
+
+    * kind must be the canonical snapshot kind;
+    * evidence_id must be position-facts:{unit_id} (unit_id recovered from
+      it when the wire carries only the four canonical fields);
+    * version must be the position-facts contract version 1.0.0;
+    * digest must be a sha256 that recomputes EXACTLY over the declared
+      value payload {unit_id, holding_sessions, marked_return,
+      prior_strategy_reduction_count}; a changed value with an unchanged or
+      bogus digest fails;
+    * the bound unit_id must name the scenario account/read the position
+      facts came from (the same-read anchor); a bare unit_id without the
+      canonical reference cannot be bound and is rejected.
+    """
+    from quanthus.expert_evaluation.serialization import digest_value
+    from quanthus.expert_protocols import EvidenceKind
+    from quanthus.expert_strategy.runner import position_facts_evidence
+
+    if not isinstance(evidence, Mapping):
+        return None, "position_facts.evidence is not a same-read reference"
+    unit_id = evidence.get("unit_id")
+    if isinstance(unit_id, str) and not unit_id.strip():
+        unit_id = None
+    kind = evidence.get("kind")
+    evidence_id = evidence.get("evidence_id")
+    version = evidence.get("version")
+    digest = evidence.get("digest")
+    has_canonical_ref = (
+        kind is not None
+        or evidence_id is not None
+        or version is not None
+        or digest is not None
+    )
+    if not has_canonical_ref:
+        if unit_id:
+            return None, (
+                "position_facts.evidence.unit_id alone cannot bind the "
+                "same-read account source (needs kind/evidence_id/version/digest)"
+            )
+        return None, "position_facts.evidence is missing the same-read reference"
+    if kind != EvidenceKind.SNAPSHOT.value:
+        return None, f"position_facts.evidence.kind must be snapshot, got {kind!r}"
+    if not isinstance(evidence_id, str) or not evidence_id.startswith("position-facts:"):
+        return None, (
+            "position_facts.evidence.evidence_id must be position-facts:{unit_id}"
+        )
+    ref_unit = evidence_id[len("position-facts:") :]
+    if unit_id is not None and unit_id != ref_unit:
+        return None, (
+            "position_facts.evidence.unit_id disagrees with evidence_id "
+            "(same-read source must be one identity)"
+        )
+    unit_id = unit_id or ref_unit
+    if version != "1.0.0":
+        return None, f"position_facts.evidence.version must be 1.0.0, got {version!r}"
+    if not isinstance(digest, str) or not digest.startswith("sha256:"):
+        return None, "position_facts.evidence.digest must be a sha256 digest"
+    expected = digest_value(
+        {
+            "unit_id": unit_id,
+            "holding_sessions": holding,
+            "marked_return": None if marked_return is None else str(marked_return),
+            "prior_strategy_reduction_count": reductions,
+        }
+    )
+    if digest != expected:
+        return None, (
+            "position_facts.evidence.digest does not recompute over the declared "
+            "value payload (wrong digest or changed value)"
+        )
+    ref = position_facts_evidence(
+        unit_id=unit_id,
+        holding_sessions=holding,
+        marked_return=marked_return,
+        prior_strategy_reduction_count=reductions,
+    )
+    return ref, None
 
 
 def _adapt_position_facts_dict(
     pf: Mapping[str, Any], sec: Mapping[str, Any]
-) -> Any:
+) -> tuple[Any | None, str | None]:
     """Adapt a versioned serializable position_facts dict to HeldPositionFacts.
 
-    The B-segment wire shape carries the P12 scenario ledger's position facts:
-    holding_sessions (int > 0), marked_return (decimal string or null),
-    prior_strategy_reduction_count (int >= 0) and a same-read evidence
-    reference (evidence.unit_id or the security's own identity).  A dict that
-    misses the required fields is a contract breach, never silently adapted.
+    Returns (HeldPositionFacts, None) when the declared evidence verifies as
+    a same-read ExpertEvidenceRef; returns (None, named_reason) when the
+    evidence cannot be bound so the member degrades to a hold_alert rather
+    than fabricating an exit or aborting the day.  The three numeric fields
+    keep their original strictness: a missing/invalid holding_sessions or
+    prior_strategy_reduction_count is a contract breach, not a degrade.
     """
     from quanthus.expert_strategy.position_risk import HeldPositionFacts
-    from quanthus.expert_strategy.runner import position_facts_evidence
 
     holding = pf.get("holding_sessions")
     if type(holding) is not int or holding <= 0:
@@ -1022,34 +1126,20 @@ def _adapt_position_facts_dict(
                 "invalid_raw_history",
                 "securities[].position_facts.marked_return must be finite",
             )
-    # Evidence binds the SAME-READ source: a serializable position_facts must
-    # carry its own evidence.unit_id naming the account/read it came from.
-    # A missing or non-mapping evidence block is a named invalid_raw_history -
-    # never a security-code or 'unknown' synthetic source.
-    evidence = pf.get("evidence")
-    unit_id = (
-        evidence.get("unit_id")
-        if isinstance(evidence, Mapping)
-        else None
-    )
-    if not isinstance(unit_id, str) or not unit_id.strip():
-        _fail(
-            "invalid_raw_history",
-            "securities[].position_facts.evidence.unit_id must name the "
-            "same-read account source (never a fabricated identity)",
-        )
-    ref = position_facts_evidence(
-        unit_id=unit_id.strip(),
-        holding_sessions=holding,
+    ref, unverifiable = _position_facts_ref_from_evidence(
+        pf.get("evidence"),
+        holding=holding,
         marked_return=marked_return,
-        prior_strategy_reduction_count=reductions,
+        reductions=reductions,
     )
+    if ref is None:
+        return None, unverifiable
     return HeldPositionFacts(
         holding_sessions=holding,
         marked_return=marked_return,
         prior_strategy_reduction_count=reductions,
         evidence=ref,
-    )
+    ), None
 
 
 def raw_security_inputs_from_history(
@@ -1084,33 +1174,13 @@ def raw_security_inputs_from_history(
     seen_ids: set[str] = set()
     for si, sec in enumerate(history.securities):
         sec_o = _obj(sec, f"securities[{si}]")
-        try:
-            identity = _identity_from(sec_o, si)
-        except ProductDailyError as exc:
-            receipts.append(
-                {
-                    "security_code": f"securities[{si}]",
-                    "status": "excluded",
-                    "reason": f"identity_parse: {exc}",
-                    "scope": "per_security",
-                }
-            )
-            continue
-        code = identity.listing_code
-        # Duplicate guard keys on the LISTING id, not the bare security_id: one
-        # corporate entity legitimately carries several listings over time (a
-        # delisted + a relisted share, e.g. security_7ca1ec46 spanning 000043 /
-        # 001914).  Rejecting on security_id alone would hard-block the whole
-        # day on that relisted shape even though each listing is aged by its
-        # own listing_id interval and isolated per-listing.  The same
-        # listing_id twice stays a hard error (a true duplicate row).
-        if identity.listing_id in seen_ids:
-            _fail(
-                "duplicate_security",
-                f"duplicate listing_id {identity.listing_id} (security_id {identity.security_id})",
-            )
-        seen_ids.add(identity.listing_id)
-        position_facts, prior_det = _position_facts_from(sec_o)
+        # Read row-level account markers BEFORE the strict identity gate: a
+        # known held/pending member whose market identity fails to parse must
+        # still surface its account review (hold_alert / pending isolation)
+        # rather than collapse into a bare securities[i] exclusion.  Account
+        # facts are the caller-declared truth for this read; a broken market
+        # row never fabricates a legal identity or a scan entry.
+        position_facts, prior_det, pf_unverifiable = _position_facts_from(sec_o)
         held_membership = _bool3(sec_o.get("held_membership"), "securities[].held_membership")
         pending_kind = (
             _text(sec_o["pending_kind"], "securities[].pending_kind")
@@ -1129,7 +1199,102 @@ def raw_security_inputs_from_history(
             or held_qty is not None
             or position_facts is not None
             or pending_kind is not None
+            or bool(_seq(sec_o.get("pending") or (), f"securities[{si}].pending"))
         )
+        try:
+            identity = _identity_from(sec_o, si)
+        except ProductDailyError as exc:
+            if not is_account_member:
+                receipts.append(
+                    {
+                        "security_code": f"securities[{si}]",
+                        "status": "excluded",
+                        "reason": f"identity_parse: {exc}",
+                        "scope": "per_security",
+                    }
+                )
+                continue
+            # Preserve the minimal real account record: keep the declared
+            # held/pending facts under a non-scan identity (the original bad
+            # digest is kept verbatim, never washed) so the account
+            # projection still surfaces hold_alert / pending isolation.  No
+            # market identity is invented: every missing field falls back to
+            # a named unknown placeholder and scan_eligible stays False.
+            raw_id = sec_o.get("identity") or {}
+            identity = IdentityFacts(
+                security_id=_text_or_unknown(raw_id.get("security_id"), f"securities[{si}]"),
+                stock_code=_text_or_unknown(
+                    raw_id.get("stock_code") or raw_id.get("listing_code"),
+                    f"securities[{si}]",
+                ),
+                listing_code=_text_or_unknown(
+                    raw_id.get("listing_code") or raw_id.get("stock_code"),
+                    f"securities[{si}]",
+                ),
+                security_name=_text_or_unknown(raw_id.get("security_name"), f"securities[{si}]"),
+                industry_id=_text_or_unknown(raw_id.get("industry_id"), f"securities[{si}]"),
+                venue_id=_text_or_unknown(raw_id.get("venue_id"), f"securities[{si}]"),
+                instrument_type=_text_or_unknown(
+                    raw_id.get("instrument_type"), f"securities[{si}]"
+                ),
+                listing_id=_text_or_unknown(raw_id.get("listing_id"), f"securities[{si}]"),
+                company_id=_text_or_unknown(raw_id.get("company_id"), f"securities[{si}]"),
+                depends_on_member_ids=(),
+                invalidations=(),
+                price_bound=None,
+                source_evidence_digest=(
+                    raw_id.get("source_evidence_digest")
+                    if isinstance(raw_id.get("source_evidence_digest"), str)
+                    else ""
+                ),
+            )
+            receipts.append(
+                {
+                    "security_code": identity.listing_code,
+                    "status": "account_member_market_unavailable",
+                    "reason": f"identity_parse: {exc}",
+                    "scope": "per_security",
+                }
+            )
+            inputs.append(
+                RawSecurityInput(
+                    identity=identity,
+                    bars=(),
+                    universe_membership=(),
+                    actions=(),
+                    exceptions=(),
+                    limits=(),
+                    close_at_by_date={},
+                    knowledge_cutoff_by_date={},
+                    position_facts=position_facts,
+                    prior_deterioration_sessions=prior_det,
+                    held_membership=held_membership,
+                    pending_kind=pending_kind,
+                    held_unavailable_reason=pf_unverifiable or held_reason,
+                    held_quantity=held_qty,
+                    pending_quantity=pending_qty,
+                    scan_eligible=False,
+                )
+            )
+            continue
+        code = identity.listing_code
+        # Duplicate guard keys on the LISTING id, not the bare security_id: one
+        # corporate entity legitimately carries several listings over time (a
+        # delisted + a relisted share, e.g. security_7ca1ec46 spanning 000043 /
+        # 001914).  Rejecting on security_id alone would hard-block the whole
+        # day on that relisted shape even though each listing is aged by its
+        # own listing_id interval and isolated per-listing.  The same
+        # listing_id twice stays a hard error (a true duplicate row).
+        if identity.listing_id in seen_ids:
+            _fail(
+                "duplicate_security",
+                f"duplicate listing_id {identity.listing_id} (security_id {identity.security_id})",
+            )
+        seen_ids.add(identity.listing_id)
+        # A same-read evidence failure degrades the member to a named
+        # hold_alert reason, never a fabricated exit or a whole-day block.
+        if pf_unverifiable and not held_reason:
+            held_reason = pf_unverifiable
         # Versioned #749 role.  "calendar_source_knowledge_from" declares the
         # row's decision coordinate is the source calendar knowledge_from; it
         # is bound verbatim into the input closure and admitted downstream only

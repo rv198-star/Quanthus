@@ -9,20 +9,18 @@ run_e1_replay_day entry on the same fixed replay request.
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
+from quanthus.product_daily.contracts import ProductDailyError
+from quanthus.product_daily.recommendation.paper_replay import (
+    build_replay_envelope,
+    load_replay_request,
+)
 from tests.unit import test_p11_paper_replay as f
 from tests.unit.test_p11_e1_runtime import (
     ROOT,
     e_run_e1_replay,
     load_e1_rule_assets,
-)
-from quanthus.product_daily.contracts import ProductDailyError
-from quanthus.product_daily.recommendation.paper_replay import (
-    build_replay_envelope,
-    load_replay_request,
 )
 
 
@@ -125,9 +123,7 @@ def test_b_sell_order_goes_to_unresolved_not_pending(assets):
     ]
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
     sc = out["source_closure"]
-    sell = [
-        r for r in sc["account_unresolved"] if r.get("direction") == "sell"
-    ]
+    sell = [r for r in sc["account_unresolved"] if r.get("direction") == "sell"]
     assert sell and sell[0]["quantity"] == 5 and sell[0]["order_key"] == "ord-s1"
     assert "600000" not in sc["pending_security_codes"]
 
@@ -142,13 +138,28 @@ def test_b_pool_external_unresolved_preserved(assets):
     sec = f._security("600000", _DAYS)
     req = _req([sec, f._security("600001", _DAYS)])
     req["account"]["unresolved"] = [
-        {"account_key": "outside-held-x", "role": "held", "quantity": None,
-         "missing_reason": "no_listing_identity", "source": "ledger-snapshot"},
-        {"account_key": "outside-held-y", "role": "held", "quantity": 50,
-         "missing_reason": "no_history_bars", "source": "ledger-snapshot"},
-        {"account_key": "outside-pend", "role": "pending", "quantity": 5,
-         "missing_reason": "sell_order_requires_explicit_disposition",
-         "direction": "sell", "source": "ledger-snapshot"},
+        {
+            "account_key": "outside-held-x",
+            "role": "held",
+            "quantity": None,
+            "missing_reason": "no_listing_identity",
+            "source": "ledger-snapshot",
+        },
+        {
+            "account_key": "outside-held-y",
+            "role": "held",
+            "quantity": 50,
+            "missing_reason": "no_history_bars",
+            "source": "ledger-snapshot",
+        },
+        {
+            "account_key": "outside-pend",
+            "role": "pending",
+            "quantity": 5,
+            "missing_reason": "sell_order_requires_explicit_disposition",
+            "direction": "sell",
+            "source": "ledger-snapshot",
+        },
     ]
     out = e_run_e1_replay(req, f.T1, assets)
     sc = out["source_closure"]
@@ -201,9 +212,7 @@ def test_b_envelope_carries_pending_and_unresolved():
     sec = f._security("600000", _DAYS)
     sec["pending"] = [{"kind": "open_buy_order", "quantity": 7}]
     req = _req([sec])
-    req["account"]["unresolved"] = [
-        {"account_key": "ext-1", "role": "held", "quantity": 1}
-    ]
+    req["account"]["unresolved"] = [{"account_key": "ext-1", "role": "held", "quantity": 1}]
     env, _, _, _ = build_replay_envelope(load_replay_request(req), f.T1)
     assert env["pending_securities"][0]["kind"] == "open_buy_order"
     assert env["pending_securities"][0]["quantity"] == 7
@@ -219,16 +228,18 @@ def test_b_r1_sell_pending_blocks_new_entry(assets):
     The sell record stays verbatim in account_unresolved."""
     sec = f._security("600000", _DAYS)
     sec["pending"] = [
-        {"kind": "sell", "quantity": 5, "order_key": "s1",
-         "direction": "sell", "source_receipt": "src.s1"},
+        {
+            "kind": "sell",
+            "quantity": 5,
+            "order_key": "s1",
+            "direction": "sell",
+            "source_receipt": "src.s1",
+        },
     ]
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
     assert ("600001", "entry_plan") in _decisions(out)
     assert not any(c == "600000" for c, s in _decisions(out))
-    sell = [
-        r for r in out["source_closure"]["account_unresolved"]
-        if r.get("direction") == "sell"
-    ]
+    sell = [r for r in out["source_closure"]["account_unresolved"] if r.get("direction") == "sell"]
     assert sell and sell[0]["quantity"] == 5 and sell[0]["order_key"] == "s1"
 
 
@@ -246,14 +257,20 @@ def test_b_r1_pool_external_held_surfaces_hold_alert(assets):
     (never a silent drop, never a fabricated market identity)."""
     req = _req([f._security("600000", _DAYS), f._security("600001", _DAYS)])
     req["account"]["unresolved"] = [
-        {"account_key": "outside-held", "role": "held", "quantity": None,
-         "missing_reason": "missing_listing", "source": "src.o"},
+        {
+            "account_key": "outside-held",
+            "role": "held",
+            "quantity": None,
+            "missing_reason": "missing_listing",
+            "source": "src.o",
+        },
     ]
     out = e_run_e1_replay(req, f.T1, assets)
     held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
     assert ("outside-held", "hold_alert") in held
-    assert any(r.get("account_key") == "outside-held"
-               for r in out["source_closure"]["account_unresolved"])
+    assert any(
+        r.get("account_key") == "outside-held" for r in out["source_closure"]["account_unresolved"]
+    )
 
 
 def test_b_r1_position_facts_without_source_refused(assets):
@@ -280,12 +297,17 @@ def test_b_r1_buy_pending_evidence_in_closure(assets):
     into the issued source_closure.pending_evidence."""
     sec = f._security("600000", _DAYS)
     sec["pending"] = [
-        {"kind": "open_buy_order", "quantity": 12,
-         "order_key": "ord-b1", "source_receipt": "src.b1"},
+        {
+            "kind": "open_buy_order",
+            "quantity": 12,
+            "order_key": "ord-b1",
+            "source_receipt": "src.b1",
+        },
     ]
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
     ev = [
-        r for r in out["source_closure"].get("pending_evidence", [])
+        r
+        for r in out["source_closure"].get("pending_evidence", [])
         if r.get("order_key") == "ord-b1"
     ]
     assert ev and ev[0]["source_receipt"] == "src.b1" and ev[0]["quantity"] == 12
@@ -316,15 +338,12 @@ def test_b_752_held_member_survives_malformed_neighbour(assets):
     held = f._security("600000", _DAYS, held=True)
     bad = _bad_digest_sec("600001")
     out = e_run_e1_replay(_req([held, bad]), f.T1, assets)
-    held_actions = [
-        (h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])
-    ]
+    held_actions = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
     assert ("600000", "holding") in held_actions or any(
         c == "600000" and s == "holding" for c, s in _decisions(out)
     )
     excl = [
-        e for e in out["source_closure"].get("exclusions", [])
-        if e.get("security_code") == "600001"
+        e for e in out["source_closure"].get("exclusions", []) if e.get("security_code") == "600001"
     ]
     assert excl and "EventContractError" in excl[0]["member_or_field"]
     assert excl[0].get("source_evidence_digest") == "malformed-digest"
@@ -336,8 +355,12 @@ def test_b_752_pending_member_survives_malformed_neighbour(assets):
     real fill and the neighbour's isolation does not leak into pending."""
     pend = f._security("600000", _DAYS)
     pend["pending"] = [
-        {"kind": "open_buy_order", "quantity": 12,
-         "order_key": "ord-x1", "source_receipt": "src.x1"},
+        {
+            "kind": "open_buy_order",
+            "quantity": 12,
+            "order_key": "ord-x1",
+            "source_receipt": "src.x1",
+        },
     ]
     bad = _bad_digest_sec("600001")
     out = e_run_e1_replay(_req([pend, bad]), f.T1, assets)
@@ -345,8 +368,7 @@ def test_b_752_pending_member_survives_malformed_neighbour(assets):
     # excluded alone, never evaluated.
     assert not any(c == "600000" for c, s in _decisions(out))
     excl = [
-        e for e in out["source_closure"].get("exclusions", [])
-        if e.get("security_code") == "600001"
+        e for e in out["source_closure"].get("exclusions", []) if e.get("security_code") == "600001"
     ]
     assert excl and "EventContractError" in excl[0]["member_or_field"]
     assert "600000" in out["source_closure"]["pending_security_codes"]
@@ -362,6 +384,7 @@ def test_b_752_mixed_bad_digest_keeps_clean_neighbour(assets):
         f.T1,
         assets,
     )
+
     def entry(out):
         return [
             x
@@ -369,19 +392,26 @@ def test_b_752_mixed_bad_digest_keeps_clean_neighbour(assets):
             for x in ds["decisions"]
             if x.get("security_code") == "600000"
         ]
+
     se, me = entry(solo), entry(mixed)
     assert len(se) == len(me) == 1
-    for field in ("opportunity_id", "stage", "action", "fraction",
-                  "price_bound", "mark_price", "reason_codes", "entry"):
+    for field in (
+        "opportunity_id",
+        "stage",
+        "action",
+        "fraction",
+        "price_bound",
+        "mark_price",
+        "reason_codes",
+        "entry",
+    ):
         assert se[0].get(field) == me[0].get(field), field
     # The mixed closure additionally names the excluded neighbour.
     assert any(
-        e.get("security_code") == "600001"
-        for e in mixed["source_closure"].get("exclusions", [])
+        e.get("security_code") == "600001" for e in mixed["source_closure"].get("exclusions", [])
     )
     assert not any(
-        e.get("security_code") == "600001"
-        for e in solo["source_closure"].get("exclusions", [])
+        e.get("security_code") == "600001" for e in solo["source_closure"].get("exclusions", [])
     )
 
 
@@ -399,7 +429,8 @@ def test_b_752_missing_digest_mixed_also_isolated(assets):
         assets,
     )
     excl = [
-        e for e in out["source_closure"].get("exclusions", [])
+        e
+        for e in out["source_closure"].get("exclusions", [])
         if e.get("security_code") == "securities[1]"
     ]
     assert excl and excl[0]["reason"] == "raw_history_security_invalid"

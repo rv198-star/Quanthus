@@ -174,6 +174,78 @@ def test_r2_artifact_identity_negatives_fail_with_named_reason(mutate, expected_
     assert any(e["reason"] == expected_reason for e in exclusions), exclusions
 
 
+# --- oct08-projection-r2 CN02 root-capture: the two ORIGINAL defect shapes ---
+#
+# Root review captured the actual request dicts entering load_replay_request on
+# CN02.  Seven of the eight positives shipped (null,null,null); the venue[valid]
+# case shipped (null,null,venue_bec59e31...).  These are the LONG-TERM hard
+# assertions: the ORIGINAL producer (p10.b02-b03-b10-register.v1) and ORIGINAL
+# coverage_id (register-synthetic-sse-2026) are kept verbatim - the defect is
+# asserted on the original request shape, never re-shaped through a different
+# producer.  Each names register_row 302, the actual defect fields (first three
+# or first two), the coverage_id and the named reason.
+
+_ORIG_PRODUCER = "p10.b02-b03-b10-register.v1"
+_ORIG_COVERAGE_ID = "register-synthetic-sse-2026"
+
+
+def _original_defect_req(defect_fields):
+    # Rebuild one ORIGINAL catalogue row: same producer + coverage_id +
+    # register_row 302 as the captured requests; only the identity fields the
+    # original shipment actually carried as JSON null are nulled back out (the
+    # rest keep the named-identity binding the fix introduced).
+    win = _returns_window()
+    ex_day = win[30]
+    req = _r5_req(
+        [_r5_event(ex_day, cash="0.116", bonus="0", transfer="0")],
+        [_r5_action("600000", ex_day, cash="0.116", bonus="0")],
+    )
+    arts = req["action_coverage"]["verified_artifacts"]
+    (art,) = arts
+    assert art["producer"] == _ORIG_PRODUCER and art["coverage_id"] == _ORIG_COVERAGE_ID
+    (row,) = art["rows"]
+    assert row["register_row"] == 302
+    for f in defect_fields:
+        row[f] = None
+    return req
+
+
+@pytest.mark.parametrize(
+    "defect_fields",
+    [
+        # 7 of 8 originals: security_id / listing_id / venue_id all JSON null.
+        ("security_id", "listing_id", "venue_id"),
+        # venue[valid]: security_id / listing_id null, venue_id = bound
+        # warehouse id already valid - the defect is the first two only.
+        ("security_id", "listing_id"),
+    ],
+    ids=["three_null", "two_null_real_venue"],
+)
+def test_r2_original_defect_shape_rejected_by_named_reason(defect_fields):
+    req = _original_defect_req(defect_fields)
+    # venue_bec59e31... is the bound warehouse venue for the venue[valid] shape;
+    # when it is the only non-null id the defect list names only the two nulls.
+    if "venue_id" not in defect_fields:
+        for a in req["action_coverage"]["verified_artifacts"]:
+            for row in a["rows"]:
+                row["venue_id"] = "venue_bec59e31eb6bb28111a10d7e6d2c689f"
+    request = load_replay_request(req)
+    _, _, window_info, exclusions = build_replay_envelope(request, T1)
+    assert window_info["delivered"]["600000"]["entry_eligible"] is False
+    assert any(
+        e["reason"] == "action_artifact_invalid_identity"
+        and any(
+            r["coverage_id"] == _ORIG_COVERAGE_ID
+            and any(
+                rr["register_row"] == 302 and rr["fields"] == list(defect_fields)
+                for rr in r["rows"]
+            )
+            for r in e.get("action_artifact_rejections", [])
+        )
+        for e in exclusions
+    ), exclusions
+
+
 def _r5_req(events, actions, market_date=T1):
     req = _request(market_dates=(market_date,), coverage="verified")
     for ev in req["action_coverage"]["window_evidence"]:

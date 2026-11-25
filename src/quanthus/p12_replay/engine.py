@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from quanthus.p12_daily.daily_job import run_daily
 from quanthus.p12_daily.rule_runner import StrategyRuleRunner

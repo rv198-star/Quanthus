@@ -1810,6 +1810,46 @@ def read_history(
                 continue
             _df = e.get("date_from")
             _df_iso = (_df.isoformat() if hasattr(_df, "isoformat") else str(_df))
+            _mid_first = str(e.get("member_id") or "")
+            if _df_iso not in needed_day_set:
+                # A monthly Base partition member carries no pinned day
+                # (date_from is None), so the day-membership gate below can
+                # never admit it.  It is still the pool's registered aggregate
+                # supply for every in-month needed session; when it physically
+                # fails (sha mismatch / unreadable) the in-month sessions are
+                # starved exactly like a channel-unknown day member.  Promote
+                # it as a shared price dependency keyed by its partition month
+                # so the per-session required-cells attribution below can place
+                # its failure on the real session intersection instead of
+                # dropping it off the ledger (audit R4 seg-A required-cells
+                # successor closeout).
+                if not ("dwd_security_bar" in _mid_first
+                        and "dwd_security_valuation" not in _mid_first):
+                    continue
+                _ymf = re.search(
+                    r"observation_start_year=(\d{4})/"
+                    r"observation_start_month=(\d+)", _mid_first)
+                if not _ymf:
+                    continue
+                _in_window = False
+                for _nd in needed_day_set:
+                    try:
+                        _yy, _mm, _dd = str(_nd).split("-")
+                    except ValueError:
+                        continue
+                    if (int(_yy), int(_mm)) == (
+                            int(_ymf.group(1)), int(_ymf.group(2))):
+                        _in_window = True
+                        break
+                if not _in_window:
+                    continue
+                e["dependency_type"] = "SHARED_T_PRICE"
+                e["shared_hard_dependency"] = True
+                e["base_partition_month"] = (
+                    f"{_ymf.group(1)}-{int(_ymf.group(2)):02d}")
+                e.setdefault("named_input_gap",
+                             "MEMBER_" + _member_read_failures[_mk])
+                continue
             # Only a shared T / prior-session PRICE member whose own day is
             # one of THIS read's needed sessions can starve the pool.  The
             # dependency class is derived from the member id (the same rule
@@ -1985,6 +2025,66 @@ def read_history(
             _gday = e.get("gap_session_day")
             _gday_iso = (_gday.isoformat()
                          if hasattr(_gday, "isoformat") else str(_gday))
+            # A monthly Base partition member is not pinned to one session -
+            # its real radius is the intersection of its partition month with
+            # THIS read's needed sessions.  Evaluate the member once per
+            # covered needed session so a qualified backup that re-covered
+            # one session is honoured there while a still-starved session
+            # keeps the failure on the ledger (audit R4 seg-A required-cells
+            # successor closeout).
+            if e.get("base_partition_month") and e.get("dependency_type") == "SHARED_T_PRICE":
+                _covered = []
+                for _nd in sorted(needed_day_set):
+                    try:
+                        _yy, _mm, _dd = str(_nd).split("-")
+                    except ValueError:
+                        continue
+                    if f"{_yy}-{_mm}" == e["base_partition_month"]:
+                        _covered.append(_nd)
+                _any_starved = False
+                for _sess in _covered:
+                    starved_sess = sorted(
+                        sid for sid in _pool_sids
+                        if not _sec_session_qualified.get((sid, _sess)))
+                    if not starved_sess:
+                        # a qualified backup re-covered the whole pool here
+                        continue
+                    # Radius precision (audit R4 seg-A required-cells successor
+                    # closeout): the month member owns ONLY the sessions where
+                    # it is the pool's sole registered supply.  When a pinned
+                    # Daily member is registered for this exact session - even
+                    # one that re-covered only part of the pool - the starved
+                    # cells are already attributed to THAT member by the
+                    # per-session row loop (its failure to surface the starved
+                    # security is the real, narrower supply gap).  Adding the
+                    # month member there would double-count one gap as two.
+                    # The month member therefore only owns sessions with no
+                    # Daily bar member pinned for the day at all.
+                    _has_daily = any(
+                        ((de.get("date_from").isoformat()
+                          if hasattr(de.get("date_from"), "isoformat")
+                          else str(de.get("date_from"))) == str(_sess))
+                        and "dwd_security_bar" in str(de.get("member_id") or "")
+                        and "dwd_security_valuation" not in str(de.get("member_id") or "")
+                        and "observation_start_year=" not in str(de.get("member_id") or "")
+                        for de in source_member_entries)
+                    if _has_daily:
+                        continue
+                    _any_starved = True
+                    _mk = e.get("package_key") or e.get("member_key")
+                    _declared_sids = _member_session_sids.get((_mk, _sess)) or set()
+                    _single_security_supply = (
+                        len(_declared_sids) == 1 and len(starved_sess) == 1)
+                    _sess_e = dict(e)
+                    _sess_e["gap_session_day"] = _sess
+                    if len(starved_sess) == len(_pool_sids) and not _single_security_supply:
+                        _shared_failed.append(_sess_e)
+                        _failed_days.append(_sess)
+                        _starved_set.update(starved_sess)
+                    else:
+                        _local_gaps.append((_sess_e, starved_sess))
+                        _starved_set.update(starved_sess)
+                continue
             if e.get("dependency_type") != "SHARED_T_PRICE":
                 # A non-price shared hard dependency (the T session/calendar,
                 # the fixed summary chain) has no qualified-backup concept -
@@ -2033,20 +2133,56 @@ def read_history(
                 # starved set back to READ.
                 _local_gaps.append((e, starved_here))
                 _starved_set.update(starved_here)
+        # One supply gap per (member, session): the physical-failure month
+        # expansion and the row-level / no-qualified-row attribution can both
+        # name the SAME member for the SAME session when a backup re-covered
+        # only part of the pool.  Collapse such duplicates here, keeping the
+        # richest row detail, so a partial backup isolates exactly the
+        # genuinely starved securities once - never double-counted (audit R4
+        # seg-A required-cells successor closeout).
+        if _local_gaps:
+            _merged = {}
+            _order = []
+            for _ge, _gsids in _local_gaps:
+                _gk = ((_ge.get("package_key") or _ge.get("member_key")),
+                       str(_ge.get("gap_session_day")))
+                if _gk not in _merged:
+                    _merged[_gk] = [_ge, set(_gsids)]
+                    _order.append(_gk)
+                else:
+                    _merged[_gk][1].update(_gsids)
+                    # prefer the entry carrying row-level detail when present
+                    if (_ge.get("row_rejection_reasons")
+                            and not _merged[_gk][0].get("row_rejection_reasons")):
+                        _merged[_gk][0] = _ge
+            _local_gaps = [
+                (_merged[_gk][0], sorted(_merged[_gk][1])) for _gk in _order]
         _starved = sorted(_starved_set)
         if _shared_failed and _failed_days:
-            day_block = {
-                "reason_code": "SHARED_INPUT_GAP",
-                "detail": (
-                    "a shared hard dependency left needed sessions without "
-                    "a qualified source for this formal read"
-                ),
-                "affected_scope": "whole_day",
-                "failed_members": [e.get("package_key") or e.get("member_key")
-                                   for e in _shared_failed],
-                "affected_securities": _starved,
-                "disposition": "block_new_entries",
-            }
+            # Terminal-guard precedence (audit 749-05 preservation): when EVERY
+            # declared bar member already failed hash or was unreadable, the
+            # named SHARED_PRICE_UNAVAILABLE collapse below is the precise
+            # receipt - the required-cells month attribution must not pre-empt
+            # it with the more generic SHARED_INPUT_GAP.  Only a partial
+            # supply failure (some members READ, or no member at all read but
+            # not a total physical collapse) is reported as SHARED_INPUT_GAP.
+            _bar_reads_here = bar_cov.get("reads") or []
+            _total_price_collapse = bool(_bar_reads_here) and all(
+                r.get("status") in ("SHA_MISMATCH", "UNREADABLE")
+                for r in _bar_reads_here if r.get("member_id"))
+            if not _total_price_collapse:
+                day_block = {
+                    "reason_code": "SHARED_INPUT_GAP",
+                    "detail": (
+                        "a shared hard dependency left needed sessions without "
+                        "a qualified source for this formal read"
+                    ),
+                    "affected_scope": "whole_day",
+                    "failed_members": [e.get("package_key") or e.get("member_key")
+                                       for e in _shared_failed],
+                    "affected_securities": _starved,
+                    "disposition": "block_new_entries",
+                }
         elif _local_gaps:
             # A local single-security gap is NOT a whole-day block: record
             # the isolated dependency so the consumer blocks only the

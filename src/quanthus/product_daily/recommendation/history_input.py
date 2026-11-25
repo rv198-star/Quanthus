@@ -23,6 +23,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, NoReturn
 from zoneinfo import ZoneInfo
 
+from quanthus.expert_strategy.position_risk import HeldPositionFacts
 from quanthus.product_daily.contracts import ProductDailyError
 from quanthus.product_daily.recommendation.contracts import NoQualifiedRawInputs
 from quanthus.product_daily.recommendation.daily_runner import (
@@ -963,16 +964,11 @@ def history_receipt_for_security(
 
 
 def _is_typed_position_facts(pf: Any) -> bool:
-    """An already-typed HeldPositionFacts carries verified session/return /
-    reduction fields plus an evidence block; a wire dict or other shape does
-    not.  Duck-typed so the trusted internal object is recognised without a
-    hard import cycle into the strategy layer."""
-    return (
-        hasattr(pf, "holding_sessions")
-        and hasattr(pf, "marked_return")
-        and hasattr(pf, "prior_strategy_reduction_count")
-        and hasattr(pf, "evidence")
-    )
+    """Only the actual HeldPositionFacts type is admitted to the trusted
+    verified-facts path.  A structurally-similar object that merely carries
+    the same four attribute names is NOT a verified snapshot - it stays on
+    the named unverified-held alert path."""
+    return isinstance(pf, HeldPositionFacts)
 
 
 def _position_facts_from(

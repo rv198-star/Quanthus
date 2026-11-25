@@ -917,3 +917,82 @@ def test_c8_r4_typed_held_position_facts_keeps_verified_provenance(runner, resou
     assert memb
     assert memb[0].get("membership_source") == "filled_position_evidence"
     assert memb[0].get("held_membership_unverified") is False
+
+
+def test_c8_held_type_structurally_similar_object_alerts(assets):
+    """A structurally-similar object that carries the same four attribute
+    names but is NOT a real HeldPositionFacts is NOT a verified snapshot -
+    it stays on the named unverified-held alert path, never the trusted
+    exit/filled_position_evidence path."""
+    from dataclasses import dataclass
+    from decimal import Decimal
+
+    @dataclass
+    class _AlmostFacts:
+        holding_sessions: int = 40
+        marked_return: object = Decimal("0.05")
+        prior_strategy_reduction_count: int = 0
+        evidence: object = None
+
+    sec = f._security("600000", _DAYS)
+    sec.update(
+        held_membership=True,
+        held_quantity=1200,
+        position_facts=_AlmostFacts(),
+    )
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    # Not the trusted type -> declared-held, risk unverified -> hold_alert.
+    assert _held_action(out) == ["hold_alert"]
+    memb = _membership(out)
+    assert memb and memb[0].get("held") is True
+    assert memb[0].get("membership_source") == "filled_position_evidence"
+    assert memb[0].get("held_membership_unverified") is True
+    assert not any(
+        d.get("exit_kind")
+        for ds in (out.get("package") or {}).get("decision_sets", [])
+        for d in ds.get("decisions", [])
+        if d.get("security_code") == "600000"
+    )
+
+
+def test_c8_held_type_real_type_keeps_verified_exit(runner, resources):
+    """The actual HeldPositionFacts type is admitted to the verified path:
+    legal exit_plan + filled_position_evidence, unverified False."""
+    from decimal import Decimal
+
+    from quanthus.expert_strategy.position_risk import HeldPositionFacts
+    from quanthus.expert_strategy.runner import position_facts_evidence
+    from quanthus.product_daily.recommendation.history_input import (
+        run_daily_advice_from_history,
+    )
+
+    sec = _security_entry(_raw_security("600000"))
+    sec.update(
+        held_membership=True,
+        held_quantity=1200,
+        position_facts=HeldPositionFacts(
+            holding_sessions=40,
+            marked_return=Decimal("0.05"),
+            prior_strategy_reduction_count=0,
+            evidence=position_facts_evidence(
+                unit_id="acct-snap-600000",
+                holding_sessions=40,
+                marked_return=Decimal("0.05"),
+                prior_strategy_reduction_count=0,
+            ),
+        ),
+    )
+    env = _envelope(
+        [sec, _security_entry(_raw_security("600001"))],
+        calendar=None,
+        listing=[_listing("security-600000"), _listing("security-600001")],
+    )
+    out = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    held = [d for d in out.seam.held_decisions if d.security_code == "600000"]
+    assert held and held[0].action == "exit"
+    memb = [
+        m for m in out.source_closure["account_membership"] if m.get("security_code") == "600000"
+    ]
+    assert memb
+    assert memb[0].get("membership_source") == "filled_position_evidence"
+    assert memb[0].get("held_membership_unverified") is False

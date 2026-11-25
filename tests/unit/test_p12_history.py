@@ -3639,6 +3639,131 @@ def test_segA_unified_partial_backup_isolated_not_whole_day(tmp_path):
                    for b in sec["security-600000"]["bars"])
 
 
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_unregistered_required_month_blocks_whole_day(tmp_path, order):
+    """Unregistered required-month closeout (independent audit 749A
+    1bf71583 P1): a needed session whose WHOLE month carries NO registered
+    price member at all (no Base month partition, no pinned Daily) still
+    has real required coverage missing.  The ledger must name the gap with
+    the real missing month/session/security scope - SHARED_INPUT_GAP /
+    whole_day / block_new_entries - not fall to READ merely because legal
+    adjacent months kept the global zero-price guard dark."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    _two_security_universe(members, tmp_path)
+    days = _sessions(330)
+    rows = (_bar_table(days).to_pylist()
+            + _bar_table(days, listing="listing-600001").to_pylist())
+    if order:
+        rows.reverse()
+    grouped = {}
+    for r in rows:
+        d = r["observation_end"].date()
+        grouped.setdefault((d.year, d.month), []).append(r)
+    base_members = []
+    for (yy, mm), vals in sorted(grouped.items()):
+        if (yy, mm) == (2026, 10):
+            continue  # whole required October unregistered
+        rel = ("payload/dwd_security_bar/interval_size=1d/"
+               f"observation_start_year={yy}/observation_start_month={mm}/"
+               "part-0.parquet")
+        _write(tmp_path / rel,
+               pa.table({k: [r.get(k) for r in vals] for k in vals[0]}))
+        base_members.append(_member(tmp_path, rel))
+    members["dwd_security_bar"] = base_members
+    daily = {}
+    clocks = {}
+    for r in rows:
+        d = r["observation_end"].date()
+        if d >= date(2026, 11, 1):
+            daily.setdefault(str(d), []).append(r)
+    daily_members = {}
+    for day, vals in sorted(daily.items()):
+        rel = f"payload/dwd_security_bar/day={day}/dwd_security_bar.parquet"
+        _write(tmp_path / rel,
+               pa.table({k: [r.get(k) for r in vals] for k in vals[0]}))
+        dm = _member(tmp_path, rel, package_id=f"daily-{day}",
+                     kind="daily", market_date=day)
+        daily_members[day] = [dm]
+        at = datetime(2026, 11, 23, 10, 0, tzinfo=UTC)
+        clocks[day] = {"knowledge": at, "producer": at, "channel": at}
+    fmap = _FormalStubSourceMap(members, daily_members, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block is not None
+    assert block["reason_code"] == "SHARED_INPUT_GAP"
+    assert block["affected_scope"] == "whole_day"
+    assert block["disposition"] == "block_new_entries"
+    assert "2026-10" in (block.get("missing_months") or [])
+    assert block.get("missing_sessions")
+    assert all(s.startswith("2026-10") for s in block["missing_sessions"])
+    assert set(block["affected_securities"]) == {
+        "security-600000", "security-600001"}
+
+
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_registered_partial_month_not_unregistered(tmp_path, order):
+    """Adjacent-shape control: a month that IS registered (even partially
+    covered) is attributed to its real member, never to the unregistered
+    placeholder.  Partial October coverage (600001 only) keeps the read
+    alive with only the genuinely starved security isolated - never
+    widened into a whole-day block by the unregistered-month placeholder."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    _two_security_universe(members, tmp_path)
+    days = _sessions(330)
+    rows = (_bar_table(days).to_pylist()
+            + _bar_table(days, listing="listing-600001").to_pylist())
+    if order:
+        rows.reverse()
+    grouped = {}
+    for r in rows:
+        d = r["observation_end"].date()
+        grouped.setdefault((d.year, d.month), []).append(r)
+    base_members = []
+    for (yy, mm), vals in sorted(grouped.items()):
+        if (yy, mm) == (2026, 10):
+            vals = [r for r in vals if r["listing_id"] == "listing-600001"]
+        rel = ("payload/dwd_security_bar/interval_size=1d/"
+               f"observation_start_year={yy}/observation_start_month={mm}/"
+               "part-0.parquet")
+        _write(tmp_path / rel,
+               pa.table({k: [r.get(k) for r in vals] for k in vals[0]}))
+        base_members.append(_member(tmp_path, rel))
+    members["dwd_security_bar"] = base_members
+    daily = {}
+    clocks = {}
+    for r in rows:
+        d = r["observation_end"].date()
+        if d >= date(2026, 11, 1):
+            daily.setdefault(str(d), []).append(r)
+    daily_members = {}
+    for day, vals in sorted(daily.items()):
+        rel = f"payload/dwd_security_bar/day={day}/dwd_security_bar.parquet"
+        _write(tmp_path / rel,
+               pa.table({k: [r.get(k) for r in vals] for k in vals[0]}))
+        dm = _member(tmp_path, rel, package_id=f"daily-{day}",
+                     kind="daily", market_date=day)
+        daily_members[day] = [dm]
+        at = datetime(2026, 11, 23, 10, 0, tzinfo=UTC)
+        clocks[day] = {"knowledge": at, "producer": at, "channel": at}
+    fmap = _FormalStubSourceMap(members, daily_members, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+    gaps = res.coverage["isolated_input_gaps"]
+    assert gaps
+    assert {sid for g in gaps for sid in g["affected_securities"]
+            } == {"security-600000"}
+    assert not any("unregistered-required-month" in str(g.get("member_id"))
+                   for g in gaps)
+
+
 # ---- R4 seg-A final-qualified-coverage closeout: row-level PIT gaps -------
 
 

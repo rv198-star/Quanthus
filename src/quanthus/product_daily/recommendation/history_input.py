@@ -1004,10 +1004,12 @@ def _same_read_sources(sec: Mapping[str, Any], history: RawHistory) -> frozenset
         the same-account same-security snapshot unit the position facts were
         read into;
       * this security's three-key identity (security_id / listing_id /
-        venue_id / listing_code) plus its own depends_on_member_ids: a member
-        bound to THIS security's identity is a same-read account source, while
-        a member shared by the whole pool or owned by a neighbour is not.
+        venue_id / listing_code): the position-facts snapshot unit may name
+        the security it describes, never a shared pool or neighbour id.
 
+    A market member (source_members / depends_on_member_ids / member_evidence)
+    is a pool content source, not an account snapshot: it carries no
+    account/position identity, so it can never qualify an exit disposition.
     Any other source id - an empty anchor set, a neighbour's member, a pending
     order key, a generic member/package id or a pool-external unresolved
     source - is not bound to this security's account and cannot qualify the
@@ -1023,9 +1025,6 @@ def _same_read_sources(sec: Mapping[str, Any], history: RawHistory) -> frozenset
             v = ident.get(key)
             if isinstance(v, str) and v.strip():
                 sources.add(v.strip())
-        for mid in _seq(ident.get("depends_on_member_ids") or (), "depends_on_member_ids"):
-            if isinstance(mid, str) and mid.strip():
-                sources.add(mid.strip())
     return frozenset(s for s in sources if s)
 
 

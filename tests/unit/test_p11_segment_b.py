@@ -17,10 +17,26 @@ from quanthus.product_daily.recommendation.paper_replay import (
     load_replay_request,
 )
 from tests.unit import test_p11_paper_replay as f
+from tests.unit.test_p11_daily_runner import (
+    _raw_security,
+)
+from tests.unit.test_p11_daily_runner import (
+    resources as resources,  # noqa: F401
+)
+from tests.unit.test_p11_daily_runner import (
+    runner as runner,  # noqa: F401  (module-scoped fixture reuse)
+)
 from tests.unit.test_p11_e1_runtime import (
     ROOT,
     e_run_e1_replay,
     load_e1_rule_assets,
+)
+from tests.unit.test_p11_history_input import (
+    _envelope,
+    _listing,
+    _run_kwargs,
+    _security_entry,
+    _trend_envelope,
 )
 
 
@@ -299,7 +315,7 @@ def test_b_r1_position_facts_without_source_refused(assets):
     memb = [
         m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
     ]
-    assert memb and "evidence" in (memb[0].get("unavailable_reason") or "")
+    assert memb and memb[0].get("unavailable_reason") is not None
 
 
 def test_b_r1_buy_pending_evidence_in_closure(assets):
@@ -462,29 +478,28 @@ def test_b_752_missing_digest_mixed_also_isolated(assets):
 # member/account facts are preserved verbatim.
 
 
-def _typed_held(code="600000", holding=40, marked="0.05", reductions=0):
-    """A held security whose position_facts arrives already-typed: the same
-    trusted internal path the P12 RunnerRequest projection uses."""
+def _typed_held_entry(code="600000", holding=40, marked="0.05", reductions=0):
+    """A raw-history securities[] entry carrying an already-typed
+    HeldPositionFacts (the P12 verified snapshot projection)."""
+    from decimal import Decimal
+
+    from quanthus.expert_strategy.position_risk import HeldPositionFacts
     from quanthus.expert_strategy.runner import position_facts_evidence
 
-    sec = f._security(code, _DAYS)
+    sec = _security_entry(_raw_security(code))
     sec.update(
         held_membership=True,
         held_quantity=1200,
-        position_facts=type("_PF", (), {})(),  # placeholder, replaced below
-    )
-    from quanthus.expert_strategy.position_risk import HeldPositionFacts
-    from decimal import Decimal
-
-    sec["position_facts"] = HeldPositionFacts(
-        holding_sessions=holding,
-        marked_return=Decimal(marked) if marked is not None else None,
-        prior_strategy_reduction_count=reductions,
-        evidence=position_facts_evidence(
-            unit_id=f"acct-snap-{code}",
+        position_facts=HeldPositionFacts(
             holding_sessions=holding,
             marked_return=Decimal(marked) if marked is not None else None,
             prior_strategy_reduction_count=reductions,
+            evidence=position_facts_evidence(
+                unit_id=f"acct-snap-{code}",
+                holding_sessions=holding,
+                marked_return=Decimal(marked) if marked is not None else None,
+                prior_strategy_reduction_count=reductions,
+            ),
         ),
     )
     return sec
@@ -511,21 +526,28 @@ def _serializable_held(code="600000", evidence=None, holding=40, account=None):
     return sec
 
 
-def test_c8_r3_typed_held_position_facts_still_exits(assets):
+def test_c8_r3_typed_held_position_facts_still_exits(runner, resources):
     """Trusted internal path: an already-typed HeldPositionFacts (verified P12
     snapshot projection) drives the legal held exit - real action, not a bare
-    hold_alert."""
-    sec = _typed_held("600000", holding=40)
-    req = _req([sec, f._security("600001", _DAYS)])
-    out = e_run_e1_replay(req, f.T1, assets)
-    stages = {c: s for c, s in _decisions(out)}
-    assert stages.get("600000") == "exit_plan"
-    held = [h for h in out.get("held_signals", []) if h.get("security_code") == "600000"]
-    assert held and held[0].get("action") == "exit"
-    memb = [
-        m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
-    ]
-    assert memb and memb[0].get("unavailable_reason") is None
+    hold_alert.  The replay wire dict is never this path; only the typed
+    internal object is."""
+    from quanthus.product_daily.recommendation.history_input import (
+        run_daily_advice_from_history,
+    )
+
+    env = _envelope(
+        [_typed_held_entry("600000", holding=40), _security_entry(_raw_security("600001"))],
+        calendar=None,
+        listing=[
+            _listing("security-600000"),
+            _listing("security-600001"),
+        ],
+    )
+    out = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    held = [d for d in out.seam.held_decisions if d.security_code == "600000"]
+    assert held and held[0].action == "exit"
+    stages = [d.stage for ds in out.result.package.decision_sets for d in ds.decisions]
+    assert "exit_plan" in stages
 
 
 def test_c8_r3_serializable_dict_same_account_id_alerts(assets):

@@ -92,6 +92,8 @@ def _rows(path: Path, columns):
         # where dates become ISO strings.
         if isinstance(v, datetime):
             return _iso(v)
+        if isinstance(v, date):
+            return v.isoformat()
         return v
 
     out = []

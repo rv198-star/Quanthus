@@ -2647,7 +2647,7 @@ def _segA_chain_fixture(tmp_path, day="2026-11-24"):
     # Real P10 index shape: kind at the root + dates[day] carrying the day in
     # its own market_date and the upstream base / downstream core digests.
     std_f = tmp_path / "std.json"
-    std_f.write_text(json.dumps({"market_date": day}))
+    std_f.write_text(json.dumps(_standard_body(day)))
     core_f = tmp_path / "core.json"
     core_f.write_text(json.dumps({"package_id": "daily-" + day}))
     base_m = tmp_path / "base-manifest.json"
@@ -2658,7 +2658,8 @@ def _segA_chain_fixture(tmp_path, day="2026-11-24"):
         "kind": "cn02_base24_daily_cycle_v1",
         "dates": {day: {"market_date": day,
                         "core_manifest_sha256": _dd(core_f),
-                        "base_manifest_sha256": _dd(base_m)}}}))
+                        "base_manifest_sha256": _dd(base_m),
+                        "standard_delivery_manifest_sha256": _dd(std_f)}}}))
     def _d(p):
         return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
     smap._base_doc = {"manifest_path": str(base_m),
@@ -2735,13 +2736,17 @@ def test_segA_chain_associated_identity_named_fault(tmp_path):
     chain2 = SourceMap.manifest_chain(smap2)
     assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
                for c in chain2)
-    # Standard descriptor date disagrees with its bound day.
+    # Standard descriptor's producer content.market_date disagrees with its
+    # bound day - a named CHAIN_ASSOCIATION_MISMATCH on the real nested field.
     smap3, files3 = _segA_chain_fixture(tmp_path)
-    files3["std"].write_text(json.dumps({"market_date": "2026-11-23"}))
+    body3 = _standard_body("2026-11-24")
+    body3["content"]["market_date"] = "2026-11-23"
+    files3["std"].write_text(json.dumps(body3))
     d3 = "sha256:" + hashlib.sha256(files3["std"].read_bytes()).hexdigest()
     smap3._daily_entries["2026-11-24"]["standard_descriptor"]["sha256"] = d3
     chain3 = SourceMap.manifest_chain(smap3)
-    assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+    assert any(c["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+               and c.get("association") == "standard_content_market_date"
                for c in chain3)
 
 
@@ -2757,7 +2762,7 @@ def test_segA_chain_missing_identity_field_named_fault(tmp_path):
     # package_id.
     for key, identity_field in (("base", "package_id"),
                                 ("dates", "kind"),
-                                ("std", "market_date"),
+                                ("std", "kind"),
                                 ("core", "package_id")):
         smap, files = _segA_chain_fixture(tmp_path)
         files[key].write_text("{}")  # hash-verified empty object, no identity
@@ -3041,6 +3046,19 @@ def test_segA_single_security_gap_isolated_not_day_block(tmp_path):
 
 # ---- R4 seg-A hardgate closeout: real P10 publisher four-chain -------------
 
+def _standard_body(day):
+    """The real producer Standard manifest body (standard_daily.publish):
+    kind + source_contract + content{role, market_date, day_kind, files}."""
+    content = {"role": "daily", "market_date": day, "day_kind": "market",
+               "files": []}
+    return {"kind": "quanthus_daily_1d5m_v1",
+            "source_contract": "p10-standard-calendar-day-delivery-v1",
+            "content": content,
+            "content_digest": "sha256:" + "0" * 64,
+            "consumer_admission": "NOT_GRANTED",
+            "execution_authorized": False}
+
+
 def _real_chain_fixture(tmp_path, day="2026-11-24"):
     """Real P10 publisher shape four-link chain (all synthetic)."""
     from quanthus.pipelines.securities_warehouse.daily_base24_cycle import publish
@@ -3050,7 +3068,7 @@ def _real_chain_fixture(tmp_path, day="2026-11-24"):
     base_f = tmp_path / "base-manifest.json"
     base_f.write_text(json.dumps({"package_id": "standard-base-2.5.1-x"}))
     std_f = tmp_path / "std.json"
-    std_f.write_text(json.dumps({"kind": "quanthus_daily_1d5m_v1", "market_date": day}))
+    std_f.write_text(json.dumps(_standard_body(day)))
     core_f = tmp_path / "core.json"
     core_pkg = "dwd-daily-" + day.replace("-", "") + "-synthetic"
     core_f.write_text(json.dumps({
@@ -3066,6 +3084,7 @@ def _real_chain_fixture(tmp_path, day="2026-11-24"):
         "status": "CORE_READY_5M_PENDING", "core": "/synthetic/core",
         "core_manifest_sha256": _d(core_f),
         "base_manifest_sha256": _d(base_f),
+        "standard_delivery_manifest_sha256": _d(std_f),
         "consumer_admission": "NOT_GRANTED", "execution_authorized": False,
     })
     dates_f = dates_root / "DATES.json"
@@ -3155,10 +3174,13 @@ def test_segA_real_dates_nonobject_dates_field_fault(tmp_path):
 
 def test_segA_real_standard_date_mismatch_fault(tmp_path):
     smap, files, day = _real_chain_fixture(tmp_path)
-    files["std"].write_text(json.dumps(
-        {"kind": "quanthus_daily_1d5m_v1", "market_date": "1999-01-01"}))
+    body = _standard_body(day)
+    body["content"]["market_date"] = "1999-01-01"
+    files["std"].write_text(json.dumps(body))
     smap._daily_entries[day]["standard_descriptor"]["sha256"] = _redigest(files["std"])
-    assert _chain_status(smap)["daily_manifest:" + day]["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "standard_content_market_date"
 
 
 def test_segA_real_core_file_identity_fault(tmp_path):
@@ -3202,3 +3224,130 @@ def test_segA_real_chain_fault_blocks_read_members_market_zero(tmp_path):
     assert res.coverage["universe"]["pool_size"] == 0
     assert res.coverage["bars"]["reads"] == []
 
+
+
+def _mutate_entry(smap, files, day, name):
+    """Apply one chain mutation on the real producer-shape fixture and keep
+    every bound digest honest (mirror of the coordinator's 42-case probe)."""
+    if name == "dates-no-core-digest":
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day].pop("core_manifest_sha256")
+    elif name == "dates-no-base-digest":
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day].pop("base_manifest_sha256")
+    elif name == "dates-no-std-digest":
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day].pop("standard_delivery_manifest_sha256")
+    elif name == "standard-index-sha-mismatch":
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day]["standard_delivery_manifest_sha256"] = "sha256:" + "f" * 64
+    else:
+        raise ValueError(name)
+    files["dates"].write_text(json.dumps(d))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+
+
+def test_segA_real_standard_producer_shape_matches(tmp_path):
+    """A Standard descriptor on the REAL producer shape (kind +
+    source_contract + content{market_date}) passes all three layers and the
+    public read runs - the reader follows content.market_date, never a bare
+    root market_date."""
+    smap, files, day = _real_chain_fixture(tmp_path)
+    chain = _chain_status(smap)
+    assert chain["daily_manifest:" + day]["status"] == "MATCH"
+    res = _formal_read(smap, tmp_path)
+    assert res.status == "READ", res.coverage.get("day_block")
+
+
+def test_segA_real_standard_missing_content_field_fault(tmp_path):
+    """A Standard body missing the producer's content object or its
+    content.market_date is a named structural fault, not a MATCH."""
+    smap, files, day = _real_chain_fixture(tmp_path)
+    body = _standard_body(day)
+    del body["content"]
+    files["std"].write_text(json.dumps(body))
+    smap._daily_entries[day]["standard_descriptor"]["sha256"] = _redigest(files["std"])
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CONTENT_MISSING_IDENTITY_FIELD"
+    assert rec["missing_field"] == "content.market_date"
+
+
+def test_segA_identity_value_null_and_list_named_fault(tmp_path):
+    """Identity keys that EXIST but carry a null / array / blank value are
+    named CONTENT_IDENTITY_VALUE_INVALID faults - existence alone is not a
+    MATCH (audit r2: null/array/blank identities must be refused)."""
+    for link, field in (("base", "package_id"),
+                        ("dates", "kind"),
+                        ("core", "package_id")):
+        for bad in (None, [], "   "):
+            smap, files = _segA_chain_fixture(tmp_path)
+            doc = json.loads(files[link].read_text())
+            doc[field] = bad
+            files[link].write_text(json.dumps(doc))
+            d = _redigest(files[link])
+            if link == "base":
+                smap._base_doc["manifest_sha256"] = d
+            elif link == "dates":
+                smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+            else:
+                smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+            rec = _chain_status(smap)[f"{ {'base':'base_manifest','dates':'dates_index:2026-11-24','core':'core_manifest:2026-11-24'}[link] }"]
+            assert rec["status"] == "CONTENT_IDENTITY_VALUE_INVALID", (link, bad, rec)
+    # Standard's nested content.market_date null -> value fault
+    smap, files, day = _real_chain_fixture(tmp_path)
+    body = _standard_body(day)
+    body["content"]["market_date"] = None
+    files["std"].write_text(json.dumps(body))
+    smap._daily_entries[day]["standard_descriptor"]["sha256"] = _redigest(files["std"])
+    rec = _chain_status(smap)["daily_manifest:" + day]
+    assert rec["status"] == "CONTENT_IDENTITY_VALUE_INVALID"
+
+
+def test_segA_dates_missing_association_digests_named_fault(tmp_path):
+    """DATES[day] MISSING a required upstream/downstream association digest
+    (core / base / standard-delivery) is a named CHAIN_ASSOCIATION_MISMATCH
+    with missing_or_invalid_digest - a missing link is never a pass."""
+    for name, field in (("dates-no-core-digest", "core_manifest_sha256"),
+                        ("dates-no-base-digest", "base_manifest_sha256"),
+                        ("dates-no-std-digest", "standard_delivery_manifest_sha256")):
+        smap, files, day = _real_chain_fixture(tmp_path)
+        _mutate_entry(smap, files, day, name)
+        rec = _chain_status(smap)["dates_index:" + day]
+        assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH", (name, rec)
+        assert rec["fault"] == "missing_or_invalid_digest"
+        assert rec["field"] == field
+
+
+def test_segA_dates_wrong_association_digests_named_fault(tmp_path):
+    """DATES[day] association digests that name a DIFFERENT core / base /
+    standard link are named digest_mismatch association faults."""
+    for name, field in (("dates-foreign-core", "core_manifest_sha256"),
+                        ("dates-foreign-base", "base_manifest_sha256"),
+                        ("standard-index-sha-mismatch",
+                         "standard_delivery_manifest_sha256")):
+        smap, files, day = _real_chain_fixture(tmp_path)
+        d = json.loads(files["dates"].read_text())
+        d["dates"][day][field] = "sha256:" + "f" * 64
+        files["dates"].write_text(json.dumps(d))
+        smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+        rec = _chain_status(smap)["dates_index:" + day]
+        assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH", (name, rec)
+        assert rec["fault"] == "digest_mismatch"
+        assert rec["field"] == field
+
+
+def test_segA_identity_value_fault_blocks_read_zero(tmp_path):
+    """A present-but-invalid identity value (null package_id) is a hard
+    pre-read gate - INPUT_BLOCKED with member and market reads both zero."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["core"].read_text())
+    doc["package_id"] = None
+    files["core"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["core_manifest"]["sha256"] = _redigest(files["core"])
+    res = _formal_read(smap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert res.coverage["member_consumption"]["members_opened"] == 0
+    assert res.coverage["bars"]["reads"] == []

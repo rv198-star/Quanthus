@@ -58,6 +58,7 @@ P1_EXCEPTION_MEMBER = Path(
 DATES_INDEX_KIND = "cn02_base24_daily_cycle_v1"
 CORE_MANIFEST_KIND = "cn01_daily_core_dwd_increment"
 STANDARD_MANIFEST_KIND = "quanthus_daily_1d5m_v1"
+STANDARD_SOURCE_CONTRACT = "p10-standard-calendar-day-delivery-v1"
 
 P1_EXCEPTION_SHA256 = (
     "sha256:9a2158a55e7e351049f242e66b21a01e96d3cf2af55e7517c0aa4bf507577be2"
@@ -440,7 +441,7 @@ class SourceMap:
         def _probe(artifact, path, declared, content_shape=None,
                    content_identity=None, declared_identity=None,
                    required_identity_key=None,
-                   chain_relation=None):
+                   chain_relation=None, required_value=None):
             """One frozen-chain link: declaration, hash, content shape and
             the associated identity all verified before members open.
 
@@ -518,6 +519,53 @@ class SourceMap:
                             "missing_field": required_identity_key,
                             "verified_at": verified_at})
                 return
+            # Required-field VALUE check (audit R4 seg-A hardgate r2): the
+            # link's declared identity fields must exist AND carry a usable
+            # value - a present-but-null / wrong-type / blank / whitespace
+            # field is a named CONTENT_IDENTITY_VALUE fault, not a MATCH.
+            # required_value is a dotted path ("content.market_date" reads
+            # the producer's nested content object) plus the expected kind
+            # of value: "identity" (non-blank string) or "digest" (the
+            # versioned sha256:hex form).
+            if required_value is not None and isinstance(doc, dict):
+                for vpath, vkind in required_value:
+                    node = doc
+                    ok = True
+                    for part in vpath.split("."):
+                        if not isinstance(node, dict) or part not in node:
+                            ok = False
+                            break
+                        node = node[part]
+                    if not ok:
+                        out.append({
+                            "artifact": artifact, "path": str(path),
+                            "declared_sha256": declared, "actual_sha256": actual,
+                            "status": "CONTENT_MISSING_IDENTITY_FIELD",
+                            "missing_field": vpath,
+                            "verified_at": verified_at})
+                        return
+                    if vkind == "digest":
+                        good = (isinstance(node, str)
+                                and node.strip() == node
+                                and node.startswith("sha256:")
+                                and len(node) == 71
+                                and all(c in "0123456789abcdef"
+                                        for c in node[7:]))
+                    else:
+                        good = (isinstance(node, str)
+                                and node.strip() == node
+                                and node != "")
+                    if not good:
+                        out.append({
+                            "artifact": artifact, "path": str(path),
+                            "declared_sha256": declared, "actual_sha256": actual,
+                            "status": "CONTENT_IDENTITY_VALUE_INVALID",
+                            "invalid_field": vpath,
+                            "field_kind": vkind,
+                            "actual_value": (node if isinstance(node, str)
+                                             else type(node).__name__),
+                            "verified_at": verified_at})
+                        return
             if declared_identity is not None:
                 key, expected = declared_identity
                 actual_id = doc.get(key) if isinstance(doc, dict) else None
@@ -559,7 +607,8 @@ class SourceMap:
         _probe("base_manifest", self._base_doc.get("manifest_path"),
                self._base_doc.get("manifest_sha256"),
                content_shape="json_object",
-               required_identity_key="package_id")
+               required_identity_key="package_id",
+               required_value=(("package_id", "identity"),))
         for day in self.daily_open_days():
             e = self._daily_entries.get(day) or {}
             # Four external frozen links, each verified for its declared
@@ -617,22 +666,39 @@ class SourceMap:
                     return {"association": "dates_index_day_market_date",
                             "expected": day,
                             "actual": item.get("market_date")}
+                # Required upstream/downstream association digests: the real
+                # published DATES entry names the base manifest, the core
+                # manifest and the standard-delivery manifest it was bound to.
+                # A MISSING required association digest is a named fault, not
+                # a pass - the digest must exist AND match the bound link.
                 core_m = entry.get("core_manifest") or {}
-                if (isinstance(core_m, dict)
-                        and core_m.get("sha256") is not None
-                        and item.get("core_manifest_sha256") is not None
-                        and item.get("core_manifest_sha256")
-                        != core_m.get("sha256")):
-                    return {"association": "dates_index_core_manifest_sha256",
-                            "expected": core_m.get("sha256"),
-                            "actual": item.get("core_manifest_sha256")}
-                if (item.get("base_manifest_sha256") is not None
-                        and self._base_doc.get("manifest_sha256") is not None
-                        and item.get("base_manifest_sha256")
-                        != self._base_doc.get("manifest_sha256")):
-                    return {"association": "dates_index_base_manifest_sha256",
-                            "expected": self._base_doc.get("manifest_sha256"),
-                            "actual": item.get("base_manifest_sha256")}
+                std_m = entry.get("standard_descriptor") or {}
+                req = [
+                    ("core_manifest_sha256",
+                     core_m.get("sha256") if isinstance(core_m, dict) else None),
+                    ("base_manifest_sha256",
+                     self._base_doc.get("manifest_sha256")),
+                    ("standard_delivery_manifest_sha256",
+                     std_m.get("sha256") if isinstance(std_m, dict) else None),
+                ]
+                for field, bound in req:
+                    actual = item.get(field)
+                    if (not isinstance(actual, str) or actual.strip() != actual
+                            or not actual.startswith("sha256:")
+                            or len(actual) != 71
+                            or any(c not in "0123456789abcdef"
+                                   for c in actual[7:])):
+                        return {"association": "dates_index_" + field,
+                                "fault": "missing_or_invalid_digest",
+                                "field": field,
+                                "actual": (actual if isinstance(actual, str)
+                                           else type(actual).__name__)}
+                    if bound is not None and actual != bound:
+                        return {"association": "dates_index_" + field,
+                                "fault": "digest_mismatch",
+                                "field": field,
+                                "expected": bound,
+                                "actual": actual}
                 return None
 
             if not isinstance(dates_entry, dict):
@@ -647,12 +713,54 @@ class SourceMap:
                        _dsha,
                        content_shape="json_object",
                        required_identity_key="kind",
+                       required_value=(("kind", "identity"),),
                        chain_relation=_dates_relation)
 
-            _descriptor_probe(f"daily_manifest:{day}",
-                              e.get("standard_descriptor"), ("sha256",),
-                              identity_key="market_date",
-                              expected_identity=day)
+            # ---- Standard delivery descriptor (real producer shape) --------
+            # standard_daily.publish writes {kind, source_contract, content:{
+            # role, market_date, day_kind, files}, content_digest}.  The bound
+            # day lives in content.market_date (the producer's nested content
+            # object), never a bare root field.  Validate the versioned shape,
+            # a usable market_date value, the producer contract identity and
+            # the association to THIS day on the same in-memory bytes.
+            std_entry = e.get("standard_descriptor")
+
+            def _std_relation(doc, day=day):
+                if doc.get("kind") != STANDARD_MANIFEST_KIND:
+                    return {"association": "standard_manifest_kind",
+                            "expected": STANDARD_MANIFEST_KIND,
+                            "actual": doc.get("kind")}
+                if (doc.get("source_contract") is not None
+                        and doc.get("source_contract")
+                        != STANDARD_SOURCE_CONTRACT):
+                    return {"association": "standard_source_contract",
+                            "expected": STANDARD_SOURCE_CONTRACT,
+                            "actual": doc.get("source_contract")}
+                content = doc.get("content")
+                if not isinstance(content, dict):
+                    return {"association": "standard_content_object",
+                            "object_shape": type(content).__name__}
+                if content.get("market_date") != day:
+                    return {"association": "standard_content_market_date",
+                            "expected": day,
+                            "actual": content.get("market_date")}
+                return None
+
+            if not isinstance(std_entry, dict):
+                out.append({
+                    "artifact": f"daily_manifest:{day}", "path": None,
+                    "declared_sha256": None, "actual_sha256": None,
+                    "status": "NON_OBJECT_DESCRIPTOR",
+                    "object_shape": type(std_entry).__name__,
+                    "verified_at": iso(VerificationClock.now())})
+            else:
+                _probe(f"daily_manifest:{day}", std_entry.get("path"),
+                       std_entry.get("sha256"),
+                       content_shape="json_object",
+                       required_identity_key="kind",
+                       required_value=(("kind", "identity"),
+                                       ("content.market_date", "identity")),
+                       chain_relation=_std_relation)
             core = e.get("core_manifest")
             if core is None:
                 out.append({
@@ -690,6 +798,7 @@ class SourceMap:
                        declared_identity=("package_id",
                                           core.get("package_id")),
                        required_identity_key="package_id",
+                       required_value=(("package_id", "identity"),),
                        chain_relation=_core_relation)
         return out
 

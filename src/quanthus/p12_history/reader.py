@@ -251,6 +251,7 @@ def read_history(
                                "CONTENT_MALFORMED_JSON",
                                "CONTENT_MISSING_IDENTITY_FIELD",
                                "ASSOCIATED_IDENTITY_MISMATCH",
+                               "CONTENT_IDENTITY_VALUE_INVALID",
                                "CHAIN_ASSOCIATION_MISMATCH")
     ]
     # Window scope (audit R4 segment A closeout): only a link for a session
@@ -1713,6 +1714,7 @@ def read_history(
                                "CONTENT_MALFORMED_JSON",
                                "CONTENT_MISSING_IDENTITY_FIELD",
                                "ASSOCIATED_IDENTITY_MISMATCH",
+                               "CONTENT_IDENTITY_VALUE_INVALID",
                                "CHAIN_ASSOCIATION_MISMATCH")
     ]
     chain_faults = [

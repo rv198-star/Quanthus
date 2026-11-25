@@ -157,6 +157,16 @@ class Replay:
             return f"unsupported tape contract version {version!r}"
         time_label = self._contract.get("time_label")
         visible_at = self._contract.get("visible_at")
+        # Field TYPE checks precede membership tests and dict access, so a
+        # list/object/scalar wrong type is a named structural rejection and
+        # never a TypeError that takes the service down.
+        if time_label is not None and not isinstance(time_label, str):
+            return f"tape contract time_label field has the wrong type {type(time_label).__name__}"
+        if visible_at is not None and not isinstance(visible_at, str):
+            return f"tape contract visible_at field has the wrong type {type(visible_at).__name__}"
+        open_field = self._contract.get("open_field")
+        if open_field is not None and not isinstance(open_field, str):
+            return f"tape contract open_field field has the wrong type {type(open_field).__name__}"
         if time_label not in self._LABEL_VISIBLE:
             return f"undefined tape time_label {time_label!r}"
         if self._LABEL_VISIBLE[time_label] != visible_at:
@@ -164,6 +174,22 @@ class Replay:
                 f"contradictory tape label pair time_label={time_label!r} "
                 f"visible_at={visible_at!r}"
             )
+        # A PROVIDED min_tick is a named constraint: it must be a finite
+        # positive decimal.  A malformed declared tick is an invalid
+        # contract - never silently downgraded to undeclared so the
+        # precision gate drops.  An absent min_tick stays undeclared.
+        if "min_tick" in self._contract:
+            from decimal import Decimal, InvalidOperation
+            _mt = self._contract.get("min_tick")
+            _tick_ok = False
+            if _mt is not None and not isinstance(_mt, bool) and isinstance(_mt, (str, int, float, Decimal)):
+                try:
+                    _cand = Decimal(str(_mt))
+                    _tick_ok = _cand.is_finite() and _cand > 0
+                except (InvalidOperation, ValueError):
+                    _tick_ok = False
+            if not _tick_ok:
+                return f"tape contract min_tick is not a finite positive decimal {_mt!r}"
         opens = self._contract.get("opens")
         if opens is not None:
             if not isinstance(opens, list):

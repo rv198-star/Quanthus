@@ -426,6 +426,55 @@ def test_invalid_contract_carries_auditable_structural_detail():
     assert "missing" in replay._contract_error
 
 
+def test_wrong_typed_scalar_fields_are_named_structural_rejections():
+    # time_label / visible_at / open_field wrong types must NOT reach the
+    # membership test (TypeError) - each is a named invalid_contract and
+    # the service stays alive.
+    for field, raw in (
+        ("time_label", []),
+        ("time_label", {}),
+        ("visible_at", []),
+        ("open_field", ["source_open"]),
+        ("open_field", {"x": 1}),
+    ):
+        contract = dict(MINUTE_START, **{field: raw})
+        tape = _tape(_POINTS_BASE, contract=contract)
+        replay = Replay(tape, day="2026-10-07", source="t")
+        assert replay._contract_error is not None
+        assert field in replay._contract_error
+        assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
+
+
+def test_provided_illegal_min_tick_is_named_contract_rejection():
+    # A DECLARED malformed min_tick is an invalid contract - never silently
+    # downgraded to undeclared so the precision gate drops.
+    for raw in ("abc", "0", "NaN", "Infinity", None, {"x": 1}, [], True, -1):
+        contract = dict(MINUTE_START)
+        contract["min_tick"] = raw
+        contract["opens"] = [
+            {"security": "600000", "time": "202610080929", "price": "49.80"}
+        ]
+        tape = _tape(_POINTS_BASE, contract=contract)
+        replay = Replay(tape, day="2026-10-07", source="t")
+        assert replay._contract_error is not None
+        assert "min_tick" in replay._contract_error
+        assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
+
+
+def test_bad_tick_does_not_drop_precision_gate():
+    # A malformed declared tick + an over-precision open must NOT fill -
+    # it is an invalid contract, not an undeclared pass.
+    contract = dict(MINUTE_START)
+    contract["min_tick"] = "abc"
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": "49.801"}
+    ]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert "min_tick" in replay._contract_error
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
+
+
 # ---- Decimal equivalence vs real conflict ----------------------------------
 
 

@@ -973,7 +973,8 @@ def read_history(
                     "knowledge clock for this formal read"
                 ),
                 "affected_scope": "whole_day",
-                "failed_members": [e.get("member_key") for e in _shared_gap],
+                "failed_members": [e.get("package_key") or e.get("member_key")
+                                   for e in _shared_gap],
                 "disposition": "block_new_entries",
             }
 

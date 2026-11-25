@@ -703,7 +703,8 @@ def read_history(
                 })
             if actual_snap is not None:
                 account_binding["actual_snapshot_sha256"] = actual_snap
-                if actual_snap != snap_sha:
+                if (str(actual_snap).split(":", 1)[-1]
+                        != str(snap_sha).split(":", 1)[-1]):
                     account_binding["rejections"].append({
                         "reason_code": "ACCOUNT_SNAPSHOT_SHA_MISMATCH",
                         "detail": f"account snapshot sha256 {actual_snap} != pinned {snap_sha}",
@@ -772,7 +773,9 @@ def read_history(
                     "reason_code": "ACCOUNT_RECEIPT_UNREADABLE",
                     "detail": f"generation receipt could not be opened: {type(exc).__name__}: {exc}",
                 })
-            if actual_gr is not None and actual_gr != gr.get("sha256"):
+            def _hex(v):
+                return str(v or "").split(":", 1)[-1].strip()
+            if actual_gr is not None and _hex(actual_gr) != _hex(gr.get("sha256")):
                 account_binding["rejections"].append({
                     "reason_code": "ACCOUNT_RECEIPT_SHA_MISMATCH",
                     "detail": f"generation receipt sha256 {actual_gr} != pinned {gr.get('sha256')}",

@@ -60,7 +60,10 @@ def test_package_clock_checks_original_receipt_against_bound_trading_day():
         "source_clocks": {"logical_decision_cutoff": cutoff.isoformat()},
         "envelope": {"sha256": digest},
     }
-    args = (request, evidence, read, observed, cutoff, digest, {"consumer_rule_version": "1.0.0"})
+    args = (
+        request, evidence, read, observed, cutoff, digest, {"consumer_rule_version": "1.0.0"},
+        {"bar": row},
+    )
     proof = _october_package_clock(*args)
     assert proof["logical_cutoff"] == cutoff.isoformat()
     assert proof["intake_verified_at"] == verified.isoformat()
@@ -720,3 +723,184 @@ def test_october_factor_ledger_survives_action_isolation(assets, unknown_impleme
     assert closed["consumption_evidence"]["p1_factor_visibility"]["restrictions"] == [
         {"security_code": "600001", "source_row": row}
     ]
+
+
+@pytest.mark.parametrize(
+    "subject_basis,ledger_failure,expected",
+    [
+        ("qfq", "missing", "p1_factor_ledger_unverified"),
+        ("hfq", "bad_sha", "p1_factor_ledger_unverified"),
+        ("qfq", None, "replay_price_basis_not_admitted"),
+        (None, "bad_sha", "p1_factor_ledger_unverified"),
+        ("none", "missing", "native_prices_independent"),
+        ("UNADJUSTED", "bad_sha", "native_prices_independent"),
+    ],
+)
+def test_public_replay_checks_price_inputs_before_entry(
+    assets, subject_basis, ledger_failure, expected
+):
+    from tests.unit import test_p11_paper_replay as f
+
+    days = tuple(d for d in f.SESSION_DAYS if d <= f.T1)
+    subject, neighbor = (f._security(c, days) for c in ("600000", "600001"))
+    req = f._request(market_dates=(f.T1,), securities=[subject, neighbor], coverage="verified")
+    req["listing_rows"].append(f._listing("security-600001"))
+    req["facts_template"]["price_basis"] = "qfq"
+    for sec in (subject, neighbor):
+        for bar in sec["bars"]:
+            bar["price_basis"] = "none"
+    subject["bars"][-2]["price_basis"] = subject_basis
+    if ledger_failure:
+        subject["dependency_reasons"] = {
+            "p1_factor_ledger": "unverified_or_missing",
+            "factor_dependent_actions": "blocked",
+        }
+    stamp = "2026-11-25T00:34:06.373370Z"
+    read = {
+        "member_id": "ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet",
+        "status": "SHA_MISMATCH" if ledger_failure else "READ",
+        "actual_sha256": None if ledger_failure == "missing" else "sha256:" + "e" * 64,
+        "verified_at": stamp,
+    }
+    day = e_run_e1_replay(req, f.T1, assets, p12_evidence={"p1_exceptions": {"reads": [read]}})
+    admitted = expected == "native_prices_independent"
+    assert day["publishable"] and day["delivered"]["600001"]["entry_eligible"]
+    assert day["delivered"]["600000"]["entry_eligible"] is admitted
+    entries = {d["security_code"] for d in day["entry_decisions"] if d["status"] == "entry"}
+    assert entries == ({"600000", "600001"} if admitted else {"600001"})
+    closure = day["source_closure"]
+    assert closure["price_basis"] == "none"
+    ce = closure["consumption_evidence"]
+    special = ce["p12"]["p1_exceptions"]
+    if ledger_failure:
+        assert special["reads"] == [read]
+    else:
+        # The optional success claim is unpaired in this fixture.
+        assert special["p1_unverified"] and not special["reads"]
+        assert special["reported_evidence"]["reads"] == [read]
+    (item,) = ce["p1_factor_visibility"]["price_inputs"]
+    assert item["disposition"] == expected
+    assert item["dependency_reasons"] == subject.get("dependency_reasons", {})
+    assert day["receipt"]["source_closure_digest"] == sha256_digest(closure)
+    if not admitted:
+        (isolation,) = day["coverage_exclusions"]
+        assert isolation["reason"] == expected and isolation in closure["exclusions"]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        None,
+        "late",
+        "early",
+        "different_time_in_window",
+        "digest",
+        "source_digest",
+        "different_package",
+        "ordinary_package",
+        "duplicate_read",
+        "duplicate_ordinary",
+    ],
+)
+def test_p1_read_pairs_identity_source_digest_and_original_clocks(change):
+    from types import SimpleNamespace
+
+    from quanthus.product_daily.recommendation.e1_runtime import _p1_read_evidence
+
+    mid = "ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet"
+    key = "base-ods::" + mid
+    digest = "sha256:" + "d" * 64
+    start, verified, observed = [
+        datetime.fromisoformat("2026-11-25T00:" + hm + "+00:00")
+        for hm in ("33:50", "34:06", "36:00")
+    ]
+    special = {
+        "member_id": mid,
+        "member_key": key,
+        "status": "READ",
+        "sha_match": True,
+        "verified_at": verified.isoformat(),
+        "sha256": digest,
+    }
+    row = {
+        "member_id": mid,
+        "package_key": key,
+        "status": "READ",
+        "sha_match": True,
+        "verify_at": verified.isoformat(),
+        "sha256": digest,
+    }
+    source = {"member_id": mid, "package_id": "base-ods", "sha256": digest}
+    member = SimpleNamespace(member_id=mid, digest=digest, available_at=verified)
+    request = SimpleNamespace(
+        source_members=[source], member_evidence=[member], required_member_ids=[mid]
+    )
+    evidence = {
+        "member_consumption": {"run_read_at": start.isoformat(), "members": [row]},
+        "p1_exceptions": {"reads": [special]},
+    }
+    if change in ("late", "early", "different_time_in_window"):
+        special["verified_at"] = {
+            "late": "2026-11-25T00:38:00Z",
+            "early": "2026-11-25T00:33:49Z",
+            "different_time_in_window": "2026-11-25T00:34:05Z",
+        }[change]
+    elif change == "digest":
+        special["sha256"] = "sha256:" + "c" * 64
+    elif change == "source_digest":
+        source["sha256"] = "sha256:" + "c" * 64
+    elif change == "different_package":
+        special["member_key"] = "other::" + mid
+    elif change == "ordinary_package":
+        row["package_key"] = "other::" + mid
+    elif change == "duplicate_read":
+        evidence["p1_exceptions"]["reads"].append(dict(special))
+    elif change == "duplicate_ordinary":
+        evidence["member_consumption"]["members"].append(dict(row))
+    if change is None:
+        assert _p1_read_evidence(request, evidence, start, observed) == evidence
+        return
+    with pytest.raises(ProductDailyError, match="replay_p1_read_mismatch"):
+        _p1_read_evidence(request, evidence, start, observed)
+    request.required_member_ids = []
+    result = _p1_read_evidence(request, evidence, start, observed)["p1_exceptions"]
+    assert result["p1_unverified"] and result["reads"] == []
+    assert result["reported_evidence"] == evidence["p1_exceptions"]
+
+
+@pytest.mark.parametrize("explicit_key", ["member_key", "package_key"])
+@pytest.mark.parametrize("used", [True, False])
+def test_ordinary_member_matches_its_own_registered_key(explicit_key, used):
+    from types import SimpleNamespace
+
+    from quanthus.product_daily.recommendation.e1_runtime import _ordinary_member_index
+
+    p1 = "ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet"
+    sources = [{"package_id": "base-ods", "member_id": mid} for mid in (p1, "other")]
+    request = SimpleNamespace(source_members=sources)
+    rows = [
+        {**src, explicit_key: "base-ods::" + src["member_id"], "status": "READ"}
+        for src in sources
+    ]
+    rows[1]["relevant_for_T"] = used
+    assert set(_ordinary_member_index(request, {"members": rows})) == {p1, "other"}
+    rows[1][explicit_key] = "base-ods::" + p1
+    with pytest.raises(ProductDailyError, match="replay_member_identity_mismatch"):
+        _ordinary_member_index(request, {"members": rows})
+
+
+def test_ordinary_p1_failed_attempt_precedes_one_verified_read():
+    from types import SimpleNamespace
+
+    from quanthus.product_daily.recommendation.e1_runtime import _ordinary_member_index
+
+    mid = "ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet"
+    source = {"package_id": "base-ods", "member_id": mid}
+    request = SimpleNamespace(source_members=[source])
+    failed = {**source, "status": "SHA_MISMATCH", "sha_match": False}
+    passed = {**source, "status": "READ", "sha_match": True}
+    rows = {"members": [failed, passed]}
+    assert _ordinary_member_index(request, rows) == {mid: passed}
+    assert rows["members"] == [failed, passed]
+    with pytest.raises(ProductDailyError, match="duplicate member receipt"):
+        _ordinary_member_index(request, {"members": [failed, passed, passed]})

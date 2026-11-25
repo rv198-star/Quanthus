@@ -1597,13 +1597,19 @@ def run_daily_advice_from_history(
             for row in sec["exceptions"]
             if isinstance(row, Mapping) and row.get("ledger") == "P1_factor_pit_exception"
         ]
-        if factor_restrictions:
+        price_inputs = [
+            sec["replay_p1_price_input"]
+            for sec in history.securities
+            if "replay_p1_price_input" in sec
+        ]
+        if factor_restrictions or price_inputs:
             consumption = {
                 **(consumption or {}),
                 "p1_factor_visibility": {
                     "policy_version": "p1-c1-conditional-20260725-v1",
                     "scope": "factor_dependent_paths",
                     "restrictions": factor_restrictions,
+                    "price_inputs": price_inputs,
                 },
             }
     output = run_daily_advice_from_raw(

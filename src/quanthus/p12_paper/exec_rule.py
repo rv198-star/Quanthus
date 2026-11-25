@@ -86,6 +86,14 @@ REJECT = {
     # a named refusal kept distinct both from a legal contract that simply
     # declares no opens (UNAVAILABLE) and from a present-but-illegal one.
     "PREOPEN_OPEN_CONTRACT_MISSING": "the bound session's replay tape carries no versioned open source contract"
+    ,
+    # Issue #723 E6 R4 (ruling 7143521670 item 1): a plan-bound intent whose
+    # published suggestion is gone ends in a named terminal state, releasing
+    # its hold; the code names WHY the intent died.
+    "INTENT_PACKAGE_RETRACTED": "the package behind this intent was retracted; intent revoked",
+    "INTENT_WINDOW_EXPIRED": "the plan's execution window closed; the intent is expired",
+    "INTENT_PLAN_NOT_FOUND": "the published plan no longer resolves; the intent is revoked",
+    "INTENT_TARGET_SATISFIED": "another order bought the target; the intent is revoked",
 }
 
 ORDER_STATUS = {

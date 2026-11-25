@@ -34,7 +34,7 @@ from typing import Any
 
 from quanthus.capabilities.execution import ExecutionReport
 from quanthus.capabilities.execution.facts import OrderObservation
-from quanthus.p12_paper.exec_rule import ORDER_STATUS, REJECT, RULE_VERSION, OrderCommand
+from quanthus.p12_paper.exec_rule import LOT, ORDER_STATUS, REJECT, RULE_VERSION, OrderCommand
 from quanthus.p12_paper.quotes import SHANGHAI, Quote, QuoteService
 from quanthus.shared.fact_contracts import FactError
 
@@ -42,13 +42,27 @@ STORE_NAME = "p12-paper.sqlite"
 USER_REPORTED_SOURCE = "user_reported"
 SIM_MATCHED_SOURCE = "sim_matched"
 
+
+def _canonical_preopen_fact(fact) -> str:
+    # Single shared category for a declared dependency name: publish, check,
+    # confirm and match all key on the SAME bare fact (E6-03 / R4 item 2).
+    # A package projects ``requires:PREOPEN_AUCTION`` onto the plan as the
+    # scoped name ``PREOPEN_AUCTION``; strip the scope prefix once so the
+    # reason code becomes PREOPEN_AUCTION_UNAVAILABLE - never a doubled
+    # PREOPEN_PREOPEN_* (the R3 KeyError) or an unregistered bare name.
+    name = str(fact or "")
+    return name[len("PREOPEN_"):] if name.startswith("PREOPEN_") else name
+
+
 # SQLite column order shared by the sim_orders table, the rebuild migration
-# and the row tuple; session_date is last so older rows stay readable.
+# and the row tuple; session_date then pending_reason are last so older
+# rows stay readable.
 SIM_ORDER_COLUMNS = (
     "account_id", "order_id", "side", "security_code", "security_name",
     "quantity", "limit_price", "filled_qty", "status", "rule_version",
     "accepted_at", "last_quote_time", "avg_price", "reject_reason",
     "source", "receipt_id", "fill_source_seq", "updated_at", "session_date",
+    "pending_reason",
 )
 
 # Continuous-auction open in Asia/Shanghai, matching the exchange session.
@@ -82,6 +96,12 @@ class PaperOrder:
     # generic close and releases only inside that session open, never
     # earlier on a disagreeing quote calendar.  None stays a same-day order.
     session_date: str | None = None
+    # Issue #723 E6 R4 / P11 v0.2 sec.5: a simulated intent confirmed under an
+    # UNKNOWN pre-open fact, and a sell intent carrying its typed unverified
+    # alert, keeps the typed pending reason on the stored row so it survives a
+    # restart and a same-id re-submit echoes it.  The buy-side fill re-check
+    # clears it once every dependent fact verifies; the sell fill reports it.
+    pending_reason: str | None = None
 
     @property
     def remaining_qty(self) -> int:
@@ -106,6 +126,8 @@ class PaperOrder:
             "avg_price": None if self.avg_price is None else format(self.avg_price, "f"),
             "reject_reason": self.reject_reason,
             "reject_text": REJECT.get(self.reject_reason or "", None),
+            "pending_reason": self.pending_reason,
+            "pending_text": REJECT.get((self.pending_reason or "").split(";")[0], None),
             "source": self.source,
             "receipt_id": self.receipt_id,
             "session_date": self.session_date,
@@ -172,12 +194,21 @@ class PaperOrderStore:
         """
         cols = {row[1] for row in c.execute("PRAGMA table_info(sim_orders)")}
         pk = [r[1] for r in c.execute("PRAGMA table_info(sim_orders)") if r[5]]
-        if "account_id" in cols and pk == ["account_id", "order_id"] and "session_date" in cols:
+        if "account_id" in cols and pk == ["account_id", "order_id"] \
+                and "session_date" in cols and "pending_reason" in cols:
+            return
+        # A table that already has the composite PK + session_date but no
+        # pending_reason only needs the new nullable column added in place -
+        # older rows read back with a NULL pending reason (no alert carried).
+        if "account_id" in cols and pk == ["account_id", "order_id"] \
+                and "session_date" in cols and "pending_reason" not in cols:
+            c.execute("ALTER TABLE sim_orders ADD COLUMN pending_reason TEXT")
             return
         # Any older shape rebuilds once into the current columns.  Rows
         # without account_id could only have been written by the single
         # bound account, so they get the synthetic discriminator; rows
-        # without session_date stay unbound (a same-day order).
+        # without session_date stay unbound (a same-day order) and rows
+        # without pending_reason carry no stored alert.
         c.execute("ALTER TABLE sim_orders RENAME TO sim_orders_old")
         self._create(c)
         old_cols = {row[1] for row in c.execute("PRAGMA table_info(sim_orders_old)")}
@@ -238,6 +269,7 @@ class PaperOrderStore:
               fill_source_seq TEXT,
               updated_at TEXT NOT NULL,
               session_date TEXT,
+              pending_reason TEXT,
               PRIMARY KEY (account_id, order_id)
             )
             """
@@ -256,19 +288,19 @@ class PaperOrderStore:
         vals[16] = fill_source_seq
         with self._connect() as c:
             c.execute(
-                "INSERT INTO sim_orders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO sim_orders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 tuple(vals),
             )
 
     def update(self, order: PaperOrder, *, fill_source_seq: str | None = None) -> None:
         with self._connect() as c:
             c.execute(
-                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=?, session_date=? WHERE order_id=? AND account_id=?",
+                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, pending_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=?, session_date=? WHERE order_id=? AND account_id=?",
                 (
                     order.filled_qty, order.status,
                     None if order.last_quote_time is None else order.last_quote_time.isoformat(),
                     None if order.avg_price is None else format(order.avg_price, "f"),
-                    order.reject_reason, order.receipt_id, fill_source_seq,
+                    order.reject_reason, order.pending_reason, order.receipt_id, fill_source_seq,
                     _utcnow().isoformat(), order.session_date, order.order_id, order.account_id,
                 ),
             )
@@ -288,12 +320,12 @@ class PaperOrderStore:
         """
         with self._connect() as c:
             cur = c.execute(
-                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=?, session_date=? WHERE order_id=? AND account_id=? AND status=?",
+                "UPDATE sim_orders SET filled_qty=?, status=?, last_quote_time=?, avg_price=?, reject_reason=?, pending_reason=?, receipt_id=?, fill_source_seq=COALESCE(?, fill_source_seq), updated_at=?, session_date=? WHERE order_id=? AND account_id=? AND status=?",
                 (
                     order.filled_qty, order.status,
                     None if order.last_quote_time is None else order.last_quote_time.isoformat(),
                     None if order.avg_price is None else format(order.avg_price, "f"),
-                    order.reject_reason, order.receipt_id, fill_source_seq,
+                    order.reject_reason, order.pending_reason, order.receipt_id, fill_source_seq,
                     _utcnow().isoformat(), order.session_date, order.order_id, order.account_id,
                     expected_status,
                 ),
@@ -343,6 +375,7 @@ class PaperOrderStore:
             avg_price=(None if r["avg_price"] is None else Decimal(r["avg_price"])),
             reject_reason=r["reject_reason"], source=r["source"], receipt_id=r["receipt_id"],
             session_date=r["session_date"],
+            pending_reason=r["pending_reason"] if "pending_reason" in r.keys() else None,
         )
 
     @staticmethod
@@ -356,6 +389,7 @@ class PaperOrderStore:
             None if o.avg_price is None else format(o.avg_price, "f"),
             o.reject_reason, o.source, o.receipt_id, None, _utcnow().isoformat(),
             o.session_date,
+            o.pending_reason,
         )
 
 
@@ -475,9 +509,13 @@ class PaperAccount:
             # verbatim - a cancelled or expired order must not echo "open"
             # while its row stays terminal (R2 same-id retry consistency).
             st = existing.status
+            # Issue #723 E6 R4: a pending-intent order echoes its stored alert;
+            # a dead intent echoes its named terminal reason.  The live quote
+            # cannot fill it here - the re-check runs in the matcher.
+            reason = existing.reject_reason or existing.pending_reason
             return SubmitOutcome(
                 existing.order_id, st,
-                existing.reject_reason, REJECT.get(existing.reject_reason or "", None),
+                reason, REJECT.get((reason or "").split(";")[0], None),
                 existing.filled_qty, existing.avg_price, existing.rule_version,
                 existing.last_quote_time, existing.receipt_id,
             )
@@ -502,6 +540,7 @@ class PaperAccount:
         # instances on other slices keep their sell flow unchanged.
         plan = None
         bound_session_date = None
+        _preopen_alerts: list[str] = []
         sell_closed = not getattr(self._app, "sell_execution_open", True)
         if sell_closed and command.side == "sell":
             return self._reject(command, "PLAN_NOT_EXECUTABLE", None, persist=False)
@@ -640,25 +679,80 @@ class PaperAccount:
             # the fact is never inferred, but the direction split means a
             # missing pre-open fact never silently blocks a position exit.
             if command.side == "buy":
+                # P11 v0.2 sec.5 / E6 R4 item 2: an UNKNOWN pre-open fact is
+                # never written as verified.  A live (real) account still
+                # fails closed on it; a simulated account is instead let
+                # through as a *pending* intent - the alert stays attached to
+                # the outcome and the matcher re-verifies fill-required facts
+                # before any fill, so an unverified fact never fills.
+                _sim_mode = getattr(self._app.scope, "mode", "real") in (
+                    "synthetic", "simulation"
+                )
                 for fact in getattr(plan, "depends_on_preopen", ()) or ():
                     provider = getattr(self._app, "preopen_fact_for", None)
                     available = (
                         provider(plan.security_code, fact) if callable(provider) else None
                     )
                     if available is not True:
+                        if _sim_mode:
+                            _code = f"PREOPEN_{_canonical_preopen_fact(fact)}_UNAVAILABLE"
+                            _preopen_alerts.append(_code)
+                            continue
                         return self._reject(
                             command,
-                            f"PREOPEN_{fact}_UNAVAILABLE",
+                            f"PREOPEN_{_canonical_preopen_fact(fact)}_UNAVAILABLE",
                             None,
                         )
+            else:
+                # E6-05/R4 item 1: a sell or reduction confirm still proceeds
+                # when a pre-open fact is missing, but the order carries the
+                # typed unverified alert (cannot verify suspension / limit) so
+                # the outcome and the workbench warn that the fill may not
+                # match.  The alert persists on the row across restart/replay.
+                for fact in getattr(plan, "depends_on_preopen", ()) or ():
+                    provider = getattr(self._app, "preopen_fact_for", None)
+                    ok = provider(plan.security_code, fact) if callable(provider) else None
+                    if ok is not True:
+                        _preopen_alerts.append(f"PREOPEN_{_canonical_preopen_fact(fact)}_UNAVAILABLE")
 
         quote = self._quotes.quote(command.security_code)
 
         # --- acceptance checks -------------------------------------------------
         if command.side == "buy":
-            need = (command.limit_price * command.quantity).quantize(Decimal("0.01"))
+            # E6-04: the cash need carries the plan's declared fee provision,
+            # and _open_buy_hold already subtracts the other open buys'
+            # reserved amount - a bare cash == price*qty confirm cannot
+            # overdraw the account once the fee is counted.
+            plan_fee = (
+                getattr(plan, "estimated_fee", None) if plan is not None else None
+            ) or Decimal("0.00")
+            need = (command.limit_price * command.quantity + plan_fee).quantize(
+                Decimal("0.01")
+            )
             if self._available_cash() < need:
-                return self._reject(command, "INSUFFICIENT_CASH", quote)
+                # E6-04: a plan confirm shrinks to the still-affordable
+                # whole-lot quantity instead of refusing outright - the
+                # pre-open check sizes the same spendable cash after the fee,
+                # so the confirm never silently rewrites the published head.
+                _shrunk = False
+                if plan is not None:
+                    spendable = self._available_cash()
+                    headroom = spendable - plan_fee
+                    if headroom > 0 and command.limit_price > 0:
+                        affordable = int(headroom // command.limit_price)
+                        shrunk = (affordable // LOT) * LOT
+                        if 0 < shrunk < command.quantity:
+                            command = OrderCommand(
+                                order_id=command.order_id, side=command.side,
+                                security_code=command.security_code,
+                                quantity=shrunk, limit_price=command.limit_price,
+                            )
+                            need = (
+                                command.limit_price * command.quantity + plan_fee
+                            ).quantize(Decimal("0.01"))
+                            _shrunk = True
+                if not _shrunk:
+                    return self._reject(command, "INSUFFICIENT_CASH", quote)
             # Fixed-bucket capacity: with no bucket able to take this security
             # the order is refused before it opens, never filled into a gap
             # the funding page cannot reconcile.
@@ -712,6 +806,7 @@ class PaperAccount:
             avg_price=None, reject_reason=None,
             source=SIM_MATCHED_SOURCE, receipt_id=None,
             session_date=bound_session_date,
+            pending_reason=(";".join(_preopen_alerts) if _preopen_alerts else None),
         )
         # Register the accepted order in the shared ledger first so a later
         # simulated fill posts against a real order row and the records view
@@ -728,7 +823,15 @@ class PaperAccount:
         outcome = self._try_fill(order, quote, session)
         if outcome is None:
             # Not marketable / not tradable now: persists as an open order.
-            return SubmitOutcome(command.order_id, "open", "BELOW_LIMIT", REJECT["BELOW_LIMIT"], 0, None, RULE_VERSION, quote.quote_time, None)
+            # E6 R4: a pending intent reports its stored alert code/text; a
+            # plain resting order reports BELOW_LIMIT.
+            _pr = order.pending_reason
+            return SubmitOutcome(
+                command.order_id, "open",
+                (_pr.split(";")[0] if _pr else "BELOW_LIMIT"),
+                (REJECT.get(_pr.split(";")[0]) if _pr else REJECT["BELOW_LIMIT"]),
+                0, None, RULE_VERSION, quote.quote_time, None,
+            )
         return outcome
 
     def _reject(
@@ -826,6 +929,89 @@ class PaperAccount:
             return
 
     # ---- matching ------------------------------------------------------------------
+
+    def _live_plan_for(self, order):
+        # Resolve the published plan a ``plan:`` order is bound to.
+        # Returns the live plan object, or None when the suggestion is gone.
+        if not order.order_id.startswith("plan:"):
+            return None
+        resolver = getattr(self._app, "paper_current_plan", None)
+        if not callable(resolver):
+            return None
+        plan_id = order.order_id.split(":", 1)[1]
+        try:
+            return resolver(plan_id)
+        except Exception:  # noqa: BLE001 - a resolver hiccup reads as gone
+            return None
+
+    def _dead_intent_reason(self, order, session):
+        # Name WHY a ``plan:`` intent can no longer fill, or None if alive.
+        # Issue #723 E6 R4 (ruling 7143521670 item 1).
+        if not order.order_id.startswith("plan:"):
+            return None
+        decisions = getattr(self._app, "_current_decisions", None)
+        try:
+            dec = decisions() if callable(decisions) else None
+        except Exception:  # noqa: BLE001
+            dec = None
+        dec_src = getattr(self._app, "_decisions", None)
+        is_retracted = getattr(dec_src, "is_retracted", None) if dec_src is not None else None
+        market_date = getattr(dec, "market_date", None)
+        if callable(is_retracted) and market_date is not None and is_retracted(market_date):
+            return "INTENT_PACKAGE_RETRACTED"
+        plan = self._live_plan_for(order)
+        if plan is not None:
+            expires = getattr(plan, "expires_at", None)
+            now = self._now()
+            if expires is not None and now > expires:
+                return "INTENT_WINDOW_EXPIRED"
+            if order.side == "buy":
+                target = getattr(plan, "target_qty", None)
+                held = self._position_qty(order.security_code)
+                if target is not None and held >= target:
+                    return "INTENT_TARGET_SATISFIED"
+            return None
+        if order.side == "buy":
+            target = self._plan_field(order.order_id, "target_qty")
+            held = self._position_qty(order.security_code)
+            if target is not None and held >= target:
+                return "INTENT_TARGET_SATISFIED"
+        expiry = self._plan_field(order.order_id, "expires_at")
+        if expiry is not None and self._now() > expiry:
+            return "INTENT_WINDOW_EXPIRED"
+        return "INTENT_PLAN_NOT_FOUND"
+
+    def _plan_field(self, order_id, field):
+        # Best-effort published field for a gone plan (target/expiry check).
+        try:
+            plan_id = order_id.split(":", 1)[1]
+            decisions = getattr(self._app, "_current_decisions", None)
+            dec = decisions() if callable(decisions) else None
+            publish = getattr(self._app, "_publish", None)
+            snapshot = self._app._facts.snapshot(self._app._context)
+            package = (
+                publish(dec, snapshot.history)
+                if callable(publish) and dec is not None
+                else None
+            )
+            for p in getattr(package, "plans", ()) or ():
+                if getattr(p, "plan_id", None) == plan_id:
+                    return getattr(p, field, None)
+        except Exception:  # noqa: BLE001
+            return None
+        return None
+
+    def _terminate_intent(self, order, reason):
+        # Drive a dead ``plan:`` intent to a named terminal state (E6 R4 item1).
+        # cancelled for revoked (retracted/not-found/satisfied), expired for a
+        # closed window; releases the hold via the terminal observation.
+        status = "expired" if reason == "INTENT_WINDOW_EXPIRED" else "cancelled"
+        object.__setattr__(order, "status", status)
+        object.__setattr__(order, "pending_reason", reason)
+        if not self._store.update_if_status(order, expected_status="open"):
+            return
+        self._observe_terminal(order, filled=order.filled_qty, cancelled=order.remaining_qty)
+
     def _try_fill(self, order: PaperOrder, quote: Quote, session: dict[str, Any]) -> SubmitOutcome | None:
         """Fill ``order`` against ``quote`` if the rule makes it marketable."""
         if order.status != "open":
@@ -854,6 +1040,18 @@ class PaperAccount:
         )
         if not marketable:
             return None
+        # E6 r2/R4 item2: a plan-bound BUY re-verifies its declared pre-open
+        # facts right before the fill.  A pending intent stays open until every
+        # dependent fact verifies; a dead suggestion never fills.
+        if order.side == "buy" and order.order_id.startswith("plan:"):
+            live_plan = self._live_plan_for(order)
+            if live_plan is None:
+                return None
+            provider = getattr(self._app, "preopen_fact_for", None)
+            for fact in getattr(live_plan, "depends_on_preopen", ()) or ():
+                ok = provider(order.security_code, fact) if callable(provider) else None
+                if ok is not True:
+                    return None
         # Fill at the observed last price, which the limit already bounds:
         # the buyer never pays above their cap and the seller never fills
         # below their floor, while a marketable order does not overpay.
@@ -902,6 +1100,14 @@ class PaperAccount:
         object.__setattr__(order, "avg_price", fill_price)
         object.__setattr__(order, "last_quote_time", quote.quote_time)
         object.__setattr__(order, "receipt_id", result.receipt_id)
+        # E6-05/R4 item1: capture the stored unverified alert before clearing -
+        # a sell/reduction fill reports it so a poll-driven outcome is never
+        # silent on a fact that stayed unverified at fill time.
+        fill_alert = order.pending_reason if order.side == "sell" else None
+        # The fill passed the pre-fill fact re-check, so the intent is no
+        # longer pending on an unverified fact; clear the stored alert so a
+        # same-id re-read/replay reports the filled state, not a stale alert.
+        object.__setattr__(order, "pending_reason", None)
         # Compare-and-set: only flip while the row is still open.  When a
         # racing matcher already committed a terminal state the CAS fails and
         # we fall back to the stored row rather than overwriting it.
@@ -911,7 +1117,7 @@ class PaperAccount:
             return self._resolve_after_conflict(order, quote)
         self._observe_terminal(order, filled=order.quantity, cancelled=0)
         return SubmitOutcome(
-            order.order_id, "filled", None, None, order.filled_qty,
+            order.order_id, "filled", fill_alert, None, order.filled_qty,
             fill_price, order.rule_version, quote.quote_time, result.receipt_id,
         )
 
@@ -1012,6 +1218,15 @@ class PaperAccount:
         """
         session = self._quotes.session()
         self._expire_stale_orders(session)
+        # E6 R4 (ruling 7143521670 item 1): sweep plan-bound intents whose
+        # suggestion is dead (retracted / window closed / plan gone / target
+        # already bought) into a named terminal state on every poll so the
+        # hold releases and the receipt records the cause - never left open.
+        for order in self._store.open_for(self._account_id):
+            if order.order_id.startswith("plan:"):
+                reason = self._dead_intent_reason(order, session)
+                if reason is not None:
+                    self._terminate_intent(order, reason)
         results: list[dict[str, Any]] = []
         if session["market_state"] == "trading":
             for order in self._store.open_for(self._account_id):

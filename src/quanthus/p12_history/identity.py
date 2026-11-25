@@ -154,16 +154,19 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
         val = str(i.get("identifier_value") or "")
         if not sid or not val:
             continue
-        code_rows_by_security.setdefault(sid, []).append(i)
-    code_by_security = {}
-    for sid, rows in code_rows_by_security.items():
+        code_rows_by_security.setdefault((sid, ns), []).append(i)
+    # Resolve each (security, namespace) group independently: identical
+    # replicas collapse to one code; conflicting values in the SAME
+    # namespace need a named unique winner (a strictly-later
+    # knowledge_from) or mark that namespace ambiguous.  Distinct
+    # namespaces are different facts, never a conflict.
+    code_by_ns = {}
+    conflict_ns = {}
+    for (sid, ns), rows in code_rows_by_security.items():
         vals = {str(r.get("identifier_value") or "") for r in rows}
         if len(vals) == 1:
-            code_by_security[sid] = next(iter(vals))
+            code_by_ns[(sid, ns)] = next(iter(vals))
             continue
-        # Conflicting codes for one security: a strictly-newest
-        # knowledge_from may uniquely name the live code; equal or missing
-        # clocks leave no named winner -> ambiguous isolation.
         best_kf = None
         winners = []
         for r in rows:
@@ -175,9 +178,29 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
                 winners.append(r)
         win_vals = {str(w.get("identifier_value") or "") for w in winners}
         if best_kf is not None and len(winners) == 1 and len(win_vals) == 1:
-            code_by_security[sid] = next(iter(win_vals))
+            code_by_ns[(sid, ns)] = next(iter(win_vals))
         else:
+            conflict_ns.setdefault(sid, set()).add(ns)
+    # The chosen primary code keeps the original "first row in source
+    # order" semantic: the security's first identifier row picks its
+    # namespace, and that namespace's resolved code is used.  If that
+    # namespace is in unresolved conflict there is no named unique code -
+    # the security is isolated rather than order-picked.
+    code_by_security = {}
+    first_ns_by_security = {}
+    for i in id_rows:
+        sid = str(i.get("security_id") or "")
+        ns = str(i.get("identifier_namespace") or "")
+        val = str(i.get("identifier_value") or "")
+        if not sid or not val or sid in first_ns_by_security:
+            continue
+        first_ns_by_security[sid] = ns
+    for sid, ns in first_ns_by_security.items():
+        if ns in conflict_ns.get(sid, set()):
             code_conflict_sids.add(sid)
+            continue
+        if (sid, ns) in code_by_ns:
+            code_by_security[sid] = code_by_ns[(sid, ns)]
 
     securities = []
     seen = set()

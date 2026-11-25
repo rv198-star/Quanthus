@@ -28,17 +28,19 @@ from quanthus.p12_history.source_pins import BASE_BUSINESS_THROUGH, SourceMap, s
 BAR_SESSIONS = bars_mod.BAR_SESSIONS
 LISTING_PROOF_SESSIONS = cal_mod.LISTING_PROOF_SESSIONS
 
-# Versioned whole-bar consumed-fact contract (audit R4 seg-A intake): the
-# set of source-row fields the consumer actually reads to judge one bar's
-# business fact at a knowledge clock.  ``_bar_fact`` collapses equivalent
-# same-clock replicas ONLY over exactly this set - two rows that differ on
-# any consumed field are a genuine conflict, never picked by physical
-# order.  Kept as a module constant so a versioned contract test can assert
-# the consumed-field set equals this checklist (a future field change must
-# update the contract and the test, not drift silently).
-BAR_FACT_KEYS = (
-    "open_price", "high_price", "low_price",
-    "close_price", "volume", "amount",
+# Versioned whole-bar consumed-fact contract (audit R4 seg-A hardgate
+# closeout): ``BAR_FACT_KEYS`` is bound to the SINGLE versioned consumed-bar
+# field contract in ``bars_mod.BAR_FIELD_CONTRACT`` - the set of produced
+# fact keys the consumer reads to judge one bar's business fact at a
+# knowledge clock.  ``_bar_fact`` collapses equivalent same-clock replicas
+# ONLY over exactly this set; two rows that differ on any consumed field
+# are a genuine conflict, never picked by physical order.  The tuple order
+# follows the contract's declaration order so the collapse comparator and
+# the consumer's emitted-bar fact fields stay bound to ONE declaration
+# (a produced-field change must re-version the contract AND the comparator).
+BAR_FACT_KEYS = tuple(
+    v["produces"] for v in bars_mod.BAR_FIELD_CONTRACT.values()
+    if v["role"] == "fact" and v["produces"] is not None
 )
 
 
@@ -248,7 +250,8 @@ def read_history(
                                "SHA_MISMATCH", "CONTENT_NON_OBJECT",
                                "CONTENT_MALFORMED_JSON",
                                "CONTENT_MISSING_IDENTITY_FIELD",
-                               "ASSOCIATED_IDENTITY_MISMATCH")
+                               "ASSOCIATED_IDENTITY_MISMATCH",
+                               "CHAIN_ASSOCIATION_MISMATCH")
     ]
     # Window scope (audit R4 segment A closeout): only a link for a session
     # this read actually needs is a pre-read block.  A fault pinned for a day
@@ -1708,7 +1711,9 @@ def read_history(
                                "NON_OBJECT_DESCRIPTOR", "UNREADABLE",
                                "SHA_MISMATCH", "CONTENT_NON_OBJECT",
                                "CONTENT_MALFORMED_JSON",
-                               "ASSOCIATED_IDENTITY_MISMATCH")
+                               "CONTENT_MISSING_IDENTITY_FIELD",
+                               "ASSOCIATED_IDENTITY_MISMATCH",
+                               "CHAIN_ASSOCIATION_MISMATCH")
     ]
     chain_faults = [
         c for c in chain_faults

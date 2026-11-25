@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date, datetime, timezone
+from collections.abc import Mapping
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from quanthus.p12_history import bars as bars_mod
 from quanthus.p12_history import reader as reader_mod
 from quanthus.p12_history.source_pins import ResolvedMember, SourceMap
 
@@ -2474,31 +2476,100 @@ def test_seg_b_bind_window_unchanged_path_reads(tmp_path):
     assert sec["held_quantity"] == 1200
 
 
-def test_segA_bar_fact_field_contract_matches_consumer_set(tmp_path):
-    """Whole-bar field contract: ``BAR_FACT_KEYS`` is the versioned checklist
-    of source-row fields the consumer actually reads to judge one bar's
-    business fact.  ``_bar_fact`` collapses equivalent same-clock replicas
-    over EXACTLY this set - the contract test pins the checklist to the
-    consumed-field set so a future consumed-field change must update the
-    contract AND this test, not drift silently (audit R4 seg-A intake)."""
-    # The consumed OHLCVA fact fields - what the consumer reads to compare
-    # one bar's business fact.  ``BAR_FACT_KEYS`` must equal exactly this set.
-    assert set(reader_mod.BAR_FACT_KEYS) == {
-        "open_price", "high_price", "low_price",
-        "close_price", "volume", "amount",
-    }
-    # The default ``_keys`` of the same-clock conflict comparator is the
-    # contract constant - proving the collapse uses the versioned checklist,
-    # not a drifting literal.  A behavioural check: every BAR_FACT_KEYS field
-    # is present on a produced T bar (the consumer can read it).
-    res = _formal_read(_build_map(tmp_path), tmp_path)
+class _RecordingRow(Mapping):
+    """A read-recording Mapping around one source bar row.  Every key the
+    consumer physically reads (via .get() or [ ]) is captured - so the
+    contract test measures the REAL consumed-field set off the running
+    consumer code, never compares two hand-written literals."""
+
+    def __init__(self, inner, accessed):
+        self._inner = inner
+        self._accessed = accessed
+
+    def __getitem__(self, key):
+        self._accessed.add(key)
+        return self._inner[key]
+
+    def get(self, key, default=None):
+        self._accessed.add(key)
+        return self._inner.get(key, default)
+
+    def __iter__(self):
+        return iter(self._inner)
+
+    def __len__(self):
+        return len(self._inner)
+
+
+def test_segA_bar_consumed_field_set_matches_contract(tmp_path, monkeypatch):
+    """Consumed-field-set contract (audit R4 seg-A hardgate closeout): run
+    the REAL consumer path (bars._project_member through read_bars) over a
+    recording Mapping and assert the set of source-row keys the consumer
+    code physically reads equals the single versioned contract
+    ``bars_mod.BAR_FIELD_CONTRACT``, AND that the same-clock equivalence /
+    conflict comparator (``reader_mod.BAR_FACT_KEYS``) binds the SAME
+    produced-fact keys the contract declares.  A consumer change that reads
+    a new field (volume -> volume_adjusted) or drops a declared field
+    changes the observed set and MUST fail this test - it cannot compare
+    two fixed literals and drift silently."""
+    # 1) Measure the real consumed source-key set off the consumer path.
+    smap = _build_map(tmp_path)
+    accessed = set()
+    orig_rows = bars_mod._rows
+
+    def _recording_rows(path, columns):
+        return [_RecordingRow(rec, accessed) for rec in orig_rows(path, columns)]
+
+    monkeypatch.setattr(bars_mod, "_rows", _recording_rows)
+    res = _formal_read(smap, tmp_path)
     sec = next(x for x in res.raw_history["securities"]
                if x["identity"]["security_id"] == "security-600000")
-    t_bars = [b for b in sec["bars"] if b["session_date"] == "2026-11-24"]
-    assert t_bars, "fixture must produce a T bar"
-    for b in t_bars:
+    assert [b for b in sec["bars"] if b["session_date"] == "2026-11-24"],         "fixture must produce a T bar so the consumer reads fields"
+    # The consumer's physically-read source-key set == the contract's declared
+    # consumed set (BAR_CONSUMED_SOURCE_KEYS derives from BAR_FIELD_CONTRACT).
+    assert accessed == set(bars_mod.BAR_CONSUMED_SOURCE_KEYS), (
+        f"consumer read-set drift: extra={sorted(accessed - set(bars_mod.BAR_CONSUMED_SOURCE_KEYS))} "
+        f"missing={sorted(set(bars_mod.BAR_CONSUMED_SOURCE_KEYS) - accessed)}"
+    )
+    # 2) The same-clock equivalence/conflict comparator reads exactly the
+    # contract's produced fact keys (derived from the SAME declaration).
+    assert set(reader_mod.BAR_FACT_KEYS) == set(bars_mod.BAR_PRODUCED_FACT_KEYS)
+    # 3) Every produced fact field lands on the emitted bar.
+    for b in sec["bars"]:
         for k in reader_mod.BAR_FACT_KEYS:
-            assert k in b, f"consumed fact field {k} absent on produced bar"
+            assert k in b, f"produced fact field {k} absent on emitted bar"
+
+
+def test_segA_bar_fact_contract_fails_on_consumer_drift(tmp_path, monkeypatch):
+    """Self-demonstrating mutation guard: a consumer that reads a field the
+    contract does NOT declare (volume_adjusted) - or that stops reading a
+    declared field - MUST make the observed-set assertion fail.  This test
+    proves the contract test is not a two-literals no-op: it feeds a
+    recording Mapping through a deliberately drifted consumer projection
+    (the same code path shape as bars._project_member's reads) and asserts
+    the mismatch is caught."""
+    smap = _build_map(tmp_path)
+    # A drifted consumer read-path: reads volume_adjusted instead of volume
+    # and never touches knowledge_to - the observed set differs from the
+    # declared contract on BOTH edges.
+    def _drifted_consume(rec):
+        rec.get("price_basis"); rec.get("currency"); rec.get("interval_size")
+        rec.get("observation_end"); rec.get("listing_id")
+        rec.get("open"); rec.get("high"); rec.get("low"); rec.get("close")
+        rec.get("volume_adjusted")   # drifted - undeclared field
+        rec.get("turnover"); rec.get("source_record_id")
+        rec.get("source_revision"); rec.get("record_source")
+        rec.get("knowledge_from")    # dropped declared field knowledge_to
+    accessed = set()
+    orig_rows = bars_mod._rows
+    sample = orig_rows(
+        tmp_path / "payload/dwd_security_bar/interval_size=1d/"
+        "observation_start_year=2026/observation_start_month=11/part-0.parquet",
+        bars_mod._COLUMNS)[0]
+    _drifted_consume(_RecordingRow(sample, accessed))
+    assert accessed != set(bars_mod.BAR_CONSUMED_SOURCE_KEYS)
+    assert "volume_adjusted" in (accessed - set(bars_mod.BAR_CONSUMED_SOURCE_KEYS))
+    assert "knowledge_to" in (set(bars_mod.BAR_CONSUMED_SOURCE_KEYS) - accessed)
 
 
 # ---- R4 segment A closeout ---------------------------------------------
@@ -2573,11 +2644,21 @@ def _segA_chain_fixture(tmp_path, day="2026-11-24"):
     base_m = tmp_path / "base-manifest.json"
     base_m.write_text(json.dumps({"package_id": "base-x"}))
     dates_f = tmp_path / "dates.json"
-    dates_f.write_text(json.dumps({"market_date": day}))
+    # Real P10 index shape: kind at the root + dates[day] carrying the day in
+    # its own market_date and the upstream base / downstream core digests.
     std_f = tmp_path / "std.json"
     std_f.write_text(json.dumps({"market_date": day}))
     core_f = tmp_path / "core.json"
     core_f.write_text(json.dumps({"package_id": "daily-" + day}))
+    base_m = tmp_path / "base-manifest.json"
+    base_m.write_text(json.dumps({"package_id": "base-x"}))
+    def _dd(p):
+        return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+    dates_f.write_text(json.dumps({
+        "kind": "cn02_base24_daily_cycle_v1",
+        "dates": {day: {"market_date": day,
+                        "core_manifest_sha256": _dd(core_f),
+                        "base_manifest_sha256": _dd(base_m)}}}))
     def _d(p):
         return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
     smap._base_doc = {"manifest_path": str(base_m),
@@ -2670,8 +2751,12 @@ def test_segA_chain_missing_identity_field_named_fault(tmp_path):
     CONTENT_MISSING_IDENTITY_FIELD fault before members open, not a MATCH.
     Each of the four links (base package_id, dates/std market_date, core
     package_id) is checked against its real versioned field."""
+    # Real P10 shapes: the DATES index carries its kind at the root (the day
+    # lives in dates[day].market_date), the Standard descriptor and the
+    # per-day entry carry market_date, the base/core manifests carry
+    # package_id.
     for key, identity_field in (("base", "package_id"),
-                                ("dates", "market_date"),
+                                ("dates", "kind"),
                                 ("std", "market_date"),
                                 ("core", "package_id")):
         smap, files = _segA_chain_fixture(tmp_path)
@@ -2699,14 +2784,16 @@ def test_segA_chain_dates_foreign_date_named_fault(tmp_path):
     The real versioned field (market_date) is checked, no invented root
     field."""
     smap, files = _segA_chain_fixture(tmp_path)
-    files["dates"].write_text(json.dumps({"market_date": "1999-01-01"}))
+    # Real index shape, but the bound dates[day] entry names a foreign day -
+    # an association fault on the real kind + dates[day] structure.
+    files["dates"].write_text(json.dumps({
+        "kind": "cn02_base24_daily_cycle_v1",
+        "dates": {"1999-01-01": {"market_date": "1999-01-01"}}}))
     d = "sha256:" + hashlib.sha256(files["dates"].read_bytes()).hexdigest()
     smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
     chain = SourceMap.manifest_chain(smap)
-    assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
-               and c.get("identity_key") == "market_date"
-               and c.get("actual_identity") == "1999-01-01"
-               for c in chain)
+    rec = next(c for c in chain if c["artifact"] == "dates_index:2026-11-24")
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
 
 
 def test_segA_chain_missing_field_blocks_read_before_members(tmp_path):
@@ -2950,3 +3037,168 @@ def test_segA_single_security_gap_isolated_not_day_block(tmp_path):
     assert res.coverage["isolated_input_gaps"]
     assert res.coverage["isolated_input_gaps"][0]["affected_securities"] == [
         "security-600000"]
+
+
+# ---- R4 seg-A hardgate closeout: real P10 publisher four-chain -------------
+
+def _real_chain_fixture(tmp_path, day="2026-11-24"):
+    """Real P10 publisher shape four-link chain (all synthetic)."""
+    from quanthus.pipelines.securities_warehouse.daily_base24_cycle import publish
+    smap = _build_map(tmp_path)
+    dm = _formal_daily_member(tmp_path, day)
+    smap._daily = {day: [dm]}
+    base_f = tmp_path / "base-manifest.json"
+    base_f.write_text(json.dumps({"package_id": "standard-base-2.5.1-x"}))
+    std_f = tmp_path / "std.json"
+    std_f.write_text(json.dumps({"kind": "quanthus_daily_1d5m_v1", "market_date": day}))
+    core_f = tmp_path / "core.json"
+    core_pkg = "dwd-daily-" + day.replace("-", "") + "-synthetic"
+    core_f.write_text(json.dumps({
+        "kind": "cn01_daily_core_dwd_increment", "package_id": core_pkg,
+        "acquisition_universe_metadata": {"market_date": day}}))
+    def _d(p):
+        return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+    smap._base_doc = {"manifest_path": str(base_f), "manifest_sha256": _d(base_f)}
+    dates_root = tmp_path / "cycle"
+    dates_root.mkdir(exist_ok=True)
+    publish({"root": str(dates_root)}, {
+        "kind": "cn02_base24_daily_cycle_v1", "market_date": day,
+        "status": "CORE_READY_5M_PENDING", "core": "/synthetic/core",
+        "core_manifest_sha256": _d(core_f),
+        "base_manifest_sha256": _d(base_f),
+        "consumer_admission": "NOT_GRANTED", "execution_authorized": False,
+    })
+    dates_f = dates_root / "DATES.json"
+    smap._daily_entries = {
+        day: {
+            "descriptor": {"path": str(dates_f), "json_pointer": "/dates/" + day,
+                           "index_sha256": _d(dates_f)},
+            "standard_descriptor": {"path": str(std_f), "sha256": _d(std_f)},
+            "core_manifest": {"path": str(core_f), "sha256": _d(core_f), "package_id": core_pkg},
+        },
+    }
+    return smap, {"base": base_f, "dates": dates_f, "std": std_f, "core": core_f}, day
+
+
+def _chain_status(smap):
+    return {c["artifact"]: c for c in SourceMap.manifest_chain(smap)}
+
+
+def _redigest(p):
+    return "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def test_segA_real_publisher_chain_matches(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    chain = _chain_status(smap)
+    for art in ("base_manifest", "dates_index:" + day,
+                "daily_manifest:" + day, "core_manifest:" + day):
+        assert chain[art]["status"] == "MATCH", (art, chain.get(art))
+    res = _formal_read(smap, tmp_path)
+    assert res.status == "READ", res.coverage.get("day_block")
+
+
+def test_segA_real_dates_day_entry_foreign_date_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"]["1999-01-01"] = doc["dates"].pop(day)
+    doc["dates"]["1999-01-01"]["market_date"] = "1999-01-01"
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+
+
+def test_segA_real_dates_missing_day_entry_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"] = {}
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "dates_index_day_entry"
+
+
+def test_segA_real_dates_foreign_core_association_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"][day]["core_manifest_sha256"] = "sha256:" + "0" * 64
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "dates_index_core_manifest_sha256"
+
+
+def test_segA_real_dates_wrong_kind_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["kind"] = "not_the_cycle"
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "dates_index_kind"
+
+
+def test_segA_real_dates_nonobject_dates_field_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"] = ["not-a-dict"]
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    rec = _chain_status(smap)["dates_index:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "dates_index_dates_object"
+
+
+def test_segA_real_standard_date_mismatch_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    files["std"].write_text(json.dumps(
+        {"kind": "quanthus_daily_1d5m_v1", "market_date": "1999-01-01"}))
+    smap._daily_entries[day]["standard_descriptor"]["sha256"] = _redigest(files["std"])
+    assert _chain_status(smap)["daily_manifest:" + day]["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+
+
+def test_segA_real_core_file_identity_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["core"].read_text())
+    doc["package_id"] = "foreign-pkg"
+    files["core"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["core_manifest"]["sha256"] = _redigest(files["core"])
+    assert _chain_status(smap)["core_manifest:" + day]["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+
+
+def test_segA_real_core_map_identity_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    smap._daily_entries[day]["core_manifest"]["package_id"] = "map-foreign"
+    assert _chain_status(smap)["core_manifest:" + day]["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+
+
+def test_segA_real_core_universe_date_mismatch_fault(tmp_path):
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["core"].read_text())
+    doc["acquisition_universe_metadata"]["market_date"] = "1999-01-01"
+    files["core"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["core_manifest"]["sha256"] = _redigest(files["core"])
+    rec = _chain_status(smap)["core_manifest:" + day]
+    assert rec["status"] == "CHAIN_ASSOCIATION_MISMATCH"
+    assert rec["association"] == "core_manifest_universe_market_date"
+
+
+def test_segA_real_chain_fault_blocks_read_members_market_zero(tmp_path):
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap, files, day = _real_chain_fixture(tmp_path)
+    doc = json.loads(files["dates"].read_text())
+    doc["dates"][day]["core_manifest_sha256"] = "sha256:" + "0" * 64
+    files["dates"].write_text(json.dumps(doc))
+    smap._daily_entries[day]["descriptor"]["index_sha256"] = _redigest(files["dates"])
+    res = _formal_read(smap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert res.coverage["member_consumption"]["members_opened"] == 0
+    assert res.coverage["universe"]["pool_size"] == 0
+    assert res.coverage["bars"]["reads"] == []
+

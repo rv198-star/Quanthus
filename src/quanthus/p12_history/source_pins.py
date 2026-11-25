@@ -51,6 +51,14 @@ P1_EXCEPTION_MEMBER = Path(
     "paired-base251-adce892e-a1/published/ODS/members/base-ods/"
     "payload/canonical/ref_adjustment_factor_pit_exceptions.parquet"
 )
+# Real P10 daily-cycle publisher kinds (daily_base24_cycle.KIND /
+# daily-core manifest kind).  The four-chain layer-3 association binds the
+# DATES index shape (kind + dates[day] entries) and the core manifest kind
+# to these versioned identities, never to an invented root market_date.
+DATES_INDEX_KIND = "cn02_base24_daily_cycle_v1"
+CORE_MANIFEST_KIND = "cn01_daily_core_dwd_increment"
+STANDARD_MANIFEST_KIND = "quanthus_daily_1d5m_v1"
+
 P1_EXCEPTION_SHA256 = (
     "sha256:9a2158a55e7e351049f242e66b21a01e96d3cf2af55e7517c0aa4bf507577be2"
 )
@@ -431,7 +439,8 @@ class SourceMap:
 
         def _probe(artifact, path, declared, content_shape=None,
                    content_identity=None, declared_identity=None,
-                   required_identity_key=None):
+                   required_identity_key=None,
+                   chain_relation=None):
             """One frozen-chain link: declaration, hash, content shape and
             the associated identity all verified before members open.
 
@@ -527,6 +536,21 @@ class SourceMap:
                                 "actual_identity": actual_id,
                                 "verified_at": verified_at})
                     return
+            # Layer 3 (upstream/downstream association): run the link's
+            # chain-relation check on the SAME in-memory bytes - a hash-verified
+            # body whose parsed content fails the cross-link association rule
+            # (e.g. a DATES[day] entry whose market_date/core digest names a
+            # different day/core) is a named CHAIN_ASSOCIATION fault, not a MATCH.
+            if chain_relation is not None and isinstance(doc, dict):
+                rel_fault = chain_relation(doc)
+                if rel_fault is not None:
+                    out.append({
+                        "artifact": artifact, "path": str(path),
+                        "declared_sha256": declared, "actual_sha256": actual,
+                        "status": "CHAIN_ASSOCIATION_MISMATCH",
+                        "verified_at": verified_at,
+                        **rel_fault})
+                    return
             out.append({"artifact": artifact, "path": str(path),
                         "declared_sha256": declared, "actual_sha256": actual,
                         "status": "MATCH",
@@ -564,15 +588,67 @@ class SourceMap:
                        declared_identity=(identity_key, expected)
                        if identity_key else None,
                        required_identity_key=identity_key)
-            # The DATES index and the Standard descriptor are both bound to
-            # THIS day - the file's own market_date must equal the bound day
-            # (a hash-verified body naming another date is refused), and the
-            # versioned market_date field must be present (a bare {} is a
-            # named missing-field fault, not a MATCH).
-            _descriptor_probe(f"dates_index:{day}", e.get("descriptor"),
-                              ("index_sha256", "sha256"),
-                              identity_key="market_date",
-                              expected_identity=day)
+            # ---- DATES index (real P10 publisher shape) ----
+            # Real P10 daily_base24_cycle.publish writes DATES.json as
+            # {"kind": KIND, "dates": {day: entry}, ...} - the day lives in the
+            # entry market_date field, never at the index root.
+            dates_entry = e.get("descriptor")
+            _dsha = next(
+                (dates_entry.get(k) for k in ("index_sha256", "sha256")
+                 if isinstance(dates_entry, dict)
+                 and dates_entry.get(k) is not None),
+                None) if isinstance(dates_entry, dict) else None
+
+            def _dates_relation(doc, day=day, entry=e):
+                if doc.get("kind") != DATES_INDEX_KIND:
+                    return {"association": "dates_index_kind",
+                            "expected": DATES_INDEX_KIND,
+                            "actual": doc.get("kind")}
+                dates = doc.get("dates")
+                if not isinstance(dates, dict):
+                    return {"association": "dates_index_dates_object",
+                            "object_shape": type(dates).__name__}
+                item = dates.get(day)
+                if not isinstance(item, dict):
+                    return {"association": "dates_index_day_entry",
+                            "missing_entry": day,
+                            "object_shape": type(item).__name__}
+                if item.get("market_date") != day:
+                    return {"association": "dates_index_day_market_date",
+                            "expected": day,
+                            "actual": item.get("market_date")}
+                core_m = entry.get("core_manifest") or {}
+                if (isinstance(core_m, dict)
+                        and core_m.get("sha256") is not None
+                        and item.get("core_manifest_sha256") is not None
+                        and item.get("core_manifest_sha256")
+                        != core_m.get("sha256")):
+                    return {"association": "dates_index_core_manifest_sha256",
+                            "expected": core_m.get("sha256"),
+                            "actual": item.get("core_manifest_sha256")}
+                if (item.get("base_manifest_sha256") is not None
+                        and self._base_doc.get("manifest_sha256") is not None
+                        and item.get("base_manifest_sha256")
+                        != self._base_doc.get("manifest_sha256")):
+                    return {"association": "dates_index_base_manifest_sha256",
+                            "expected": self._base_doc.get("manifest_sha256"),
+                            "actual": item.get("base_manifest_sha256")}
+                return None
+
+            if not isinstance(dates_entry, dict):
+                out.append({
+                    "artifact": f"dates_index:{day}", "path": None,
+                    "declared_sha256": None, "actual_sha256": None,
+                    "status": "NON_OBJECT_DESCRIPTOR",
+                    "object_shape": type(dates_entry).__name__,
+                    "verified_at": iso(VerificationClock.now())})
+            else:
+                _probe(f"dates_index:{day}", dates_entry.get("path"),
+                       _dsha,
+                       content_shape="json_object",
+                       required_identity_key="kind",
+                       chain_relation=_dates_relation)
+
             _descriptor_probe(f"daily_manifest:{day}",
                               e.get("standard_descriptor"), ("sha256",),
                               identity_key="market_date",
@@ -595,12 +671,26 @@ class SourceMap:
                 # The core manifest's own package_id must equal the identity
                 # the map bound it to - a hash-verified body naming another
                 # package is refused, not adopted.
+                def _core_relation(doc, day=day):
+                    if doc.get("kind") is not None and doc.get("kind") != CORE_MANIFEST_KIND:
+                        return {"association": "core_manifest_kind",
+                                "expected": CORE_MANIFEST_KIND,
+                                "actual": doc.get("kind")}
+                    meta = doc.get("acquisition_universe_metadata")
+                    if (isinstance(meta, dict)
+                            and meta.get("market_date") is not None
+                            and meta.get("market_date") != day):
+                        return {"association": "core_manifest_universe_market_date",
+                                "expected": day,
+                                "actual": meta.get("market_date")}
+                    return None
                 _probe(f"core_manifest:{day}", core.get("path"),
                        core.get("sha256"),
                        content_shape="json_object",
                        declared_identity=("package_id",
                                           core.get("package_id")),
-                       required_identity_key="package_id")
+                       required_identity_key="package_id",
+                       chain_relation=_core_relation)
         return out
 
     def resolve(self, member_id: str) -> ResolvedMember | None:

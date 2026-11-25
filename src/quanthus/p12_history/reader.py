@@ -204,11 +204,16 @@ def read_history(
     # second segment): the Base manifest, the DATES index and the day's
     # descriptors are verified BEFORE any member is trusted, so a broken
     # / wrong / unreadable link blocks the whole day without opening a
-    # single market member.  (UNAVAILABLE / NO_PATH stay advisory - a
-    # stub map has no chain to break; a genuinely declared link that
-    # fails hash or read is the block.)
-    _chain_faults = [c for c in manifest_chain
-                     if c.get("status") not in ("MATCH", "NO_PATH", "UNAVAILABLE")]
+    # single market member.  Formal update (audit R4 second segment):
+    # the four external frozen links must each be present, declared,
+    # readable and sha-matched - a missing path, a missing declared sha,
+    # an unreadable link or a wrong sha is the block.  UNAVAILABLE stays
+    # advisory only when the stub cannot expose a chain at all.
+    _chain_faults = [
+        c for c in manifest_chain
+        if c.get("status") in ("NO_PATH", "MISSING_DECLARED_SHA256",
+                               "UNREADABLE", "SHA_MISMATCH")
+    ]
     if _chain_faults:
         return HistoryResult(
             raw_history={
@@ -453,12 +458,25 @@ def read_history(
                 # are conditional (applied only to a use that actually
                 # depends on the member); audit/universe/other members
                 # are declared-not-read.
-                if "dwd_security_bar" in mid_l:
+                # Window scoping (audit R4 second segment): only THIS T's
+                # package member is an actual shared dependency - a member
+                # declared for a different day (market_date != T) is an
+                # out-of-window registration whose gap is kept for the
+                # record but must NOT block this T's day.
+                in_t_window = (day == market_date.isoformat())
+                # dwd_security_valuation is a DECLARED_NOT_READ_ONLY
+                # member per the P10 named supply - it only shares the
+                # "dwd_security" PREFIX, so it is tested before the
+                # dwd_security identity branch.
+                if "dwd_security_valuation" in mid_l:
+                    dep_type = "DECLARED_NOT_READ_ONLY"
+                    shared_dep = False
+                elif "dwd_security_bar" in mid_l:
                     dep_type = "SHARED_T_PRICE"
-                    shared_dep = True
+                    shared_dep = in_t_window
                 elif "dwd_trading_calendar" in mid_l:
                     dep_type = "NATIVE_T_SESSION_AND_TIME"
-                    shared_dep = True
+                    shared_dep = in_t_window
                 elif "dwd_tradability_state" in mid_l:
                     dep_type = "CONDITIONAL_T_TRADABILITY"
                     shared_dep = False
@@ -631,6 +649,7 @@ def read_history(
         # preserved verbatim, never silently overwritten.
         sec_bars = []
         bar_revision_chain = {}
+        formal_ineligible_sessions = []
         for sess_revs in raw_revisions:
             ordered = sorted(
                 sess_revs,
@@ -654,14 +673,45 @@ def read_history(
                 and (not formal
                      or b.get("member_key") not in formal_inadmissible_keys)
             ]
-            chosen = (eligible or ordered)[-1]
-            chosen["late_for_cutoff"] = bool(
-                parse_ts(chosen.get("knowledge_from"))
-                and parse_ts(chosen.get("knowledge_from")) > decision_cutoff
-            )
-            sec_bars.append(chosen)
-            if len(ordered) > 1:
-                bar_revision_chain[chosen["session_date"]] = [
+            # Formal read (audit R4 second segment): when NO revision is
+            # eligible - every row is late, withdrawn or channel-ineligible
+            # - the reader emits NO selected bar for this session.  The
+            # rows stay on the auditable revision/rejection chain verbatim
+            # and the affected dependency is named; a production read must
+            # never fall back to an ineligible row merely because it is the
+            # physical last one.  Under a non-formal read the last-known
+            # row is still exposed for the H1 shape.
+            if not eligible and formal:
+                chosen = None
+                # Rows exist but none is eligible - the session's price
+                # supply failed PIT/channel admission.  Name the actual
+                # rejected clocks so the named block carries real instants.
+                formal_ineligible_sessions.append({
+                    "session_date": ordered[-1]["session_date"],
+                    "rejected_rows": [
+                        {
+                            "source_revision": b.get("source_revision"),
+                            "knowledge_from": b.get("knowledge_from"),
+                            "knowledge_to": b.get("knowledge_to"),
+                            "member_key": b.get("member_key"),
+                        }
+                        for b in ordered
+                    ],
+                })
+            else:
+                chosen = (eligible or ordered)[-1]
+            if chosen is not None:
+                chosen["late_for_cutoff"] = bool(
+                    parse_ts(chosen.get("knowledge_from"))
+                    and parse_ts(chosen.get("knowledge_from")) > decision_cutoff
+                )
+                sec_bars.append(chosen)
+            # The revision/rejection chain keeps EVERY physical row for
+            # the session (late, withdrawn, channel-ineligible), flagged -
+            # even when no row was selected for this formal read.
+            if len(ordered) > 1 or (formal and not eligible):
+                chain_date = (chosen or ordered[-1])["session_date"]
+                bar_revision_chain[chain_date] = [
                     {
                         "source_record_id": b.get("source_record_id"),
                         "source_revision": b.get("source_revision"),
@@ -733,7 +783,21 @@ def read_history(
         # empty", never a silent gap.
         dep_reasons = {}
         if not sec_bars:
-            dep_reasons["bars"] = "no_qualified_1d_rows"
+            # Formal read (audit R4 second segment): distinguish "no source
+            # rows" from "rows present but every revision ineligible" - the
+            # latter keeps the actual rejected clocks on the dependency so
+            # the named block is auditable, not a generic empty.
+            if formal_ineligible_sessions:
+                dep_reasons["bars"] = "no_qualified_formal_revision"
+                dep_reasons["bar_rejections"] = formal_ineligible_sessions
+            else:
+                dep_reasons["bars"] = "no_qualified_1d_rows"
+        elif formal_ineligible_sessions:
+            # A formal read with SOME eligible sessions still names each
+            # session whose whole revision set was ineligible - the
+            # affected dependency (that session's price) is named with the
+            # real rejected clocks, never silently dropped.
+            dep_reasons["bar_rejections"] = formal_ineligible_sessions
         # P1 factor-PIT ledger missing or failed sha (audit R4 item 2a):
         # actions that consume the factor evidence must see a named
         # block, never a silently-empty exception list on a security
@@ -1032,7 +1096,17 @@ def read_history(
             "disposition": "block_new_entries",
         }
     coverage["manifest_chain"] = manifest_chain
-    chain_faults = [c for c in manifest_chain if c.get("status") not in ("MATCH", "NO_PATH", "UNAVAILABLE")]
+    # Formal update (audit R4 second segment): the four external frozen
+    # links (Base manifest, DATES index, Standard descriptor, Core
+    # manifest) must each be present, readable and sha-matched BEFORE
+    # any member is opened.  A missing path (NO_PATH), a missing declared
+    # sha (MISSING_DECLARED_SHA256), an unreadable link (UNREADABLE) or a
+    # wrong sha (SHA_MISMATCH) is a named whole-day fault - never a MATCH.
+    chain_faults = [
+        c for c in manifest_chain
+        if c.get("status") in ("NO_PATH", "MISSING_DECLARED_SHA256",
+                               "UNREADABLE", "SHA_MISMATCH")
+    ]
     if chain_faults and day_block is None:
         day_block = {
             "reason_code": "SUMMARY_CHAIN_FAULT",

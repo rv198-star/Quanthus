@@ -1676,3 +1676,123 @@ def test_formal_not_read_dependency_set_lists_named_gaps(tmp_path):
                for k, v in types.items())
     assert any("dwd_listing" in k and v == "CONDITIONAL_T_IDENTITY"
                for k, v in types.items())
+
+
+def test_formal_no_eligible_revision_emits_no_bar(tmp_path):
+    """R4 second segment audit: a formal read selects ONLY a revision
+    known by the cutoff, not withdrawn, and channel-admitted.  With NO
+    eligible row the session emits no selected bar; the late/withdrawn/
+    ineligible rows stay on the revision chain with real clocks and the
+    affected dependency is named, never a silent fallback to the last
+    physical row."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    days = _sessions(330)
+    rows1 = _bar_table(days).to_pylist()
+    # The ONLY T rows are a 17:00Z late revision and a noon-withdrawn row:
+    # nothing is eligible for the 14:30Z formal cutoff.
+    withdrawn = dict(rows1[-1], close=22.0, source_revision="w",
+                     knowledge_from=datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+                     knowledge_to=datetime(2026, 11, 24, 12, 0, tzinfo=UTC))
+    late = dict(rows1[-1], close=88.0, source_revision="late",
+                knowledge_from=datetime(2026, 11, 24, 17, 0, tzinfo=UTC),
+                knowledge_to=None)
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    pq.write_table(pa.table({k: [r.get(k) for r in rows1[:-1] + [withdrawn, late]]
+                             for k in rows1[0].keys()}), tmp_path / rel)
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
+    res = reader_mod.read_history(
+        T, CUT, source_map=StubSourceMap(members, {}),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    # No selected bar for the ineligible session; the dependency is named
+    # with the real rejected clocks, never a silent last-row fallback.
+    assert all(b["session_date"] != "2026-11-24" for b in sec["bars"])
+    assert sec["dependency_reasons"]["bar_rejections"]
+    chain = sec["bar_revisions"].get("2026-11-24")
+    assert chain and not any(c["selected"] for c in chain)
+    # The withdrawn row and the late row both stay on the chain verbatim.
+    prices = {float(c["close_price"]) for c in chain}
+    assert prices == {22.0, 88.0}
+
+
+def test_formal_missing_declared_sha_blocks_before_member_read(tmp_path):
+    """R4 second segment audit: a missing DECLARED sha on an external
+    frozen link (Base / DATES / Standard / Core) is a named pre-read
+    fault - the chain does not degrade it to MATCH and no member is
+    opened."""
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    smap.manifest_chain = lambda: [
+        {"artifact": "base_manifest", "path": "/x/manifest.json",
+         "declared_sha256": None, "actual_sha256": None,
+         "status": "MISSING_DECLARED_SHA256", "verified_at": "2026-11-24T14:00:00Z"},
+    ]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=smap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert calls == []
+
+
+def test_formal_out_of_window_member_gap_not_shared(tmp_path):
+    """R4 second segment audit: a daily-core member declared for a day
+    OUTSIDE this T is an out-of-window registration - its channel gap is
+    kept for the record but is NOT a shared hard dependency, so it does
+    not block the whole day."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # An out-of-window (May) price member, channel UNKNOWN on its own day.
+    older = _member(tmp_path, "payload/dwd_security_bar/day=2026-05-01/x.parquet",
+                    package_id="daily-2026-05-01", kind="daily",
+                    market_date="2026-05-01")
+    clocks = {"2026-05-01": {"knowledge": None, "producer": None,
+                            "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-05-01": [older]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    # The out-of-window member's gap is recorded but does NOT mark the
+    # day INPUT_BLOCKED - it is not an actual T shared dependency.
+    gap = next((g for g in res.coverage.get("named_input_gaps", [])
+                if "2026-05-01" in g["member_key"]), None)
+    if gap is not None:
+        assert not gap["shared_hard_dependency"]
+    assert res.status != "INPUT_BLOCKED" or (
+        res.coverage["day_block"]["reason_code"] != "SHARED_INPUT_GAP")
+
+
+def test_dwd_security_valuation_is_declared_not_read_only(tmp_path):
+    """P10 named supply: dwd_security_valuation is DECLARED_NOT_READ_ONLY,
+    not a conditional-identity member merely because its id shares the
+    "dwd_security" prefix."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    val = _member(
+        tmp_path,
+        "payload/security_market_observation/dwd_security_valuation/market_date=2026-11-24/part-0.parquet",
+        package_id="dwd-daily-20261124-x", kind="daily",
+        market_date="2026-11-24")
+    clocks = {"2026-11-24": {"knowledge": None, "producer": None,
+                            "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [val]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    gap = next((g for g in res.coverage.get("named_input_gaps", [])
+                if "dwd_security_valuation" in g["member_id"]), None)
+    assert gap is not None
+    assert gap["dependency_type"] == "DECLARED_NOT_READ_ONLY"
+    assert not gap["shared_hard_dependency"]

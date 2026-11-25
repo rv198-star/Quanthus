@@ -431,6 +431,15 @@ class SourceMap:
 
         def _probe(artifact, path, declared):
             verified_at = iso(VerificationClock.now())
+            # Formal update (audit R4 second segment): the chain is
+            # externally FROZEN - a missing declared sha is a defect, not
+            # a pass.  "declared is None" previously slipped to MATCH.
+            if declared is None:
+                out.append({"artifact": artifact, "path": str(path) if path else None,
+                            "declared_sha256": None, "actual_sha256": None,
+                            "status": "MISSING_DECLARED_SHA256",
+                            "verified_at": verified_at})
+                return
             if not path:
                 out.append({"artifact": artifact, "path": None,
                             "declared_sha256": declared, "actual_sha256": None,
@@ -445,7 +454,7 @@ class SourceMap:
                             "error": f"{type(exc).__name__}: {exc}",
                             "verified_at": verified_at})
                 return
-            ok = declared is None or actual == declared
+            ok = actual == declared
             out.append({"artifact": artifact, "path": str(path),
                         "declared_sha256": declared, "actual_sha256": actual,
                         "status": "MATCH" if ok else "SHA_MISMATCH",

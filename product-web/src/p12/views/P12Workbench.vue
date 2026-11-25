@@ -1646,7 +1646,12 @@ export default {
         if (item.applicability && item.applicability.status === 'NEEDS_REASSESSMENT') {
           return `本轮已买入 ${formatQuantity(item.applicability.current_qty)} 入账；剩余额度待下一交易日收盘后结合新余额复核`
         }
-        return `${formatTime(plan.eligible_at).slice(0, 10)} 开盘后买入 ${formatQuantity(item.applicability.delta_qty)}，成交价不高于 ${plan.price_cap}`
+        // The detail leads with the confirmable quantity; the published
+        // package figure is named separately as history when they differ.
+        const confirmQty = this.confirmableQty(item)
+        const published = item.applicability.delta_qty
+        const publishedNote = confirmQty !== published ? `（原建议 ${formatQuantity(published)}）` : ''
+        return `${formatTime(plan.eligible_at).slice(0, 10)} 开盘后买入 ${formatQuantity(confirmQty)}${publishedNote}，成交价不高于 ${plan.price_cap}`
       }
       if (item.action_code === 'SELL') {
         const t = this.sellTask || { filled: 0, remaining: Math.abs(item.applicability ? item.applicability.delta_qty : 0) }
@@ -1923,7 +1928,11 @@ export default {
       if (this.isUnheldExit(item)) return '无需卖出'
       if (this.isOpportunityExpired(item)) return '窗口已过'
       if (item.action_code === 'BUY' && item.applicability && item.applicability.delta_qty > 0) {
-        return `买入 ${item.applicability.delta_qty} 股`
+        // Issue #723 E8 r5-fix: the queue shows the quantity the confirm
+        // will actually bind (confirm-time re-sized confirm_qty), never the
+        // stale published delta_qty - the published figure is listed
+        // separately as history, not as the live offer.
+        return `买入 ${this.confirmableQty(item)} 股`
       }
       if (item.action_code === 'SELL') {
         // Issue #723 E8 r5: phase-1 sell is display-only - the queue
@@ -1944,6 +1953,16 @@ export default {
       if (item.action_code === 'SELL') return 'sell'
       if (item.action_code === 'BUY') return 'buy'
       return 'neutral'
+    },
+    // The quantity a buy confirm actually binds: the server's confirm-time
+    // re-sized figure (confirm_qty on the v3 plan) when present, else the
+    // published delta_qty.  List, detail and the confirm card all read this
+    // so the user sees one consistent confirmable quantity; the published
+    // package figure stays visible separately as history.
+    confirmableQty (item) {
+      const plan = item && item.plan
+      if (plan && plan.confirm_qty != null) return plan.confirm_qty
+      return item && item.applicability ? item.applicability.delta_qty : 0
     },
     queueStatusLabel (item) {
       if (item.selfDirected) return '自主模拟'

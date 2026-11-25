@@ -802,42 +802,7 @@ def read_history(
                     "reason_code": "ACCOUNT_SNAPSHOT_UNREADABLE",
                     "detail": f"account snapshot could not be opened: {type(exc).__name__}: {exc}",
                 })
-            # The path identity is re-stat'ed at bind completion - an
-            # os.replace (inode change) or an in-place rewrite (size/clock
-            # change) inside the binding window is a named refusal, never
-            # silently bound to the first read's bytes.
             if snap_bytes is not None:
-                try:
-                    _final_sig = _stat_sig(os.stat(snap_path))
-                except Exception as exc:  # noqa: BLE001
-                    _final_sig = None
-                    account_binding["rejections"].append({
-                        "reason_code": "ACCOUNT_SNAPSHOT_PATH_CHANGED",
-                        "detail": (
-                            "account snapshot path disappeared inside the "
-                            f"binding window: {type(exc).__name__}: {exc}"),
-                    })
-            if snap_bytes is not None and _final_sig is not None:
-                _fd_diff = [k for k in _STAT_KEYS
-                            if _pre_sig is not None
-                            and _post_sig is not None
-                            and _pre_sig[k] != _post_sig[k]]
-                _path_diff = [k for k in _STAT_KEYS
-                              if _pre_sig is not None
-                              and _pre_sig[k] != _final_sig[k]]
-                if _fd_diff or _path_diff:
-                    account_binding["rejections"].append({
-                        "reason_code": "ACCOUNT_SNAPSHOT_PATH_CHANGED",
-                        "detail": (
-                            "account snapshot path changed inside the "
-                            "binding window (fd-drift fields "
-                            f"{_fd_diff or '[]'}, path-drift fields "
-                            f"{_path_diff or '[]'}); verified bytes are the "
-                            "first read only"),
-                    })
-            if snap_bytes is not None and not any(
-                    r["reason_code"] == "ACCOUNT_SNAPSHOT_PATH_CHANGED"
-                    for r in account_binding["rejections"]):
                 actual_snap = "sha256:" + hashlib.sha256(snap_bytes).hexdigest()
                 account_binding["actual_snapshot_sha256"] = actual_snap
                 if (str(actual_snap).split(":", 1)[-1]
@@ -963,6 +928,59 @@ def read_history(
                     f"{sorted(snap_sids)}"
                 ),
             })
+        # Bind-completion path identity (audit R4 seg-B binding-completion):
+        # the FINAL path.stat happens only now - AFTER the single in-memory
+        # bytes were hashed and decoded, the account/scenario/as_of fields
+        # were projected, the generation receipt was re-hashed and the
+        # three-key identity was checked, but BEFORE the account facts are
+        # committed.  A path replaced or rewritten in ANY of those binding
+        # stages (decode, receipt verification, identity checks) is a named
+        # ACCOUNT_SNAPSHOT_PATH_CHANGED refusal here.  The three identity
+        # signatures (pre-read fstat, post-read fstat, bind-completion
+        # path.stat) and the real read/hash evidence are recorded on the
+        # binding receipt, not just held in locals.
+        if snap_path and snap_sha and snap_bytes is not None:
+            _final_sig = None
+            try:
+                _final_sig = _stat_sig(os.stat(snap_path))
+            except Exception as exc:  # noqa: BLE001
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_SNAPSHOT_PATH_CHANGED",
+                    "detail": (
+                        "account snapshot path disappeared inside the "
+                        f"binding window: {type(exc).__name__}: {exc}"),
+                })
+            _fd_diff = [k for k in _STAT_KEYS
+                        if _pre_sig is not None
+                        and _post_sig is not None
+                        and _pre_sig[k] != _post_sig[k]]
+            _path_diff = [k for k in _STAT_KEYS
+                          if _pre_sig is not None
+                          and _final_sig is not None
+                          and _pre_sig[k] != _final_sig[k]]
+            # Persist the three identity signatures + read/hash evidence on
+            # the binding receipt so the refusal is auditable, not local-only.
+            account_binding["path_identity"] = {
+                "stat_fields": list(_STAT_KEYS),
+                "pre_read_fstat": _pre_sig,
+                "post_read_fstat": _post_sig,
+                "bind_completion_path_stat": _final_sig,
+                "fd_drift_fields": _fd_diff,
+                "path_drift_fields": _path_diff,
+                "read_bytes_sha256": account_binding.get(
+                    "actual_snapshot_sha256"),
+                "declared_sha256": snap_sha,
+            }
+            if _fd_diff or _path_diff:
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_SNAPSHOT_PATH_CHANGED",
+                    "detail": (
+                        "account snapshot path changed inside the "
+                        "binding window (fd-drift fields "
+                        f"{_fd_diff or '[]'}, path-drift fields "
+                        f"{_path_diff or '[]'}); verified bytes are the "
+                        "first read only"),
+                })
         # Use the snapshot's own holdings/pending for the projection when
         # it supplies them; a rejected snapshot contributes NO account
         # facts (the named rejection stands instead).

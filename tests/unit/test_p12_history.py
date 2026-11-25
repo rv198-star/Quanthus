@@ -2333,6 +2333,128 @@ def test_seg_b_bind_window_inplace_rewrite_named_rejection(tmp_path, monkeypatch
     assert sec["held_membership"] is False
 
 
+def test_seg_b_bind_window_replace_during_decode_named_rejection(
+        tmp_path, monkeypatch):
+    """Binding-completion stat (R4 seg-B binding-completion): the snapshot
+    bytes are read and json-decoded from the SAME in-memory bytes, THEN the
+    path is atomically os.replace'd before the account facts commit.  The
+    bind-completion path.stat (run AFTER decode/receipt/identity checks,
+    before facts commit) catches the inode change -> named
+    ACCOUNT_SNAPSHOT_PATH_CHANGED, the three identity signatures land on
+    the binding receipt, and NO held facts project."""
+    import os as _os, json as _j
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    other = _b_write_other_account_snapshot(tmp_path)
+    orig_inode = _os.stat(path).st_ino
+
+    real_loads = reader_mod.json.loads
+    done = {"swapped": False}
+
+    def _loads_then_replace(text, *a, **k):
+        obj = real_loads(text, *a, **k)
+        if not done["swapped"] and isinstance(obj, dict) and obj.get(
+                "account_id") == "SYN-PAPER-A" and "holdings" in obj:
+            done["swapped"] = True
+            _os.replace(str(other), path)  # inode changes after decode
+        return obj
+
+    monkeypatch.setattr(reader_mod.json, "loads", _loads_then_replace)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    assert _os.stat(path).st_ino != orig_inode
+    # The three signatures are persisted on the receipt.
+    pi = ab["path_identity"]
+    assert "st_ino" in pi["path_drift_fields"]
+    assert pi["read_bytes_sha256"] == sha
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_bind_window_inplace_during_decode_named_rejection(
+        tmp_path, monkeypatch):
+    """Binding-completion stat: same path rewritten IN PLACE (same inode,
+    changed size/mtime/ctime) after the snapshot bytes decode, before facts
+    commit -> named ACCOUNT_SNAPSHOT_PATH_CHANGED via path_drift on
+    size/mtime/ctime (inode unchanged)."""
+    import os as _os, json as _j
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    orig_inode = _os.stat(path).st_ino
+
+    real_loads = reader_mod.json.loads
+    done = {"swapped": False}
+
+    def _loads_then_rewrite(text, *a, **k):
+        obj = real_loads(text, *a, **k)
+        if not done["swapped"] and isinstance(obj, dict) and obj.get(
+                "account_id") == "SYN-PAPER-A" and "holdings" in obj:
+            done["swapped"] = True
+            with open(path, "w") as fh:   # same inode, new bytes/clock
+                fh.write(_j.dumps({"account_id": "SYN-PAPER-B",
+                                   "holdings": [], "pending": [],
+                                   "as_of": "2026-10-20T09:30:00+08:00",
+                                   "extra_padding": "y" * 8192}))
+        return obj
+
+    monkeypatch.setattr(reader_mod.json, "loads", _loads_then_rewrite)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    assert _os.stat(path).st_ino == orig_inode  # in-place, inode kept
+    assert ab["path_identity"]["path_drift_fields"]  # size/mtime/ctime drift
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_bind_window_replace_during_receipt_verify_named_rejection(
+        tmp_path, monkeypatch):
+    """Binding-completion stat: the snapshot path is os.replace'd while the
+    generation-receipt file is being re-hashed (a LATER binding stage than
+    decode).  The bind-completion path.stat still catches the inode change
+    -> named ACCOUNT_SNAPSHOT_PATH_CHANGED, no verified-empty projection."""
+    import os as _os, json as _j
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text('{"ok":true}')
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    other = _b_write_other_account_snapshot(tmp_path)
+
+    real_sha256_file = reader_mod.sha256_file
+    done = {"swapped": False}
+
+    def _sha_then_replace(p, *a, **k):
+        digest = real_sha256_file(p, *a, **k)
+        if not done["swapped"] and str(p).endswith("receipt.json"):
+            done["swapped"] = True
+            _os.replace(str(other), path)
+        return digest
+
+    monkeypatch.setattr(reader_mod, "sha256_file", _sha_then_replace)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha,
+            "generation_receipt": {"path": str(receipt), "sha256": "7d05c625"}}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
 def test_seg_b_bind_window_unchanged_path_reads(tmp_path):
     """Legal variant: a bound snapshot whose path identity is unchanged
     through the binding window reads cleanly (READ, no path-change

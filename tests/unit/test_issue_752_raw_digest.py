@@ -20,16 +20,15 @@ import pytest
 from quanthus.event_library.contracts import sha256_digest
 from quanthus.product_daily.contracts import ProductDailyError
 from tests.unit.test_p11_daily_runner import (
-    CARD,
-    _held_facts,
     _identity,
-    _producer_inputs,
-    _prospective_source,
-    _prospective_split,
     _raw_security,
     _run,
     _trend_raw,
+)
+from tests.unit.test_p11_daily_runner import (
     resources as resources,  # noqa: F401
+)
+from tests.unit.test_p11_daily_runner import (
     runner as runner,  # noqa: F401
 )
 
@@ -39,15 +38,16 @@ def _digest_for(code):
 
 
 def _malformed(code):
-    return replace(_raw_security(code), identity=replace(
-        _identity(code), source_evidence_digest="malformed-digest"
-    ))
+    return replace(
+        _raw_security(code),
+        identity=replace(_identity(code), source_evidence_digest="malformed-digest"),
+    )
 
 
 def _missing(code):
-    return replace(_raw_security(code), identity=replace(
-        _identity(code), source_evidence_digest=""
-    ))
+    return replace(
+        _raw_security(code), identity=replace(_identity(code), source_evidence_digest="")
+    )
 
 
 def _entry_fields(decision):
@@ -59,13 +59,18 @@ def _entry_fields(decision):
         "event_id": decision.event_id,
         "entry_allowed": decision.entry_allowed,
         "target_maximum_position": (
-            None if decision.target_maximum_position is None
+            None
+            if decision.target_maximum_position is None
             else str(decision.target_maximum_position)
         ),
         "reason": decision.reason,
         "expert_decision_digest": decision.expert_decision_digest,
-        "signal_close": None if decision.signal_close is None else decision.signal_close.isoformat(),
-        "knowledge_cutoff": None if decision.knowledge_cutoff is None else decision.knowledge_cutoff.isoformat(),
+        "signal_close": None
+        if decision.signal_close is None
+        else decision.signal_close.isoformat(),
+        "knowledge_cutoff": None
+        if decision.knowledge_cutoff is None
+        else decision.knowledge_cutoff.isoformat(),
         "decision_at": None if decision.decision_at is None else decision.decision_at.isoformat(),
     }
     if decision.decision is not None:
@@ -90,9 +95,7 @@ def test_752_legal_neighbour_survives_malformed_digest(runner, resources):
     assert out.result.package is not None
     entries = [d for d in out.seam.decisions if d.entry_allowed]
     assert any(d.security_code == "600000" for d in entries)
-    excl = [
-        e for e in out.source_closure["exclusions"] if e["security_code"] == "600001"
-    ]
+    excl = [e for e in out.source_closure["exclusions"] if e["security_code"] == "600001"]
     assert excl and excl[0]["reason"] == "raw_input_closure_invalid"
     assert excl[0]["scope"] == "per_security"
     assert "EventContractError" in excl[0]["member_or_field"]
@@ -153,14 +156,8 @@ def test_752_legal_alone_matches_legal_when_mixed(runner, resources):
     assert solo.source_closure["schema_version"] == mixed.source_closure["schema_version"]
     assert solo.source_closure["code_provenance"] == mixed.source_closure["code_provenance"]
     # The mixed run's closure additionally names the excluded neighbour.
-    assert any(
-        e["security_code"] == "600001"
-        for e in mixed.source_closure["exclusions"]
-    )
-    assert not any(
-        e["security_code"] == "600001"
-        for e in solo.source_closure["exclusions"]
-    )
+    assert any(e["security_code"] == "600001" for e in mixed.source_closure["exclusions"])
+    assert not any(e["security_code"] == "600001" for e in solo.source_closure["exclusions"])
 
 
 # ---- missing and malformed digests each isolated in a mixed positive ---------
@@ -175,9 +172,7 @@ def test_752_missing_digest_isolated_too(runner, resources):
         [_trend_raw("600000"), _missing("600001")],
     )
     assert out.result.package is not None
-    excl = [
-        e for e in out.source_closure["exclusions"] if e["security_code"] == "600001"
-    ]
+    excl = [e for e in out.source_closure["exclusions"] if e["security_code"] == "600001"]
     assert excl and "EventContractError" in excl[0]["member_or_field"]
     assert excl[0]["source_evidence_digest"] == ""
 
@@ -193,9 +188,7 @@ def test_752_missing_digest_neighbour_also_isolated(runner, resources):
     )
     entries = [d for d in out.seam.decisions if d.entry_allowed]
     assert [d.security_code for d in entries] == ["600000"]
-    excl = [
-        e for e in out.source_closure["exclusions"] if e["security_code"] == "600001"
-    ]
+    excl = [e for e in out.source_closure["exclusions"] if e["security_code"] == "600001"]
     assert excl and excl[0]["reason"] == "raw_input_closure_invalid"
     assert excl[0]["source_evidence_digest"] == ""
 
@@ -214,9 +207,7 @@ def test_752_held_member_keeps_hold_alert(runner, resources):
     )
     out = _run(runner, resources, [_trend_raw("600000"), raw])
     held = [
-        (d.security_code, d.action)
-        for d in out.seam.held_decisions
-        if d.security_code == "600001"
+        (d.security_code, d.action) for d in out.seam.held_decisions if d.security_code == "600001"
     ]
     assert held == [("600001", "hold_alert")]
     # The bad market row is still a named exclusion.
@@ -235,9 +226,7 @@ def test_752_product_error_exclusion_keeps_original_shape(runner, resources):
     EventContractError, so the existing audit shape is preserved."""
     bad = replace(_trend_raw("600001"), close_at_by_date={})
     out = _run(runner, resources, [_trend_raw("600000"), bad])
-    excl = [
-        e for e in out.source_closure["exclusions"] if e["security_code"] == "600001"
-    ]
+    excl = [e for e in out.source_closure["exclusions"] if e["security_code"] == "600001"]
     assert excl and excl[0]["reason"] == "raw_input_closure_invalid"
     assert excl[0]["scope"] == "per_security"
     assert "ProductDailyError" in excl[0]["member_or_field"]

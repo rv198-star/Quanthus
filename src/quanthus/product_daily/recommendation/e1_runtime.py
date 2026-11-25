@@ -429,6 +429,58 @@ _P1_PACKAGE = "base-ods"
 _P1_MEMBER_KEY = f"{_P1_PACKAGE}::{_P1_LEDGER_ID}"
 
 
+def _ordinary_member_index(
+    request: Any, consumption: Mapping[str, Any]
+) -> dict[str, Mapping[str, Any]]:
+    """Resolve each ordinary receipt against its source package before using its digest or clock."""
+    rows = consumption.get("members", ())
+    if not isinstance(rows, (list, tuple)):
+        _fail("replay_package_clock_mismatch", "invalid member receipts")
+    if not rows:
+        return {}
+
+    def check_key(record: Mapping[str, Any], package: str, mid: str) -> None:
+        expected = f"{package}::{mid}"
+        if record.get("package_id", package) != package or any(
+            record[field] != expected for field in ("member_key", "package_key") if field in record
+        ):
+            _fail("replay_member_identity_mismatch", f"receipt key differs from {expected}")
+
+    sources: dict[str, list[str]] = {}
+    for source in request.source_members:
+        mid, package = source["member_id"], source.get("package_id")
+        if not isinstance(mid, str) or not mid or not isinstance(package, str) or not package:
+            _fail("replay_member_identity_mismatch", "missing source package or member identity")
+        if "::" in package:
+            _fail("replay_member_identity_mismatch", f"invalid source package for {mid}")
+        check_key(source, package, mid)
+        sources.setdefault(mid, []).append(package)
+
+    by_id: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping) or not isinstance(row.get("member_id"), str):
+            _fail("replay_package_clock_mismatch", "missing ordinary receipt member identity")
+        mid = row["member_id"]
+        packages = sources.get(mid, [])
+        if len(packages) != 1:
+            _fail("replay_member_identity_mismatch", f"no unique source for receipt: {mid}")
+        package = packages[0]
+        # Legacy rows may omit the qualified fields. Explicit fields must name
+        # the declared source, including on reads unused on the signal date.
+        check_key(row, package, mid)
+        previous = by_id.get(mid)
+        # Only the final P1 read feeds intake. Its original failed attempts
+        # remain in the signed member_consumption receipt.
+        if previous is not None and (
+            (package, mid) != (_P1_PACKAGE, _P1_LEDGER_ID)
+            or previous.get("status") not in ("SHA_MISMATCH", "UNREADABLE")
+            or previous.get("sha_match") is True
+        ):
+            _fail("replay_package_clock_mismatch", f"duplicate member receipt: {package}::{mid}")
+        by_id[mid] = row
+    return by_id
+
+
 def _p1_read_error(
     request: Any,
     read: Mapping[str, Any],
@@ -456,6 +508,7 @@ def _p1_read_error(
         r
         for r in rows
         if isinstance(r, Mapping) and r.get("member_id") == _P1_LEDGER_ID
+        and r.get("status", "READ") == "READ"
     ]
     intake = [m for m in request.member_evidence if m.member_id == _P1_LEDGER_ID]
     if len(sources) != 1 or len(ordinary) != 1 or len(intake) != 1:
@@ -554,6 +607,7 @@ def _october_package_clock(
     cutoff: datetime,
     envelope_digest: str,
     calendar: Mapping[str, Any],
+    by_id: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
     """Verify the producer's intake clocks against the reader's same-day receipt."""
     consumption = evidence.get("member_consumption") or {}
@@ -567,19 +621,16 @@ def _october_package_clock(
         or calendar.get("consumer_rule_version") is None
     ):
         _fail("replay_package_clock_mismatch", "envelope, bound day or calendar rule differs")
-    rows = consumption.get("members") or ()
-    if not all(isinstance(row, Mapping) for row in rows):
-        _fail("replay_package_clock_mismatch", "invalid member receipt")
-    by_id = {r.get("member_id"): r for r in rows}
-    if len(by_id) != len(rows):
-        _fail("replay_package_clock_mismatch", "duplicate member receipt")
-    used = {r.get("member_id") for r in rows if r.get("relevant_for_T") is True}
+    used = {mid for mid, row in by_id.items() if row.get("relevant_for_T") is True}
     if not used or used != set(request.required_member_ids):
         _fail("replay_package_clock_mismatch", "required members differ from the used receipt rows")
     verified = []
     for member in request.member_evidence:
         row = by_id.get(member.member_id)
-        if row is None or row.get("sha_match") is not True or member.digest != row.get("sha256"):
+        if (
+            row is None or row.get("status", "READ") != "READ"
+            or row.get("sha_match") is not True or member.digest != row.get("sha256")
+        ):
             _fail("replay_package_clock_mismatch", f"unverified intake member {member.member_id}")
         when = _package_instant(row.get("verify_at"))
         if not source_read <= when <= observed or member.available_at != when:
@@ -833,10 +884,15 @@ def run_e1_replay_day(
     # Native archive reads can finish weeks after the replay date. Authorize
     # their physical clock only for a verified receipt for this exact day.
     logical_cutoff = paper_replay.replay_decision_at(market_date)
+    member_consumption = (p12_evidence or {}).get("member_consumption", {})
+    if not isinstance(member_consumption, Mapping):
+        _fail("replay_package_clock_mismatch", "invalid member consumption")
+    ordinary_reads = _ordinary_member_index(req, member_consumption)
     if p12_evidence and _package_instant(req.facts_template["intake_verified_at"]) > logical_cutoff:
         consumption_evidence["package_clock"] = _october_package_clock(
             req, p12_evidence, source_read_at, observed_at, logical_cutoff,
             snapshot_manifest_digest, consumption_evidence["calendar_schedule_evidence"],
+            ordinary_reads,
         )
     consumption_evidence["p12"] = _p1_read_evidence(
         req, p12_evidence or {}, source_read_at, observed_at

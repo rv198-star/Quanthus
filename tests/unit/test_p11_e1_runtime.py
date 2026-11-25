@@ -60,7 +60,10 @@ def test_package_clock_checks_original_receipt_against_bound_trading_day():
         "source_clocks": {"logical_decision_cutoff": cutoff.isoformat()},
         "envelope": {"sha256": digest},
     }
-    args = (request, evidence, read, observed, cutoff, digest, {"consumer_rule_version": "1.0.0"})
+    args = (
+        request, evidence, read, observed, cutoff, digest, {"consumer_rule_version": "1.0.0"},
+        {"bar": row},
+    )
     proof = _october_package_clock(*args)
     assert proof["logical_cutoff"] == cutoff.isoformat()
     assert proof["intake_verified_at"] == verified.isoformat()
@@ -863,3 +866,41 @@ def test_p1_read_pairs_identity_source_digest_and_original_clocks(change):
     result = _p1_read_evidence(request, evidence, start, observed)["p1_exceptions"]
     assert result["p1_unverified"] and result["reads"] == []
     assert result["reported_evidence"] == evidence["p1_exceptions"]
+
+
+@pytest.mark.parametrize("explicit_key", ["member_key", "package_key"])
+@pytest.mark.parametrize("used", [True, False])
+def test_ordinary_member_matches_its_own_registered_key(explicit_key, used):
+    from types import SimpleNamespace
+
+    from quanthus.product_daily.recommendation.e1_runtime import _ordinary_member_index
+
+    p1 = "ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet"
+    sources = [{"package_id": "base-ods", "member_id": mid} for mid in (p1, "other")]
+    request = SimpleNamespace(source_members=sources)
+    rows = [
+        {**src, explicit_key: "base-ods::" + src["member_id"], "status": "READ"}
+        for src in sources
+    ]
+    rows[1]["relevant_for_T"] = used
+    assert set(_ordinary_member_index(request, {"members": rows})) == {p1, "other"}
+    rows[1][explicit_key] = "base-ods::" + p1
+    with pytest.raises(ProductDailyError, match="replay_member_identity_mismatch"):
+        _ordinary_member_index(request, {"members": rows})
+
+
+def test_ordinary_p1_failed_attempt_precedes_one_verified_read():
+    from types import SimpleNamespace
+
+    from quanthus.product_daily.recommendation.e1_runtime import _ordinary_member_index
+
+    mid = "ODS/canonical/ref_adjustment_factor_pit_exceptions.parquet"
+    source = {"package_id": "base-ods", "member_id": mid}
+    request = SimpleNamespace(source_members=[source])
+    failed = {**source, "status": "SHA_MISMATCH", "sha_match": False}
+    passed = {**source, "status": "READ", "sha_match": True}
+    rows = {"members": [failed, passed]}
+    assert _ordinary_member_index(request, rows) == {mid: passed}
+    assert rows["members"] == [failed, passed]
+    with pytest.raises(ProductDailyError, match="duplicate member receipt"):
+        _ordinary_member_index(request, {"members": [failed, passed, passed]})

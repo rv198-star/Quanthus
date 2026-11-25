@@ -753,15 +753,77 @@ def read_history(
             # Same-bytes closeout: read the bound snapshot ONCE - the single
             # in-memory bytes feed both the sha256 and the decode, so verify
             # and project never re-open the path for a swapped second read.
+            # Binding-window identity (closeout pass 2): the path may be
+            # atomically replaced or rewritten in place AFTER the bytes are
+            # read.  Hold one fd, fstat before and after the read, and stat
+            # the path again at bind completion; any change in
+            # st_dev/st_ino/st_size/st_mtime_ns/st_ctime_ns is a named
+            # ACCOUNT_SNAPSHOT_PATH_CHANGED refusal.  Verification and
+            # decode still act ONLY on the first in-memory bytes.
+            _STAT_KEYS = ("st_dev", "st_ino", "st_size",
+                          "st_mtime_ns", "st_ctime_ns")
+
+            def _stat_sig(st):
+                return {k: getattr(st, k, None) for k in _STAT_KEYS}
+
+            snap_bytes = None
+            _pre_sig = _post_sig = _final_sig = None
             try:
-                snap_bytes = open(snap_path, "rb").read()
+                _fd = os.open(snap_path, os.O_RDONLY)
+                try:
+                    _pre_sig = _stat_sig(os.fstat(_fd))
+                    _chunks = []
+                    while True:
+                        _c = os.read(_fd, 1 << 20)
+                        if not _c:
+                            break
+                        _chunks.append(_c)
+                    snap_bytes = b"".join(_chunks)
+                    _post_sig = _stat_sig(os.fstat(_fd))
+                finally:
+                    os.close(_fd)
             except Exception as exc:  # noqa: BLE001
                 snap_bytes = None
                 account_binding["rejections"].append({
                     "reason_code": "ACCOUNT_SNAPSHOT_UNREADABLE",
                     "detail": f"account snapshot could not be opened: {type(exc).__name__}: {exc}",
                 })
+            # The path identity is re-stat'ed at bind completion - an
+            # os.replace (inode change) or an in-place rewrite (size/clock
+            # change) inside the binding window is a named refusal, never
+            # silently bound to the first read's bytes.
             if snap_bytes is not None:
+                try:
+                    _final_sig = _stat_sig(os.stat(snap_path))
+                except Exception as exc:  # noqa: BLE001
+                    _final_sig = None
+                    account_binding["rejections"].append({
+                        "reason_code": "ACCOUNT_SNAPSHOT_PATH_CHANGED",
+                        "detail": (
+                            "account snapshot path disappeared inside the "
+                            f"binding window: {type(exc).__name__}: {exc}"),
+                    })
+            if snap_bytes is not None and _final_sig is not None:
+                _fd_diff = [k for k in _STAT_KEYS
+                            if _pre_sig is not None
+                            and _post_sig is not None
+                            and _pre_sig[k] != _post_sig[k]]
+                _path_diff = [k for k in _STAT_KEYS
+                              if _pre_sig is not None
+                              and _pre_sig[k] != _final_sig[k]]
+                if _fd_diff or _path_diff:
+                    account_binding["rejections"].append({
+                        "reason_code": "ACCOUNT_SNAPSHOT_PATH_CHANGED",
+                        "detail": (
+                            "account snapshot path changed inside the "
+                            "binding window (fd-drift fields "
+                            f"{_fd_diff or '[]'}, path-drift fields "
+                            f"{_path_diff or '[]'}); verified bytes are the "
+                            "first read only"),
+                    })
+            if snap_bytes is not None and not any(
+                    r["reason_code"] == "ACCOUNT_SNAPSHOT_PATH_CHANGED"
+                    for r in account_binding["rejections"]):
                 actual_snap = "sha256:" + hashlib.sha256(snap_bytes).hexdigest()
                 account_binding["actual_snapshot_sha256"] = actual_snap
                 if (str(actual_snap).split(":", 1)[-1]

@@ -2183,7 +2183,10 @@ def test_seg_b_same_bytes_no_second_decode_after_swap(tmp_path):
     """Closeout: verification + projection decode ONLY the first read's
     bytes.  A caller whose pinned sha matches the ORIGINAL content but whose
     mapping re-points facts cannot smuggle a different second read in - the
-    single verified bytes govern (no reopened decode of new content)."""
+    single verified bytes govern (no reopened decode of new content).  The
+    real path-swap refusals are covered by the two binding-window tests
+    below; this case keeps the no-swap legal variant + the cleared-mapping
+    projection."""
     import hashlib as _hl, json as _j
     # File holds 1200 held.  Caller pins its REAL sha but clears holdings in
     # the mapping; the verified bytes (not any second/swap read) project 1200.
@@ -2192,6 +2195,112 @@ def test_seg_b_same_bytes_no_second_decode_after_swap(tmp_path):
     path, sha = _seg_b_write_snapshot(tmp_path, held, [])
     snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
             "holdings": [], "pending": [],
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["rejections"] == []
+    assert ab["actual_snapshot_sha256"] == sha
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert sec["held_quantity"] == 1200
+
+
+def _b_write_other_account_snapshot(tmp_path):
+    """Materialise a DIFFERENT-account snapshot file for the swap refusal."""
+    import json as _j
+    snap_obj = {
+        "account_id": "SYN-PAPER-B", "account_mode": "synthetic",
+        "environment": "isolated_paper", "as_of": "2026-10-20T09:30:00+08:00",
+        "scenario": "other_empty", "holdings": [], "pending": [],
+        "security_identity": {"security_id": "other-sid"},
+        "generation_receipt": {"sha256": "abcd"},
+    }
+    p = tmp_path / "other_snapshot.json"
+    p.write_text(_j.dumps(snap_obj))
+    return p
+
+
+def test_seg_b_bind_window_os_replace_named_rejection(tmp_path, monkeypatch):
+    """Binding window: the snapshot path is atomically os.replace'd (new
+    inode) AFTER the first bytes are read but before bind completion.  The
+    verified bytes still hash to the pinned sha, but the path identity
+    changed -> a named ACCOUNT_SNAPSHOT_PATH_CHANGED refusal, never bound."""
+    import os as _os
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    other = _b_write_other_account_snapshot(tmp_path)
+    orig_inode = _os.stat(path).st_ino
+
+    real_read = reader_mod.os.read
+    done = {"swapped": False}
+
+    def _read_then_replace(fd, n):
+        data = real_read(fd, n)
+        if data and not done["swapped"]:
+            done["swapped"] = True
+            _os.replace(str(other), path)  # atomic replace -> inode changes
+        return data
+
+    monkeypatch.setattr(reader_mod.os, "read", _read_then_replace)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    assert _os.stat(path).st_ino != orig_inode
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_bind_window_inplace_rewrite_named_rejection(tmp_path, monkeypatch):
+    """Binding window: the same path is rewritten IN PLACE (same inode,
+    changed size/mtime) after the first read -> named
+    ACCOUNT_SNAPSHOT_PATH_CHANGED refusal."""
+    import os as _os, json as _j
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    orig_inode = _os.stat(path).st_ino
+
+    real_read = reader_mod.os.read
+    done = {"swapped": False}
+
+    def _read_then_rewrite(fd, n):
+        data = real_read(fd, n)
+        if data and not done["swapped"]:
+            done["swapped"] = True
+            with open(path, "w") as fh:
+                fh.write(_j.dumps({"account_id": "SYN-PAPER-B",
+                                   "holdings": [], "pending": [],
+                                   "as_of": "2026-10-20T09:30:00+08:00",
+                                   "extra_padding": "x" * 4096}))
+        return data
+
+    monkeypatch.setattr(reader_mod.os, "read", _read_then_rewrite)
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
+            "snapshot_path": path, "snapshot_sha256": sha}
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_PATH_CHANGED" in codes
+    assert _os.stat(path).st_ino == orig_inode
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+
+
+def test_seg_b_bind_window_unchanged_path_reads(tmp_path):
+    """Legal variant: a bound snapshot whose path identity is unchanged
+    through the binding window reads cleanly (READ, no path-change
+    refusal) and projects the verified bytes."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    path, sha = _seg_b_write_snapshot(tmp_path, held, [])
+    snap = {"account_id": "SYN-PAPER-A", "as_of": "2026-10-20T09:30:00+08:00",
             "snapshot_path": path, "snapshot_sha256": sha}
     res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
     ab = res.coverage["account_binding"]

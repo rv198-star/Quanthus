@@ -200,3 +200,82 @@ def test_b_envelope_carries_pending_and_unresolved():
     assert env["pending_securities"][0]["kind"] == "open_buy_order"
     assert env["pending_securities"][0]["quantity"] == 7
     assert env["account_unresolved"][0]["account_key"] == "ext-1"
+
+
+# ---- R1 fixes ----------------------------------------------------------------
+
+
+def test_b_r1_sell_pending_blocks_new_entry(assets):
+    """A sell order on a security blocks its NEW entry (the pool-external
+    direction is an unresolved disposition, not a silently-admitted buy).
+    The sell record stays verbatim in account_unresolved."""
+    sec = f._security("600000", _DAYS)
+    sec["pending"] = [
+        {"kind": "sell", "quantity": 5, "order_key": "s1",
+         "direction": "sell", "source_receipt": "src.s1"},
+    ]
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    assert ("600001", "entry_plan") in _decisions(out)
+    assert not any(c == "600000" for c, s in _decisions(out))
+    sell = [
+        r for r in out["source_closure"]["account_unresolved"]
+        if r.get("direction") == "sell"
+    ]
+    assert sell and sell[0]["quantity"] == 5 and sell[0]["order_key"] == "s1"
+
+
+def test_b_r1_fractional_quantity_named_refusal(assets):
+    """fractional_quantity=1.2 is a named invalid_pending_quantity, never
+    silently truncated to 1."""
+    sec = f._security("600000", _DAYS)
+    sec["pending"] = [{"kind": "open_buy_order", "quantity": 1.2}]
+    with pytest.raises(ProductDailyError, match="invalid_pending_quantity"):
+        e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+
+
+def test_b_r1_pool_external_held_surfaces_hold_alert(assets):
+    """A pool-external held unresolved record produces a named hold_alert
+    (never a silent drop, never a fabricated market identity)."""
+    req = _req([f._security("600000", _DAYS), f._security("600001", _DAYS)])
+    req["account"]["unresolved"] = [
+        {"account_key": "outside-held", "role": "held", "quantity": None,
+         "missing_reason": "missing_listing", "source": "src.o"},
+    ]
+    out = e_run_e1_replay(req, f.T1, assets)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("outside-held", "hold_alert") in held
+    assert any(r.get("account_key") == "outside-held"
+               for r in out["source_closure"]["account_unresolved"])
+
+
+def test_b_r1_position_facts_without_source_refused(assets):
+    """A serializable position_facts with no evidence.unit_id cannot invent
+    a same-read source; it is a named invalid_raw_history."""
+    sec = f._security("600000", _DAYS)
+    sec.update(
+        held_membership=True,
+        held_quantity=1200,
+        position_facts={
+            "holding_sessions": 10,
+            "marked_return": "-0.003",
+            "prior_strategy_reduction_count": 0,
+        },
+    )
+    with pytest.raises(ProductDailyError, match="invalid_raw_history"):
+        e_run_e1_replay(_req([sec]), f.T1, assets)
+
+
+def test_b_r1_buy_pending_evidence_in_closure(assets):
+    """order_key/source_receipt on a buy pending record are bound verbatim
+    into the issued source_closure.pending_evidence."""
+    sec = f._security("600000", _DAYS)
+    sec["pending"] = [
+        {"kind": "open_buy_order", "quantity": 12,
+         "order_key": "ord-b1", "source_receipt": "src.b1"},
+    ]
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    ev = [
+        r for r in out["source_closure"].get("pending_evidence", [])
+        if r.get("order_key") == "ord-b1"
+    ]
+    assert ev and ev[0]["source_receipt"] == "src.b1" and ev[0]["quantity"] == 12

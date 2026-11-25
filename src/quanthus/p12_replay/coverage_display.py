@@ -471,6 +471,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
             code in evaluated
             and clock_reason is None
             and qualified
+            and code not in coverage_excl
         )
         if clock_reason is not None:
             state = "blocked"

@@ -82,6 +82,16 @@ class ResolvedMember:
     readability: str
     package_kind: str  # "base" | "daily-core"
     market_date: str | None = None  # daily-core only
+    # P10 daily-channel ruling (audit 749 R4 second segment): a P10
+    # calendar-map daily partition and the formal daily-core package's
+    # dwd_trading_calendar member are TWO logical aliases of the SAME
+    # physical member when their sha256 match.  "alias_of" carries the
+    # formal member's package_key so the reader merges both aliases into
+    # one Daily identity under a single channel-admission judgement
+    # instead of letting the P10 alias bypass the formal gate with a
+    # base clock.
+    alias_of: str | None = None
+    alias_abs_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -150,21 +160,20 @@ class SourceMap:
                     )
                 )
             for e in daily:
-                out.append(
-                    ResolvedMember(
-                        member_id=str(e["path"]).split("/published/DWD/")[-1]
-                        if "/published/DWD/" in str(e["path"])
-                        else str(e["path"]),
-                        package_id=str(e.get("package_id") or "dwd-daily-calendar"),
-                        version=BASE_VERSION,
-                        abs_path=Path(e["path"]),
-                        sha256="sha256:" + str(e["sha256"]).replace("sha256:", ""),
-                        size_bytes=int(e.get("size_bytes") or 0),
-                        readability="READABLE",
-                        package_kind="daily-core",
-                        market_date=e.get("target"),
-                    )
+                member = ResolvedMember(
+                    member_id=str(e["path"]).split("/published/DWD/")[-1]
+                    if "/published/DWD/" in str(e["path"])
+                    else str(e["path"]),
+                    package_id=str(e.get("package_id") or "dwd-daily-calendar"),
+                    version=BASE_VERSION,
+                    abs_path=Path(e["path"]),
+                    sha256="sha256:" + str(e["sha256"]).replace("sha256:", ""),
+                    size_bytes=int(e.get("size_bytes") or 0),
+                    readability="READABLE",
+                    package_kind="daily-core",
+                    market_date=e.get("target"),
                 )
+                out.append(self._bind_calendar_alias(member))
             return out
         entry = self._base_tables.get(table) or {}
         out = []
@@ -186,6 +195,38 @@ class SourceMap:
         return out
 
     # ---- Daily core ---------------------------------------------------------
+    def _bind_calendar_alias(self, member: ResolvedMember) -> ResolvedMember:
+        """Merge a P10 calendar-map daily alias into its formal member.
+
+        When the pinned daily-core package for the alias's market_date
+        declares a dwd_trading_calendar member with the SAME sha256, the
+        two registrations are the same physical member (P10 ruling: gate
+        both logical aliases against the same Daily identity).  Return a
+        member whose "alias_of" points at the formal package_key; the
+        reader treats it as that identity's alias, not a separate
+        member."""
+        target = member.market_date
+        if not target:
+            return member
+        formal = self.daily_member(target, "dwd_trading_calendar")
+        if formal is None:
+            return member
+        if str(formal.sha256).replace("sha256:", "") != str(member.sha256).replace("sha256:", ""):
+            return member
+        return ResolvedMember(
+            member_id=member.member_id,
+            package_id=member.package_id,
+            version=member.version,
+            abs_path=member.abs_path,
+            sha256=member.sha256,
+            size_bytes=member.size_bytes,
+            readability=member.readability,
+            package_kind=member.package_kind,
+            market_date=member.market_date,
+            alias_of=f"{formal.package_id}::{formal.member_id}",
+            alias_abs_path=str(formal.abs_path),
+        )
+
     def daily_open_days(self) -> list[str]:
         return sorted(
             d for d, e in self._daily_entries.items()

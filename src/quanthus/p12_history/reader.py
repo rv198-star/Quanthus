@@ -284,6 +284,7 @@ def read_history(
 
     # ---- assemble source_members (unique members actually opened) ----
     member_entries = {}
+    pending_aliases = {}
     def _member_key(member):
         # Package-qualified member key (audit 749-01): two daily packages
         # can ship the same relative member path (same-member-path.parquet
@@ -294,6 +295,25 @@ def read_history(
     def _reg(member, knowledge_at, date_from=None, date_to=None, visible_at=None,
              producer_completed_at=None, channel_visible_at=None,
              keep_null_visible=False):
+        # A P10 calendar-map daily alias is the SAME physical member as
+        # the formal daily-core calendar member it points at (P10
+        # ruling).  Register it as an alias ON the formal identity - it
+        # must NOT open a separate entry clocked at base_knowledge, which
+        # would let the alias bypass the formal channel-admission gate.
+        if getattr(member, "alias_of", None):
+            target = member_entries.get(member.alias_of)
+            alias_rec = {
+                "member_key": _member_key(member),
+                "member_id": member.member_id,
+                "package_id": member.package_id,
+                "sha256": member.sha256,
+                "abs_path": str(member.abs_path),
+            }
+            if target is not None:
+                target.setdefault("aliases", []).append(alias_rec)
+            else:
+                pending_aliases.setdefault(member.alias_of, []).append(alias_rec)
+            return
         key = _member_key(member)
         if key not in member_entries:
             # keep_null_visible: a formal read whose channel is UNKNOWN
@@ -311,6 +331,8 @@ def read_history(
                 channel_visible_at=channel_visible_at,
             )
             e["package_key"] = key
+            for alias_rec in pending_aliases.pop(key, []):
+                e.setdefault("aliases", []).append(alias_rec)
             member_entries[key] = e
     # P11 裁定 (OCTOBER-REPLAY-TIME-v1): the original member clock is
     # carried verbatim - visible_at equals the member's own knowledge_at
@@ -950,6 +972,26 @@ def read_history(
             for e in source_member_entries if e.get("named_input_gap")
         ] if (purpose == FORMAL_DAILY_UPDATE) else [],
         "member_consumption": member_consumption,
+        "formal_not_read_dependency_set": (
+            # P10 ruling (audit 749 R4 second segment): the registered-but-
+            # not-read members for THIS T under a formal update, each
+            # carrying its P10 dependency_type so the named-gap
+            # dispositions bind to the actual selected/excluded dependency
+            # set.  Only members carrying a named input gap count - the
+            # sealed-October base and other-day partitions are out of
+            # scope.
+            [
+                {
+                    "member_key": e["package_key"],
+                    "member_id": e["member_id"],
+                    "package_id": e["package_id"],
+                    "dependency_type": e.get("dependency_type"),
+                    "gap": e.get("named_input_gap"),
+                }
+                for e in source_member_entries
+                if e.get("named_input_gap") and e["package_key"] in not_read
+            ]
+        ) if (purpose == FORMAL_DAILY_UPDATE) else [],
         "note": (
             "Corporate-action/exception completeness for the covered window is "
             "UNKNOWN (0 securities proven; 2026-11 deltas SOURCE_NOT_REFRESHED). "

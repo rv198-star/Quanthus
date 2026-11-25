@@ -62,7 +62,12 @@ class StubSourceMap(SourceMap):
         self._daily = daily_cores
 
     def base_members(self, table):
-        return list(self._members_by_table.get(table, ()))
+        out = list(self._members_by_table.get(table, ()))
+        if table == "dwd_trading_calendar":
+            # Apply the same P10 calendar-alias merge the real SourceMap
+            # performs on its daily calendar partitions.
+            out = [self._bind_calendar_alias(m) for m in out]
+        return out
 
     def daily_open_days(self):
         return sorted(self._daily)
@@ -1589,3 +1594,85 @@ def test_seg_b_outside_held_and_unknown_qty_projected(tmp_path):
                if x["identity"]["security_id"] == "outside-held-x")
     assert out["account"]["account_role"] == "held"
     assert out["account"]["held_quantity"] is None
+
+
+def test_calendar_alias_merges_into_formal_daily_identity(tmp_path):
+    """P10 daily-channel ruling (R4 second segment): a P10 calendar-map
+    daily partition whose sha256 matches the formal daily-core package's
+    dwd_trading_calendar member is the SAME physical member - both
+    logical aliases are gated under the formal member's channel
+    admission, never double-counted as an independent source clocked at
+    base_knowledge."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # Formal daily-core calendar member for T (channel UNKNOWN -> its
+    # named gap blocks the day under a formal read).
+    formal_cal = _member(
+        tmp_path, "payload/tradability_state/dwd_trading_calendar/day=T/cal.parquet",
+        package_id="dwd-daily-20261124-x", kind="daily", market_date="2026-11-24")
+    # The P10 calendar-map alias: a DIFFERENT member_id/abs_path but the
+    # SAME sha256 - the same physical member under another logical name.
+    alias_cal = _member(
+        tmp_path, "/abs/dwd-daily-calendar/cal-2026-11-24.parquet",
+        package_id="dwd-daily-calendar", kind="daily", market_date="2026-11-24",
+        declared_sha256=formal_cal.sha256)
+    members["dwd_trading_calendar"].append(alias_cal)
+    clocks = {"2026-11-24": {"knowledge": None, "producer": None, "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [formal_cal]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    # The alias read is recorded as ALIAS against the formal identity,
+    # never an independent READ that admits the member on a base clock.
+    alias_reads = [r for r in res.coverage["calendar"]["reads"]
+                   if r.get("status") == "ALIAS"]
+    assert alias_reads and alias_reads[0]["alias_of"].startswith(
+        "dwd-daily-20261124-x::")
+    # The formal identity carries the alias on its source_member entry;
+    # the alias opens no separate member entry.
+    formal_entry = next(
+        m for m in res.raw_history["source_members"]
+        if m["package_key"] == f"dwd-daily-20261124-x::{formal_cal.member_id}")
+    assert any(a["package_id"] == "dwd-daily-calendar"
+               for a in formal_entry.get("aliases", []))
+    assert not any(
+        m.get("package_key") == f"dwd-daily-calendar::{alias_cal.member_id}"
+        for m in res.raw_history["source_members"])
+    # Channel UNKNOWN on the shared calendar -> named whole-day gap.
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_INPUT_GAP"
+
+
+def test_formal_not_read_dependency_set_lists_named_gaps(tmp_path):
+    """P10 ruling: the formal-update registered-but-not-read members for
+    THIS T are bound to their P10 dependency_type so the named-gap
+    dispositions attach to the actual selected/excluded dependency set."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # A formal daily package whose channel is UNKNOWN: its members are
+    # rejected_no_channel_proof and land on registered_not_read.
+    bar = _formal_daily_member(tmp_path, "2026-11-24")
+    ident = _member(tmp_path, "reference/dwd_listing/d.parquet",
+                    package_id="dwd-daily-20261124-x", kind="daily",
+                    market_date="2026-11-24")
+    clocks = {"2026-11-24": {"knowledge": None, "producer": None,
+                            "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [bar, ident]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    dep = res.coverage["formal_not_read_dependency_set"]
+    keys = {d["member_key"] for d in dep}
+    assert f"daily-2026-11-24::{bar.member_id}" in keys or any(
+        bar.member_id in k for k in keys)
+    types = {d["member_id"]: d["dependency_type"] for d in dep}
+    # The bar member is a shared T price gap; the listing member is a
+    # conditional identity gap - each bound to its real dependency.
+    assert any("dwd_security_bar" in k and v == "SHARED_T_PRICE"
+               for k, v in types.items())
+    assert any("dwd_listing" in k and v == "CONDITIONAL_T_IDENTITY"
+               for k, v in types.items())

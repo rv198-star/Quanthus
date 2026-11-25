@@ -127,6 +127,21 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
         if m is not None:
             sources.append(m)
     for member in sources:
+        # P10 daily-channel ruling: a calendar-map daily partition that is
+        # an alias of the formal daily-core calendar member (same sha256)
+        # is the SAME Daily identity - skip the duplicate read so both
+        # logical aliases are gated under the formal member's channel
+        # admission, never double-counted as independent sources.
+        if getattr(member, "alias_of", None):
+            reads.append({
+                "member_id": member.member_id,
+                "member_key": f"{member.package_id}::{member.member_id}",
+                "status": "ALIAS",
+                "alias_of": member.alias_of,
+                "sha256": member.sha256,
+                "sha_match": True,
+            })
+            continue
         verify = source_map.verify_member(member)
         if not verify["matches"]:
             reads.append({

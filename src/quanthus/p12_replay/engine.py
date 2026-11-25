@@ -142,6 +142,12 @@ class ReplayEngine:
     # projection is the source; absent a supplier the reader sees empty
     # tuples.  Kept separate from run_daily's own account_facts read.
     account_projection: Any = None
+    # Coordinator-approved read-only review mode (P12_REPLAY_READONLY): the
+    # console serves GET from the sealed run/package/day-receipt artifacts +
+    # a known-empty account projection only.  _build_app, the replay ledger
+    # (sqlite) and the simulated account never open on a read path - GETs
+    # project the same payload shape without touching account truth.
+    read_only: bool = False
 
     # runtime state
     day_index: int = 0
@@ -554,6 +560,8 @@ class ReplayEngine:
 
     def workbench(self) -> dict:
         """The current account/workbench view (the browser reads this)."""
+        if self.read_only:
+            return self._readonly_workbench()
         app = self._build_app()
         from quanthus.platform.p12.transport import workbench_dto
 
@@ -574,6 +582,8 @@ class ReplayEngine:
 
     def _open_plans(self) -> list[dict]:
         """Published plans the account can still confirm or skip."""
+        if self.read_only:
+            return []
         bench = self.workbench().get("workbench") or {}
         plans = []
         for item in bench.get("opportunities") or []:
@@ -1289,8 +1299,78 @@ class ReplayEngine:
             "day_index": self.day_index,
         }
 
+    def _readonly_replay_meta(self) -> dict:
+        """The shared replay clock/session labels - identical in both modes."""
+        return {
+            "label": "历史回放·模拟",
+            "current_day": self.current_day.isoformat(),
+            "day_index": self.day_index,
+            "sessions_total": len(self.sessions),
+            "now": self.now().isoformat(),
+            "next_day": self.next_day.isoformat() if self.next_day else None,
+        }
+
+    def _readonly_account(self) -> dict:
+        """The known account projection for a sealed read-only review.
+
+        The sealed v10 evidence binds the replay account baseline snapshot
+        fc92def5: SYN-PAPER-A opened with 100000.00 cash and zero holdings /
+        orders.  The day published 今日无操作, so no cash moved and no order
+        was posted.  This is a DISPLAY projection from that signed-off
+        baseline - not a rebuild-from-events reconciliation.  rebuild_matches
+        stays None (the read-only path never runs the ledger rebuild check)
+        so the page labels the cash as a projected baseline, never a verified
+        reconciled balance.  Opening the replay ledger (sqlite) or the
+        simulated account on a read path is refused.
+        """
+        return {
+            "engineering_replay_as_observed": True,
+            "read_only_projection": True,
+            "rebuild_matches": None,
+            "cash": "100000.00",
+            "positions": [],
+            "orders": 0,
+            "reports": 0,
+        }
+
+    def _readonly_workbench(self) -> dict:
+        """The workbench payload for a sealed read-only day.
+
+        The published package is the empty-advice day (今日无操作): the
+        opportunities list is empty, there are no open orders and the
+        account is the known baseline projection.  The run-receipt status
+        the page shows still comes from the sealed run record.
+        """
+        run = self._run_receipt() or {}
+        body = {
+            "account": {},
+            "opportunities": [],
+            "orders": [],
+            "run_receipt": {"status": run.get("status")},
+        }
+        return {"replay": self._readonly_replay_meta(), "workbench": body}
+
+    def _readonly_records(self) -> dict:
+        """The empty advice-to-fill chain for a sealed read-only day.
+
+        No advice was confirmed, no order posted and no fill recorded: the
+        chain is honest-empty, not a degraded read.  Marked as a read-only
+        projection so the review labels it correctly.
+        """
+        return {
+            "reports": [],
+            "orders": [],
+            "plans": [],
+            "events": [],
+            "skips": [],
+            "outbox_pending": 0,
+            "read_only_projection": True,
+        }
+
     def reconcile(self) -> dict:
         """Relogin reconciliation: rebuild-from-events vs stored projection."""
+        if self.read_only:
+            return self._readonly_account()
         app = self._build_app()
         ok = app.rebuild_matches(app.scope)
         projection = app.paper_projection()
@@ -1508,6 +1588,8 @@ class ReplayEngine:
         transport validation - a SKIPPED plan must stay visible on the
         review, never crash the page.
         """
+        if self.read_only:
+            return self._readonly_records()
         app = self._build_app()
         # A T-only day (next_session stays null by contract) has no pending
         # decision set; the review still shows the day's fills + balances

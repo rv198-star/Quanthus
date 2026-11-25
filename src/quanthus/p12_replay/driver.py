@@ -357,6 +357,7 @@ def make_engine(
         account_id=account_id,
         account_mode=account_mode,
         publish_time=publish_time,
+        read_only=os.environ.get("P12_REPLAY_READONLY") in ("1", "true", "yes"),
         app_builder=lambda **kw: build_replay_app(
             fixture_path=fixture_path, **kw
         ),

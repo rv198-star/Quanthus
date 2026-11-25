@@ -430,19 +430,20 @@ def run_daily_advice_from_raw(
                 )
         except (ProductDailyError, CandidateScanError, EventContractError) as exc:
             detail = f"{type(exc).__name__}: {exc}"
-            input_exclusions.append(
-                {
-                    "security_code": code,
-                    "reason": "raw_input_closure_invalid",
-                    "member_or_field": detail,
-                    # The malformed field is named so the audit shows exactly
-                    # which contract row failed (e.g. source_evidence_digest),
-                    # not a buried exception type alone.
-                    "source_evidence_digest": getattr(identity, "source_evidence_digest", None),
-                    "at": signal_date.isoformat(),
-                    "scope": "per_security",
-                }
-            )
+            exclusion: dict[str, Any] = {
+                "security_code": code,
+                "reason": "raw_input_closure_invalid",
+                "member_or_field": detail,
+                "at": signal_date.isoformat(),
+                "scope": "per_security",
+            }
+            if isinstance(exc, EventContractError):
+                # Only an actual digest-contract breach earns the extra field: the
+                # audit then names the bad source_evidence_digest row, while the
+                # original ProductDailyError/CandidateScanError exclusion shape
+                # stays exactly as before.
+                exclusion["source_evidence_digest"] = identity.source_evidence_digest
+            input_exclusions.append(exclusion)
             if code in held_facts:
                 held_facts[code] = None
                 held_reasons[code] = "; ".join(

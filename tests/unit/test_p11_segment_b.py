@@ -706,3 +706,157 @@ def test_c8_r3_consistent_directions_keep_working(assets):
             assert rec and rec[0]["missing_reason"] == expected_reason
         else:
             assert "600000" in out["source_closure"]["pending_security_codes"]
+
+
+# ---- C8 fix R4: held-existence is preserved when risk facts unverified -------
+#
+# A member that only declares a serializable position_facts dict (no explicit
+# held_membership / held_quantity) is still a HELD record: its risk values are
+# dropped (never a fabricated exit), but the held EXISTENCE must block a new
+# entry and surface a named hold_alert, with quantity kept unknown.  The same
+# declared-held record plus an explicit not-held marker (held_membership=False
+# or held_quantity=0) restores the contradictory_account_membership refusal.
+# Verified held fills (typed HeldPositionFacts) keep their legal exit path.
+
+
+def _dict_only_held(code="600000", holding=40, marked="0.05", reductions=0):
+    """A securities entry that declares ONLY a position_facts dict - no
+    held_membership and no held_quantity markers."""
+    sec = f._security(code, _DAYS)
+    sec["position_facts"] = _serializable_pf(holding=holding, marked=marked, reductions=reductions)
+    return sec
+
+
+def _stages(out, code="600000"):
+    return [
+        d.get("stage")
+        for ds in (out.get("package") or {}).get("decision_sets", [])
+        for d in ds.get("decisions", [])
+        if d.get("security_code") == code
+    ]
+
+
+def _held_action(out, code="600000"):
+    return [
+        h.get("action") for h in out.get("held_signals", []) if h.get("security_code") == code
+    ]
+
+
+def _membership(out, code="600000"):
+    return [
+        m
+        for m in out["source_closure"].get("account_membership", [])
+        if m.get("security_code") == code
+    ]
+
+
+def test_c8_r4_position_facts_only_blocks_entry_holds(assets):
+    """Core P1: a member with ONLY a position_facts dict (existence declared,
+    risk unverified, quantity omitted) must NOT earn a new entry - it is a
+    declared-held record that yields a named hold_alert and holds, with no
+    new entry / reduce / exit opportunity and quantity kept unknown."""
+    out = e_run_e1_replay(_req([_dict_only_held(), f._security("600001", _DAYS)]), f.T1, assets)
+    # No new entry, reduce or exit for 600000; the held review surfaces.
+    assert _stages(out) == ["holding"]
+    assert _held_action(out) == ["hold_alert"]
+    assert not any(
+        d.get("exit_kind") or d.get("entry")
+        for ds in (out.get("package") or {}).get("decision_sets", [])
+        for d in ds.get("decisions", [])
+        if d.get("security_code") == "600000"
+    )
+    # The account record is auditable: held existence preserved, quantity stays
+    # explicitly unknown (None, never a fabricated 0), source marks unverified.
+    memb = _membership(out)
+    assert memb and memb[0].get("held") is True
+    assert memb[0].get("held_quantity") is None
+    assert memb[0].get("held_membership_unverified") is True
+    assert memb[0].get("unavailable_reason")
+    # Qualified neighbour keeps its real entry.
+    assert "entry_plan" in _stages(out, "600001")
+
+
+def test_c8_r4_position_facts_only_bad_market_digest_still_alerts(assets):
+    """Adjacent negative: the same dict-only held member still reaches the
+    hold_alert path when its own market digest is empty or malformed."""
+    for digest in ("", "malformed-digest"):
+        sec = _dict_only_held()
+        sec["identity"]["source_evidence_digest"] = digest
+        out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+        assert _held_action(out) == ["hold_alert"], digest
+        assert _stages(out) == ["holding"]
+        memb = _membership(out)
+        assert memb and memb[0].get("held") is True
+
+
+def test_c8_r4_dict_with_held_membership_false_is_contradiction(assets):
+    """Declared-held dict + explicit held_membership=False restores the
+    contradictory_account_membership refusal (not a silent pass)."""
+    sec = _dict_only_held()
+    sec["held_membership"] = False
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    # The conflict refuses the day; the account conflict is locatable to the
+    # security and its original field.
+    assert out.get("disposition") == "blocked" or (out.get("day_block") or {}).get("reason")
+
+
+def test_c8_r4_dict_with_zero_quantity_is_contradiction(assets):
+    """Declared-held dict + explicit held_quantity=0 restores the same
+    contradictory refusal - existence and a zero quantity cannot coexist."""
+    sec = _dict_only_held()
+    sec["held_quantity"] = 0
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    assert out.get("disposition") == "blocked" or (out.get("day_block") or {}).get("reason")
+
+
+def test_c8_r4_legitimate_empty_and_not_held_pass(assets):
+    """Control: a security with no position_facts at all, or an explicit
+    not-held marker (held_membership=False / held_quantity=0 with no dict),
+    keeps its ordinary path - no held existence is invented."""
+    # No position_facts at all -> a clean not-held member.
+    out = e_run_e1_replay(
+        _req([f._security("600000", _DAYS), f._security("600001", _DAYS)]), f.T1, assets
+    )
+    memb = _membership(out)
+    assert memb and memb[0].get("held") is False and memb[0].get("membership_source") == "not_held"
+    # Explicit not-held markers without a dict stay legal.
+    sec = f._security("600000", _DAYS)
+    sec["held_membership"] = False
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    memb = _membership(out)
+    assert memb and memb[0].get("held") is False
+
+
+def test_c8_r4_dict_plus_positive_quantity_keeps_verified_member(assets):
+    """A declared-held dict alongside a positive quantity keeps the original
+    member and quantity; only the unverified RISK path stays a hold_alert
+    (existence does not conjure a legal exit)."""
+    sec = _dict_only_held()
+    sec["held_quantity"] = 1200
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    assert _held_action(out) == ["hold_alert"]
+    memb = _membership(out)
+    assert memb and memb[0].get("held") is True and memb[0].get("held_quantity") == 1200
+
+
+def test_c8_r4_unverifiable_non_dict_position_facts_alerts(assets):
+    """An unverifiable non-dict position_facts (list/string/number/bool) is
+    degraded to the declared-held alert - never a pass-through that crashes
+    the closure or leaks into a fabricated disposition."""
+    for bogus in ([], "bad", 12, True):
+        sec = f._security("600000", _DAYS)
+        sec.update(held_membership=True, held_quantity=1200, position_facts=bogus)
+        out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+        assert _held_action(out) == ["hold_alert"], repr(bogus)
+        assert _stages(out) == ["holding"]
+
+
+def test_c8_r4_source_closure_digest_recomputes(assets):
+    """The issued source_closure digest recomputes from the closure content -
+    existence, fields, unverified reason and the held-membership_unverified
+    flag are all bound into the identity."""
+    from quanthus.event_library.contracts import sha256_digest
+
+    out = e_run_e1_replay(_req([_dict_only_held(), f._security("600001", _DAYS)]), f.T1, assets)
+    receipt = out.get("receipt") or {}
+    assert receipt.get("source_closure_digest") == sha256_digest(out["source_closure"])

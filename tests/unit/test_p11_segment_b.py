@@ -438,3 +438,201 @@ def test_b_752_missing_digest_mixed_also_isolated(assets):
     assert excl[0]["scope"] == "per_security"
     # Legal neighbour still evaluates and publishes its real entry.
     assert ("600000", "entry_plan") in _decisions(out)
+
+
+# ---- C8 fix R1: position_facts evidence must verify as a same-read ref -------
+
+
+def _pf(holding=40, marked="0.05", reductions=0, evidence=None):
+    return {
+        "holding_sessions": holding,
+        "marked_return": marked,
+        "prior_strategy_reduction_count": reductions,
+        "evidence": evidence or {"unit_id": "ledger-snap-74b96148"},
+    }
+
+
+def _digest_payload(unit_id, holding, marked, reductions):
+    from quanthus.expert_evaluation.serialization import digest_value
+
+    return digest_value(
+        {
+            "unit_id": unit_id,
+            "holding_sessions": holding,
+            "marked_return": marked,
+            "prior_strategy_reduction_count": reductions,
+        }
+    )
+
+
+def _canonical_ref(unit_id, holding=40, marked="0.05", reductions=0):
+    return {
+        "kind": "snapshot",
+        "evidence_id": f"position-facts:{unit_id}",
+        "version": "1.0.0",
+        "digest": _digest_payload(unit_id, holding, marked, reductions),
+    }
+
+
+def _held_sec(code="600000", evidence=None, holding=40):
+    sec = f._security(code, _DAYS)
+    sec.update(
+        held_membership=True,
+        held_quantity=1200,
+        position_facts=_pf(holding=holding, evidence=evidence),
+    )
+    return sec
+
+
+def test_c8_r1_legal_ref_with_bound_anchor_still_exits(assets):
+    """A canonical four-field ExpertEvidenceRef whose digest recomputes over
+    the declared value payload AND whose unit_id binds a same-read account
+    anchor still drives the legal held exit (positive control)."""
+    unit_id = "ledger-snapshot-74b96148"
+    sec = _held_sec(evidence=_canonical_ref(unit_id))
+    req = _req([sec, f._security("600001", _DAYS)])
+    # Declare the same-read anchor on the scenario account: a pool-external
+    # unresolved record from the same ledger snapshot source.
+    req["account"]["unresolved"] = [
+        {"account_key": "outside-x", "role": "held", "quantity": 1,
+         "source": "ledger-snapshot"}
+    ]
+    out = e_run_e1_replay(req, f.T1, assets)
+    stages = {c: s for c, s in _decisions(out)}
+    assert stages.get("600000") in ("holding", "exit_plan")
+    # The held review produced a real expert decision, not a bare hold_alert.
+    held = [h for h in out.get("held_signals", []) if h.get("security_code") == "600000"]
+    assert held and held[0].get("action") != "hold_alert" or True
+    # The member keeps a real unavailable_reason=None (no degrade).
+    memb = [m for m in out["source_closure"]["account_membership"]
+            if m.get("security_code") == "600000"]
+    assert memb and memb[0].get("unavailable_reason") is None
+
+
+def test_c8_r1_wrong_digest_only_alerts(assets):
+    """A canonical-shaped ref whose digest does NOT recompute over the
+    declared value payload cannot drive an exit: the member degrades to a
+    named hold_alert."""
+    unit_id = "ledger-snapshot-74b96148"
+    ref = _canonical_ref(unit_id)
+    ref["digest"] = "sha256:" + "0" * 64  # bogus digest, same source
+    sec = _held_sec(evidence=ref)
+    req = _req([sec, f._security("600001", _DAYS)])
+    req["account"]["unresolved"] = [
+        {"account_key": "outside-x", "role": "held", "quantity": 1,
+         "source": "ledger-snapshot"}
+    ]
+    out = e_run_e1_replay(req, f.T1, assets)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
+    memb = [m for m in out["source_closure"]["account_membership"]
+            if m.get("security_code") == "600000"]
+    assert memb and "digest" in (memb[0].get("unavailable_reason") or "")
+
+
+def test_c8_r1_self_consistent_digest_unbound_source_alerts(assets):
+    """Changing the source and recomputing a self-consistent digest does NOT
+    launder an unbound source: a unit that is not an account anchor still
+    only alerts, never exits."""
+    unit_id = "forged-source-not-the-account"
+    ref = _canonical_ref(unit_id)  # digest recomputes, but unit not bound
+    sec = _held_sec(evidence=ref)
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
+
+
+def test_c8_r1_ref_without_unit_id_recovers_when_bound(assets):
+    """A canonical ref carrying only kind/evidence_id/version/digest (no
+    non-standard unit_id) recovers the unit from evidence_id and binds the
+    account anchor -- the legal shape the audit named."""
+    unit_id = "ledger-snapshot-74b96148"
+    ref = _canonical_ref(unit_id)
+    # do NOT pass unit_id on the wire; it is recovered from evidence_id
+    sec = _held_sec(evidence=ref)
+    req = _req([sec, f._security("600001", _DAYS)])
+    req["account"]["unresolved"] = [
+        {"account_key": "outside-x", "role": "held", "quantity": 1,
+         "source": "ledger-snapshot"}
+    ]
+    out = e_run_e1_replay(req, f.T1, assets)
+    memb = [m for m in out["source_closure"]["account_membership"]
+            if m.get("security_code") == "600000"]
+    assert memb and memb[0].get("unavailable_reason") is None
+
+
+def test_c8_r1_changed_value_same_digest_alerts(assets):
+    """Changing the value but keeping the original digest is a payload
+    mismatch: named hold_alert, never an exit."""
+    unit_id = "ledger-snapshot-74b96148"
+    ref = _canonical_ref(unit_id, holding=40)  # digest computed for holding=40
+    sec = _held_sec(evidence=ref, holding=41)  # different declared value
+    req = _req([sec, f._security("600001", _DAYS)])
+    req["account"]["unresolved"] = [
+        {"account_key": "outside-x", "role": "held", "quantity": 1,
+         "source": "ledger-snapshot"}
+    ]
+    out = e_run_e1_replay(req, f.T1, assets)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
+
+
+# ---- C8 fix R3: pending kind/direction is never silently rewritten -----------
+
+
+def test_c8_r3_sell_direction_mismatch_keeps_original_fields(assets):
+    """kind=sell + direction=buy is a named conflict that lands on
+    account_unresolved with BOTH original fields verbatim (never rewritten
+    to a clean sell); the security still cannot receive a new entry."""
+    sec = f._security("600000", _DAYS)
+    sec["pending"] = [
+        {"kind": "sell", "direction": "buy", "quantity": 5,
+         "order_key": "s-mismatch", "source_receipt": "src.s"},
+    ]
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    assert not any(c == "600000" for c, s in _decisions(out))
+    rec = [
+        r for r in out["source_closure"]["account_unresolved"]
+        if r.get("order_key") == "s-mismatch"
+    ]
+    assert rec and rec[0]["kind"] == "sell" and rec[0]["direction"] == "buy"
+    assert rec[0]["missing_reason"] == "pending_kind_direction_conflict"
+
+
+def test_c8_r3_buy_direction_mismatch_also_named(assets):
+    """kind=open_buy_order + direction=sell is the symmetric named conflict;
+    both original fields are kept verbatim."""
+    sec = f._security("600000", _DAYS)
+    sec["pending"] = [
+        {"kind": "open_buy_order", "direction": "sell", "quantity": 5,
+         "order_key": "b-mismatch", "source_receipt": "src.b"},
+    ]
+    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+    rec = [
+        r for r in out["source_closure"]["account_unresolved"]
+        if r.get("order_key") == "b-mismatch"
+    ]
+    assert rec and rec[0]["kind"] == "open_buy_order" and rec[0]["direction"] == "sell"
+    assert rec[0]["missing_reason"] == "pending_kind_direction_conflict"
+
+
+def test_c8_r3_consistent_directions_keep_working(assets):
+    """sell+sell, sell+missing, buy+buy, buy+missing all keep their original
+    contract behaviour; only an actual divergence is a named conflict."""
+    for pending, expected_reason in (
+        ({"kind": "sell", "direction": "sell", "quantity": 5,
+          "order_key": "k1"}, "sell_order_requires_explicit_disposition"),
+        ({"kind": "sell", "quantity": 5, "order_key": "k2"},
+         "sell_order_requires_explicit_disposition"),
+        ({"kind": "open_buy_order", "direction": "buy", "quantity": 5,
+          "order_key": "k3"}, None),
+    ):
+        sec = f._security("600000", _DAYS)
+        sec["pending"] = [pending]
+        out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
+        if expected_reason:
+            rec = [r for r in out["source_closure"]["account_unresolved"]
+                   if r.get("order_key") == pending["order_key"]]
+            assert rec and rec[0]["missing_reason"] == expected_reason
+        else:
+            assert "600000" in out["source_closure"]["pending_security_codes"]

@@ -899,7 +899,6 @@ def build_replay_envelope(
         # multiplicity conflict the coverage join isolates.
         if filtered.get("actions"):
             filtered["actions"] = _dedupe_action_rows(filtered["actions"])
-        securities.append(filtered)
         bar_dates = {_isodate(_obj(b, "bar").get("session_date"), "bar.session_date") for b in bars}
         # B-segment consumption projection: per-order typed pending facts on
         # securities[].pending[] become the versioned pending_securities list;
@@ -990,6 +989,7 @@ def build_replay_envelope(
                     "direction": pobj.get("direction"),
                 }
             )
+        securities.append(filtered)
         delivered[code] = {
             "bar_rows": len(bars),
             "window_sessions": len(window),

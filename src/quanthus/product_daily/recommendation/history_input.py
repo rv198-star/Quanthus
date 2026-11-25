@@ -968,6 +968,8 @@ def history_receipt_for_security(
 
 def _position_facts_from(
     sec: Mapping[str, Any],
+    *,
+    allowed_sources: frozenset[str] = frozenset(),
 ) -> tuple[Any, int | None, str | None]:
     """Project the caller-declared position facts through, unchanged.
 
@@ -982,7 +984,9 @@ def _position_facts_from(
     unverifiable: str | None = None
     pf = sec.get("position_facts")
     if pf is not None and isinstance(pf, dict):
-        pf, unverifiable = _adapt_position_facts_dict(pf, sec)
+        pf, unverifiable = _adapt_position_facts_dict(
+            pf, sec, allowed_sources=allowed_sources
+        )
     pds = sec.get("prior_deterioration_sessions")
     if pds is not None and (type(pds) is not int or pds < 0):
         _fail(
@@ -992,12 +996,59 @@ def _position_facts_from(
     return pf, pds, unverifiable
 
 
+
+def _same_read_sources(
+    sec: Mapping[str, Any], history: RawHistory
+) -> frozenset[str]:
+    """The same-read account/source anchor ids declared on THIS security row
+    plus the run-level account/member evidence.  A serializable
+    position_facts.evidence.unit_id must resolve to one of these to bind; a
+    self-consistent digest over an unbound source id is still rejected.
+
+    Anchors: the run's account.unresolved[].source/account_key, every
+    pending_securities[] source_receipt/order_key, every declared
+    source_members[]/member_evidence member id, and this row's own nested
+    account.unresolved[].source / pending[].source_receipt.  A unit_id that
+    is none of these was never read into this account and cannot
+    masquerade as a trusted position fact."""
+    sources: set[str] = set()
+    for m in getattr(history, "source_members", ()) or ():
+        for key in ("member_id", "package_id"):
+            v = getattr(m, key, None)
+            if isinstance(v, str) and v.strip():
+                sources.add(v.strip())
+    for r in history.account_unresolved or ():
+        if isinstance(r, dict):
+            for key in ("source", "account_key"):
+                if isinstance(r.get(key), str) and r[key].strip():
+                    sources.add(r[key].strip())
+    for r in history.pending_securities or ():
+        if isinstance(r, dict):
+            for key in ("source_receipt", "order_key"):
+                if isinstance(r.get(key), str) and r[key].strip():
+                    sources.add(r[key].strip())
+    acct = sec.get("account") or {}
+    if isinstance(acct.get("account_id"), str) and acct["account_id"].strip():
+        sources.add(acct["account_id"].strip())
+    for r in _seq(sec.get("unresolved") or (), "securities[].unresolved"):
+        if isinstance(r, dict):
+            for key in ("source", "account_key"):
+                if isinstance(r.get(key), str) and r[key].strip():
+                    sources.add(r[key].strip())
+    for r in _seq(sec.get("pending") or (), "securities[].pending"):
+        if isinstance(r, dict):
+            for key in ("source_receipt", "order_key"):
+                if isinstance(r.get(key), str) and r[key].strip():
+                    sources.add(r[key].strip())
+    return frozenset(s for s in sources if s)
+
 def _position_facts_ref_from_evidence(
     evidence: Any,
     *,
     holding: int,
     marked_return: Decimal | None,
     reductions: int,
+    allowed_sources: frozenset[str] = frozenset(),
 ) -> tuple[Any | None, str | None]:
     """Verify a serializable position_facts.evidence block against the
     existing ExpertEvidenceRef contract.
@@ -1015,9 +1066,10 @@ def _position_facts_ref_from_evidence(
       value payload {unit_id, holding_sessions, marked_return,
       prior_strategy_reduction_count}; a changed value with an unchanged or
       bogus digest fails;
-    * the bound unit_id must name the scenario account/read the position
-      facts came from (the same-read anchor); a bare unit_id without the
-      canonical reference cannot be bound and is rejected.
+    * the bound unit_id must name a same-read account/source anchor declared
+      by THIS run's account/unresolved/pending/member evidence
+      (``allowed_sources``); a self-consistent digest over a source id that
+      is not bound to this account is still rejected.
     """
     from quanthus.expert_evaluation.serialization import digest_value
     from quanthus.expert_protocols import EvidenceKind
@@ -1075,6 +1127,21 @@ def _position_facts_ref_from_evidence(
             "position_facts.evidence.digest does not recompute over the declared "
             "value payload (wrong digest or changed value)"
         )
+    # The declared unit must be a same-read source actually bound to THIS
+    # run's account: an exact anchor id or an anchor-namespaced unit
+    # (e.g. a ledger-snapshot-<digest> under the declared "ledger-snapshot"
+    # account source).  A source id that is merely self-consistent but was
+    # never read into this account cannot masquerade as a trusted fact.
+    if allowed_sources:
+        bound = any(
+            unit_id == anchor or unit_id.startswith(anchor + "-")
+            for anchor in allowed_sources
+        )
+        if not bound:
+            return None, (
+                f"position_facts.evidence unit {unit_id!r} is not a same-read "
+                "account/source anchor bound to this run"
+            )
     ref = position_facts_evidence(
         unit_id=unit_id,
         holding_sessions=holding,
@@ -1085,7 +1152,10 @@ def _position_facts_ref_from_evidence(
 
 
 def _adapt_position_facts_dict(
-    pf: Mapping[str, Any], sec: Mapping[str, Any]
+    pf: Mapping[str, Any],
+    sec: Mapping[str, Any],
+    *,
+    allowed_sources: frozenset[str] = frozenset(),
 ) -> tuple[Any | None, str | None]:
     """Adapt a versioned serializable position_facts dict to HeldPositionFacts.
 
@@ -1131,6 +1201,7 @@ def _adapt_position_facts_dict(
         holding=holding,
         marked_return=marked_return,
         reductions=reductions,
+        allowed_sources=allowed_sources,
     )
     if ref is None:
         return None, unverifiable
@@ -1180,7 +1251,14 @@ def raw_security_inputs_from_history(
         # rather than collapse into a bare securities[i] exclusion.  Account
         # facts are the caller-declared truth for this read; a broken market
         # row never fabricates a legal identity or a scan entry.
-        position_facts, prior_det, pf_unverifiable = _position_facts_from(sec_o)
+        # Same-read account/source anchors declared by THIS run: the scenario
+        # account id, every account.unresolved[].source, every
+        # pending[].source_receipt and every member_evidence id are the only
+        # source identities a serializable position_facts.evidence may bind.
+        allowed_sources = _same_read_sources(sec_o, history)
+        position_facts, prior_det, pf_unverifiable = _position_facts_from(
+            sec_o, allowed_sources=allowed_sources
+        )
         held_membership = _bool3(sec_o.get("held_membership"), "securities[].held_membership")
         pending_kind = (
             _text(sec_o["pending_kind"], "securities[].pending_kind")

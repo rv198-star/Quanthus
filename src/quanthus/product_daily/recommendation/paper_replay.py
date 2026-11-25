@@ -95,6 +95,25 @@ def _text(value: Any, label: str) -> str:
     return str(value)
 
 
+_ARTIFACT_ID_FIELDS = ("security_id", "listing_id", "venue_id")
+
+
+def _invalid_artifact_ids(row: Mapping[str, Any], *, required: bool) -> list[str]:
+    """Signed P10 rows carry all three ids. A placeholder never identifies a security."""
+    invalid = []
+    for field in _ARTIFACT_ID_FIELDS:
+        if not required and field not in row:
+            continue
+        value = row.get(field)
+        if (
+            not isinstance(value, str)
+            or value != value.strip()
+            or value.casefold() in {"", "none", "null", "nan", "unknown"}
+        ):
+            invalid.append(field)
+    return invalid
+
+
 def _coverage_records(coverage: dict[str, Any], field: str) -> dict[str, dict[str, Any]]:
     """Coalesce identical records and reject a key that names two different sources."""
     records: dict[str, dict[str, Any]] = {}
@@ -520,6 +539,7 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                 "batch_id": _text(auth_o.get("batch_id"), "authority.batch_id"),
             }
             rows: dict[Any, dict[str, Any]] = {}
+            rejected_rows = []
             for j, r in enumerate(_seq(vo.get("rows", ()), "verified_artifacts[].rows")):
                 rr = _obj(r, f"verified_artifacts[{i}].rows[{j}]")
                 for field in ART_ROW_REQUIRED:
@@ -529,6 +549,9 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                             f"verified_artifacts[{i}].rows[{j}] lacks {field}",
                         )
                 reg_row = rr.get("register_row")
+                invalid = _invalid_artifact_ids(rr, required=producer == _SIGNED_ACTION_PRODUCER)
+                if invalid:
+                    rejected_rows.append({"register_row": reg_row, "fields": invalid})
                 rows[reg_row] = dict(rr)
             verified_artifacts[cid] = {
                 "digest": digest,
@@ -536,6 +559,12 @@ def load_replay_request(raw: Mapping[str, Any]) -> ReplayRequest:
                 "authority": authority_id,
                 "rows": rows,
             }
+            if rejected_rows:
+                verified_artifacts[cid]["identity_rejection"] = {
+                    "reason": "action_artifact_invalid_identity",
+                    "coverage_id": cid,
+                    "rows": rejected_rows,
+                }
         action_coverage = {
             "default_state": default_state,
             "registers": registers,
@@ -836,6 +865,12 @@ def build_replay_envelope(
                 "at": market_date.isoformat(),
                 "scope": "per_security",
             }
+            if action_block and (
+                rejected := _artifact_identity_rejections(request, code, market_date)
+            ):
+                isolation["action_artifact_rejections"] = rejected
+                if not p1_block:
+                    isolation["reason"] = rejected[0]["reason"]
             if p1_block:
                 isolation["p1_price_input"] = p1_evidence
                 if action_block:
@@ -959,10 +994,28 @@ def _action_row_identity_matches(
     )
 
 
+def _artifact_identity_rejections(
+    request: ReplayRequest, code: str, market_date: date
+) -> list[dict[str, Any]]:
+    coverage = request.action_coverage or {}
+    evidence = coverage.get("window_evidence", {})
+    ids = {
+        row["coverage_id"]
+        for purpose in ("scan_two_session", "returns_61_session")
+        if (row := evidence.get((code, market_date.isoformat(), purpose)))
+    }
+    catalogues = coverage.get("verified_artifacts", {})
+    return [
+        rejected
+        for cid in sorted(ids)
+        if (rejected := catalogues.get(cid, {}).get("identity_rejection"))
+    ]
+
+
 def _action_coverage_ok(
     request: ReplayRequest, sec_o: Mapping[str, Any], code: str, market_date: date
 ) -> bool:
-    if request.action_coverage is None:
+    if request.action_coverage is None or _artifact_identity_rejections(request, code, market_date):
         return False
     we = request.action_coverage.get("window_evidence", {})
     iso = market_date.isoformat()
@@ -1542,9 +1595,9 @@ def build_signed_action_authority(
             # bound (security/listing/venue were verified equal above); fall
             # back to the function's own verified identity so the catalogue row
             # binds the real security, never a literal "None" string.
-            "security_id": str(e.get("security_id") or security_id),
-            "listing_id": str(e.get("listing_id") or listing_id),
-            "venue_id": str(e.get("venue_id") or venue_id),
+            "security_id": e["security_id"] if e.get("security_id") is not None else security_id,
+            "listing_id": e["listing_id"] if e.get("listing_id") is not None else listing_id,
+            "venue_id": e["venue_id"] if e.get("venue_id") is not None else venue_id,
             "stock_code": stock_code,
         }
         cat_rows[reg_row] = row
@@ -1572,6 +1625,13 @@ def build_signed_action_authority(
             + str(coverage_doc.get("register", {}).get("venue", venue_id)).replace("XSHE", "XSHE")
             + "-action-coverage"
         )
+    for reg_row, row in cat_rows.items():
+        invalid = _invalid_artifact_ids(row, required=True)
+        if invalid:
+            _fail(
+                "action_artifact_invalid_identity",
+                f"coverage_id={cov_id} register_row={reg_row} fields={','.join(invalid)}",
+            )
     batch_id = _text(pointer_root.get("batch", pointer_root.get("id")), "pointer_root.batch")
     cred = {
         "batch_id": batch_id,
@@ -1744,6 +1804,8 @@ def _signed_action_terms(
             return None
 
     for cat in catalogues:
+        if isinstance(cat, Mapping) and cat.get("identity_rejection"):
+            continue
         rows = cat.get("rows", cat) if isinstance(cat, Mapping) else cat
         seq = rows.values() if isinstance(rows, Mapping) else rows
         for row in seq or ():

@@ -355,7 +355,15 @@ def read_history(
         # sees the gap rather than a guessed cutoff-pass.
         day_knowledge = smap.daily_knowledge_at(day)
         day_producer = smap.daily_producer_completed_at(day)
-        day_channel = smap.daily_visible_at(day)
+        # Channel visibility for a FORMAL read only counts the qualified
+        # publication/withdrawal chain - never the producer-completion
+        # fallback (audit R4 second segment: a member with no channel
+        # proof is a named gap, not silently admitted).  The October
+        # replay still consumes the real clock via daily_visible_at.
+        day_channel = (
+            smap.daily_channel_visible_at(day)
+            if formal else smap.daily_visible_at(day)
+        )
         # Formal admission is judged on the channel-visible instant; a
         # missing channel clock is a named gap (the member is registered
         # but flagged late so the rule can fail it closed).
@@ -381,15 +389,30 @@ def read_history(
                 # Late-for-cutoff receipt + the named input gap a P10
                 # shared-source proof must fill (audit R4 second
                 # segment): a member with no proven channel/knowledge
-                # clock is named, never silently qualified.
+                # clock is named, never silently qualified.  A gap on a
+                # shared hard dependency (venue calendar, shared listing
+                # identity, a needed price source, or the fixed summary
+                # chain) blocks the whole day for new entries; a single-
+                # security or single-action gap is isolated to that
+                # dependency so a qualified neighbour keeps working.
                 ent = member_entries[_member_key(m)]
                 ent["formal_admission"] = "late_for_cutoff" if late else "admitted"
+                mid_l = str(m.member_id or "")
+                shared_dep = (
+                    "dwd_trading_calendar" in mid_l
+                    or "dwd_listing" in mid_l
+                    or "dwd_security_bar" in mid_l
+                    or "dwd_security_identifier" in mid_l
+                    or "dwd_security" in mid_l and "identifier" not in mid_l
+                )
                 if day_channel is None and day_knowledge is None:
                     ent["named_input_gap"] = (
                         "NO_PROVEN_CHANNEL_OR_KNOWLEDGE_CLOCK"
                     )
                 elif day_channel is None:
                     ent["named_input_gap"] = "NO_CHANNEL_VISIBILITY_PROOF"
+                if ent.get("named_input_gap") and shared_dep:
+                    ent["shared_hard_dependency"] = True
 
     source_member_entries = list(member_entries.values())
 
@@ -930,6 +953,30 @@ def read_history(
             "failed_members": [c.get("artifact") for c in chain_faults],
             "disposition": "block_new_entries",
         }
+    # Formal-update shared-hard-dependency gap (audit R4 second
+    # segment): a member with NO proven channel/knowledge clock that is
+    # a shared hard dependency (venue calendar, shared listing identity,
+    # a needed price source, the fixed summary chain) blocks the whole
+    # day for new entries.  A single-security or single-action gap is
+    # isolated to its own dependency so a qualified neighbour keeps
+    # working - those are named on coverage.named_input_gaps, not here.
+    if day_block is None and purpose == FORMAL_DAILY_UPDATE:
+        _shared_gap = [
+            e for e in source_member_entries
+            if e.get("named_input_gap") and e.get("shared_hard_dependency")
+        ]
+        if _shared_gap:
+            day_block = {
+                "reason_code": "SHARED_INPUT_GAP",
+                "detail": (
+                    "a shared hard dependency has no proven channel/"
+                    "knowledge clock for this formal read"
+                ),
+                "affected_scope": "whole_day",
+                "failed_members": [e.get("member_key") for e in _shared_gap],
+                "disposition": "block_new_entries",
+            }
+
     # Listing or all-qualified-price collapse is also a whole-day block:
     # "zero listings" (nothing can be a candidate) and "every bar member
     # failed" are input failures, distinct from a real zero-signal day.

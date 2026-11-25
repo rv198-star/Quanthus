@@ -1274,6 +1274,9 @@ class _FormalStubSourceMap(StubSourceMap):
     def daily_visible_at(self, market_date):
         return (self._clocks.get(market_date) or {}).get("channel")
 
+    def daily_channel_visible_at(self, market_date):
+        return (self._clocks.get(market_date) or {}).get("channel")
+
     class _Pkg:
         def __init__(self, members):
             self.members = members
@@ -1419,3 +1422,54 @@ def test_same_name_member_two_packages_kept_distinct(tmp_path):
     pkg_ids = {m["package_id"] for m in res.raw_history["source_members"]
                if m["member_id"] == rel}
     assert pkg_ids == {"daily-2026-11-23", "daily-2026-11-24"}
+
+
+def test_formal_missing_channel_shared_dep_blocks_day(tmp_path):
+    """R4 second segment: under a formal read a member with NO qualified
+    channel/knowledge proof that is a shared hard dependency (a needed
+    price source) blocks the whole day as SHARED_INPUT_GAP; the producer
+    completion clock is never a silent substitute."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # A daily bar member with NO channel/knowledge proof at all.
+    dm = _formal_daily_member(tmp_path, "2026-11-24")
+    clocks = {"2026-11-24": {
+        "knowledge": None, "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "channel": None,  # no qualified publication/withdrawal event
+    }}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [dm]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_INPUT_GAP"
+
+
+def test_formal_missing_channel_single_member_named_not_day_block(tmp_path):
+    """R4 second segment: a missing channel clock on a NON-shared member
+    is named on coverage.named_input_gaps + flagged late, but does not
+    block the whole day."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # A non-shared daily member (audit.json - not calendar/listing/bar).
+    rel = "payload/dwd_other/day=x/audit.json.parquet"
+    dm = _member(tmp_path, rel, package_id="daily-2026-11-24",
+                 kind="daily", market_date="2026-11-24")
+    clocks = {"2026-11-24": {
+        "knowledge": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "channel": None,
+    }}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [dm]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    assert res.status == "READ"
+    gaps = res.coverage["named_input_gaps"]
+    assert any(g["gap"] == "NO_CHANNEL_VISIBILITY_PROOF" for g in gaps)
+    key = f"daily-2026-11-24::{rel}"
+    assert key in res.coverage["late_visible_members"]

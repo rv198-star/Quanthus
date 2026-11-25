@@ -297,6 +297,20 @@ class SourceMap:
             return ts
         return self.daily_knowledge_at(market_date)
 
+    def daily_channel_visible_at(self, market_date: str):
+        """The QUALIFIED channel-visible instant for a daily package
+        (audit 749 R4 second segment).  Only the named
+        ``qualified_publication_or_withdrawal_chain`` value counts - a
+        package with no purpose-bound publication/withdrawal proof has
+        NO channel clock (returns None, a named gap).  Unlike
+        ``daily_visible_at`` this NEVER falls back to the producer
+        completion / knowledge clock: a formal daily update must not
+        silently admit a member merely because production finished."""
+        e = self._daily_entries.get(market_date) or {}
+        chain = e.get("qualified_publication_or_withdrawal_chain") or {}
+        from quanthus.p12_history.clocks import parse_ts
+        return parse_ts(chain.get("value"))
+
     # ---- verification ---------------------------------------------------------
     def p1_exception_member(self) -> ResolvedMember:
         """The pinned P1 factor-PIT visibility exception ledger member."""

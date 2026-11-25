@@ -63,6 +63,7 @@ def test_b_held_with_serializable_position_facts(assets):
             "holding_sessions": 10,
             "marked_return": "-0.003",
             "prior_strategy_reduction_count": 0,
+            "evidence": {"unit_id": "ledger-snap-74b96148"},
         },
     )
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)

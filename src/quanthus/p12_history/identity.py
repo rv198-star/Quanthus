@@ -86,7 +86,8 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
     )
     id_rows, r2 = _read_table(
         source_map, "dwd_security_identifier",
-        ["security_id", "identifier_namespace", "identifier_value", "venue_id"],
+        ["security_id", "identifier_namespace", "identifier_value", "venue_id",
+         "effective_from", "effective_to", "knowledge_from"],
     )
     list_rows, r3 = _read_table(
         source_map, "dwd_listing",
@@ -140,36 +141,52 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
             if kf is not None and kf > cutoff_ts:
                 continue
         company_industry[cid] = str(i.get("industry_node_id") or "")
-    # Primary coded identifier (the 6-digit exchange code the bar source keys on).
-    # Key-fact conflict handling (audit R4 second pass): two rows naming
-    # different codes for the SAME security + namespace cannot both be
-    # right.  Identical replicas collapse; conflicting values need a named
-    # unique winner (a strictly-later knowledge_from) or the security is
-    # held ambiguous - never a physical-order pick.
-    code_rows_by_security = {}
-    code_conflict_sids = set()
+    # Primary trading identifier (the exchange code the bar source keys
+    # on).  Audit R4 third pass: resolve each (security, namespace) to the
+    # rows effective at the venue's actual open instant AND known by the
+    # decision cutoff.  Mutually-exclusive historical code-changes
+    # (old code effective_to at a boundary, new code effective_from at
+    # the same boundary) leave exactly ONE effective row per namespace -
+    # not a conflict.  Two rows effective at the open in the SAME
+    # namespace are a real key-fact conflict unless a strictly-later
+    # knowledge_from uniquely names the live row; otherwise that
+    # namespace is ambiguous.  Distinct namespaces are distinct facts.
+    mkt_date = market_date
+    code_eff_by_ns = {}
     for i in id_rows:
         sid = str(i.get("security_id") or "")
         ns = str(i.get("identifier_namespace") or "")
         val = str(i.get("identifier_value") or "")
         if not sid or not val:
             continue
-        code_rows_by_security.setdefault((sid, ns), []).append(i)
-    # Resolve each (security, namespace) group independently: identical
-    # replicas collapse to one code; conflicting values in the SAME
-    # namespace need a named unique winner (a strictly-later
-    # knowledge_from) or mark that namespace ambiguous.  Distinct
-    # namespaces are different facts, never a conflict.
+        code_eff_by_ns.setdefault((sid, ns), []).append(i)
     code_by_ns = {}
     conflict_ns = {}
-    for (sid, ns), rows in code_rows_by_security.items():
-        vals = {str(r.get("identifier_value") or "") for r in rows}
+    for (sid, ns), rows in code_eff_by_ns.items():
+        # Rows effective at the open instant and known by the cutoff.
+        effective = []
+        for r in rows:
+            eff_from = parse_ts(r.get("effective_from"))
+            eff_to = parse_ts(r.get("effective_to"))
+            if eff_from is not None and eff_from.date() > mkt_date:
+                continue
+            if eff_to is not None and eff_to.date() <= mkt_date:
+                continue
+            kf = parse_ts(r.get("knowledge_from"))
+            if cutoff_ts is not None and kf is not None and kf > cutoff_ts:
+                continue
+            effective.append(r)
+        if not effective:
+            continue
+        vals = {str(r.get("identifier_value") or "") for r in effective}
         if len(vals) == 1:
             code_by_ns[(sid, ns)] = next(iter(vals))
             continue
+        # Multiple effective rows in one namespace: a strictly-latest
+        # knowledge_from may uniquely name the live code.
         best_kf = None
         winners = []
-        for r in rows:
+        for r in effective:
             kf = parse_ts(r.get("knowledge_from"))
             if best_kf is None or (kf is not None and kf > best_kf):
                 best_kf = kf
@@ -181,32 +198,18 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
             code_by_ns[(sid, ns)] = next(iter(win_vals))
         else:
             conflict_ns.setdefault(sid, set()).add(ns)
-    # The chosen primary code keeps the original "first row in source
-    # order" semantic: the security's first identifier row picks its
-    # namespace, and that namespace's resolved code is used.  If that
-    # namespace is in unresolved conflict there is no named unique code -
-    # the security is isolated rather than order-picked.
-    code_by_security = {}
-    first_ns_by_security = {}
-    for i in id_rows:
-        sid = str(i.get("security_id") or "")
-        ns = str(i.get("identifier_namespace") or "")
-        val = str(i.get("identifier_value") or "")
-        if not sid or not val or sid in first_ns_by_security:
-            continue
-        first_ns_by_security[sid] = ns
-    for sid, ns in first_ns_by_security.items():
-        if ns in conflict_ns.get(sid, set()):
-            code_conflict_sids.add(sid)
-            continue
-        if (sid, ns) in code_by_ns:
-            code_by_security[sid] = code_by_ns[(sid, ns)]
+    # The primary trading code comes from the CN_STOCK_CODE:{venue}
+    # namespace, not an arbitrary first row - so #737 and the P1 key stay
+    # stable regardless of identifier row order or a non-trading
+    # namespace (ISIN / short-name) appearing first.  The venue is known
+    # only after the listing resolves, so the code is chosen inside the
+    # security loop; a security whose chosen namespace is in unresolved
+    # conflict is isolated there.
 
     securities = []
     seen = set()
     dup_ids = set()
     ambiguous_ids = set()
-    ambiguous_ids.update(code_conflict_sids)
     cutoff_ts = decision_cutoff
     open_at_by_venue = open_at_by_venue or {}
     for s in sec_rows:
@@ -305,13 +308,65 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
             # exists keeps its late_visible mark; a pre-cutoff version
             # always wins over a later re-post of the same fact.
             chosen_late = chosen_late and not known
+            # Key-fact conflict among the surviving same-listing_id rows
+            # (audit R4 third pass): same listing_id + same effective
+            # interval + same knowledge clock but a different listing_code
+            # is a real conflict with no named unique winner -> isolate,
+            # identical order.  Equivalent replicas collapse; a strictly-
+            # newer knowledge_from names the unique winner.
+            fact_keys = {
+                (str(q[0].get("listing_code") or ""),
+                 str(q[0].get("board_code") or ""))
+                for q in pool
+            }
+            if len(fact_keys) > 1:
+                best_kf2 = None
+                winners2 = []
+                for q in pool:
+                    kf2 = parse_ts(q[0].get("knowledge_from"))
+                    if best_kf2 is None or (kf2 is not None and kf2 > best_kf2):
+                        best_kf2 = kf2
+                        winners2 = [q]
+                    elif kf2 is not None and best_kf2 is not None and kf2 == best_kf2:
+                        winners2.append(q)
+                win_facts = {
+                    (str(w[0].get("listing_code") or ""),
+                     str(w[0].get("board_code") or ""))
+                    for w in winners2
+                }
+                if best_kf2 is not None and len(winners2) == 1 and len(win_facts) == 1:
+                    chosen_lst, venue, _, chosen_late = winners2[0]
+                    chosen_late = chosen_late and not known
+                else:
+                    ambiguous_ids.add(sid)
+                    continue
             pair = (sid, str(chosen_lst.get("listing_id") or ""))
             if pair in seen:
                 continue
             if sid in seen:
                 dup_ids.add(sid)
                 continue
-            code = code_by_security.get(sid) or str(chosen_lst.get("listing_code") or sid)
+            # Primary trading code: prefer CN_STOCK_CODE:{venue}; fall
+            # back to the generic "code" namespace, then listing_code.
+            # A namespace that is in unresolved conflict must never be
+            # picked by physical order - isolate the security instead.
+            cand_nss = ["CN_STOCK_CODE:" + str(venue), "code"]
+            code = None
+            for ns_c in cand_nss:
+                if ns_c in conflict_ns.get(sid, set()):
+                    continue  # conflicting namespace: skip to next candidate
+                if code_by_ns.get((sid, ns_c)) is not None:
+                    code = code_by_ns[(sid, ns_c)]
+                    break
+            # If a trading-code namespace exists but ALL of them are in
+            # unresolved conflict, the code cannot be proven unique.
+            trading_nss = [n for n in cand_nss if (sid, n) in code_eff_by_ns]
+            if code is None and trading_nss and all(
+                n in conflict_ns.get(sid, set()) for n in trading_nss
+            ):
+                ambiguous_ids.add(sid)
+                continue
+            code = code or str(chosen_lst.get("listing_code") or sid)
             securities.append(
                 SecurityIdentity(
                     security_id=sid,

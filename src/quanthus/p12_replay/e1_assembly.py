@@ -31,7 +31,7 @@ from __future__ import annotations
 import json
 import hashlib
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -418,10 +418,34 @@ def load_e1_scenario(
             raise ValueError(f"e1 scenario.scenario missing {key}")
 
     coverage = doc.get("action_coverage")
+    coverage_path: str | None = None
+    coverage_bytes: bytes | None = None
     if isinstance(coverage, dict) and set(coverage) == {"path"}:
-        coverage = json.loads(Path(coverage["path"]).read_text())
+        coverage_path = str(coverage["path"])
+        # Read the signed wire's actual bytes once: the same bytes feed
+        # the decoded object the run consumes AND the action_use read
+        # evidence below, so the recorded sha256 can never drift from
+        # what this run really opened.
+        coverage_bytes = Path(coverage_path).read_bytes()
+        coverage = json.loads(coverage_bytes)
     if coverage is None:
         raise ValueError("e1 scenario requires action_coverage")
+
+    # Same-load binding: verify the signed action_coverage wire and the
+    # B02/B10 member bytes this replay really opens, then fold that
+    # evidence into p12_evidence.action_use so the issued source_closure
+    # signs THIS run's actual reads (the sealed 78-member intake stays
+    # under b10_files as provenance).  Runs before this read - or with
+    # no action_use block - keep the scenario's original evidence.
+    action_use_evidence = _verify_action_use(
+        scenario, coverage, coverage_path, coverage_bytes
+    )
+    if action_use_evidence:
+        pe = scenario.setdefault("p12_evidence", {})
+        au = dict(pe.get("action_use") or {})
+        au.pop("opened_files", None)
+        au["actual_read"] = action_use_evidence
+        pe["action_use"] = au
 
     smap_doc = doc.get("source_map") or {}
     smap = None
@@ -470,3 +494,120 @@ def load_e1_scenario(
     )
 
 __all__ = ["build_e1_entry", "load_e1_scenario"]
+
+
+# The sealed B10-FILES intake artefact names 78 member keys across both
+# action releases, but a 10-08 replay day only actually opens the members
+# the signed action_coverage authorities reference plus the shared B10
+# use-table members.  These are the keys the coordinator independently
+# read-verified on CN02; the rest of the sealed list stays provenance,
+# never this run's claim.
+_ACTION_USE_READ_KEYS: tuple[str, ...] = (
+    "B02:2026-11-25/quanthus-p10-action-supply/sse/batch-02-spdb-r2/RESULT.json",
+    "B02:2026-11-25/quanthus-p10-action-supply/sse/batch-02-spdb-r2/raw/1225416710.pdf",
+    "B02:2026-11-25/quanthus-p10-action-supply/sse/batch-02-spdb-r2/security-windows.json",
+    "B02:MANIFEST.json",
+    "B10:2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/ACCEPTED-OCTOBER-ACTION-COVERAGE.v2.json",
+    "B10:2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/SOURCE-MEMBERS.json",
+    "B10:2026-11-24/quanthus-p11-rule-release/october-action-feasibility-intake/terms-740-897-v2/WINDOW-USE.json",
+    "B10:2026-11-25/quanthus-p10-action-supply/szse/batch-pilots-2x15-october-v2/RESULT.json",
+    "B10:MANIFEST.json",
+    "B10:ROUTES.json",
+)
+
+
+def _verify_action_use(
+    scenario: dict,
+    action_coverage: dict,
+    coverage_path: str | None,
+    coverage_bytes: bytes | None,
+) -> dict:
+    """Bind the signed action_coverage and its real member reads into
+    p12_evidence.action_use before the run consumes them.
+
+    The scenario's static ``action_use.opened_files`` prose claims every
+    sealed B10-FILES member was opened by this run, which the reader never
+    did.  This replaces that claim with THIS load's real evidence: the
+    signed wire's own path+sha (recomputed over the same bytes that are
+    decoded), and per-member path/sha256/read_at for the B02/B10 members
+    the coverage authorities reference.  A byte that fails its declared
+    digest is a named block, never a silent pass.
+    """
+    au = (scenario.get("p12_evidence") or {}).get("action_use")
+    if not isinstance(au, dict):
+        return {}
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    out: dict[str, Any] = {"verified_at": now}
+    if coverage_path is not None and coverage_bytes is not None:
+        out["signed_action_coverage"] = {
+            "uri": coverage_path,
+            "sha256": "sha256:" + hashlib.sha256(coverage_bytes).hexdigest(),
+            "read_at": now,
+        }
+    declared: dict[str, list[str]] = {}
+
+    def _decl(digest: Any, role: str) -> None:
+        if isinstance(digest, str) and digest.startswith("sha256:"):
+            declared.setdefault(digest.removeprefix("sha256:"), []).append(role)
+
+    for art in action_coverage.get("verified_artifacts") or ():
+        if not isinstance(art, dict):
+            continue
+        auth = art.get("authority") or {}
+        for role in ("accepted_sha256", "manifest_sha256", "result_sha256"):
+            _decl(auth.get(role), role)
+        for row in art.get("rows") or ():
+            if isinstance(row, dict):
+                _decl(row.get("implementation_sha256"), "implementation_sha256")
+        _decl(art.get("digest"), "artifact_digest")
+    for reg in action_coverage.get("registers") or ():
+        if isinstance(reg, dict):
+            _decl(reg.get("sha256"), "register_sha256")
+
+    b10_files = au.get("b10_files") or {}
+    lookup_uri = b10_files.get("uri")
+    reads: list[dict[str, Any]] = []
+    missing: list[str] = []
+    mismatched: list[str] = []
+    if isinstance(lookup_uri, str) and Path(lookup_uri).is_file():
+        lookup = json.loads(Path(lookup_uri).read_text())
+        files = lookup.get("files") or {}
+        for key in _ACTION_USE_READ_KEYS:
+            ent = files.get(key)
+            if not isinstance(ent, dict):
+                missing.append(key)
+                continue
+            ap = ent.get("abs_path")
+            declared_sha = ent.get("declared_sha256") or ent.get("sha256") or ""
+            read_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            try:
+                data = Path(ap).read_bytes()
+            except OSError:
+                missing.append(key)
+                continue
+            actual = hashlib.sha256(data).hexdigest()
+            verify_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            ok = actual == declared_sha
+            if not ok:
+                mismatched.append(key)
+            reads.append({
+                "member_key": key,
+                "abs_path": ap,
+                "sha256": actual,
+                "sha_match": ok,
+                "declared_roles": declared.get(actual, []),
+                "read_at": read_at,
+                "verify_at": verify_at,
+            })
+    else:
+        missing.extend(_ACTION_USE_READ_KEYS)
+    out["actual_reads"] = reads
+    out["actual_read_count"] = len(reads)
+    if missing:
+        out["unread_members"] = missing
+    if mismatched:
+        raise ValueError(
+            "e1 action_use member sha mismatch: " + ", ".join(mismatched)
+        )
+    return out
+

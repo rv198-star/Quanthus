@@ -638,3 +638,140 @@ def test_scenario_replay_exclusion_used_when_no_explicit_pin(tmp_path, monkeypat
     _runner, reader = asm.load_e1_scenario(doc, repo_root=tmp_path)
     reader(T, CUTOFF)
     assert captured["replay_exclusion"] == pin
+
+
+def _action_use_scenario(tmp_path):
+    """Scenario + lookup + member files mirroring the real 10-08 binding."""
+    import hashlib
+    import json as _json
+
+    member = tmp_path / "member.bin"
+    member_bytes = b"real member bytes"
+    member.write_bytes(member_bytes)
+    member_sha = hashlib.sha256(member_bytes).hexdigest()
+
+    lookup = tmp_path / "B10-FILES.json"
+    lookup.write_text(_json.dumps({
+        "files": {
+            "B02:MANIFEST.json": {
+                "abs_path": str(member),
+                "sha256": member_sha,
+                "declared_sha256": member_sha,
+            }
+        }
+    }))
+
+    coverage = {
+        "default_state": "unknown",
+        "registers": [{"sha256": "sha256:" + "1" * 64}],
+        "verified_artifacts": [{
+            "authority": {"manifest_sha256": "sha256:" + member_sha},
+            "rows": [],
+            "digest": "sha256:" + "2" * 64,
+        }],
+        "securities": [],
+        "window_evidence": [],
+    }
+    coverage_path = tmp_path / "signed-action-coverage.json"
+    coverage_bytes = _json.dumps(coverage).encode()
+    coverage_path.write_bytes(coverage_bytes)
+    coverage_sha = hashlib.sha256(coverage_bytes).hexdigest()
+
+    doc = {
+        "schema_version": "p12.e1-scenario.v1",
+        "scenario": {
+            "scenario_id": "spdb-20261008",
+            "account_namespace": "ns",
+            "package_id": "pkg",
+            "manifest_sha256": "sha256:" + "c" * 64,
+            "account": {"account_id": "A"},
+            "policy": {},
+            "facts_template": {},
+            "snapshot_id": "s",
+            "snapshot_manifest_digest": "sha256:" + "d" * 64,
+            "p12_evidence": {
+                "action_use": {
+                    "opened_files": "78 originals opened+sha-verified this run",
+                    "b10_files": {"uri": str(lookup), "sha256": "x" * 64,
+                                  "provenance": "sealed_intake"},
+                }
+            },
+        },
+        "action_coverage": {"path": str(coverage_path)},
+    }
+    doc_path = tmp_path / "scenario.json"
+    doc_path.write_text(_json.dumps(doc))
+    return doc_path, member_sha, coverage_sha
+
+
+def test_load_e1_scenario_binds_actual_action_use(tmp_path, monkeypatch):
+    from quanthus.p12_replay import e1_assembly as asm
+
+    monkeypatch.setattr(
+        _e1_rt, "load_e1_rule_assets", lambda root: {"assets": "fake"}
+    )
+    doc_path, member_sha, coverage_sha = _action_use_scenario(tmp_path)
+
+    captured = {}
+
+    def fake_read(day, cutoff, *, holdings, pending, source_map, replay_exclusion=None):
+        return _Result()
+
+    monkeypatch.setattr(asm, "read_history", fake_read)
+    _runner, reader = asm.load_e1_scenario(doc_path, repo_root=tmp_path)
+    reader(T, CUTOFF)
+    ctx = _runner._context_supplier(T)
+    au = ctx.p12_evidence["action_use"]
+    assert "opened_files" not in au
+    ar = au["actual_read"]
+    assert ar["signed_action_coverage"]["sha256"] == "sha256:" + coverage_sha
+    keys = [r["member_key"] for r in ar["actual_reads"]]
+    assert "B02:MANIFEST.json" in keys
+    row = next(r for r in ar["actual_reads"] if r["member_key"] == "B02:MANIFEST.json")
+    assert row["sha256"] == member_sha and row["sha_match"] is True
+    assert "manifest_sha256" in row["declared_roles"]
+    assert row["read_at"] and row["verify_at"]
+    assert ar["actual_read_count"] == len(ar["actual_reads"])
+    # Unlisted members are honestly recorded, not silently dropped.
+    assert "B10:ROUTES.json" in ar.get("unread_members", ())
+
+
+def test_load_e1_scenario_action_use_member_mismatch_blocks(tmp_path, monkeypatch):
+    import hashlib
+    import json as _json
+
+    import pytest as _pt
+
+    from quanthus.p12_replay import e1_assembly as asm
+
+    monkeypatch.setattr(
+        _e1_rt, "load_e1_rule_assets", lambda root: {"assets": "fake"}
+    )
+    member = tmp_path / "member.bin"
+    member.write_bytes(b"tampered")
+    lookup = tmp_path / "B10-FILES.json"
+    lookup.write_text(_json.dumps({
+        "files": {
+            "B02:MANIFEST.json": {
+                "abs_path": str(member),
+                "sha256": "f" * 64,
+                "declared_sha256": "f" * 64,
+            }
+        }
+    }))
+    doc = {
+        "schema_version": "p12.e1-scenario.v1",
+        "scenario": {
+            "scenario_id": "s", "account_namespace": "n", "package_id": "p",
+            "manifest_sha256": "sha256:" + "c" * 64,
+            "account": {"account_id": "A"}, "policy": {},
+            "facts_template": {}, "snapshot_id": "s",
+            "snapshot_manifest_digest": "sha256:" + "d" * 64,
+            "p12_evidence": {"action_use": {"b10_files": {"uri": str(lookup)}}},
+        },
+        "action_coverage": {"signed": []},
+    }
+    doc_path = tmp_path / "scenario.json"
+    doc_path.write_text(_json.dumps(doc))
+    with _pt.raises(ValueError, match="action_use member sha mismatch"):
+        asm.load_e1_scenario(doc_path, repo_root=tmp_path)

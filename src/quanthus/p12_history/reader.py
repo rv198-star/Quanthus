@@ -10,6 +10,7 @@ carried, with UNKNOWN where coverage is unproven.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
@@ -861,14 +862,37 @@ def read_history(
     # Distinct from a real zero-bar day (members READ, just no rows).
     if day_block is None:
         bar_reads = bar_cov.get("reads") or []
+        # Only members that can actually project into THIS T's window
+        # count as declared price supply (audit R4 second pass): a member
+        # is window-relevant when its observation month intersects the
+        # needed sessions (Base) or its market_date is a needed session
+        # (Daily).  Members pinned only for OTHER windows are not supply
+        # for this T - a map that declares only out-of-window members
+        # still has no usable price input and must block.
+        sessions_set = set(sessions_sorted)
+        months_needed = {(s.year, s.month) for s in sessions_sorted}
+        def _bar_member_in_window(m):
+            if "interval_size=1d" not in m.member_id:
+                return False
+            if m.market_date is not None:
+                return _date_iso(m.market_date) in sessions_set
+            ym = re.search(
+                r"observation_start_year=(\d{4})/observation_start_month=(\d+)",
+                m.member_id,
+            )
+            if ym:
+                return (int(ym.group(1)), int(ym.group(2))) in months_needed
+            # No decodable window key: keep it as a conservative declared
+            # member rather than silently dropping a possible supplier.
+            return True
         bar_members = [
             m for m in smap.base_members("dwd_security_bar")
-            if "interval_size=1d" in m.member_id
+            if _bar_member_in_window(m)
         ]
         bar_members += [
             m for d in smap.daily_open_days()
             for m in ([smap.daily_member(d, "dwd_security_bar")] or [])
-            if m is not None
+            if m is not None and _bar_member_in_window(m)
         ]
         # No bar member declared at all: the pool has no price input -
         # a named shared-input block, distinct from a real zero-signal day

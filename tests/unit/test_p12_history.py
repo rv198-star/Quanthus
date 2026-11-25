@@ -960,3 +960,107 @@ def test_p1_unverified_blocks_factor_dependent_action(tmp_path):
         for e in sec["exceptions"])
     # Coverage still records the real member read state.
     assert res.coverage["p1_exceptions"]["p1_unverified"] is True
+
+
+def test_out_of_window_only_price_member_blocks_day(tmp_path):
+    """R4-second: only out-of-window Daily/Base members declared -> SHARED_PRICE_UNAVAILABLE."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    members.pop("dwd_security_bar", None)
+    # A Daily member pinned ONLY for an out-of-window date (11-23 for an
+    # Oct-8 T).  Its member_id carries the 1d interval tag so it is a real
+    # declared price member - just not for THIS window.
+    rel_n = "daily/dwd_security_bar/interval_size=1d/market_date=2026-11-23/part-0.parquet"
+    _write(tmp_path / rel_n, _bar_table([date(2026, 11, 23)]))
+    class _NovDaily(StubSourceMap):
+        def daily_open_days(self):
+            return ["2026-11-23"]
+        def daily_member(self, day, frag):
+            m = _member(tmp_path, rel_n, package_id="daily-2026-11-23", kind="daily", market_date="2026-11-23")
+            return m if frag in m.member_id else None
+    sm = _NovDaily(members, {})
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=sm, purpose=reader_mod.REPLAY_AS_OBSERVED,
+        replay_exclusion=_write_exclusion(tmp_path),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_PRICE_UNAVAILABLE"
+
+
+def test_in_window_bad_out_window_good_price_blocks(tmp_path):
+    """R4-second: in-window member all-bad-sha stays blocked even with a good out-of-window member."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=10/part-0.parquet"
+    _write(tmp_path / rel, _bar_table(_sessions(61, end=date(2026, 10, 8))))
+    bad = _member(tmp_path, rel, declared_sha256="sha256:" + "a" * 64)
+    grel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    _write(tmp_path / grel, _bar_table(_sessions(5, end=date(2026, 11, 24))))
+    good = _member(tmp_path, grel)
+    members["dwd_security_bar"] = [bad, good]
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+        replay_exclusion=_write_exclusion(tmp_path),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_PRICE_UNAVAILABLE"
+
+
+def test_qualified_empty_pool_stays_read(tmp_path):
+    """R4-second: qualified in-window price member + retired listing (empty pool) -> READ, not a block."""
+    smap = _build_map(tmp_path)
+    lp = tmp_path / "listing.parquet"
+    pq.write_table(_listing_table_custom([
+        ("security-600000", "listing-600000", "SSE",
+         datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 10, 1, tzinfo=UTC),
+         datetime(2026, 1, 1, tzinfo=UTC)),
+    ]), lp)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=10/part-0.parquet"
+    _write(tmp_path / rel, _bar_table(_sessions(61, end=date(2026, 10, 8))))
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+        replay_exclusion=_write_exclusion(tmp_path),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+    assert res.coverage["universe"]["pool_size"] == 0
+
+
+def test_same_listing_id_same_clock_conflict_isolated(tmp_path):
+    """R4-second: same listing_id/interval/clock but conflicting code -> ambiguous isolation, order-independent."""
+    def run(id_rows):
+        smap = _build_map(tmp_path)
+        lp = tmp_path / "listing.parquet"
+        pq.write_table(_listing_table_custom([
+            ("security-600000", "listing-600000", "SSE",
+             datetime(2026, 1, 1, tzinfo=UTC), None, datetime(2026, 7, 18, tzinfo=UTC)),
+        ]), lp)
+        members = smap._members_by_table
+        members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+        ip = tmp_path / "dwd_security_identifier.parquet"
+        pq.write_table(pa.table({
+            "security_id": [r[0] for r in id_rows],
+            "identifier_namespace": [r[1] for r in id_rows],
+            "identifier_value": [r[2] for r in id_rows],
+            "venue_id": [r[3] for r in id_rows],
+        }), ip)
+        members["dwd_security_identifier"] = [_member(tmp_path, "dwd_security_identifier.parquet")]
+        return reader_mod.read_history(
+            date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+            source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+            replay_exclusion=_write_exclusion(tmp_path),
+            observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    i_a = ("security-600000", "code", "300308", "SSE")
+    i_b = ("security-600000", "code", "300309", "SSE")
+    for rows in ([i_a, i_b], [i_b, i_a]):
+        r = run(rows)
+        assert "security-600000" in r.coverage["universe"]["ambiguous_security_ids"]
+        assert all(
+            x["identity"]["security_id"] != "security-600000"
+            for x in r.raw_history["securities"])

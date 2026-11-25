@@ -141,25 +141,60 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
                 continue
         company_industry[cid] = str(i.get("industry_node_id") or "")
     # Primary coded identifier (the 6-digit exchange code the bar source keys on).
-    code_by_security = {}
+    # Key-fact conflict handling (audit R4 second pass): two rows naming
+    # different codes for the SAME security + namespace cannot both be
+    # right.  Identical replicas collapse; conflicting values need a named
+    # unique winner (a strictly-later knowledge_from) or the security is
+    # held ambiguous - never a physical-order pick.
+    code_rows_by_security = {}
+    code_conflict_sids = set()
     for i in id_rows:
         sid = str(i.get("security_id") or "")
         ns = str(i.get("identifier_namespace") or "")
         val = str(i.get("identifier_value") or "")
         if not sid or not val:
             continue
-        code_by_security.setdefault(sid, val)
+        code_rows_by_security.setdefault(sid, []).append(i)
+    code_by_security = {}
+    for sid, rows in code_rows_by_security.items():
+        vals = {str(r.get("identifier_value") or "") for r in rows}
+        if len(vals) == 1:
+            code_by_security[sid] = next(iter(vals))
+            continue
+        # Conflicting codes for one security: a strictly-newest
+        # knowledge_from may uniquely name the live code; equal or missing
+        # clocks leave no named winner -> ambiguous isolation.
+        best_kf = None
+        winners = []
+        for r in rows:
+            kf = parse_ts(r.get("knowledge_from"))
+            if best_kf is None or (kf is not None and kf > best_kf):
+                best_kf = kf
+                winners = [r]
+            elif kf is not None and best_kf is not None and kf == best_kf:
+                winners.append(r)
+        win_vals = {str(w.get("identifier_value") or "") for w in winners}
+        if best_kf is not None and len(winners) == 1 and len(win_vals) == 1:
+            code_by_security[sid] = next(iter(win_vals))
+        else:
+            code_conflict_sids.add(sid)
 
     securities = []
     seen = set()
     dup_ids = set()
     ambiguous_ids = set()
+    ambiguous_ids.update(code_conflict_sids)
     cutoff_ts = decision_cutoff
     open_at_by_venue = open_at_by_venue or {}
     for s in sec_rows:
         sid = str(s.get("security_id") or "")
         itype = str(s.get("instrument_type") or "")
         if not sid or itype != COMMON_EQUITY:
+            continue
+        # A key-fact conflict with no named unique winner isolates the
+        # security from the new-candidate pool (audit R4 second pass) -
+        # it is still named on the ambiguous list for the rule.
+        if sid in ambiguous_ids:
             continue
         cid = str(s.get("company_id") or "")
         # Pick the listing row effective at the VENUE's actual open instant

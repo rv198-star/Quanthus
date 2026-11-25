@@ -1,111 +1,111 @@
 {
- "schema_version": "quanthus.p11-d1b.release-manifest.v2",
- "manifest_id": "p11-d1b-fixed-rule-20261124-v2",
- "purpose": "P11 fixed-rule three-piece set under the frozen P12 interface; rule release manifest, per-action simulated-use receipts, machine invalidation/position policy. Engineering + adoption are separately gated; this file grants no daily_adopted.",
- "strategy": {
-  "card_path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
-  "card_sha256": "7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
-  "strategy_id": "candidate.p4-trend-risk",
-  "strategy_version": "1.0.1",
-  "registry_key": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
-  "note": "card bound to 2020-2021 research; a separate versioned proposal is required for daily simulated use; preserved original."
- },
- "code_entry": {
-  "seam": "src/quanthus/product_daily/recommendation/rule_seam.py",
-  "producer": "src/quanthus/product_daily/recommendation/producer.py",
-  "expert_runner": "src/quanthus/expert_strategy/runner.py",
-  "event_scan": "src/quanthus/event_library/scan.py",
-  "entry_seam": "src/quanthus/product_daily/risk.py",
-  "trend_producer": "src/quanthus/expert_evaluation/experts/trend_stability.py",
-  "context_builder": "src/quanthus/expert_strategy/runner.py:build_formal_expert_context",
-  "code_commit": "155d341be5289fac7bf893a2ebdddc9f425ad6be",
-  "code_tree": "59e151f7802c243f9c1230552500fbc6a8c0e07e",
-  "publish_path": "src/quanthus/product_daily/recommendation/publish.py",
-  "contracts_path": "src/quanthus/product_daily/recommendation/contracts.py",
-  "runtime_identity": "src/quanthus/product_daily/recommendation/runtime_identity.py",
-  "release_loader": "src/quanthus/product_daily/recommendation/release_contract.py"
- },
- "input_closure": {
-  "pointer": "cn02:/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5/CURRENT_DAILY_CORE_BASE24.json",
-  "kind": "cn02_base24_daily_cycle_v1",
-  "selected_scope": "core",
-  "consumable_intervals": [
-   "1d"
-  ],
-  "price_basis": "none",
-  "industry_source": "static non-PIT concentration mapping (versioned, named)",
-  "industry_mapping": {
-   "path": "config/p3-temporary-industry-mapping.v1.json",
-   "version": "1.0.0",
-   "binding_state": "pending",
-   "sha256": null,
-   "note": "versioned named mapping pending P10 confirmation; blocked until a real sha256 is bound"
+  "schema_version": "quanthus.p11-d1b.release-manifest.v2",
+  "manifest_id": "p11-d1b-fixed-rule-20261124-v2",
+  "purpose": "P11 fixed-rule three-piece set under the frozen P12 interface; rule release manifest, per-action simulated-use receipts, machine invalidation/position policy. Engineering + adoption are separately gated; this file grants no daily_adopted.",
+  "strategy": {
+    "card_path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+    "card_sha256": "7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+    "strategy_id": "candidate.p4-trend-risk",
+    "strategy_version": "1.0.1",
+    "registry_key": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+    "note": "card bound to 2020-2021 research; a separate versioned proposal is required for daily simulated use; preserved original."
   },
-  "history_window_sessions": 60,
-  "calendar": "core trading calendar",
-  "feature_registry": {
-   "path": "config/p3-baseline-features.research.v1.json",
-   "sha256": "sha256:f336c21b4724b1e0c0a52faca7ab3a725831437d6aea9a945ee52ba0f884fbd9"
+  "code_entry": {
+    "seam": "src/quanthus/product_daily/recommendation/rule_seam.py",
+    "producer": "src/quanthus/product_daily/recommendation/producer.py",
+    "expert_runner": "src/quanthus/expert_strategy/runner.py",
+    "event_scan": "src/quanthus/event_library/scan.py",
+    "entry_seam": "src/quanthus/product_daily/risk.py",
+    "trend_producer": "src/quanthus/expert_evaluation/experts/trend_stability.py",
+    "context_builder": "src/quanthus/expert_strategy/runner.py:build_formal_expert_context",
+    "code_commit": "51449c77db0de6c2060563614d24912677030481",
+    "code_tree": "7c800e6d5e89fa9373ef0a439508c4ddfc56f906",
+    "publish_path": "src/quanthus/product_daily/recommendation/publish.py",
+    "contracts_path": "src/quanthus/product_daily/recommendation/contracts.py",
+    "runtime_identity": "src/quanthus/product_daily/recommendation/runtime_identity.py",
+    "release_loader": "src/quanthus/product_daily/recommendation/release_contract.py"
   },
-  "features": [
-   "price.rsi14",
-   "risk.realized_volatility20",
-   "price.total_return_index",
-   "price.sma20",
-   "price.sma60",
-   "price.momentum20",
-   "price.prior_high20"
-  ],
-  "adjustment_factor": {
-   "table": "dwd_adjustment_factor",
-   "note": "required for total_return_index; missing factor -> held/exit blocked, not default"
+  "input_closure": {
+    "pointer": "cn02:/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5/CURRENT_DAILY_CORE_BASE24.json",
+    "kind": "cn02_base24_daily_cycle_v1",
+    "selected_scope": "core",
+    "consumable_intervals": [
+      "1d"
+    ],
+    "price_basis": "none",
+    "industry_source": "static non-PIT concentration mapping (versioned, named)",
+    "industry_mapping": {
+      "path": "config/p3-temporary-industry-mapping.v1.json",
+      "version": "1.0.0",
+      "binding_state": "pending",
+      "sha256": null,
+      "note": "versioned named mapping pending P10 confirmation; blocked until a real sha256 is bound"
+    },
+    "history_window_sessions": 60,
+    "calendar": "core trading calendar",
+    "feature_registry": {
+      "path": "config/p3-baseline-features.research.v1.json",
+      "sha256": "sha256:f336c21b4724b1e0c0a52faca7ab3a725831437d6aea9a945ee52ba0f884fbd9"
+    },
+    "features": [
+      "price.rsi14",
+      "risk.realized_volatility20",
+      "price.total_return_index",
+      "price.sma20",
+      "price.sma60",
+      "price.momentum20",
+      "price.prior_high20"
+    ],
+    "adjustment_factor": {
+      "table": "dwd_adjustment_factor",
+      "note": "required for total_return_index; missing factor -> held/exit blocked, not default"
+    },
+    "consumer_time_contract": {
+      "published_at": "consumer declared",
+      "available_at": "<= decision_at",
+      "revision": "versioned",
+      "note": "5m excluded; published/available/revision contract pending from P10"
+    },
+    "consumer_binding_v2": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json"
   },
-  "consumer_time_contract": {
-   "published_at": "consumer declared",
-   "available_at": "<= decision_at",
-   "revision": "versioned",
-   "note": "5m excluded; published/available/revision contract pending from P10"
+  "knowledge_cutoff": "consumer decision_cutoff declared per batch (prospective 22:30+08 pre-registered; never max(available_at))",
+  "adoption_state": "proposed",
+  "daily_adopted": false,
+  "real_account_limits": null,
+  "expert_binding": {
+    "card_sha256": "sha256:7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+    "trend_expert_config_sha256": "sha256:938970cc2ca9b4d317c4cccef2e90e1495d15db94897f39d0da597ebd6250015",
+    "trend_eval_spec_sha256": "sha256:44b1d5e9eb5721391dbf012f2d74fd24446a3ba042b3f897db3d5fb88fb2e3f3",
+    "position_eval_spec_sha256": "sha256:a361dd05ab64dfae6d190bb37bc165a71cbd3d4e55b6a64135fb5fcbf3a79f3d"
   },
-  "consumer_binding_v2": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json"
- },
- "knowledge_cutoff": "consumer decision_cutoff declared per batch (prospective 22:30+08 pre-registered; never max(available_at))",
- "adoption_state": "proposed",
- "daily_adopted": false,
- "real_account_limits": null,
- "expert_binding": {
-  "card_sha256": "sha256:7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
-  "trend_expert_config_sha256": "sha256:938970cc2ca9b4d317c4cccef2e90e1495d15db94897f39d0da597ebd6250015",
-  "trend_eval_spec_sha256": "sha256:44b1d5e9eb5721391dbf012f2d74fd24446a3ba042b3f897db3d5fb88fb2e3f3",
-  "position_eval_spec_sha256": "sha256:a361dd05ab64dfae6d190bb37bc165a71cbd3d4e55b6a64135fb5fcbf3a79f3d"
- },
- "prospective_clock": {
-  "purpose": "P11 fixed-rule prospective daily candidate",
-  "decision_deadline": "pre-registered per batch (DAY1 22:30+08)",
-  "source_clock": "actual source available_at kept at source precision",
-  "received": "actual intake received_at",
-  "first_read": "actual first read_at",
-  "verified": "actual verified_at"
- },
- "note": "60-session minimum for sma60/base-exit; consumer published/available/revision contract pending from P10",
- "held_reduction_wire": {
-  "wire_version": "p12.decision-set.v2",
-  "reduce_denominator": "locked_cycle_budget",
-  "consumer_capability": "versioned p12-consumer-binding.v1 object bound to P12 commit a676de97: consumer_schema=p12.decision-set.v2 + real source_commit/tree + per-file sha256 pin + capabilities.supports_held_reduction_v2 + single-call (MarketDecisionSet, wire_digest) with the seam account_digest carried out",
-  "missing_consumer_disposition": "refused or display_only",
-  "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set, bound at commit a676de97); caller bools/dicts, unpinned bindings, stale-commit trees and old field-dropping loaders are all refused before write. mode=simulation with purpose=historical_replay; the binding digest is p12_package_digests=digest(_package_content(validated)) - the account ConfigurationBinding identity - while the raw-byte wire digest is kept separately on p12_wire_digests."
- },
- "release_bindings": {
-  "machine_policy": {
-   "path": "config/research/r11/d1b-20261124/machine-policy.v2.json",
-   "sha256": "sha256:b974af06e219235e00e81b81137e1b7d2e137d0e11b44b3caaac0eb032351033"
+  "prospective_clock": {
+    "purpose": "P11 fixed-rule prospective daily candidate",
+    "decision_deadline": "pre-registered per batch (DAY1 22:30+08)",
+    "source_clock": "actual source available_at kept at source precision",
+    "received": "actual intake received_at",
+    "first_read": "actual first read_at",
+    "verified": "actual verified_at"
   },
-  "action_receipts": {
-   "path": "config/research/r11/d1b-20261124/action-receipts.v1.json",
-   "sha256": "sha256:5e015303ce55a60684d911a05ed05a07f76e06001a827382ab80a6855fa237c8"
+  "note": "60-session minimum for sma60/base-exit; consumer published/available/revision contract pending from P10",
+  "held_reduction_wire": {
+    "wire_version": "p12.decision-set.v2",
+    "reduce_denominator": "locked_cycle_budget",
+    "consumer_capability": "versioned p12-consumer-binding.v1 object bound to P12 commit a676de97: consumer_schema=p12.decision-set.v2 + real source_commit/tree + per-file sha256 pin + capabilities.supports_held_reduction_v2 + single-call (MarketDecisionSet, wire_digest) with the seam account_digest carried out",
+    "missing_consumer_disposition": "refused or display_only",
+    "note": "executable reduce requires the pinned P12 v2 loader (quanthus.p12_daily.decision_loader.load_decision_set, bound at commit a676de97); caller bools/dicts, unpinned bindings, stale-commit trees and old field-dropping loaders are all refused before write. mode=simulation with purpose=historical_replay; the binding digest is p12_package_digests=digest(_package_content(validated)) - the account ConfigurationBinding identity - while the raw-byte wire digest is kept separately on p12_wire_digests."
   },
-  "consumer": {
-   "path": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json",
-   "sha256": "sha256:ba7bbd0930d77a7f23d30858b985343d3bc48d789bbbc4d77330aa1ce827a0c0"
+  "release_bindings": {
+    "machine_policy": {
+      "path": "config/research/r11/d1b-20261124/machine-policy.v2.json",
+      "sha256": "sha256:b974af06e219235e00e81b81137e1b7d2e137d0e11b44b3caaac0eb032351033"
+    },
+    "action_receipts": {
+      "path": "config/research/r11/d1b-20261124/action-receipts.v1.json",
+      "sha256": "sha256:5e015303ce55a60684d911a05ed05a07f76e06001a827382ab80a6855fa237c8"
+    },
+    "consumer": {
+      "path": "config/research/r11/d1b-20261124/p12-consumer.daily-advice-package.v2.json",
+      "sha256": "sha256:ba7bbd0930d77a7f23d30858b985343d3bc48d789bbbc4d77330aa1ce827a0c0"
+    }
   }
- }
 }

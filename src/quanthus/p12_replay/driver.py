@@ -499,6 +499,47 @@ def main(argv=None) -> int:
             "expected_sha256": EXPECTED_EXCLUSION_SHA256,
             "detail": f"exclusion file cannot be read: {exc}",
         }
+    # The verified frozen {path, sha256} is THE binding this entry passes
+    # to read_history.  A scenario that pins a different self-consistent
+    # pair is refused HERE - at the same gate as the file check and
+    # BEFORE load_window opens any market member - so a conflicting
+    # binding never reaches the reader through the production entry.
+    if exclusion_block["status"] != "blocked" and args.e1_scenario is not None:
+        try:
+            _scen_doc = json.loads(Path(args.e1_scenario).read_text())
+            _scen_pin = _scen_doc.get("replay_exclusion")
+        except Exception:
+            _scen_pin = None
+        if isinstance(_scen_pin, str):
+            _scen_pin = {"path": _scen_pin}
+        if (
+            isinstance(_scen_pin, dict)
+            and _scen_pin.get("path") is not None
+            and _scen_pin.get("sha256") is not None
+            and (
+                str(_scen_pin.get("path")) != str(exclusion_path)
+                or str(_scen_pin.get("sha256")) != EXPECTED_EXCLUSION_SHA256
+            )
+        ):
+            exclusion_block = {
+                "status": "blocked",
+                "reason": "REPLAY_EXCLUSION_BINDING_CONFLICT",
+                "config_path": str(args.e1_scenario),
+                "scenario_binding": {
+                    "path": str(_scen_pin.get("path")),
+                    "sha256": str(_scen_pin.get("sha256")),
+                },
+                "verified_binding": {
+                    "path": str(exclusion_path),
+                    "sha256": EXPECTED_EXCLUSION_SHA256,
+                },
+                "detail": (
+                    "the scenario pins a #737 exclusion that differs from "
+                    "the frozen binding the entry verified; the replay "
+                    "refuses to read against an alternate pair before any "
+                    "member is opened"
+                ),
+            }
     if exclusion_block["status"] == "blocked":
         args.state_dir.mkdir(parents=True, exist_ok=True)
         (args.state_dir / "replay-exclusion-block.json").write_text(
@@ -563,55 +604,15 @@ def main(argv=None) -> int:
         try:
             from quanthus.p12_replay.e1_assembly import load_e1_scenario
 
-            # The formal entry passes the SAME frozen #737 binding it
-            # already verified at the gate EXPLICITLY to read_history -
+            # The entry passes the SAME frozen {path, sha256} it verified
+            # at the pre-load_window gate EXPLICITLY to read_history -
             # never let a scenario or the process env point the read at a
-            # different self-consistent path/digest pair.  A conflicting
-            # scenario binding is a named block BEFORE any market read; a
-            # matching scenario pin is accepted verbatim.
+            # different self-consistent pair.  A conflicting scenario pin
+            # was already refused at that gate before any member opened.
             _verified_pin = {
                 "path": str(exclusion_path),
                 "sha256": EXPECTED_EXCLUSION_SHA256,
             }
-            try:
-                _scen_doc = json.loads(Path(args.e1_scenario).read_text())
-                _scen_pin = _scen_doc.get("replay_exclusion")
-            except Exception:
-                _scen_pin = None
-            if isinstance(_scen_pin, str):
-                _scen_pin = {"path": _scen_pin}
-            if (
-                isinstance(_scen_pin, dict)
-                and _scen_pin.get("path") is not None
-                and _scen_pin.get("sha256") is not None
-                and (
-                    str(_scen_pin.get("path")) != _verified_pin["path"]
-                    or str(_scen_pin.get("sha256")) != _verified_pin["sha256"]
-                )
-            ):
-                e1_block = {
-                    "status": "blocked",
-                    "reason": "REPLAY_EXCLUSION_BINDING_CONFLICT",
-                    "config_path": str(args.e1_scenario),
-                    "scenario_binding": {
-                        "path": str(_scen_pin.get("path")),
-                        "sha256": str(_scen_pin.get("sha256")),
-                    },
-                    "verified_binding": _verified_pin,
-                    "detail": (
-                        "the scenario pins a #737 exclusion that differs "
-                        "from the frozen binding the entry verified; the "
-                        "replay refuses to read against an alternate pair "
-                        "before any member is opened"
-                    ),
-                }
-                args.state_dir.mkdir(parents=True, exist_ok=True)
-                (args.state_dir / "e1-assembly-block.json").write_text(
-                    json.dumps(e1_block, ensure_ascii=False, indent=1)
-                )
-                print(json.dumps({"e1_assembly_blocked": e1_block}, ensure_ascii=False))
-                return 2
-
             e1_runner, e1_history_reader = load_e1_scenario(
                 args.e1_scenario,
                 repo_root=Path(__file__).resolve().parents[3],

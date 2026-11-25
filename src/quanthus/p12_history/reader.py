@@ -435,7 +435,6 @@ def read_history(
     # the real knowledge clock is used verbatim as before.
     formal = purpose == FORMAL_DAILY_UPDATE
     formal_inadmissible_keys = set()
-    _day_qualified_price_members = {}
     for day in smap.daily_open_days():
         if day > market_date.isoformat():
             continue
@@ -483,13 +482,6 @@ def read_history(
                     formal_inadmissible_keys.add(_member_key(m))
             if rejected_no_proof and formal:
                 formal_inadmissible_keys.add(_member_key(m))
-            elif not late and "dwd_security_bar" in str(m.member_id or ""):
-                # A member admitted for THIS day's price supply (not the
-                # rejected_no_proof path and not late-for-cutoff).  The
-                # shared-scope gate reads whether the session still has a
-                # qualified same-session source to fall back on.
-                _day_qualified_price_members.setdefault(day, []).append(
-                    _member_key(m))
             _reg(
                 m, day_knowledge,
                 date_from=day, date_to=day,
@@ -1748,65 +1740,78 @@ def read_history(
         # late; a single-security gap stays local; a session whose only
         # supply leaves some securities without a qualified bar blocks the
         # day only for the securities it actually starves.
+        # Unified gap ledger (audit R4 seg-A unified closeout): EVERY
+        # admission failure folds into one per-member ledger - a declared
+        # channel/knowledge gap (named_input_gap), a formal channel-
+        # admission rejection (late_for_cutoff / rejected_no_channel_proof)
+        # AND a member's own physical read/verify failure (sha mismatch,
+        # unreadable, corrupt parquet) are all recorded on the same entry
+        # before the coverage matrix is judged.  A physical read failure is
+        # a supply gap too: the member's rows never reach the candidate
+        # set, so a session whose ONLY registered supplier failed its sha
+        # is starved exactly like a channel-unknown one.
+        _member_read_failures = {}
+        for _sec_reads in (bar_cov, cal_cov, list_cov, uni_cov):
+            for _r in (_sec_reads or {}).get("reads") or []:
+                _st = _r.get("status")
+                if _st in ("SHA_MISMATCH", "UNREADABLE") and _r.get("member_key"):
+                    _member_read_failures[_r["member_key"]] = _st
+        needed_day_set = {
+            (d.isoformat() if hasattr(d, "isoformat") else str(d))
+            for d in sessions_needed}
+        for e in source_member_entries:
+            _mk = e.get("package_key") or e.get("member_key")
+            if _mk not in _member_read_failures or e.get("shared_hard_dependency"):
+                continue
+            _df = e.get("date_from")
+            _df_iso = (_df.isoformat() if hasattr(_df, "isoformat") else str(_df))
+            # Only a shared T / prior-session PRICE member whose own day is
+            # one of THIS read's needed sessions can starve the pool.  The
+            # dependency class is derived from the member id (the same rule
+            # the registration loop applies) because a channel-admitted yet
+            # physically-failed member never earned a stored dependency_type.
+            # A failed member pinned for an out-of-window day is kept on the
+            # named-gap receipt but must not block this T.
+            _mid = str(e.get("member_id") or "")
+            if _df_iso not in needed_day_set:
+                continue
+            if ("dwd_security_bar" in _mid
+                    and "dwd_security_valuation" not in _mid):
+                e["dependency_type"] = "SHARED_T_PRICE"
+                e["shared_hard_dependency"] = True
+                e["gap_session_day"] = _df
+                e.setdefault("named_input_gap",
+                             "MEMBER_" + _member_read_failures[_mk])
         _gap_members = [
             e for e in source_member_entries
             if e.get("shared_hard_dependency")
             and (e.get("named_input_gap")
                  or e.get("formal_admission") in ("late_for_cutoff",
-                                                 "rejected_no_channel_proof"))
+                                                 "rejected_no_channel_proof")
+                 or (e.get("package_key") or e.get("member_key"))
+                 in _member_read_failures)
         ]
-        # Securities whose NEEDED sessions ended with NO qualified bar are
-        # the actually-blocked set.  A session that still produced a chosen
-        # bar for this security (qualified backup / qualified replica) is
-        # supplied for it regardless of a sibling member's gap.
-        # For each gapped shared member, the session it supplies must still
-        # have produced a QUALIFIED bar for every needed security; a session
-        # where some needed security has source rows but no qualified bar is
-        # starved for that security (qualified backup covers the rest, a
-        # single-security gap starves only that security).
-        # A needed session's shared price supply fails when its OWN day's
-        # registered price member is gapped AND no same-session qualified
-        # member covers it.  A Base month's aggregate member is a separate
-        # provenance, not a same-session registered backup; an independent
-        # qualified same-session member (a backup in the same Daily package)
-        # does cover.  The starved securities are the ones that session left
-        # with rows but no qualified bar.
-        # A needed session's shared price supply fails when its OWN day's
-        # registered price member is gapped AND no same-session qualified
-        # member covers it.  A Base month's aggregate member is a separate
-        # provenance, not a same-session registered backup; an independent
-        # qualified same-session member does cover.  The starved securities
-        # are the ones the failed session left with rows but no qualified
-        # bar (a single-security gap starves only that security).
-        # Scope per gapped member by the securities it physically supplies on
-        # its session.  A pool-wide supply member whose session has no
-        # qualified same-session backup starves every needed security -> a
-        # whole-day block.  A member covering a single security isolates the
-        # gap to that security's own dependency so a qualified neighbour and
-        # an independently-held security keep working (audit R4 segment A
-        # closeout: single-security gap must not block the whole day).
+        # ONE judgement: the post-admission qualified-coverage matrix -
+        # needed sessions x active-pool securities.  After every admitted
+        # source (qualified backups included) ran the full gate chain, a
+        # session is starved for exactly the securities that ended with NO
+        # qualified bar.  A whole-day block fires ONLY when the session has
+        # NO common coverage left (every pool security starved) - the cause
+        # (channel UNKNOWN, proven late, member sha mismatch, unreadable) is
+        # kept on the ledger, not used to widen the radius.  A session that
+        # kept ANY qualified bar stays READ with the genuinely starved
+        # securities isolated to their own gap (a partial backup never
+        # balloons into whole_day, a shared pool-wide collapse is never
+        # mistaken for an isolated gap).
+        _pool_sids = {ident.security_id for ident in identities}
         _starved_set = set()
         _failed_days = []
         _shared_failed = []          # members whose gap is pool-wide
         _local_gaps = []             # (member, [starved security ids])
         for e in _gap_members:
             _gday = e.get("gap_session_day")
-            if _day_qualified_price_members.get(_gday):
-                continue  # same-session qualified backup covers it
-            _mk = e.get("member_key") or e.get("package_key")
-            _declared_rows = _member_session_sids.get((_mk, _gday)) or set()
-            _declared_pool = not _declared_rows
-            supplied = _declared_rows
-            if _declared_pool:
-                # The member declares supply for this session but admits no
-                # rows at all (sha-bad, unreadable or channel-rejected before
-                # a single row surfaces): it is a DECLARED pool supply whose
-                # whole coverage is unproven, so the session's supply is the
-                # full security universe, not a single local gap.
-                supplied = {ident.security_id for ident in identities}
-            starved_here = sorted(
-                sid for sid in supplied
-                if not _sec_session_qualified.get((sid, _gday)))
+            _gday_iso = (_gday.isoformat()
+                         if hasattr(_gday, "isoformat") else str(_gday))
             if e.get("dependency_type") != "SHARED_T_PRICE":
                 # A non-price shared hard dependency (the T session/calendar,
                 # the fixed summary chain) has no qualified-backup concept -
@@ -1816,25 +1821,44 @@ def read_history(
                 _failed_days.append(_gday)
                 _starved_set.update(
                     ident.security_id for ident in identities)
-            elif not starved_here:
-                # T and prior days judged the same way: a gapped shared
-                # PRICE member whose session a qualified backup actually
-                # covered (an independent same-session member OR a base
-                # aggregate row the formal read could select) leaves nothing
-                # starved - the session is supplied, no block (audit R4
-                # seg-A second-segment intake: drop the T-day always-block
-                # for price supply).  A T-day price supply that leaves
-                # securities starved falls through to the shared/isolated
-                # split below like any session.
                 continue
-            elif len(supplied) <= 1 and not _declared_pool:
-                # Single-security price supply (T or prior): the gap is
-                # local to that security's dependency, not a whole-day block.
-                _local_gaps.append((e, starved_here))
-                _starved_set.update(starved_here)
-            else:
+            # Post-admission coverage on this needed session: the securities
+            # that ended with NO qualified bar are the session's real gap.
+            starved_here = sorted(
+                sid for sid in _pool_sids
+                if not _sec_session_qualified.get((sid, _gday_iso)))
+            if not starved_here:
+                # A qualified backup (an independent same-session member or
+                # a qualified base aggregate row the formal read could
+                # select) covered the whole pool for this session - the
+                # member's gap left nothing starved, no block.
+                continue
+            # The failed member's own supply radius: the securities it
+            # physically surfaced rows for on this session.  A member that
+            # only ever supplies ONE security can never be a shared pool
+            # supply - its gap stays isolated to that security even on a
+            # one-security pool.  A member with NO readable rows (sha-bad,
+            # unreadable, or every row rejected before surfacing) has an
+            # UNPROVEN declared radius - it is treated as the session's
+            # shared pool supply, never narrowed to a single local gap.
+            _mk = e.get("package_key") or e.get("member_key")
+            _declared_sids = _member_session_sids.get((_mk, _gday_iso)) or set()
+            _single_security_supply = (
+                len(_declared_sids) == 1 and len(starved_here) == 1)
+            if len(starved_here) == len(_pool_sids) and not _single_security_supply:
+                # The session's merged admitted sources left the WHOLE pool
+                # without a qualified bar - a shared pool-wide collapse,
+                # whatever the member's failure cause.
                 _shared_failed.append(e)
                 _failed_days.append(_gday)
+                _starved_set.update(starved_here)
+            else:
+                # Some pool securities kept a qualified bar (a qualified
+                # backup covered part of the pool) - isolate the gap to the
+                # securities that actually starved; never widen a partial
+                # coverage into a whole-day block, and never drop a real
+                # starved set back to READ.
+                _local_gaps.append((e, starved_here))
                 _starved_set.update(starved_here)
         _starved = sorted(_starved_set)
         if _shared_failed and _failed_days:

@@ -73,6 +73,20 @@ def sha256_file(path: Path) -> str:
     return "sha256:" + d.hexdigest()
 
 
+def _canonical(value) -> bytes:
+    """The producer's canonical JSON serialization (base_build_inputs.
+    canonical): sorted keys, tight separators, ASCII, NaN refused - the
+    exact bytes a real P10 publisher hashes for content_digest."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=True, allow_nan=False).encode("ascii")
+
+
+def _content_identity(content) -> str:
+    """sha256:<hex> of the producer-canonical content bytes - identical to
+    base_build_inputs.identity used by standard_daily.inspect."""
+    return "sha256:" + hashlib.sha256(_canonical(content)).hexdigest()
+
+
 @dataclass(frozen=True)
 class ResolvedMember:
     """One named source member, resolved to an absolute path + pinned sha.
@@ -730,12 +744,23 @@ class SourceMap:
                     return {"association": "standard_manifest_kind",
                             "expected": STANDARD_MANIFEST_KIND,
                             "actual": doc.get("kind")}
-                if (doc.get("source_contract") is not None
-                        and doc.get("source_contract")
-                        != STANDARD_SOURCE_CONTRACT):
+                # The REAL producer header gate (standard_daily.inspect,
+                # DAILY_DELIVERY_ENVELOPE_CONTRACT_CHANGED): every required
+                # envelope field must exist AND carry its exact contract
+                # value - a missing / null / wrong-type field is refused
+                # before members open, never compared only when present.
+                contract = doc.get("source_contract")
+                if contract is None:
                     return {"association": "standard_source_contract",
+                            "fault": "missing_or_null",
                             "expected": STANDARD_SOURCE_CONTRACT,
-                            "actual": doc.get("source_contract")}
+                            "actual": None}
+                if contract != STANDARD_SOURCE_CONTRACT:
+                    return {"association": "standard_source_contract",
+                            "fault": "contract_mismatch",
+                            "expected": STANDARD_SOURCE_CONTRACT,
+                            "actual": (contract if isinstance(contract, str)
+                                       else type(contract).__name__)}
                 content = doc.get("content")
                 if not isinstance(content, dict):
                     return {"association": "standard_content_object",
@@ -744,6 +769,55 @@ class SourceMap:
                     return {"association": "standard_content_market_date",
                             "expected": day,
                             "actual": content.get("market_date")}
+                # Inner body digest: content_digest must equal the producer-
+                # canonical sha256 of the SAME in-memory content object.
+                digest = doc.get("content_digest")
+                if digest is None:
+                    return {"association": "standard_content_digest",
+                            "fault": "missing_or_null",
+                            "actual": None}
+                try:
+                    expected_digest = _content_identity(content)
+                except (TypeError, ValueError) as exc:
+                    return {"association": "standard_content_digest",
+                            "fault": "content_not_serializable",
+                            "actual": f"{type(exc).__name__}: {exc}"}
+                if digest != expected_digest:
+                    return {"association": "standard_content_digest",
+                            "fault": "digest_mismatch",
+                            "expected": expected_digest,
+                            "actual": (digest if isinstance(digest, str)
+                                       else type(digest).__name__)}
+                # The versioned daily role: the day's Standard content must be
+                # the formal daily delivery, never an archive/other role.
+                role = content.get("role")
+                if role != "daily":
+                    return {"association": "standard_content_role",
+                            "fault": ("missing_or_null" if role is None
+                                      else "role_mismatch"),
+                            "expected": "daily",
+                            "actual": (role if isinstance(role, str)
+                                       else type(role).__name__)}
+                # Governance metadata on the SAME envelope: a delivery that
+                # does not carry an explicit NOT_GRANTED admission and an
+                # explicit execution_authorized=false is refused.
+                admission = doc.get("consumer_admission")
+                if admission != "NOT_GRANTED":
+                    return {"association": "standard_consumer_admission",
+                            "fault": ("missing_or_null" if admission is None
+                                      else "admission_mismatch"),
+                            "expected": "NOT_GRANTED",
+                            "actual": (admission if isinstance(admission, str)
+                                       else type(admission).__name__)}
+                execution = doc.get("execution_authorized")
+                if execution is not False:
+                    return {"association": "standard_execution_authorized",
+                            "fault": ("missing_or_null" if execution is None
+                                      else "execution_enabled"),
+                            "expected": False,
+                            "actual": (execution
+                                       if isinstance(execution, bool)
+                                       else type(execution).__name__)}
                 return None
 
             if not isinstance(std_entry, dict):

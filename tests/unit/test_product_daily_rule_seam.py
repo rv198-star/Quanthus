@@ -1260,6 +1260,123 @@ def test_core_missing_held_features_is_explicit_holding_alert(tmp_path, runner, 
     assert "unavailable" in decision.explanations[0]["text"]
 
 
+def _deteriorating_features(code, signal_date=date(2026, 11, 24), **over):
+    """A feature row whose shape triggers the base structural-deterioration exit:
+
+    total_return_index < sma60 and sma20 <= sma60, with enough holding sessions and
+    prior deterioration to satisfy the base guardian (min 3 / deterioration 2).
+    """
+    return dataclasses.replace(
+        _features(code, Decimal("40"), Decimal("0.30"), signal_date=signal_date),
+        total_return_index=Decimal("90"),  # < sma60
+        sma20=Decimal("95"),  # <= sma60
+        sma60=Decimal("100"),
+        **over,
+    )
+
+
+def _deteriorating_held():
+    # holding_sessions >= minimum_holding_sessions(3), below maximum(40);
+    # marked_return above stop-loss -> only the FEATURE-driven structural
+    # deterioration can produce an exit.  That isolates the feature gate.
+    return HeldPositionFacts(
+        5,
+        Decimal("0.05"),
+        0,
+        position_facts_evidence(
+            unit_id="held-751",
+            holding_sessions=5,
+            marked_return=Decimal("0.05"),
+            prior_strategy_reduction_count=0,
+        ),
+    )
+
+
+def test_751_qualified_feature_deterioration_can_exit(tmp_path, runner, resources):
+    """Control: a READY, exception-free deteriorating feature legally drives exit."""
+    features = _deteriorating_features(
+        "600001", feature_ready=True, exception_active=False, entry_eligible=False
+    )
+    seam, result, _, held_signals = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        trigger=False,
+        held={"600001": _deteriorating_held()},
+        feature_override={"600001": features},
+        run_override={"prior_deterioration_sessions_by_security": {"600001": 1}},
+    )
+    # entry_eligible=False blocks only new entries; the held exit still runs.
+    assert result.publishable, result.diagnostics
+    assert seam.held_decisions[0].action == "exit"
+    assert seam.held_decisions[0].decision is not None
+
+
+@pytest.mark.parametrize(
+    "flag",
+    [
+        {"feature_ready": False, "exception_active": False},
+        {"feature_ready": True, "exception_active": True},
+        {"feature_ready": False, "exception_active": True},
+    ],
+    ids=["not_ready", "exception_active", "both"],
+)
+def test_751_unqualified_feature_cannot_drive_held_exit(tmp_path, runner, resources, flag):
+    # A deteriorating feature that is NOT qualified (unready / exception / not
+    # evaluated) must not drive a reduce/exit.  With raw position facts that do
+    # not independently trigger the base guardian, the held decision collapses
+    # to hold + alert.
+    features = _deteriorating_features("600001", **flag)
+    seam, result, _, held_signals = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        trigger=False,
+        held={"600001": _deteriorating_held()},
+        feature_override={"600001": features},
+        run_override={"prior_deterioration_sessions_by_security": {"600001": 1}},
+    )
+    assert result.publishable, result.diagnostics
+    assert held_signals, "held security must still reach the decision set"
+    assert seam.held_decisions[0].action == "hold_alert"
+    assert any(e["security_code"] == "600001" for e in seam.excluded)
+    # The degraded feature view keeps the source row but drops the unqualified
+    # domain features, so the deterioration signal can no longer drive an exit.
+    assert seam.held_decisions[0].features.rsi14 is None
+
+
+def test_751_raw_position_facts_can_still_exit_when_feature_unqualified(
+    tmp_path, runner, resources
+):
+    # Independent raw position facts still legally fire the base guardian even
+    # when the domain feature is unqualified: holding_sessions >= maximum (40)
+    # forces the exit without any feature evidence.
+    held = HeldPositionFacts(
+        40,
+        Decimal("0.05"),
+        0,
+        position_facts_evidence(
+            unit_id="held-751-base",
+            holding_sessions=40,
+            marked_return=Decimal("0.05"),
+            prior_strategy_reduction_count=0,
+        ),
+    )
+    features = _deteriorating_features("600001", feature_ready=False)
+    seam, result, _, held_signals = _forward_chain(
+        tmp_path,
+        runner,
+        resources,
+        trigger=False,
+        held={"600001": held},
+        feature_override={"600001": features},
+    )
+    assert result.publishable, result.diagnostics
+    # The raw holding_sessions fact independently triggers the base guardian;
+    # the unqualified feature does not mask it.
+    assert seam.held_decisions[0].action == "exit"
+
+
 def test_core_empty_trust_configuration_fails_closed(tmp_path, runner, resources):
     _, result, _, _ = _forward_chain(
         tmp_path,

@@ -1022,16 +1022,24 @@ def _adapt_position_facts_dict(
                 "invalid_raw_history",
                 "securities[].position_facts.marked_return must be finite",
             )
-    # Evidence binds the same-read unit; fall back to the security's own
-    # identity key when the caller did not supply a separate unit_id.
-    evidence = pf.get("evidence") or {}
+    # Evidence binds the SAME-READ source: a serializable position_facts must
+    # carry its own evidence.unit_id naming the account/read it came from.
+    # A missing or non-mapping evidence block is a named invalid_raw_history -
+    # never a security-code or 'unknown' synthetic source.
+    evidence = pf.get("evidence")
     unit_id = (
         evidence.get("unit_id")
         if isinstance(evidence, Mapping)
         else None
-    ) or (sec.get("identity") or {}).get("listing_code") or "unknown"
+    )
+    if not isinstance(unit_id, str) or not unit_id.strip():
+        _fail(
+            "invalid_raw_history",
+            "securities[].position_facts.evidence.unit_id must name the "
+            "same-read account source (never a fabricated identity)",
+        )
     ref = position_facts_evidence(
-        unit_id=str(unit_id),
+        unit_id=unit_id.strip(),
         holding_sessions=holding,
         marked_return=marked_return,
         prior_strategy_reduction_count=reductions,
@@ -1365,6 +1373,7 @@ def raw_security_inputs_from_history(
                 held_unavailable_reason=held_reason,
                 held_quantity=held_qty,
                 pending_quantity=pending_qty,
+                scan_eligible=sec_o.get("scan_eligible") is not False,
             )
         )
     return inputs, receipts
@@ -1639,17 +1648,6 @@ def run_daily_advice_from_history(
     account_unresolved_records = [
         dict(r) for r in history.account_unresolved
     ]
-    if account_unresolved_records:
-        held_keys = [
-            r.get("account_key") for r in account_unresolved_records
-            if r.get("role") == "held"
-        ]
-        if held_keys:
-            # A held unresolved record still produces a held review: the
-            # security-less account key is registered as held evidence so the
-            # seam's held_decisions carry the alert (never a silent drop).
-            for key in held_keys:
-                pass  # surfaced through account_unresolved in source_closure
     if not inputs and not account_unresolved_records:
         raise NoQualifiedRawInputs(
             "raw_history produced no qualified security inputs; this is a shared "
@@ -1729,11 +1727,30 @@ def run_daily_advice_from_history(
             }
     # Per-order typed pending facts stay verbatim (never summed or last-one-
     # wins); the runner merges them into the same account-membership audit.
+    # Per-order pending evidence (order_key/source_receipt/direction) binds
+    # the same-read order identity into the issued closure.  A fractional,
+    # bool or negative quantity is a named invalid_pending_quantity on the
+    # typed boundary, never silently truncated.
     pending_descriptors = [
         PendingSecurityInput(
             security_code=_text(p.get("security_code"), "pending_securities[].security_code"),
             kind=_text(p.get("kind"), "pending_securities[].kind"),
             quantity=p.get("quantity"),
+            order_key=(
+                _text(p.get("order_key"), "pending_securities[].order_key")
+                if p.get("order_key") is not None
+                else None
+            ),
+            source_receipt=(
+                _text(p.get("source_receipt"), "pending_securities[].source_receipt")
+                if p.get("source_receipt") is not None
+                else None
+            ),
+            direction=(
+                _text(p.get("direction"), "pending_securities[].direction")
+                if p.get("direction") is not None
+                else None
+            ),
         )
         for p in history.pending_securities
     ]

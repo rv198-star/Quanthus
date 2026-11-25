@@ -755,6 +755,15 @@ def _p1_price_input(
     }, reason
 
 
+def _pending_qty(value, label):
+    """Strict pending quantity: non-negative int, never truncated or coerced."""
+    if value is None:
+        return None
+    if type(value) is not int or isinstance(value, bool) or value < 0:
+        _fail("invalid_pending_quantity", f"{label} must be a non-negative int, not {value!r}")
+    return value
+
+
 def build_replay_envelope(
     request: ReplayRequest,
     market_date: date,
@@ -948,10 +957,12 @@ def build_replay_envelope(
         # Per-order pending projection: each securities[].pending[] record is a
         # typed PendingSecurityInput (kind/quantity verbatim); the row-level
         # pending_kind/pending_quantity remain the single-record projection.
+        entry_blocked_by_unresolved_direction = False
         for po in _seq(sec_o.get("pending") or (), f"securities[{index}].pending"):
             pobj = _obj(po, f"securities[{index}].pending[]")
             kind = _text(pobj.get("kind"), "pending[].kind")
             if kind == "sell":
+                entry_blocked_by_unresolved_direction = True
                 # A sell order keeps direction + quantity verbatim but needs an
                 # explicit consumer disposition: it lands on the versioned
                 # account-unresolved list (role=pending, direction=sell),
@@ -960,10 +971,8 @@ def build_replay_envelope(
                     {
                         "account_key": str(pobj.get("order_key") or code),
                         "role": "pending",
-                        "quantity": (
-                            int(pobj["quantity"])
-                            if pobj.get("quantity") is not None
-                            else None
+                        "quantity": _pending_qty(
+                            pobj.get("quantity"), "pending[].quantity"
                         ),
                         "missing_reason": "sell_order_requires_explicit_disposition",
                         "source": "securities[].pending",
@@ -979,16 +988,24 @@ def build_replay_envelope(
                 {
                     "security_code": code,
                     "kind": kind,
-                    "quantity": (
-                        int(pobj["quantity"])
-                        if pobj.get("quantity") is not None
-                        else None
+                    "quantity": _pending_qty(
+                        pobj.get("quantity"), "pending[].quantity"
                     ),
                     "order_key": pobj.get("order_key"),
                     "source_receipt": pobj.get("source_receipt"),
                     "direction": pobj.get("direction"),
                 }
             )
+        if entry_blocked_by_unresolved_direction:
+            # The sell direction is an unresolved account disposition; the
+            # security never receives a new entry on this run.  Keep held
+            # facts so an existing position still surfaces its hold review.
+            filtered["bars"] = []
+            filtered["actions"] = []
+            filtered["limits"] = []
+            filtered["close_at_by_date"] = {}
+            filtered["knowledge_cutoff_by_date"] = {}
+            filtered["scan_eligible"] = False
         securities.append(filtered)
         delivered[code] = {
             "bar_rows": len(bars),

@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import date
 
 from quanthus.p12_history.calendar_listing import _date, _rows
+from quanthus.p12_history.envelope import _num
 from quanthus.p12_history.clocks import iso, parse_ts
 from quanthus.p12_history.source_pins import SourceMap
 
@@ -90,9 +91,13 @@ def read_actions(source_map: SourceMap, market_date: date):
             aid = str(rec.get("corporate_action_id") or "")
             if aid in actions:
                 actions[aid]["terms"][str(rec.get("term_type") or "")] = {
-                    "amount_per_share": rec.get("amount_per_share"),
-                    "ratio_numerator": rec.get("ratio_numerator"),
-                    "ratio_denominator": rec.get("ratio_denominator"),
+                    # Keep the precise decimal at source precision as text -
+                    # pyarrow hands back Decimal which is not JSON-serializable;
+                    # str() preserves it exactly, never float, never a global
+                    # default (audit: same wire as envelope._num).
+                    "amount_per_share": _num(rec.get("amount_per_share")),
+                    "ratio_numerator": _num(rec.get("ratio_numerator")),
+                    "ratio_denominator": _num(rec.get("ratio_denominator")),
                     "currency": rec.get("currency"),
                     "record_source": str(rec.get("record_source") or ""),
                     "source_record_id": str(rec.get("source_record_id") or ""),

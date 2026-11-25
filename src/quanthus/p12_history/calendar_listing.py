@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 
 from quanthus.p12_history.clocks import parse_ts
@@ -72,7 +73,20 @@ def _date(v):
 def _rows(path: Path, columns):
     import pyarrow.parquet as pq
 
-    return pq.ParquetFile(str(path)).read(columns=columns).to_pylist()
+    recs = pq.ParquetFile(str(path)).read(columns=columns).to_pylist()
+    # pyarrow returns Decimal for every fixed-precision numeric column;
+    # keep each at source precision as text so the fixed reader wire is
+    # JSON-serializable verbatim (Decimal -> str, never float, never a
+    # global default).  Downstream _num/iso projections stay unchanged.
+    out = []
+    for rec in recs:
+        out.append(
+            {
+                k: (str(v) if isinstance(v, Decimal) else v)
+                for k, v in rec.items()
+            }
+        )
+    return out
 
 
 def _venue_code_map(source_map: SourceMap):

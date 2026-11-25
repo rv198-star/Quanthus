@@ -341,14 +341,28 @@ class ReplayEngine:
             if callable(self.account_projection):
                 day_holdings, day_pending = self.account_projection(day)
             reader = self.history_reader
+            # Pick the call shape by the reader's declared arity, never by
+            # catching TypeError - an internal TypeError inside the reader
+            # (e.g. a Decimal reaching a JSON boundary) would otherwise be
+            # retried as a second expensive cold read and mis-labelled.
             try:
+                import inspect as _inspect
+                _n_pos = len([
+                    p for p in _inspect.signature(reader).parameters.values()
+                    if p.kind in (
+                        p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD
+                    )
+                ])
+            except (TypeError, ValueError):
+                _n_pos = 4
+            if _n_pos >= 4:
                 self._real_raw_history = reader(
                     day,
                     _sh_now(day, self.decision_cutoff_time),
                     day_holdings,
                     day_pending,
                 )
-            except TypeError:
+            else:
                 # a 2-arg reader (older signature) still binds the T
                 self._real_raw_history = reader(
                     day, _sh_now(day, self.decision_cutoff_time)

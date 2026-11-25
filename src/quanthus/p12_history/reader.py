@@ -60,6 +60,8 @@ def read_history(
     *,
     holdings=(),
     pending=(),
+    account_snapshot=None,
+    expected_account_id=None,
     source_map: SourceMap | None = None,
     observed_at: datetime | None = None,
     replay_exclusion: dict | None = None,
@@ -625,6 +627,119 @@ def read_history(
     # holdings and pending from securities[], so a held or pending
     # security carries its real quantity/kind on its own entry - an empty
     # account and a populated one must not produce the same envelope.
+    # Account-input binding (audit 749 R4 segment B): a production read
+    # binds the SAME account input to a scenario account, its original
+    # as_of instant, the snapshot sha and the generation receipt BEFORE
+    # the account facts are projected.  A different account swapped in, a
+    # future-dated snapshot, a security/listing/venue three-key conflict
+    # or a wrong snapshot sha is a NAMED rejection - the account branch is
+    # refused, never silently accepted.
+    account_binding = {
+        "bound": False,
+        "account_id": None,
+        "scenario": None,
+        "account_mode": None,
+        "environment": None,
+        "as_of": None,
+        "snapshot_path": None,
+        "source_databases": None,
+        "nested_account": None,
+        "declared_snapshot_sha256": None,
+        "actual_snapshot_sha256": None,
+        "generation_receipt_sha256": None,
+        "rejections": [],
+    }
+    if account_snapshot is not None:
+        snap = account_snapshot
+        account_binding["bound"] = True
+        account_binding["account_id"] = snap.get("account_id")
+        # P11 segment-B contract: keep the scenario namespace, the raw
+        # account mode/environment and the source databases verbatim so
+        # the consumer re-pairs the bound input inside the closure.
+        account_binding["scenario"] = snap.get("scenario")
+        account_binding["account_mode"] = snap.get("account_mode")
+        account_binding["environment"] = snap.get("environment")
+        account_binding["as_of"] = snap.get("as_of")
+        account_binding["source_databases"] = snap.get("source_databases")
+        # Original nested account fields preserved verbatim for forensics.
+        account_binding["nested_account"] = snap.get("account")
+        snap_path = snap.get("snapshot_path")
+        snap_sha = snap.get("snapshot_sha256") or snap.get("sha256")
+        account_binding["snapshot_path"] = str(snap_path) if snap_path else None
+        account_binding["declared_snapshot_sha256"] = snap_sha
+        gr = snap.get("generation_receipt") or {}
+        account_binding["generation_receipt_sha256"] = gr.get("sha256")
+        # Wrong snapshot sha -> named rejection.
+        if snap_path and snap_sha:
+            try:
+                actual_snap = sha256_file(snap_path)
+            except Exception as exc:  # noqa: BLE001
+                actual_snap = None
+                account_binding["rejections"].append({
+                    "reason_code": "ACCOUNT_SNAPSHOT_UNREADABLE",
+                    "detail": f"account snapshot could not be opened: {type(exc).__name__}: {exc}",
+                })
+            if actual_snap is not None:
+                account_binding["actual_snapshot_sha256"] = actual_snap
+                if actual_snap != snap_sha:
+                    account_binding["rejections"].append({
+                        "reason_code": "ACCOUNT_SNAPSHOT_SHA_MISMATCH",
+                        "detail": f"account snapshot sha256 {actual_snap} != pinned {snap_sha}",
+                    })
+        # A different account swapped in -> named rejection.
+        if (expected_account_id is not None
+                and snap.get("account_id") != expected_account_id):
+            account_binding["rejections"].append({
+                "reason_code": "ACCOUNT_ID_MISMATCH",
+                "detail": (
+                    f"bound account_id {snap.get('account_id')} != expected "
+                    f"{expected_account_id} for this read"
+                ),
+            })
+        # A future-dated snapshot -> named rejection.
+        as_of_ts = parse_ts(snap.get("as_of"))
+        if as_of_ts is not None and as_of_ts > decision_cutoff:
+            account_binding["rejections"].append({
+                "reason_code": "ACCOUNT_SNAPSHOT_FUTURE",
+                "detail": (
+                    f"snapshot as_of {snap.get('as_of')} post-dates the "
+                    f"decision cutoff {iso(decision_cutoff)}"
+                ),
+            })
+        # security/listing/venue three-key conflict between the bound
+        # snapshot's security_identity and the effective identity -> named
+        # rejection.  The snapshot's declared identity must agree with the
+        # security_id its holdings/pending actually carry.
+        s_ident = snap.get("security_identity") or {}
+        snap_sids = {
+            str(h.get("security_id") or h.get("security_code") or "")
+            for h in snap.get("holdings") or ()
+        } | {
+            str(p.get("security_id") or p.get("security_code") or "")
+            for p in snap.get("pending") or ()
+        }
+        snap_sids.discard("")
+        declared_sid = str(s_ident.get("security_id") or "")
+        if (declared_sid and snap_sids
+                and snap_sids != {declared_sid}
+                and len(snap_sids & ({declared_sid} if declared_sid else set())) == 0):
+            account_binding["rejections"].append({
+                "reason_code": "ACCOUNT_IDENTITY_KEY_CONFLICT",
+                "detail": (
+                    f"snapshot security_identity security_id {declared_sid} "
+                    f"does not match the held/pending security_ids "
+                    f"{sorted(snap_sids)}"
+                ),
+            })
+        # Use the snapshot's own holdings/pending for the projection when
+        # it supplies them; a rejected snapshot contributes NO account
+        # facts (the named rejection stands instead).
+        if not account_binding["rejections"]:
+            holdings = tuple(snap.get("holdings") or ())
+            pending = tuple(snap.get("pending") or ())
+        else:
+            holdings = ()
+            pending = ()
     holdings_by_sid = {}
     for h in holdings or ():
         hsid = str(h.get("security_id") or h.get("security_code") or "")
@@ -818,24 +933,49 @@ def read_history(
             dep_reasons["price_limit_regime"] = "no_price_limit_regime_rows"
         if not any(k[0] == ident.listing_id for k in exc_by_listing):
             dep_reasons["quality_exceptions"] = "no_exception_rows"
-        # Account facts for this security (audit 749-04): held quantity and
-        # typed pending travel on the wire so the rule can issue an
-        # independent hold_alert / qualified exit - never left to coverage
-        # counters alone.
+        # Account facts for this security (audit 749-04 / P11 segment-B
+        # contract): held / typed-pending facts travel as SIBLING
+        # top-level fields on securities[] - held_membership,
+        # held_quantity, held_unavailable_reason, pending_kind,
+        # pending_quantity and the per-record pending_records list.  The
+        # nested "account" block keeps the raw snapshot detail verbatim
+        # for forensics; the rule consumes the flat fields so a real
+        # account issues a hold_alert / qualified exit and never
+        # collapses back into empty-account semantics.
         hold = holdings_by_sid.get(ident.security_id)
         pends = pending_by_sid.get(ident.security_id) or []
+        # Each in-flight order keeps its own order key, kind, remaining
+        # quantity and source receipt - never summed, never collapsed to
+        # a last record.  An unsupported kind (e.g. a sell order whose
+        # enum is sell/5) keeps its original kind string and direction.
+        pending_records = [
+            {
+                "order_id": p.get("order_id") or p.get("receipt_id"),
+                "pending_kind": p.get("pending_kind") or p.get("kind"),
+                "pending_quantity": p.get("pending_quantity") or p.get("quantity"),
+                "receipt_id": p.get("receipt_id"),
+                "source": p.get("source"),
+            }
+            for p in pends
+        ]
+        held_qty = hold.get("quantity") if hold else None
+        held_unavailable_reason = None
+        if hold is not None and held_qty is None:
+            # Quantity unknown: keep the original null and name why the
+            # held fact cannot be projected - never fabricate a number.
+            held_unavailable_reason = "held_quantity_unavailable"
+        if hold is not None and hold.get("history_unavailable"):
+            # Missing held history: a named gap kept verbatim - the rule
+            # keeps the held review (hold_alert) rather than a silent pass.
+            held_unavailable_reason = (
+                (held_unavailable_reason + ";" if held_unavailable_reason else "")
+                + "held_history_unavailable")
         account = {
             "account_role": (
                 "held" if hold is not None else ("pending" if pends else "candidate")
             ),
-            "held_quantity": (hold.get("quantity") if hold else None),
-            "pending": [
-                {
-                    "pending_kind": p.get("pending_kind") or p.get("kind"),
-                    "pending_quantity": p.get("pending_quantity") or p.get("quantity"),
-                }
-                for p in pends
-            ],
+            "held_quantity": held_qty,
+            "pending": pending_records,
         }
         securities.append(
             env_mod.security_entry(
@@ -846,6 +986,20 @@ def read_history(
                 bar_revisions=bar_revision_chain,
                 dependency_reasons=dep_reasons,
                 account=account,
+                held_membership=hold is not None,
+                held_quantity=held_qty,
+                held_unavailable_reason=held_unavailable_reason,
+                pending_kind=(
+                    pending_records[0]["pending_kind"]
+                    if len(pending_records) == 1 else (
+                        "multiple" if pending_records else None
+                    )
+                ),
+                pending_quantity=(
+                    pending_records[0]["pending_quantity"]
+                    if len(pending_records) == 1 else None
+                ),
+                pending_records=pending_records,
             )
         )
 
@@ -858,8 +1012,50 @@ def read_history(
     # order, never dropped silently.
     pool_sids = {i.security_id for i in identities}
     extra_account_sids = sorted(
-        set(holdings_by_sid) | set(pending_by_sid) - pool_sids
+        (set(holdings_by_sid) | set(pending_by_sid)) - pool_sids
     )
+    # Three-key alignment (audit 749 R4 segment B): the bound snapshot's
+    # declared security_identity is verified against the EFFECTIVE pool
+    # identity actually selected - a snapshot whose declared
+    # security_id / listing_id / venue_id disagrees with the resolved
+    # pool member is a named rejection, never silently accepted.
+    if account_snapshot is not None and not account_binding["rejections"]:
+        s_ident = account_snapshot.get("security_identity") or {}
+        want_sid = str(s_ident.get("security_id") or "")
+        want_lid = str(s_ident.get("listing_id") or "")
+        want_ven = str(s_ident.get("venue_id") or "")
+        if want_sid:
+            pool_ident = next(
+                (i for i in identities if i.security_id == want_sid), None)
+            if pool_ident is not None:
+                mism = []
+                if want_lid and pool_ident.listing_id != want_lid:
+                    mism.append(f"listing_id {pool_ident.listing_id} != {want_lid}")
+                if want_ven and pool_ident.venue_id != want_ven:
+                    mism.append(f"venue_id {pool_ident.venue_id} != {want_ven}")
+                account_binding["identity_alignment"] = {
+                    "security_id": want_sid,
+                    "in_pool": True,
+                    "aligned": not mism,
+                    "conflicts": mism,
+                }
+                if mism:
+                    account_binding["rejections"].append({
+                        "reason_code": "ACCOUNT_IDENTITY_KEY_CONFLICT",
+                        "detail": "; ".join(mism),
+                    })
+                    holdings = ()
+                    pending = ()
+                    holdings_by_sid = {}
+                    pending_by_sid = {}
+                    extra_account_sids = []
+            else:
+                account_binding["identity_alignment"] = {
+                    "security_id": want_sid,
+                    "in_pool": False,
+                    "aligned": False,
+                    "conflicts": ["security_id not in resolved pool"],
+                }
     for sid in extra_account_sids:
         if sid in pool_sids:
             continue
@@ -881,22 +1077,61 @@ def read_history(
             source_evidence_digest="",
             late_visible=False,
         )
+        # Per-record in-flight orders keep their original order key, kind,
+        # quantity and source receipt verbatim - a sell/5 order keeps its
+        # own direction and enum, never rewritten to a supported buy.
+        op_pending_records = [
+            {
+                "order_id": p.get("order_id") or p.get("receipt_id"),
+                "pending_kind": p.get("pending_kind") or p.get("kind"),
+                "pending_quantity": p.get("pending_quantity") or p.get("quantity"),
+                "receipt_id": p.get("receipt_id"),
+                "source": p.get("source"),
+            }
+            for p in pends
+        ]
+        op_held_qty = hold.get("quantity") if hold else None
+        op_held_unavailable = None
+        if hold is not None and op_held_qty is None:
+            op_held_unavailable = "held_quantity_unavailable"
+        if hold is not None and hold.get("history_unavailable"):
+            op_held_unavailable = (
+                (op_held_unavailable + ";" if op_held_unavailable else "")
+                + "held_history_unavailable")
         securities.append(
             env_mod.security_entry(
                 pseudo, [], [], [], [], {}, {},
                 bar_revisions={},
-                dependency_reasons={"identity": "out_of_pool_account_member"},
+                # P11 fixed contract (audit 749 R4 segment B): an
+                # out-of-pool held/pending member carries its account facts
+                # on a NAMED risk branch - "held_risk" for a holding with
+                # no listing anchor, "pending_risk" for an in-flight order
+                # - never a fabricated listing_id (kept empty/UNKNOWN).
+                dependency_reasons={
+                    "identity": "out_of_pool_account_member",
+                    "account_branch": (
+                        "held_risk" if hold is not None else "pending_risk"
+                    ),
+                },
                 account={
                     "account_role": ("held" if hold is not None else "pending"),
-                    "held_quantity": (hold.get("quantity") if hold else None),
-                    "pending": [
-                        {
-                            "pending_kind": p.get("pending_kind") or p.get("kind"),
-                            "pending_quantity": p.get("pending_quantity") or p.get("quantity"),
-                        }
-                        for p in pends
-                    ],
+                    "held_quantity": op_held_qty,
+                    "pending": op_pending_records,
                 },
+                held_membership=hold is not None,
+                held_quantity=op_held_qty,
+                held_unavailable_reason=op_held_unavailable,
+                pending_kind=(
+                    op_pending_records[0]["pending_kind"]
+                    if len(op_pending_records) == 1 else (
+                        "multiple" if op_pending_records else None
+                    )
+                ),
+                pending_quantity=(
+                    op_pending_records[0]["pending_quantity"]
+                    if len(op_pending_records) == 1 else None
+                ),
+                pending_records=op_pending_records,
             )
         )
 
@@ -1025,6 +1260,27 @@ def read_history(
         "limits": lim_cov,
         "p1_exceptions": p1_exc_cov,
         "security_count": len(securities),
+        "account_binding": account_binding,
+        # P11 segment-B contract row 4: account members that have only an
+        # account key and no valid listing identity are kept in a
+        # VERSIONED unresolved-detail list - each record carries the raw
+        # account key, role, quantity, the named missing reason and its
+        # source, never a fabricated listing_id or a rewritten enum.
+        "unresolved_account_details": [
+            {
+                "security_id": s["identity"]["security_id"],
+                "account_role": s["account"]["account_role"],
+                "held_quantity": s.get("held_quantity"),
+                "held_unavailable_reason": s.get("held_unavailable_reason"),
+                "pending_records": s.get("pending_records") or [],
+                "missing_reason": s["dependency_reasons"]["identity"],
+                "account_branch": s["dependency_reasons"]["account_branch"],
+                "source": "account_snapshot",
+            }
+            for s in securities
+            if (s.get("dependency_reasons") or {}).get("identity")
+            == "out_of_pool_account_member"
+        ],
         "bar_sessions": BAR_SESSIONS,
         "listing_proof_sessions": LISTING_PROOF_SESSIONS,
         "late_visible_members": late_visible_members,

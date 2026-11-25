@@ -1796,3 +1796,245 @@ def test_dwd_security_valuation_is_declared_not_read_only(tmp_path):
     assert gap is not None
     assert gap["dependency_type"] == "DECLARED_NOT_READ_ONLY"
     assert not gap["shared_hard_dependency"]
+
+
+# ---- Segment B: account-input binding (audit R4 seg-B) -------------------
+
+def _b_snapshot(tmp_path, **over):
+    snap = {
+        "account_id": "SYN-PAPER-A",
+        "as_of": "2026-10-20T09:30:00+08:00",
+        "holdings": [{"security_id": _B_SID, "security_code": "600000",
+                      "listing_id": _B_LID, "venue_id": "SSE",
+                      "quantity": 1200}],
+        "pending": [],
+        "security_identity": {"security_id": _B_SID, "listing_id": _B_LID,
+                              "venue_id": "SSE", "security_code": "600000"},
+        "generation_receipt": {"sha256": "7d05c625"},
+    }
+    snap.update(over)
+    return snap
+
+
+def _seg_b_read_snap(tmp_path, snapshot, expected=None):
+    return reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=_build_map_seg_b(tmp_path),
+        account_snapshot=snapshot, expected_account_id=expected,
+        observed_at=datetime(2026, 10, 20, 23, 0, tzinfo=UTC),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE)
+
+
+def test_seg_b_account_snapshot_binds_scenario_account(tmp_path):
+    """Segment B: a bound account snapshot carries the scenario account_id,
+    original as_of, snapshot sha and generation receipt; the held fact is
+    projected with the effective pool identity (3-key aligned)."""
+    res = _seg_b_read_snap(tmp_path, _b_snapshot(tmp_path),
+                           expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["bound"] and ab["account_id"] == "SYN-PAPER-A"
+    assert ab["as_of"] == "2026-10-20T09:30:00+08:00"
+    assert ab["generation_receipt_sha256"] == "7d05c625"
+    assert ab["rejections"] == []
+    assert ab["identity_alignment"]["aligned"] is True
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["account"]["account_role"] == "held"
+    assert sec["account"]["held_quantity"] == 1200
+
+
+def test_seg_b_account_id_mismatch_named_rejection(tmp_path):
+    """A different account swapped in is a named rejection, not accepted."""
+    res = _seg_b_read_snap(tmp_path, _b_snapshot(tmp_path),
+                           expected="SYN-PAPER-B")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_ID_MISMATCH" in codes
+
+
+def test_seg_b_future_snapshot_named_rejection(tmp_path):
+    """A snapshot whose as_of post-dates the decision cutoff is a named
+    rejection."""
+    snap = _b_snapshot(tmp_path, as_of="2026-11-25T09:30:00+08:00")
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_FUTURE" in codes
+
+
+def test_seg_b_identity_key_conflict_named_rejection(tmp_path):
+    """A snapshot whose declared venue conflicts with the resolved pool
+    identity is a named three-key rejection."""
+    snap = _b_snapshot(
+        tmp_path,
+        security_identity={"security_id": _B_SID, "listing_id": _B_LID,
+                           "venue_id": "SZSE", "security_code": "600000"})
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    codes = {r["reason_code"] for r in ab["rejections"]}
+    assert "ACCOUNT_IDENTITY_KEY_CONFLICT" in codes
+    assert ab["identity_alignment"]["aligned"] is False
+
+
+def test_seg_b_snapshot_sha_mismatch_named_rejection(tmp_path):
+    """A declared snapshot sha256 that does not match the real file is a
+    named rejection."""
+    import hashlib as _hl
+    snap_file = tmp_path / "held.json"
+    snap_file.write_text('{"a":1}')
+    snap = _b_snapshot(
+        tmp_path, snapshot_path=str(snap_file),
+        snapshot_sha256="sha256:" + "f" * 64)
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
+    assert "ACCOUNT_SNAPSHOT_SHA_MISMATCH" in codes
+
+
+def test_seg_b_out_of_pool_named_risk_branch(tmp_path):
+    """An out-of-pool held/pending member carries its facts on a named
+    held_risk / pending_risk branch with NO fabricated listing_id."""
+    res = reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=_build_map_seg_b(tmp_path),
+        holdings=[{"security_id": "ghost-held", "quantity": 10}],
+        pending=[{"security_id": "ghost-pend", "pending_kind": "sell",
+                  "pending_quantity": 3}],
+        observed_at=datetime(2026, 10, 20, 23, 0, tzinfo=UTC),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE)
+    held = next(x for x in res.raw_history["securities"]
+                if x["identity"]["security_id"] == "ghost-held")
+    pend = next(x for x in res.raw_history["securities"]
+                if x["identity"]["security_id"] == "ghost-pend")
+    assert held["identity"]["listing_id"] == ""
+    assert held["dependency_reasons"]["account_branch"] == "held_risk"
+    assert pend["dependency_reasons"]["account_branch"] == "pending_risk"
+    assert held["account"]["account_role"] == "held"
+    assert pend["account"]["pending"][0]["pending_kind"] == "sell"
+
+def test_seg_b_wire_flat_fields_and_pending_records(tmp_path):
+    """P11 segment-B contract: held/pending facts project to SIBLING
+    top-level securities[] fields (not a nested account dict) - the
+    consumer reads held_membership / held_quantity /
+    held_unavailable_reason / pending_kind / pending_quantity /
+    pending_records, with each pending order keeping its own key,
+    direction and source receipt."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    res = _seg_b_read(tmp_path, held, [])
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert sec["held_quantity"] == 1200
+    assert sec["held_unavailable_reason"] is None
+    assert sec["account"]["account_role"] == "held"
+    # Unknown quantity keeps the original null + a named reason.
+    res2 = _seg_b_read(
+        tmp_path,
+        [{"security_id": _B_SID, "security_code": "600000",
+          "listing_id": _B_LID, "venue_id": "SSE", "quantity": None}], [])
+    sec2 = next(x for x in res2.raw_history["securities"]
+                if x["identity"]["security_id"] == _B_SID)
+    assert sec2["held_quantity"] is None
+    assert "held_quantity_unavailable" in sec2["held_unavailable_reason"]
+
+
+def test_seg_b_wire_pending_records_keep_order_key_and_source(tmp_path):
+    """Single typed pending -> pending_kind/pending_quantity plus a
+    pending_records entry carrying order_id, kind, quantity, receipt and
+    source verbatim."""
+    pend = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE",
+             "order_id": "q749-b-paper-buy-600000-20261020",
+             "pending_kind": "open_buy_order", "pending_quantity": 1200,
+             "receipt_id": "receipt-sha256:2c4b",
+             "source": "pending/generation-receipt.json"}]
+    res = _seg_b_read(tmp_path, [], pend)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is False
+    assert sec["pending_kind"] == "open_buy_order"
+    assert sec["pending_quantity"] == 1200
+    rec = sec["pending_records"][0]
+    assert rec["order_id"] == "q749-b-paper-buy-600000-20261020"
+    assert rec["receipt_id"] == "receipt-sha256:2c4b"
+    assert rec["source"] == "pending/generation-receipt.json"
+
+
+def test_seg_b_wire_held_and_pending_coexist(tmp_path):
+    """A held security that also has an in-flight order keeps BOTH facts -
+    the held projection and each pending record, never merged."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    pend = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE",
+             "order_id": "o1", "pending_kind": "open_buy_order",
+             "pending_quantity": 300},
+            {"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE",
+             "order_id": "o2", "pending_kind": "open_buy_order",
+             "pending_quantity": 100}]
+    res = _seg_b_read(tmp_path, held, pend)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True and sec["held_quantity"] == 1200
+    # Two orders are never summed or collapsed to a last record.
+    assert sec["pending_kind"] == "multiple"
+    assert [r["order_id"] for r in sec["pending_records"]] == ["o1", "o2"]
+    assert [r["pending_quantity"] for r in sec["pending_records"]] == [300, 100]
+
+
+def test_seg_b_wire_held_missing_history_named(tmp_path):
+    """A held position whose history is missing keeps a named
+    held_history_unavailable - the held review is retained, not silently
+    passed, and needs no listing-id conflict to surface."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200,
+             "history_unavailable": True}]
+    res = _seg_b_read(tmp_path, held, [])
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["held_membership"] is True
+    assert "held_history_unavailable" in sec["held_unavailable_reason"]
+
+
+def test_seg_b_out_of_pool_unresolved_details_versioned(tmp_path):
+    """Out-of-pool account members land on coverage
+    .unresolved_account_details with the raw key, role, quantity, named
+    missing reason and source - a sell/5 pending keeps its own enum."""
+    res = reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=_build_map_seg_b(tmp_path),
+        holdings=[{"security_id": "outside-held-x", "quantity": None}],
+        pending=[{"security_id": "outside-pend", "order_id": "so1",
+                  "pending_kind": "sell/5", "pending_quantity": 50,
+                  "source": "pending/generation-receipt.json"}],
+        observed_at=datetime(2026, 10, 20, 23, 0, tzinfo=UTC),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE)
+    details = {d["security_id"]: d
+               for d in res.coverage["unresolved_account_details"]}
+    hx = details["outside-held-x"]
+    assert hx["account_role"] == "held"
+    assert hx["held_quantity"] is None
+    assert "held_quantity_unavailable" in hx["held_unavailable_reason"]
+    assert hx["missing_reason"] == "out_of_pool_account_member"
+    assert hx["account_branch"] == "held_risk"
+    assert hx["source"] == "account_snapshot"
+    op = details["outside-pend"]
+    assert op["account_branch"] == "pending_risk"
+    assert op["pending_records"][0]["pending_kind"] == "sell/5"
+    assert op["pending_records"][0]["order_id"] == "so1"
+
+
+def test_seg_b_binding_preserves_scenario_and_nested(tmp_path):
+    """The bound account keeps scenario, account mode, source databases
+    and the nested account fields verbatim for the consumer closure."""
+    snap = _b_snapshot(
+        tmp_path, scenario="held_after_bound_open_fill",
+        account_mode="synthetic", environment="isolated_paper",
+        source_databases=[{"path": "held/p12-paper-facts.sqlite",
+                           "sha256": "2233b4e0"}])
+    res = _seg_b_read_snap(tmp_path, snap, expected="SYN-PAPER-A")
+    ab = res.coverage["account_binding"]
+    assert ab["scenario"] == "held_after_bound_open_fill"
+    assert ab["account_mode"] == "synthetic"
+    assert ab["environment"] == "isolated_paper"
+    assert ab["source_databases"][0]["sha256"] == "2233b4e0"
+

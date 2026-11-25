@@ -200,6 +200,54 @@ def read_history(
             manifest_chain = [{"artifact": "manifest_chain", "status": "UNAVAILABLE",
                                "error": f"{type(exc).__name__}: {exc}"}]
 
+    # A failed fixed-summary link is a hard pre-read gate (audit 749 R4
+    # second segment): the Base manifest, the DATES index and the day's
+    # descriptors are verified BEFORE any member is trusted, so a broken
+    # / wrong / unreadable link blocks the whole day without opening a
+    # single market member.  (UNAVAILABLE / NO_PATH stay advisory - a
+    # stub map has no chain to break; a genuinely declared link that
+    # fails hash or read is the block.)
+    _chain_faults = [c for c in manifest_chain
+                     if c.get("status") not in ("MATCH", "NO_PATH", "UNAVAILABLE")]
+    if _chain_faults:
+        return HistoryResult(
+            raw_history={
+                "schema_version": "p11.raw-history-input.v1",
+                "market_date": market_date.isoformat(),
+                "decision_cutoff": iso(decision_cutoff),
+                "source_members": [], "calendar_rows": [],
+                "listing_rows": [], "securities": [],
+            },
+            coverage={
+                "read_at": read_at,
+                "visible_at_label": purpose,
+                "market_date": market_date.isoformat(),
+                "manifest_chain": manifest_chain,
+                "calendar": {"reads": []}, "listing": {"reads": []},
+                "universe": {"reads": [], "pool_size": 0},
+                "bars": {"reads": []}, "actions": {},
+                "exceptions": {"reads": []}, "limits": {"reads": []},
+                "security_count": 0,
+                "late_visible_members": [],
+                "member_consumption": {
+                    "consumed_member_count": 0, "consumed_for_T_count": 0,
+                    "base_member_count": 0, "daily_member_count": 0,
+                    "sha_all_match": True, "members": [],
+                    "registered_member_count": 0, "registered_not_read": [],
+                    "november_partitions_not_used": [], "run_read_at": read_at,
+                    "members_opened": 0,
+                },
+                "day_block": {
+                    "reason_code": "SUMMARY_CHAIN_FAULT",
+                    "detail": "a declared manifest/dates/descriptor link failed hash or was unreadable before any member was opened",
+                    "affected_scope": "whole_day",
+                    "failed_members": [c.get("artifact") for c in _chain_faults],
+                    "disposition": "block_new_entries",
+                },
+            },
+            read_at=read_at, status="INPUT_BLOCKED",
+        )
+
     calendar_rows, cal_cov = cal_mod.read_calendar_rows(smap, market_date)
     listing_rows, list_cov = cal_mod.read_listing_rows(smap, market_date)
     # The venue's real native open instant for T (audit 749-03): the
@@ -329,6 +377,20 @@ def read_history(
                 producer_completed_at=day_producer,
                 channel_visible_at=day_channel,
             )
+            if formal:
+                # Late-for-cutoff receipt + the named input gap a P10
+                # shared-source proof must fill (audit R4 second
+                # segment): a member with no proven channel/knowledge
+                # clock is named, never silently qualified.
+                ent = member_entries[_member_key(m)]
+                ent["formal_admission"] = "late_for_cutoff" if late else "admitted"
+                if day_channel is None and day_knowledge is None:
+                    ent["named_input_gap"] = (
+                        "NO_PROVEN_CHANNEL_OR_KNOWLEDGE_CLOCK"
+                    )
+                elif day_channel is None:
+                    ent["named_input_gap"] = "NO_CHANNEL_VISIBILITY_PROOF"
+
     source_member_entries = list(member_entries.values())
 
     # ---- per-security entries ----
@@ -812,6 +874,11 @@ def read_history(
         "bar_sessions": BAR_SESSIONS,
         "listing_proof_sessions": LISTING_PROOF_SESSIONS,
         "late_visible_members": late_visible_members,
+        "named_input_gaps": [
+            {"member_key": e["package_key"], "member_id": e["member_id"],
+             "package_id": e["package_id"], "gap": e["named_input_gap"]}
+            for e in source_member_entries if e.get("named_input_gap")
+        ] if (purpose == FORMAL_DAILY_UPDATE) else [],
         "member_consumption": member_consumption,
         "note": (
             "Corporate-action/exception completeness for the covered window is "

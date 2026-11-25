@@ -1359,3 +1359,63 @@ def test_formal_selects_pre_cutoff_revision_over_late(tmp_path):
     assert chain is not None and len(chain) == 3
     kts = [c["knowledge_to"] for c in chain]
     assert any(k is not None for k in kts)  # withdrawn row preserved verbatim
+
+
+def test_manifest_chain_fault_blocks_before_member_read(tmp_path):
+    """R4 second segment: a declared Base/DATES/descriptor link that
+    fails hash or is unreadable blocks the whole day BEFORE any market
+    member is opened (SUMMARY_CHAIN_FAULT, zero members read)."""
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    # Inject a chain whose declared Base manifest sha does not match.
+    smap.manifest_chain = lambda: [
+        {"artifact": "base_manifest", "path": "/x/manifest.json",
+         "declared_sha256": "sha256:" + "a" * 64,
+         "actual_sha256": "sha256:" + "b" * 64,
+         "status": "SHA_MISMATCH", "verified_at": "2026-11-24T14:00:00Z"},
+    ]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=smap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert calls == []  # no market member opened before the gate
+
+
+def test_same_name_member_two_packages_kept_distinct(tmp_path):
+    """R4 second segment (R3 item 1): the same relative member path
+    (e.g. audit.json) shipped under TWO daily packages stays resolvable
+    under both package-qualified keys, not collapsed to the first."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # The same relative member id under two different daily packages.
+    rel = "payload/dwd_security_bar/day=x/audit.json.parquet"
+    m_a = _member(tmp_path, rel, package_id="daily-2026-11-23",
+                  kind="daily", market_date="2026-11-23")
+    m_b = _member(tmp_path, rel, package_id="daily-2026-11-24",
+                  kind="daily", market_date="2026-11-24")
+    clocks = {
+        "2026-11-23": {"knowledge": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+                        "producer": datetime(2026, 11, 23, 10, 0, tzinfo=UTC),
+                        "channel": datetime(2026, 11, 23, 10, 5, tzinfo=UTC)},
+        "2026-11-24": {"knowledge": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+                        "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+                        "channel": datetime(2026, 11, 24, 10, 5, tzinfo=UTC)},
+    }
+    fmap = _FormalStubSourceMap(
+        members, {"2026-11-23": [m_a], "2026-11-24": [m_b]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    keys = {m["package_key"] for m in res.raw_history["source_members"]
+            if m["member_id"] == rel}
+    assert keys == {"daily-2026-11-23::" + rel, "daily-2026-11-24::" + rel}
+    # Each keeps its own package_id + version on the envelope.
+    pkg_ids = {m["package_id"] for m in res.raw_history["source_members"]
+               if m["member_id"] == rel}
+    assert pkg_ids == {"daily-2026-11-23", "daily-2026-11-24"}

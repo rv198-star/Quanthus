@@ -174,7 +174,10 @@ def test_b_nested_account_alone_is_unresolved_not_entry(assets):
     out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
     sc = out["source_closure"]
     assert ("600001", "entry_plan") in _decisions(out)
-    assert not any(c == "600000" for c, s in _decisions(out))
+    # The bare nested block is NOT fill evidence: 600000 gets no entry; its
+    # held-role unresolved record surfaces the named hold_alert only.
+    decs = dict(_decisions(out))
+    assert decs.get("600000") in (None, "holding")
     unres = [r for r in sc["account_unresolved"] if r.get("security_code") == "600000"]
     assert unres and unres[0]["missing_reason"] == "nested_account_block_only_no_row_markers"
 
@@ -266,8 +269,10 @@ def test_b_r1_position_facts_without_source_refused(assets):
             "prior_strategy_reduction_count": 0,
         },
     )
-    with pytest.raises(ProductDailyError, match="invalid_raw_history"):
-        e_run_e1_replay(_req([sec]), f.T1, assets)
+    out = e_run_e1_replay(_req([sec]), f.T1, assets)
+    block = out.get("day_block") or {}
+    assert block.get("reason") == "invalid_raw_history"
+    assert "unit_id" in block.get("detail", "")
 
 
 def test_b_r1_buy_pending_evidence_in_closure(assets):

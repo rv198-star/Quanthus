@@ -264,6 +264,25 @@ class SourceMap:
                 return ts
         return None
 
+    def daily_producer_completed_at(self, market_date: str):
+        """The producer's index/manifest completion instant for a daily
+        package (audit 749 R4 second segment).  Distinct from the
+        knowledge clock: production-complete is when the day's core
+        manifest was sealed, which may precede the channel-visible
+        instant.  Returns an aware UTC datetime or None when the source
+        carries no such clock (a named gap, never a guess)."""
+        e = self._daily_entries.get(market_date) or {}
+        core = e.get("core_manifest") or {}
+        acq = (core.get("acquisition_universe_metadata") or {}).get(
+            "warehouse_observed_at"
+        )
+        from quanthus.p12_history.clocks import parse_ts
+        for candidate in (e.get("producer_index_completed_at"), acq):
+            ts = parse_ts(candidate)
+            if ts is not None:
+                return ts
+        return None
+
     def daily_visible_at(self, market_date: str):
         """The channel-visible instant for a daily package.
 

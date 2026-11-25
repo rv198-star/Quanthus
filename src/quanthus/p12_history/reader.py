@@ -19,7 +19,7 @@ from quanthus.p12_history import calendar_listing as cal_mod
 from quanthus.p12_history import envelope as env_mod
 from quanthus.p12_history import identity as id_mod
 from quanthus.p12_history import supplements as sup_mod
-from quanthus.p12_history.clocks import REPLAY_AS_OBSERVED, iso, parse_ts, utcnow
+from quanthus.p12_history.clocks import FORMAL_DAILY_UPDATE, REPLAY_AS_OBSERVED, iso, parse_ts, utcnow
 from quanthus.p12_history.source_pins import BASE_BUSINESS_THROUGH, SourceMap, sha256_file
 
 BAR_SESSIONS = bars_mod.BAR_SESSIONS
@@ -243,13 +243,16 @@ def read_history(
         # member_id would collide and keep only the first; the composite
         # package_id::member_id keeps both registered and resolvable.
         return f"{member.package_id}::{member.member_id}"
-    def _reg(member, knowledge_at, date_from=None, date_to=None, visible_at=None):
+    def _reg(member, knowledge_at, date_from=None, date_to=None, visible_at=None,
+             producer_completed_at=None, channel_visible_at=None):
         key = _member_key(member)
         if key not in member_entries:
             e = env_mod.member_entry(
                 member, knowledge_at,
                 visible_at if visible_at is not None else knowledge_at,
                 date_from, date_to,
+                producer_completed_at=producer_completed_at,
+                channel_visible_at=channel_visible_at,
             )
             e["package_key"] = key
             member_entries[key] = e
@@ -282,6 +285,15 @@ def read_history(
     # the consumed member to be supplied).
     p1_member = smap.p1_exception_member()
     _reg(p1_member, base_knowledge, visible_at=base_knowledge)
+    # Second-segment formal update: production-complete and channel-
+    # visible are separate instants (audit 749 R4).  Under FORMAL_DAILY_
+    # UPDATE a package is admissible only when its QUALIFIED channel
+    # visibility is at or before the cutoff - a member that completed
+    # production early but only became channel-visible after the cutoff
+    # is named late and contributes nothing.  Under the October replay
+    # the real knowledge clock is used verbatim as before.
+    formal = purpose == FORMAL_DAILY_UPDATE
+    formal_inadmissible_keys = set()
     for day in smap.daily_open_days():
         if day > market_date.isoformat():
             continue
@@ -294,14 +306,28 @@ def read_history(
         # still registered (its knowledge_at stays None) so the consumer
         # sees the gap rather than a guessed cutoff-pass.
         day_knowledge = smap.daily_knowledge_at(day)
-        day_visible = smap.daily_visible_at(day)
+        day_producer = smap.daily_producer_completed_at(day)
+        day_channel = smap.daily_visible_at(day)
+        # Formal admission is judged on the channel-visible instant; a
+        # missing channel clock is a named gap (the member is registered
+        # but flagged late so the rule can fail it closed).
+        admissible_instant = day_channel if formal else day_knowledge
         for m in pkg.members:
-            if day_knowledge is not None and day_knowledge > decision_cutoff:
+            late = False
+            if admissible_instant is not None and admissible_instant > decision_cutoff:
+                late = True
+            elif admissible_instant is None and formal:
+                late = True  # no proven channel clock under a formal read
+            if late:
                 late_visible_members.append(_member_key(m))
+                if formal:
+                    formal_inadmissible_keys.add(_member_key(m))
             _reg(
                 m, day_knowledge,
                 date_from=day, date_to=day,
-                visible_at=day_visible if day_visible is not None else day_knowledge,
+                visible_at=(day_channel if day_channel is not None else day_knowledge),
+                producer_completed_at=day_producer,
+                channel_visible_at=day_channel,
             )
     source_member_entries = list(member_entries.values())
 
@@ -473,6 +499,8 @@ def read_history(
                     or parse_ts(b.get("knowledge_from")) <= decision_cutoff)
                 and (parse_ts(b.get("knowledge_to")) is None
                     or parse_ts(b.get("knowledge_to")) > decision_cutoff)
+                and (not formal
+                     or b.get("member_key") not in formal_inadmissible_keys)
             ]
             chosen = (eligible or ordered)[-1]
             chosen["late_for_cutoff"] = bool(

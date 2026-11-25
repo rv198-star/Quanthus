@@ -29,7 +29,21 @@ def _num(value):
     return str(value)
 
 
-def member_entry(member, knowledge_at, visible_at, date_from=None, date_to=None):
+def member_entry(member, knowledge_at, visible_at, date_from=None, date_to=None,
+                 producer_completed_at=None, channel_visible_at=None):
+    """One registered source member on the envelope.
+
+    Four instants stay distinct (audit 749 R4 second segment):
+      * ``knowledge_at``      - the source row's own knowledge clock;
+      * ``producer_completed_at`` - when the producer's index/manifest
+        sealed the day's package (production-complete, not visibility);
+      * ``channel_visible_at``- when the channel made the package visible
+        (qualified publication/withdrawal chain), which may lag the
+        completion;
+      * ``visible_at``        - the effective visibility the reader used
+        for THIS purpose (== channel clock for a formal update, == the
+        real knowledge clock verbatim for the October replay).
+    A fact the source does not prove stays None, never a guess."""
     return {
         "member_id": member.member_id,
         "package_id": member.package_id,
@@ -39,6 +53,8 @@ def member_entry(member, knowledge_at, visible_at, date_from=None, date_to=None)
         "date_from": date_from,
         "date_to": date_to,
         "knowledge_at": iso(knowledge_at),
+        "producer_completed_at": iso(producer_completed_at),
+        "channel_visible_at": iso(channel_visible_at),
         "visible_at": iso(visible_at),
     }
 

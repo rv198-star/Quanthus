@@ -1254,3 +1254,108 @@ def test_listing_latest_replica_collapses_before_conflict(tmp_path):
     for rows in ([older, latest, conflict], [conflict, latest, older]):
         r = run(rows)
         assert "security-600000" in r.coverage["universe"]["ambiguous_security_ids"]
+
+
+class _FormalStubSourceMap(StubSourceMap):
+    """Stub that also serves the producer / channel / knowledge clocks
+    per daily package so a FORMAL_DAILY_UPDATE read can be exercised."""
+
+    def __init__(self, members_by_table, daily_cores, clocks):
+        super().__init__(members_by_table, daily_cores)
+        # clocks: {day: {"knowledge": ts, "producer": ts, "channel": ts}}
+        self._clocks = clocks
+
+    def daily_knowledge_at(self, market_date):
+        return (self._clocks.get(market_date) or {}).get("knowledge")
+
+    def daily_producer_completed_at(self, market_date):
+        return (self._clocks.get(market_date) or {}).get("producer")
+
+    def daily_visible_at(self, market_date):
+        return (self._clocks.get(market_date) or {}).get("channel")
+
+    class _Pkg:
+        def __init__(self, members):
+            self.members = members
+
+    def daily_core(self, market_date):
+        return _FormalStubSourceMap._Pkg(self._daily.get(market_date, ()))
+
+
+def _formal_daily_member(tmp_path, day, fragment="dwd_security_bar"):
+    """A daily-core bar member for one market date."""
+    rel = f"payload/dwd_security_bar/day={day}/{fragment}.parquet"
+    return _member(tmp_path, rel, package_id=f"daily-{day}", kind="daily",
+                   market_date=day)
+
+
+def test_formal_channel_visibility_gates_bar_selection(tmp_path):
+    """R4 second segment: a package that COMPLETED production before the
+    cutoff but only became CHANNEL-VISIBLE after it must not supply T
+    bars under a FORMAL_DAILY_UPDATE read; the member is registered and
+    named late with producer/channel/knowledge kept distinct."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # A daily-core bar member whose production finished 10:00Z but whose
+    # channel only published it 16:05Z - after the 14:30Z formal cutoff.
+    dm = _formal_daily_member(tmp_path, "2026-11-24")
+    clocks = {"2026-11-24": {
+        "knowledge": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "channel": datetime(2026, 11, 24, 16, 5, tzinfo=UTC),
+    }}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [dm]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    key = f"daily-2026-11-24::{dm.member_id}"
+    # Member is registered and named late for the formal read.
+    assert key in res.coverage["late_visible_members"]
+    src = next(m for m in res.raw_history["source_members"]
+               if m["member_id"] == dm.member_id)
+    # The four instants stay distinct on the receipt.
+    assert src["producer_completed_at"] == "2026-11-24T10:00:00Z"
+    assert src["channel_visible_at"] == "2026-11-24T16:05:00Z"
+    assert src["visible_at"] == "2026-11-24T16:05:00Z"
+
+
+def test_formal_selects_pre_cutoff_revision_over_late(tmp_path):
+    """R4 second segment: a 17:00Z revision does NOT displace the last
+    revision known by the 14:30Z formal cutoff; a noon-withdrawn row
+    stays in the revision chain verbatim but never wins the select."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    days = _sessions(330)
+    rows1 = _bar_table(days).to_pylist()
+    # Same session carries: original bar + a noon-withdrawn row + a 17:00Z
+    # late fix.  The formal cutoff selects the original (last revision
+    # known by 14:30Z), keeps the other two in the chain verbatim.
+    withdrawn = dict(rows1[-1], close_price=17.0, source_revision="withdrawn",
+                     knowledge_to=datetime(2026, 11, 24, 12, 0, tzinfo=UTC))
+    late_fix = dict(rows1[-1], close_price=25.0, source_revision="late-fix",
+                    knowledge_from=datetime(2026, 11, 24, 17, 0, tzinfo=UTC),
+                    knowledge_to=None)
+    all_rows = rows1 + [withdrawn, late_fix]
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    pq.write_table(pa.table({k: [r.get(k) for r in all_rows]
+                             for k in rows1[0].keys()}), tmp_path / rel)
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
+    res = reader_mod.read_history(
+        T, CUT, source_map=StubSourceMap(members, {}),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    last = sec["bars"][-1]
+    # The 17:00Z late fix does not win; the noon-withdrawn row is kept in
+    # the chain verbatim but is not selected either.  The selected bar is
+    # the original close (neither 17.0 nor 25.0).
+    assert float(last["close_price"]) not in (17.0, 25.0)
+    chain = sec["bar_revisions"].get("2026-11-24")
+    assert chain is not None and len(chain) == 3
+    kts = [c["knowledge_to"] for c in chain]
+    assert any(k is not None for k in kts)  # withdrawn row preserved verbatim

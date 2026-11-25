@@ -20,6 +20,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 REPLAY_AS_OBSERVED = "ENGINEERING_REPLAY_AS_OBSERVED"
+# Formal daily update (issue #749 second segment): the production T
+# close read.  The call value is "production_daily" (the label P11 and
+# the read entry already use); the constant only names it in code.  The
+# decision_cutoff is the formal deadline (e.g. 14:30Z); a package is
+# admissible only when its QUALIFIED channel visibility is at or before
+# the cutoff, and the version selected is the last revision known by
+# the cutoff.  Production-complete, channel publication/withdrawal and
+# this run's read/verify instants are recorded separately - never
+# conflated.
+FORMAL_DAILY_UPDATE = "production_daily"
 
 
 def utcnow() -> datetime:

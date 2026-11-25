@@ -1412,3 +1412,117 @@ class TestScanDetailDisplay:
         assert block["replay_message"] is None
         for row in block["securities"]:
             assert row["scan_detail"] is None
+
+
+class TestRunFailureReceipt:
+    """Product directive 2026-11-25: an internal run-day error must land a
+    FAIL-closed run receipt bound to run_id + T + stage + reason + the
+    honest input evidence - never a bare 500 and never a package."""
+
+    def _engine(self, tmp_path, *, materialize_side_effect, failure_context=None):
+        from quanthus.p12_replay.engine import ReplayEngine
+        from quanthus.p12_replay.replay_product import ReplayInputSpec
+        from quanthus.p12_daily.rule_runner import SyntheticRuleRunner
+
+        sessions = [date(2026, 10, 8)]
+        spec = ReplayInputSpec(
+            history={}, corporate_actions={}, volume={},
+            knowledge_cutoff=None, completed_at=None,
+        )
+        eng = ReplayEngine(
+            state_dir=tmp_path / "st",
+            sessions=sessions,
+            bars_by_day={},
+            runner=SyntheticRuleRunner(candidates=()),
+            spec=spec,
+            base_manifest_path=tmp_path / "m.json",
+            base_manifest_sha256="sha256:" + "0" * 64,
+            app_builder=lambda **kw: None,
+            run_failure_context=failure_context,
+        )
+        if materialize_side_effect is not None:
+            def _boom(*a, **kw):
+                raise materialize_side_effect
+            eng.materialize_day = _boom
+        return eng
+
+    def _receipts_dir(self, tmp_path):
+        return (tmp_path / "st" / "daily-runs")
+
+    def test_decimal_encode_fault_lands_failed_receipt(self, tmp_path):
+        """A Decimal reaching a JSON boundary during materialize still
+        writes one persisted FAILED run receipt - never a bare error."""
+        eng = self._engine(
+            tmp_path,
+            materialize_side_effect=TypeError(
+                "Object of type Decimal is not JSON serializable"
+            ),
+            failure_context={
+                "scenario_id": "spdb-20261008",
+                "sealed_source": {"envelope_sha256": "sha256:" + "a" * 64},
+                "replay_exclusion": {"sha256": "sha256:" + "b" * 64},
+            },
+        )
+        receipt = eng.evening_run()
+        assert receipt["status"] == "FAILED"
+        assert receipt["run_id"]
+        assert receipt["market_date"] == "2026-10-08"
+        assert receipt["error"]["reason_code"] == "RUN_INTERNAL_ERROR"
+        assert receipt["error"]["stage"] == "materialize"
+        # Persisted under daily-runs/<run_id>.json - retrievable from the
+        # same T's run log, and the identity matches the returned body.
+        path = self._receipts_dir(tmp_path) / (receipt["run_id"] + ".json")
+        assert path.is_file()
+        on_disk = __import__("json").loads(path.read_text())
+        assert on_disk["status"] == "FAILED"
+        assert on_disk["run_id"] == receipt["run_id"]
+        # Input aborted before materialization -> the verified entry
+        # binding is declared as the evidence, with no fabricated digest.
+        ev = on_disk["input_evidence"]
+        assert ev["kind"] == "entry_binding"
+        assert ev["entry_bindings"]["scenario_id"] == "spdb-20261008"
+        assert ev["entry_bindings"]["sealed_source"]["envelope_sha256"].startswith(
+            "sha256:"
+        )
+        assert "sha256" not in ev or not ev.get("sha256")
+        # No package was emitted for the day.
+        from quanthus.p12_daily.package_store import DailyPackageStore
+        assert not DailyPackageStore(
+            tmp_path / "st"
+        ).package_path(date(2026, 10, 8)).is_file()
+
+    def test_non_encode_internal_fault_lands_failed_receipt(self, tmp_path):
+        """A non-encoding internal exception (assembly/product write) also
+        lands a FAILED receipt with the materialize stage recorded."""
+        eng = self._engine(
+            tmp_path,
+            materialize_side_effect=OSError("disk full on payload write"),
+        )
+        receipt = eng.evening_run()
+        assert receipt["status"] == "FAILED"
+        assert receipt["error"]["stage"] == "materialize"
+        path = self._receipts_dir(tmp_path) / (receipt["run_id"] + ".json")
+        assert path.is_file()
+        from quanthus.p12_daily.package_store import DailyPackageStore
+        assert not DailyPackageStore(
+            tmp_path / "st"
+        ).package_path(date(2026, 10, 8)).is_file()
+
+    def test_run_daily_escape_lands_failed_receipt(self, tmp_path):
+        """A failure escaping even run_daily's own last-line wrapper still
+        lands one engine-side FAILED receipt - the day never exits with no
+        daily-runs record."""
+        eng = self._engine(tmp_path, materialize_side_effect=None)
+        # materialize succeeds trivially; force run_daily itself to escape.
+        from unittest.mock import patch as _patch
+        eng.materialize_day = lambda *a, **kw: {"ok": True}
+        with _patch(
+            "quanthus.p12_replay.engine.run_daily",
+            side_effect=ValueError("runner exploded past its own guards"),
+        ):
+            receipt = eng.evening_run()
+        assert receipt["status"] == "FAILED"
+        assert receipt["error"]["stage"] == "run_daily"
+        assert (
+            tmp_path / "st" / "daily-runs" / (receipt["run_id"] + ".json")
+        ).is_file()

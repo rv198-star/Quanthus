@@ -424,7 +424,15 @@ def make_handler(engine_factory, users: dict | None = None):
             engine = self._engine()
             try:
                 if path == "/api/run-day":
-                    return self._json(engine.evening_run())
+                    receipt = engine.evening_run()
+                    # Product directive 2026-11-25: an internal run failure
+                    # still lands a FAIL-closed run receipt bound to
+                    # run_id + T + stage + reason + input evidence.  HTTP
+                    # keeps a non-200 status but returns THIS receipt's
+                    # identity - never a bare 500 with no daily-runs record.
+                    if receipt.get("status") == "FAILED":
+                        return self._json(receipt, 503)
+                    return self._json(receipt)
                 if path == "/api/confirm":
                     return self._json(engine.confirm(str(body.get("plan_id") or "")))
                 if path == "/api/skip":

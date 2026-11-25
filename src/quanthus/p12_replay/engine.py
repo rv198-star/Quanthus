@@ -161,6 +161,14 @@ class ReplayEngine:
     # envelope, used only when _real_raw_history is empty so the page can
     # show signed-off names without opening a market member.  Display only.
     read_only_name_map: dict | None = None
+    # Run-failure provenance (product directive 2026-11-25): when a run-day
+    # aborts before its input read has produced an envelope the FAILED run
+    # receipt still binds the verified scenario / sealed-source / fixed
+    # SourceMap identity the entry actually configured.  Injected by the
+    # driver from the pre-load_window verified bindings - never read back
+    # from a scenario file or the process env here - and declared verbatim
+    # as unavailable-for-digest when the input never materialized.
+    run_failure_context: dict | None = None
 
     # runtime state
     day_index: int = 0
@@ -522,6 +530,136 @@ class ReplayEngine:
         with path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
 
+    def _input_evidence(self) -> dict:
+        """The input closure a FAILED receipt can still honestly bind."""
+        import hashlib as _hl
+
+        envelope = getattr(self, "_real_raw_history", None)
+        if isinstance(envelope, dict):
+            try:
+                canonical = json.dumps(
+                    envelope, ensure_ascii=False, sort_keys=True
+                ).encode("utf-8")
+            except (TypeError, ValueError):
+                return {
+                    "kind": "materialized_envelope",
+                    "schema_version": envelope.get("schema_version"),
+                    "market_date": envelope.get("market_date"),
+                    "digest_unavailable": (
+                        "the materialized envelope raised on JSON "
+                        "serialization; its digest cannot be recomputed, "
+                        "so the verified entry bindings below are the "
+                        "input evidence"
+                    ),
+                    "entry_bindings": dict(self.run_failure_context or {}),
+                }
+            return {
+                "kind": "materialized_envelope",
+                "schema_version": envelope.get("schema_version"),
+                "market_date": envelope.get("market_date"),
+                "sha256": "sha256:" + _hl.sha256(canonical).hexdigest(),
+                "entry_bindings": dict(self.run_failure_context or {}),
+            }
+        ctx = dict(self.run_failure_context or {})
+        return {
+            "kind": "entry_binding",
+            "entry_bindings": ctx,
+            "input_digest_unavailable": (
+                "the run aborted before this day's input envelope was "
+                "materialized; the verified scenario / SourceMap / sealed-"
+                "source identity above is the complete input evidence for "
+                "this attempt"
+            )
+            if ctx
+            else (
+                "the run aborted before this day's input envelope was "
+                "materialized and no verified entry binding is configured"
+            ),
+        }
+
+    def _failed_receipt(
+        self, *, stage: str, exc: BaseException, reason_code: str
+    ) -> dict:
+        """One FAIL-closed run receipt for an internal error escaped from
+        encoding, input assembly, the rule runner or persistence."""
+        from quanthus.p12_daily.daily_job import _run_id
+        from quanthus.p12_daily.daily_job import STATUS_FAILED
+        from quanthus.p12_daily.package_store import RUN_SCHEMA
+
+        moment = self.now()
+        if moment is None:
+            moment = datetime.now(EXCHANGE_TZ)
+        moment = moment.astimezone(EXCHANGE_TZ)
+        run_id = _run_id(moment)
+        day = self.current_day
+        runner_ref = getattr(getattr(self, "runner", None), "runner_ref", None)
+        detail = (
+            "daily run aborted on an internal "
+            + type(exc).__name__
+            + " at stage "
+            + stage
+            + ": "
+            + str(exc)
+        )
+        receipt = {
+            "schema_version": RUN_SCHEMA,
+            "run_id": run_id,
+            "market_date": day.isoformat(),
+            "next_session": (
+                self.next_day.isoformat() if self.next_day else None
+            ),
+            "decision_cutoff": _sh_now(
+                day, self.decision_cutoff_time
+            ).isoformat(),
+            "account_id": self.account_id,
+            "runner": {
+                "ref_id": getattr(runner_ref, "ref_id", "p12.replay.e1"),
+                "version": getattr(runner_ref, "version", "0"),
+                "digest": getattr(
+                    runner_ref, "digest", "sha256:" + "0" * 64
+                ),
+            },
+            "started_at": moment.isoformat(),
+            "stages": [
+                {
+                    "stage": stage,
+                    "elapsed_ms": 0,
+                    "result": "failed",
+                    "reason_code": reason_code,
+                }
+            ],
+            "status": STATUS_FAILED,
+            "error": {
+                "reason_code": reason_code,
+                "stage": stage,
+                "detail": detail,
+            },
+            "input_block": {
+                "reason_code": reason_code,
+                "detail": detail,
+                "checked_at": moment.isoformat(),
+                "expected_market_date": day.isoformat(),
+                "observed_market_date": None,
+                "affected_scope": "new_entries",
+                "missing_members": ["run_completion"],
+                "recovery_condition": (
+                    "the failing stage is repaired; the next scheduled run "
+                    "then re-qualifies and may publish"
+                ),
+            },
+            "input_evidence": self._input_evidence(),
+            "elapsed_ms": 0,
+        }
+        try:
+            self._store.write_run(receipt)
+            receipt["_persisted"] = True
+        except Exception as write_exc:  # noqa: BLE001
+            receipt["_persisted"] = False
+            receipt["_persist_error"] = (
+                type(write_exc).__name__ + ": " + str(write_exc)
+            )
+        return receipt
+
     def evening_run(self, *, rerun: bool = False) -> dict:
         """Session T evening: materialize the input and run the daily job.
 
@@ -555,24 +693,56 @@ class ReplayEngine:
                 physical_clock=datetime.now(EXCHANGE_TZ).isoformat(),
             )
             return receipt
-        product = self.materialize_day(day)
-        receipt = run_daily(
-            state_dir=self.state_dir,
-            job_root=self._job_root / ".." if False else self._job_root,
-            runner=(
-                self.runner_factory(day)
-                if callable(self.runner_factory)
-                else self.runner
-            ),
-            market_date=day,
-            next_session=None,
-            account_id=self.account_id,
-            account_mode=self.account_mode,
-            now=self.now(),
-            decision_cutoff=_sh_now(day, self.decision_cutoff_time),
-            calendar_root=self._calendar_root,
-            raw_history=getattr(self, "_real_raw_history", None),
-        )
+        # Input assembly / materialization is the stage BEFORE run_daily's
+        # own guards.  An exception escaping here (encode, reader, product
+        # write) still lands ONE FAIL-closed run receipt bound to this T.
+        try:
+            product = self.materialize_day(day)
+        except Exception as exc:  # noqa: BLE001 - every internal fault lands
+            receipt = self._failed_receipt(
+                stage="materialize",
+                exc=exc,
+                reason_code="RUN_INTERNAL_ERROR",
+            )
+            self._log(
+                "evening_run",
+                market_date=day.isoformat(),
+                status=receipt.get("status"),
+                rerun=rerun,
+                failed_stage="materialize",
+                run_id=receipt.get("run_id"),
+                logical_clock=self.now().isoformat(),
+                physical_clock=datetime.now(EXCHANGE_TZ).isoformat(),
+            )
+            return receipt
+        # run_daily's own wrapper already lands FAILED receipts for faults
+        # escaping its inner guards.  A failure escaping even THAT wrapper
+        # (or the engine-side call itself) still lands one receipt here -
+        # never a bare 500 with no daily-runs record.
+        try:
+            receipt = run_daily(
+                state_dir=self.state_dir,
+                job_root=self._job_root / ".." if False else self._job_root,
+                runner=(
+                    self.runner_factory(day)
+                    if callable(self.runner_factory)
+                    else self.runner
+                ),
+                market_date=day,
+                next_session=None,
+                account_id=self.account_id,
+                account_mode=self.account_mode,
+                now=self.now(),
+                decision_cutoff=_sh_now(day, self.decision_cutoff_time),
+                calendar_root=self._calendar_root,
+                raw_history=getattr(self, "_real_raw_history", None),
+            )
+        except Exception as exc:  # noqa: BLE001 - last engine line
+            receipt = self._failed_receipt(
+                stage="run_daily",
+                exc=exc,
+                reason_code="RUN_INTERNAL_ERROR",
+            )
         self._log(
             "evening_run",
             market_date=day.isoformat(),

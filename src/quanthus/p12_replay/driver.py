@@ -306,6 +306,7 @@ def make_engine(
     publish_time: time = time(22, 30, tzinfo=EXCHANGE_TZ),
     read_only_account_snapshot: dict | None = None,
     read_only_name_map: dict | None = None,
+    run_failure_context: dict | None = None,
     reset: bool = False,
 ) -> ReplayEngine:
     """Build a ReplayEngine bound to the replay's own state dir."""
@@ -362,6 +363,7 @@ def make_engine(
         read_only=os.environ.get("P12_REPLAY_READONLY") in ("1", "true", "yes"),
         read_only_account_snapshot=read_only_account_snapshot,
         read_only_name_map=read_only_name_map,
+        run_failure_context=run_failure_context,
         app_builder=lambda **kw: build_replay_app(
             fixture_path=fixture_path, **kw
         ),
@@ -598,6 +600,7 @@ def main(argv=None) -> int:
     e1_runner = None
     e1_history_reader = None
     e1_decision_cutoff = None
+    run_failure_context = None
     if args.e1_scenario is not None:
         e1_block = {"status": "ok"}
         try:
@@ -631,6 +634,49 @@ def main(argv=None) -> int:
             e1_decision_cutoff = time(
                 int(hh), int(mm), tzinfo=EXCHANGE_TZ
             )
+            # Run-failure provenance (product directive 2026-11-25): bind
+            # the SAME verified scenario / SourceMap / sealed-source /
+            # exclusion identity this entry configured, so a run-day that
+            # aborts before its input envelope materializes still lands a
+            # FAILED receipt that names the complete input evidence - and
+            # says why no input digest exists.  Read here ONCE from the
+            # verified scenario doc and the entry's own verified pin, never
+            # from a per-request file or the process env at failure time.
+            try:
+                _scen_full = json.loads(Path(args.e1_scenario).read_text())
+            except Exception:
+                _scen_full = {}
+            _sealed = _scen_full.get("sealed_source") or {}
+            _smap = _scen_full.get("source_map") or {}
+            run_failure_context = {
+                "scenario_path": str(args.e1_scenario),
+                "scenario_id": _scen_full.get("scenario_id"),
+                "sealed_source": {
+                    "path": _sealed.get("path"),
+                    "sha256": _sealed.get("sha256"),
+                    "envelope_sha256": _sealed.get("envelope_sha256"),
+                    "coverage_sha256": _sealed.get("coverage_sha256"),
+                }
+                if isinstance(_sealed, dict) and _sealed
+                else None,
+                "source_map": {
+                    "base": (_smap.get("base") or {}).get("sha256")
+                    if isinstance(_smap.get("base"), dict)
+                    else _smap.get("base"),
+                    "daily": (_smap.get("daily") or {}).get("sha256")
+                    if isinstance(_smap.get("daily"), dict)
+                    else _smap.get("daily"),
+                    "calendar": (_smap.get("calendar") or {}).get("sha256")
+                    if isinstance(_smap.get("calendar"), dict)
+                    else _smap.get("calendar"),
+                }
+                if isinstance(_smap, dict) and _smap
+                else None,
+                "replay_exclusion": {
+                    "path": str(exclusion_path),
+                    "sha256": EXPECTED_EXCLUSION_SHA256,
+                },
+            }
         except Exception as exc:  # noqa: BLE001 - assembly is best effort
             e1_block = {
                 "status": "blocked",
@@ -666,6 +712,7 @@ def main(argv=None) -> int:
             account_mode=(
                 "simulation" if e1_runner is not None else "synthetic"
             ),
+            run_failure_context=run_failure_context,
             read_only_account_snapshot=(
                 {
                     "path": args.account_snapshot,

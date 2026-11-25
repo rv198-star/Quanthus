@@ -965,9 +965,7 @@ def test_c8_held_type_structurally_similar_object_alerts(runner, resources):
     assert memb[0].get("held_membership_unverified") is True
     # The neighbour is evaluated on its own (named feature exclusion), never
     # contaminated by the unverified held member's isolation.
-    assert any(
-        e.get("security_code") == "600001" for e in out.source_closure.get("exclusions", [])
-    )
+    assert any(e.get("security_code") == "600001" for e in out.source_closure.get("exclusions", []))
 
 
 def test_c8_held_type_real_type_keeps_verified_exit(runner, resources):

@@ -912,15 +912,16 @@ def build_replay_envelope(
         if nested_account is not None:
             nested_o = _obj(nested_account, f"securities[{index}].account")
             nested_role = nested_o.get("account_role")
+            # Only an actual value divergence against the row-level held
+            # markers is a projection conflict.  A bare nested account block
+            # on a row with NO held/pending markers is never fill evidence and
+            # lands on account_unresolved below (never an entry).
             conflict = (
-                (nested_role == "held" and not held_member)
-                or (
-                    nested_role == "held"
-                    and held_member
-                    and nested_o.get("held_quantity") is not None
-                    and sec_o.get("held_quantity") is not None
-                    and nested_o.get("held_quantity") != sec_o.get("held_quantity")
-                )
+                nested_role == "held"
+                and held_member
+                and nested_o.get("held_quantity") is not None
+                and sec_o.get("held_quantity") is not None
+                and int(nested_o["held_quantity"]) != int(sec_o["held_quantity"])
             )
             if conflict:
                 _fail(

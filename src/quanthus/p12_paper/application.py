@@ -1100,14 +1100,21 @@ class PaperAccount:
         object.__setattr__(order, "avg_price", fill_price)
         object.__setattr__(order, "last_quote_time", quote.quote_time)
         object.__setattr__(order, "receipt_id", result.receipt_id)
-        # E6-05/R4 item1: capture the stored unverified alert before clearing -
-        # a sell/reduction fill reports it so a poll-driven outcome is never
-        # silent on a fact that stayed unverified at fill time.
+        # E6-05/R4 rework: the typed unavailable alert a sell/reduction
+        # carried into the fill stays PERSISTED on the stored row.  The
+        # filled status and the alert are expressed separately - the row
+        # reads status=filled AND pending_reason=<typed alert>, so an
+        # open/fill/restart/same-id/conflict replay never loses the fact
+        # that stayed unverified at fill time.  A buy-side fill still
+        # clears its alert only through the verified-fact path below
+        # (an actually verified fact never keeps a stale pending alert).
         fill_alert = order.pending_reason if order.side == "sell" else None
-        # The fill passed the pre-fill fact re-check, so the intent is no
-        # longer pending on an unverified fact; clear the stored alert so a
-        # same-id re-read/replay reports the filled state, not a stale alert.
-        object.__setattr__(order, "pending_reason", None)
+        if order.side != "sell":
+            # The fill passed the pre-fill fact re-check, so the intent is no
+            # longer pending on an unverified fact; clear the stored alert so
+            # a same-id re-read/replay reports the filled state, not a stale
+            # alert.
+            object.__setattr__(order, "pending_reason", None)
         # Compare-and-set: only flip while the row is still open.  When a
         # racing matcher already committed a terminal state the CAS fails and
         # we fall back to the stored row rather than overwriting it.
@@ -1134,8 +1141,12 @@ class PaperAccount:
         if stored is None:
             return None
         if stored.status == "filled":
+            # E6-05: a conflict/same-id replay of a filled sell echoes the
+            # persisted typed alert (filled state and alert stay separate);
+            # a buy fill carries no stale pending alert at this point.
+            replay_alert = stored.pending_reason if stored.side == "sell" else None
             return SubmitOutcome(
-                stored.order_id, "filled", None, None, stored.filled_qty,
+                stored.order_id, "filled", replay_alert, None, stored.filled_qty,
                 stored.avg_price, stored.rule_version, stored.last_quote_time,
                 stored.receipt_id,
             )

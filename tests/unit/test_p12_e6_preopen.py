@@ -264,8 +264,13 @@ def test_buy_recompute_down_on_reduced_cash():
 
 
 def test_buy_blocked_when_auction_above_price_cap():
-    plan = _Plan(price_cap=Decimal("10.80"))
-    # a qualified (already observed+received) print above the cap still fails
+    # E6-03/R4 rework: the price-cap comparison only applies when the plan
+    # actually declares the auction dependency - an undeclared plan keeps
+    # its original result even above the cap.
+    plan = _Plan(price_cap=Decimal("10.80"), depends_on_preopen=(preopen.FACT_AUCTION,))
+    # a qualified (already observed+received, auction-purpose shape) print
+    # above the cap still fails.  The fixture quote carries no ordinary
+    # session market_state, i.e. it is the pre-qualified auction record.
     q = _Quote(open=Decimal("11.50"), quote_time=_at(9, 18), received_at=_at(9, 18))
     receipt = preopen.run_check(
         package=_Package(plans=(plan,)),
@@ -288,6 +293,36 @@ def test_buy_blocked_when_auction_above_price_cap():
         now=_at(9, 20),
     )
     assert "auction_above_price_cap" not in receipt2["plans"][0]["reason_codes"]
+
+
+def test_no_auction_dependency_no_price_veto():
+    # Legal adjacent case: the SAME qualified print above the cap never
+    # vetoes a plan that does not declare the auction dependency.
+    plan = _Plan(price_cap=Decimal("10.80"))
+    q = _Quote(open=Decimal("11.50"), quote_time=_at(9, 18), received_at=_at(9, 18))
+    receipt = preopen.run_check(
+        package=_Package(plans=(plan,)),
+        projection=_Projection(),
+        history=_History(),
+        quotes=_Quotes({"600000": q}),
+        now=_at(9, 20),
+    )
+    r = receipt["plans"][0]
+    assert r["executable"] is True
+    assert "auction_above_price_cap" not in r["reason_codes"]
+
+
+def test_ordinary_intraday_snapshot_never_qualified_for_auction():
+    # Purpose qualification: an ordinary intraday snapshot declaring a
+    # session market_state (the production Quote shape) is never the
+    # auction print even with in-window same-day double clocks.
+    class _Ordinary(_Quote):
+        market_state = "trading"
+    q = _Ordinary(open=Decimal("10.90"), quote_time=_at(9, 19), received_at=_at(9, 19))
+    v = preopen.resolve_auction(q, "600000", _at(9, 20))
+    assert v.status == "unavailable"
+    assert v.observed_at == _at(9, 19).isoformat()
+    assert v.received_at == _at(9, 19).isoformat()
 
 
 def test_check_marks_window_and_never_mints_signal():

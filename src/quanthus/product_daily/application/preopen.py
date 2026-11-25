@@ -53,6 +53,16 @@ AUCTION_CLOSE = dtime(9, 25)
 CHECK_OPEN = dtime(9, 0)
 CHECK_CLOSE = dtime(9, 25)
 
+# Purpose qualification for the opening auction: the ordinary intraday
+# quote surface (production Quote always stamps a ``market_state`` session
+# value) carries the day's open price as a regular post-hoc tape field, not
+# as an auction-purpose record visible inside 09:15-09:25.  An ordinary
+# snapshot therefore never qualifies as the auction print no matter which
+# clocks it carries; only a record shape that does not declare an ordinary
+# session state (the pre-qualified auction record, e.g. a future #727-named
+# supply) can be admitted, and only after the same-security/same-session/
+# in-window/point-in-time gates in resolve_auction.
+
 _ROUND_LOT = 100
 
 
@@ -158,11 +168,27 @@ def merge_stock_pool_snapshots(snapshots: tuple, as_of: datetime) -> dict:
     accounts keeps every applicable source and the per-account quantity.
     """
     securities: dict[str, dict] = {}
+    expected_day = as_of.date().isoformat()
     trading_date = None
+    rejected: list[dict] = []
     for snap in snapshots:
         if snap is None:
             continue
-        trading_date = trading_date or snap.get("trading_date")
+        snap_day = snap.get("trading_date")
+        if snap_day != expected_day:
+            # An account pool written for a DIFFERENT trading day never
+            # merges into today's named pool: its held quantities would
+            # silently re-enter the current session under a valid SHA.
+            # The wrong-day account is recorded as a typed rejection and
+            # contributes nothing - per-account quantities and ledger
+            # source refs stay separated by day.
+            rejected.append({
+                'account_ref': snap.get('account_ref'),
+                'trading_date': snap_day,
+                'error': 'POOL_WRONG_DAY',
+            })
+            continue
+        trading_date = trading_date or snap_day
         for row in snap.get("securities", ()):
             code = row.get("security_code", "")
             entry = securities.setdefault(
@@ -199,6 +225,8 @@ def merge_stock_pool_snapshots(snapshots: tuple, as_of: datetime) -> dict:
         "generated_at": as_of.isoformat(),
         "securities": rows,
     }
+    if rejected:
+        body["rejected_accounts"] = rejected
     payload = json.dumps(body, ensure_ascii=False, sort_keys=True).encode("utf-8")
     body["sha256"] = _sha256_bytes(payload)
     return body
@@ -227,7 +255,7 @@ def load_stock_pool_snapshot(state_dir: Path, trading_date) -> dict:
         raise PoolError("POOL_MISSING", f"no named pre-open pool for {day}")
     try:
         body = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise PoolError("POOL_CORRUPT", f"unreadable pre-open pool: {exc}") from exc
     # A syntactically valid JSON value that is not an object (``[]``, a
     # scalar, ``null``) is still a corrupt named pool - refuse it with the
@@ -278,15 +306,22 @@ class FactVerdict:
         }
 
 
-def _unavailable(code, fact, reason, source, now) -> FactVerdict:
+def _unavailable(code, fact, reason, source, now, quote=None) -> FactVerdict:
+    # E6-02 source-clock fidelity: an unavailable verdict keeps the
+    # source-side observation/receipt times at their ORIGINAL values.
+    # A missing source clock stays null - the check instant belongs only
+    # to ``checked_at`` and is never copied into the fact's source fields,
+    # so a late/early/missing receipt is auditable as it actually was.
+    observed = getattr(quote, 'quote_time', None) if quote is not None else None
+    received = getattr(quote, 'received_at', None) if quote is not None else None
     return FactVerdict(
         security_code=code,
         fact=fact,
         status="unavailable",
         reason=reason,
         source=source,
-        observed_at=None,
-        received_at=now.isoformat(),
+        observed_at=_iso(observed),
+        received_at=_iso(received),
     )
 
 
@@ -331,7 +366,7 @@ def resolve_auction(quote, code, now) -> FactVerdict:
             FACT_AUCTION,
             "open call auction has not printed yet (window 09:15-09:25)",
             "none",
-            now,
+            now, quote=quote,
         )
     if quote is None or getattr(quote, "open", None) is None:
         return _unavailable(
@@ -339,14 +374,14 @@ def resolve_auction(quote, code, now) -> FactVerdict:
             FACT_AUCTION,
             "no usable opening-auction print from the quote surface",
             "none",
-            now,
+            now, quote=quote,
         )
     # Identity and session: the snapshot must belong to the queried
     # security and to the same T+1 trading day as the check instant.
     if getattr(quote, "security_code", code) != code:
         return _unavailable(
             code, FACT_AUCTION, "quote belongs to a different security",
-            getattr(quote, "source", "tencent") or "tencent", now,
+            getattr(quote, "source", "tencent") or "tencent", now, quote=quote,
         )
     quote_status = getattr(quote, "status", "live")
     if quote_status in ("unavailable", "halt", "closed") or getattr(
@@ -355,8 +390,25 @@ def resolve_auction(quote, code, now) -> FactVerdict:
         return _unavailable(
             code, FACT_AUCTION,
             f"quote surface is {quote_status}; no usable auction print",
-            getattr(quote, "source", "tencent") or "tencent", now,
+            getattr(quote, "source", "tencent") or "tencent", now, quote=quote,
         )
+    # Purpose qualification: an auction verdict is only available from a
+    # record qualified for THIS purpose.  An ordinary intraday snapshot
+    # whose source stamps a continuous/post-auction session state
+    # (trading/lunch/closing-auction/closed, or the pre/holiday states that
+    # never carry a print) reports the day's open price as a post-hoc
+    # field of the regular tape; it is not the opening-auction print that
+    # was visible inside 09:15-09:25.  Only a quote surface that does not
+    # declare such a session state (the pre-qualified auction record
+    # shape) can qualify, and the time-window gates below still apply.
+    market_state = getattr(quote, 'market_state', None)
+    if market_state is not None:
+        return _unavailable(
+            code, FACT_AUCTION,
+            'ordinary intraday snapshot open is not an auction-purpose print (market_state='+str(market_state)+')',
+            getattr(quote, 'source', 'tencent') or 'tencent', now, quote=quote,
+        )
+
     # Point-in-time AND window qualification: a genuine auction print must
     # carry BOTH a source observation time and a source receipt time, each
     # on the same trading day and each at or before the check instant, and
@@ -371,25 +423,34 @@ def resolve_auction(quote, code, now) -> FactVerdict:
         return _unavailable(
             code, FACT_AUCTION,
             "auction print lacks a source observation/receipt time",
-            getattr(quote, "source", "tencent") or "tencent", now,
+            getattr(quote, "source", "tencent") or "tencent", now, quote=quote,
         )
     qt = quote_time.astimezone(EXCHANGE_TZ)
     ra = received_at.astimezone(EXCHANGE_TZ)
     if qt.date() != now.date() or ra.date() != now.date():
         return _unavailable(
             code, FACT_AUCTION, "auction print belongs to a different session",
-            getattr(quote, "source", "tencent") or "tencent", now,
+            getattr(quote, "source", "tencent") or "tencent", now, quote=quote,
         )
     if qt > now or ra > now:
         return _unavailable(
             code, FACT_AUCTION, "auction print observed/received after the check instant",
-            getattr(quote, "source", "tencent") or "tencent", now,
+            getattr(quote, "source", "tencent") or "tencent", now, quote=quote,
         )
     if not (AUCTION_OPEN <= qt.time() <= AUCTION_CLOSE):
         return _unavailable(
             code, FACT_AUCTION,
             "auction print observed outside the 09:15-09:25 window",
-            getattr(quote, "source", "tencent") or "tencent", now,
+            getattr(quote, "source", "tencent") or "tencent", now, quote=quote,
+        )
+    if ra.time() > AUCTION_CLOSE:
+        # A print first received after 09:25 was never visible inside the
+        # auction window, so it cannot serve as the 09:15-09:25-visible
+        # auction record even when the check itself runs late.
+        return _unavailable(
+            code, FACT_AUCTION,
+            "auction print received after the 09:15-09:25 visibility window",
+            getattr(quote, "source", "tencent") or "tencent", now, quote=quote,
         )
     return FactVerdict(
         security_code=code,
@@ -492,21 +553,27 @@ def run_check(
         depends = tuple(getattr(plan, "depends_on_preopen", ()) or ())
         facts = [resolve_fact(quote, code, fact, now).to_dict() for fact in depends]
 
-        # A verified pool confines the check to the named securities; a
-        # pool that is missing/stale/corrupt or that does not list this
-        # security keeps every declared fact unverified (never inferred).
+        # E6-01/E6-02 unified qualification+pool verdict: ONE gate decides
+        # whether quote-derived facts may be admitted for this security, and
+        # the same verdict governs both the declared-fact list and the auction
+        # price comparison below - a bad/missing/unlisted pool never leaves an
+        # independent ungated verdict feeding the price-cap failure.
+        pool_blocks_facts = False
+        pool_block_reason = None
         if pool_error is not None:
-            for f in facts:
-                if f["status"] == "verified":
-                    f["status"] = "unavailable"
-                    f["reason"] = f"named pre-open pool defect: {pool_error}"
-                    f["observed_at"] = None
+            pool_blocks_facts = True
+            pool_block_reason = f"named pre-open pool defect: {pool_error}"
         elif pool is not None and code not in pool_members:
+            pool_blocks_facts = True
+            pool_block_reason = "security absent from the named pre-open pool"
+        if pool_blocks_facts:
             for f in facts:
                 if f["status"] == "verified":
                     f["status"] = "unavailable"
-                    f["reason"] = "security absent from the named pre-open pool"
-                    f["observed_at"] = None
+                    f["reason"] = pool_block_reason
+                    # The pool defect denies admission but never rewrites the
+                    # source clocks: observed/received keep their original
+                    # source values (a missing source clock stays null).
         missing = [f["fact"] for f in facts if f["status"] != "verified"]
 
         recheck_qty = None
@@ -577,16 +644,20 @@ def run_check(
                 alerted += 1
                 reasons.append("preopen_unverified_alert")
 
-        # The auction comparison uses only a PIT-qualified print: the same
-        # verdict gate that admits an observed-and-received in-session open.
-        # A future, stale, wrong-security or unqualified print never feeds
-        # the price-cap failure (it stays a typed unavailable fact instead).
-        auction_verdict = resolve_fact(quote, code, FACT_AUCTION, now)
-        auction_price = (
-            getattr(quote, "open", None)
-            if (quote is not None and auction_verdict.status == "verified")
-            else None
+        # The auction comparison is one more consumer of the SAME
+        # unified qualification+pool verdict as the declared facts: it is
+        # skipped entirely unless the plan actually depends on the auction
+        # fact, and a defective/missing/unlisted pool exits the price
+        # judgment instead of feeding the cap failure from a fresh ungated
+        # resolve_fact.  Never minted for a plan without the dependency.
+        auction_declared = any(
+            _canonical_fact(dep) == FACT_AUCTION for dep in depends
         )
+        auction_price = None
+        if auction_declared and not pool_blocks_facts and quote is not None:
+            auction_verdict = resolve_fact(quote, code, FACT_AUCTION, now)
+            if auction_verdict.status == "verified":
+                auction_price = getattr(quote, "open", None)
         if (
             plan.side == "buy"
             and auction_price is not None

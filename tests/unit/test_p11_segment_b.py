@@ -919,13 +919,18 @@ def test_c8_r4_typed_held_position_facts_keeps_verified_provenance(runner, resou
     assert memb[0].get("held_membership_unverified") is False
 
 
-def test_c8_held_type_structurally_similar_object_alerts(assets):
-    """A structurally-similar object that carries the same four attribute
-    names but is NOT a real HeldPositionFacts is NOT a verified snapshot -
-    it stays on the named unverified-held alert path, never the trusted
-    exit/filled_position_evidence path."""
+def test_c8_held_type_structurally_similar_object_alerts(runner, resources):
+    """A structurally-similar object carrying the same four attribute names
+    but NOT a real HeldPositionFacts is NOT a verified snapshot.  The public
+    JSON wire cannot carry a non-serializable object, so the reachable vector
+    is the internal entry: it stays on the named unverified-held alert path,
+    never the trusted exit/filled_position_evidence path."""
     from dataclasses import dataclass
     from decimal import Decimal
+
+    from quanthus.product_daily.recommendation.history_input import (
+        run_daily_advice_from_history,
+    )
 
     @dataclass
     class _AlmostFacts:
@@ -934,24 +939,36 @@ def test_c8_held_type_structurally_similar_object_alerts(assets):
         prior_strategy_reduction_count: int = 0
         evidence: object = None
 
-    sec = f._security("600000", _DAYS)
+    sec = _security_entry(_raw_security("600000"))
     sec.update(
         held_membership=True,
         held_quantity=1200,
         position_facts=_AlmostFacts(),
     )
-    out = e_run_e1_replay(_req([sec, f._security("600001", _DAYS)]), f.T1, assets)
-    # Not the trusted type -> declared-held, risk unverified -> hold_alert.
-    assert _held_action(out) == ["hold_alert"]
-    memb = _membership(out)
-    assert memb and memb[0].get("held") is True
+    env = _envelope(
+        [sec, _security_entry(_raw_security("600001"))],
+        calendar=None,
+        listing=[_listing("security-600000"), _listing("security-600001")],
+    )
+    out = run_daily_advice_from_history(env, runner=runner, resources=resources, **_run_kwargs())
+    # Not the trusted type -> declared-held, risk unverified -> hold_alert,
+    # never an exit even though the shape is structurally similar.
+    held = [d for d in out.seam.held_decisions if d.security_code == "600000"]
+    assert held and held[0].action == "hold_alert"
+    memb = [
+        m for m in out.source_closure["account_membership"] if m.get("security_code") == "600000"
+    ]
+    assert memb
+    # Membership is confirmed by held_membership/quantity -> verified fill
+    # source; only the unqualified risk stays unverified.
     assert memb[0].get("membership_source") == "filled_position_evidence"
     assert memb[0].get("held_membership_unverified") is True
-    assert not any(
-        d.get("exit_kind")
-        for ds in (out.get("package") or {}).get("decision_sets", [])
-        for d in ds.get("decisions", [])
-        if d.get("security_code") == "600000"
+    # Qualified neighbour keeps its real entry.
+    assert any(
+        d.stage == "entry_plan"
+        for ds in out.result.package.decision_sets
+        for d in ds.decisions
+        if d.security_code == "600001"
     )
 
 

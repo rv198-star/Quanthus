@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 from zoneinfo import ZoneInfo
 
 from quanthus.product_daily.contracts import ProductDailyError
+from quanthus.product_daily.recommendation.contracts import NoQualifiedRawInputs
 from quanthus.product_daily.recommendation.daily_runner import RawSecurityInput
 from quanthus.product_daily.recommendation.feature_adapter import (
     CorporateAction,
@@ -1498,12 +1499,6 @@ def run_daily_advice_from_history(
         proof_sinks=proof_sinks,
         as_observed=as_observed,
     )
-    if not inputs:
-        _fail(
-            "missing_raw_inputs",
-            "raw_history produced no qualified security inputs; this is a shared "
-            "block, never a fabricated qualified-empty day",
-        )
     envelope_identity = raw_history_digest(history)
     bound_receipts = [{**receipt, "raw_history_digest": envelope_identity} for receipt in receipts]
     # Convert adapter-level exclusions into the runner's input_exclusions so a bad
@@ -1541,6 +1536,12 @@ def run_daily_advice_from_history(
         )
     ]
     runner_exclusions = [*(adapter_exclusions), *(kwargs.pop("input_exclusions", None) or ())]
+    if not inputs:
+        raise NoQualifiedRawInputs(
+            "raw_history produced no qualified security inputs; this is a shared "
+            "block, never a fabricated qualified-empty day",
+            runner_exclusions,
+        )
     # The single-T numeric context is established only inside the versioned
     # as-observed replay entry; a strict/forward/H1/M2 caller supplying it is
     # a contract breach, never a silent widening.  Under as_observed the

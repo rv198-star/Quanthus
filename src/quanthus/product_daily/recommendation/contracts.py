@@ -12,6 +12,7 @@ backfilled.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -24,6 +25,15 @@ from quanthus.product_daily.contracts import (
     require_decimal,
     require_text,
 )
+
+
+class NoQualifiedRawInputs(ProductDailyError):
+    """All market inputs failed. Keep the exclusions collected before issuance."""
+
+    def __init__(self, detail: str, exclusions: Sequence[Mapping[str, Any]]) -> None:
+        super().__init__("missing_raw_inputs", detail)
+        self.input_exclusions = tuple(dict(row) for row in exclusions)
+
 
 # Private replay-context token.  The single-T "october_replay_as_observed" date
 # context is established only inside the versioned as-observed replay entry

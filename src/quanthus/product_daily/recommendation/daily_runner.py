@@ -43,6 +43,7 @@ from quanthus.product_daily.contracts import (
 )
 from quanthus.product_daily.recommendation.contracts import (
     DailyFactsView,
+    NoQualifiedRawInputs,
     OctoberReplayContext,
 )
 from quanthus.product_daily.recommendation.contracts import (
@@ -485,7 +486,7 @@ def run_daily_advice_from_raw(
     held_facts = dict(account_view.held_facts)
     held_reasons = dict(account_view.unavailable_reasons)
     if not raw and not held_facts:
-        raise ProductDailyError("missing_raw_inputs", "no qualified security inputs")
+        raise NoQualifiedRawInputs("no qualified security inputs", caller_input_exclusions or ())
     features_by_security: dict[str, SecurityFeatureFacts] = {}
     scan_rows: list[CandidateDailyInput] = []
     prior_det: dict[str, int] = {}
@@ -717,8 +718,8 @@ def run_daily_advice_from_raw(
             prior_det[code] = item.prior_deterioration_sessions
 
     if not scan_rows and not held_facts:
-        raise ProductDailyError(
-            "missing_raw_inputs", "every supplied market input failed validation"
+        raise NoQualifiedRawInputs(
+            "every supplied market input failed validation", input_exclusions
         )
 
     # The scan requires the T+1 session in trading_dates; take it from the bound

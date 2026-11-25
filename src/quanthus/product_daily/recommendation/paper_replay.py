@@ -48,6 +48,7 @@ from quanthus.product_daily.contracts import ProductDailyError
 from quanthus.product_daily.recommendation.contracts import (
     DailyFactsView,
     MemberEvidence,
+    NoQualifiedRawInputs,
 )
 from quanthus.product_daily.recommendation.producer import (
     AccountFactsView,
@@ -2680,6 +2681,8 @@ def run_replay_day(
             "detail": str(exc),
             "scope": "whole_day",
         }
+        if isinstance(exc, NoQualifiedRawInputs):
+            day_block["input_exclusions"] = list(exc.input_exclusions)
 
     receipt: dict[str, Any] = {
         "schema_version": REPLAY_DAY_SCHEMA,

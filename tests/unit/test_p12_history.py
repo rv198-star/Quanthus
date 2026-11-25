@@ -1473,3 +1473,111 @@ def test_formal_missing_channel_single_member_named_not_day_block(tmp_path):
     assert any(g["gap"] == "NO_CHANNEL_VISIBILITY_PROOF" for g in gaps)
     key = f"daily-2026-11-24::{rel}"
     assert key in res.coverage["late_visible_members"]
+
+
+# ---- segment B: real non-empty paper account snapshots --------------------
+# Snapshot identities from #748 fixed f29506fe (SYN-PAPER-A, synthetic).
+_B_SID = "security_2e02245cf8b28319ec8af0e9554cdc24"
+_B_LID = "listing_5edd7b7cdd4b6445afae0d2cca6b85ce"
+
+
+def _build_map_seg_b(tmp_path):
+    """_build_map whose pool security carries the real snapshot identity
+    (600000 / security_2e02... / listing_5edd... / SSE)."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    # Replace the default security/listing/identifier ids with the real
+    # snapshot identity so the account facts bind inside the pool.
+    pq.write_table(pa.table({
+        "security_id": [_B_SID], "company_id": ["company-1"],
+        "instrument_type": ["common_equity"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+        "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+    }), tmp_path / "dwd_security.parquet")
+    pq.write_table(pa.table({
+        "security_id": [_B_SID], "listing_id": [_B_LID], "venue_id": ["SSE"],
+        "listing_code": ["600000"], "board_code": ["main"],
+        "effective_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+        "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [datetime(2026, 1, 1, tzinfo=UTC)],
+    }), tmp_path / "listing.parquet")
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    members["dwd_security"] = [_member(tmp_path, "dwd_security.parquet")]
+    pq.write_table(_identifier_table_full([
+        (_B_SID, "CN_STOCK_CODE:SSE", "600000", "SSE",
+         datetime(2026, 1, 1, tzinfo=UTC), None, datetime(2026, 7, 18, tzinfo=UTC)),
+    ]), tmp_path / "dwd_security_identifier.parquet")
+    members["dwd_security_identifier"] = [_member(tmp_path, "dwd_security_identifier.parquet")]
+    return StubSourceMap(members, {})
+
+
+def _seg_b_read(tmp_path, holdings, pending):
+    # The fixture bar member is windowed to November; use an in-window T
+    # so the pool is admitted and the account projection is exercised
+    # (the snapshot as_of is an account fact, not a market window).
+    return reader_mod.read_history(
+        date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
+        source_map=_build_map_seg_b(tmp_path),
+        holdings=holdings, pending=pending,
+        observed_at=datetime(2026, 10, 20, 23, 0, tzinfo=UTC),
+        purpose=reader_mod.FORMAL_DAILY_UPDATE)
+
+
+def test_seg_b_held_snapshot_binds_pool_identity(tmp_path):
+    """Segment B: the held SYN-PAPER-A snapshot (1200 shares, fill
+    replay-fill-20261020-0001) binds to the pool security's real
+    identity; the wire carries held_quantity=1200 + account_role=held
+    and the held-vs-empty envelopes differ."""
+    held = [{"security_id": _B_SID, "security_code": "600000",
+             "listing_id": _B_LID, "venue_id": "SSE", "quantity": 1200}]
+    res_held = _seg_b_read(tmp_path, held, [])
+    res_empty = _seg_b_read(tmp_path, [], [])
+    sec = next(x for x in res_held.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["account"]["held_quantity"] == 1200
+    assert sec["account"]["account_role"] == "held"
+    assert _B_SID in res_held.coverage["universe"]["held_in_pool"]
+    # Held and empty accounts must NOT produce the same wire account.
+    sec_e = next(x for x in res_empty.raw_history["securities"]
+                 if x["identity"]["security_id"] == _B_SID)
+    assert sec_e["account"]["account_role"] == "candidate"
+    assert sec_e["account"]["held_quantity"] is None
+
+
+def test_seg_b_pending_open_buy_order_snapshot(tmp_path):
+    """Segment B: the pending SYN-PAPER-A snapshot (open_buy_order 1200,
+    limit 9.50, zero fills) binds as a typed pending on the pool
+    security; holdings stay empty, account_role=pending."""
+    pending = [{"security_id": _B_SID, "security_code": "600000",
+                "listing_id": _B_LID, "venue_id": "SSE",
+                "order_id": "q749-b-paper-buy-600000-20261020",
+                "pending_kind": "open_buy_order", "pending_quantity": 1200,
+                "receipt_id": "receipt-sha256:2c4b1b889e971c"}]
+    res = _seg_b_read(tmp_path, [], pending)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == _B_SID)
+    assert sec["account"]["account_role"] == "pending"
+    assert sec["account"]["held_quantity"] is None
+    assert any(p["pending_kind"] == "open_buy_order"
+               for p in sec["account"]["pending"])
+
+
+def test_seg_b_outside_held_and_unknown_qty_projected(tmp_path):
+    """Segment B: an out-of-pool held security and an unknown-quantity
+    holding are still projected as independent account members
+    (hold_alert path), never silently dropped."""
+    held = [{"security_id": _B_SID, "quantity": 1200},
+            {"security_id": "outside-held-x", "quantity": None},
+            {"security_id": "outside-held-y", "quantity": 50}]
+    pending = [{"security_id": "outside-pend", "pending_kind": "sell",
+                "pending_quantity": 5}]
+    res = _seg_b_read(tmp_path, held, pending)
+    uni = res.coverage["universe"]
+    assert _B_SID in uni["held_in_pool"]
+    assert "outside-held-x" in uni["held_unknown_quantity"]
+    sids = {x["identity"]["security_id"] for x in res.raw_history["securities"]}
+    assert "outside-held-x" in sids and "outside-held-y" in sids
+    out = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "outside-held-x")
+    assert out["account"]["account_role"] == "held"
+    assert out["account"]["held_quantity"] is None

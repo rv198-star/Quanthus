@@ -491,24 +491,29 @@ def _held_sec(code="600000", evidence=None, holding=40):
     return sec
 
 
+def _held_sec_with_account(account_id, **kw):
+    """A held security carrying the SAME account snapshot id its position
+    facts were read into -- the same-account same-security anchor the frozen
+    B v1 contract requires (not a pool-external / neighbour / generic id)."""
+    sec = _held_sec(**kw)
+    sec["account"] = {"account_id": account_id}
+    return sec
+
+
 def test_c8_r1_legal_ref_with_bound_anchor_still_exits(assets):
     """A canonical four-field ExpertEvidenceRef whose digest recomputes over
-    the declared value payload AND whose unit_id binds a same-read account
-    anchor still drives the legal held exit (positive control)."""
-    unit_id = "ledger-snapshot-74b96148"
-    sec = _held_sec(evidence=_canonical_ref(unit_id))
+    the declared value payload AND whose unit_id binds THIS security's own
+    same-read account snapshot still drives the legal held exit (positive
+    control)."""
+    unit_id = "acct-spdb-20261008-snap"
+    sec = _held_sec_with_account(unit_id, evidence=_canonical_ref(unit_id))
     req = _req([sec, f._security("600001", _DAYS)])
-    # Declare the same-read anchor on the scenario account: a pool-external
-    # unresolved record from the same ledger snapshot source.
-    req["account"]["unresolved"] = [
-        {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
-    ]
     out = e_run_e1_replay(req, f.T1, assets)
     stages = {c: s for c, s in _decisions(out)}
-    assert stages.get("600000") in ("holding", "exit_plan")
+    assert stages.get("600000") == "exit_plan"
     # The held review produced a real expert decision, not a bare hold_alert.
     held = [h for h in out.get("held_signals", []) if h.get("security_code") == "600000"]
-    assert held and held[0].get("action") != "hold_alert" or True
+    assert held and held[0].get("action") == "exit"
     # The member keeps a real unavailable_reason=None (no degrade).
     memb = [
         m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
@@ -516,18 +521,80 @@ def test_c8_r1_legal_ref_with_bound_anchor_still_exits(assets):
     assert memb and memb[0].get("unavailable_reason") is None
 
 
-def test_c8_r1_wrong_digest_only_alerts(assets):
-    """A canonical-shaped ref whose digest does NOT recompute over the
-    declared value payload cannot drive an exit: the member degrades to a
-    named hold_alert."""
-    unit_id = "ledger-snapshot-74b96148"
-    ref = _canonical_ref(unit_id)
-    ref["digest"] = "sha256:" + "0" * 64  # bogus digest, same source
-    sec = _held_sec(evidence=ref)
+def test_c8_r2_pool_external_source_does_not_qualify(assets):
+    """R1 hole: a pool-external unresolved 'source' that merely PREFIX-matches
+    the unit_id can never qualify the position facts (caller-declared, not an
+    independently-read account fact)."""
+    sec = _held_sec(evidence=_canonical_ref("ledger-snapshot-x"))
     req = _req([sec, f._security("600001", _DAYS)])
     req["account"]["unresolved"] = [
         {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
     ]
+    out = e_run_e1_replay(req, f.T1, assets)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
+    memb = [
+        m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
+    ]
+    assert memb and "same-read" in (memb[0].get("unavailable_reason") or "")
+
+
+def test_c8_r2_neighbour_member_does_not_qualify(assets):
+    """R1 hole: a member bound only through a NEIGHBOUR's depends_on_member_ids
+    is not this security's same-read account source (prefix share refused)."""
+    sec = _held_sec(evidence=_canonical_ref("only-600001-x"))
+    req = _req([sec, f._security("600001", _DAYS)])
+    req["securities"][1]["identity"]["depends_on_member_ids"] = ["only-600001"]
+    req["source_members"].append(
+        dict(req["source_members"][0], member_id="only-600001", member_path="nb.parquet")
+    )
+    out = e_run_e1_replay(req, f.T1, assets)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
+
+
+def test_c8_r2_generic_member_does_not_qualify(assets):
+    """R1 hole: a generic shared market/source member id is a pool-wide source,
+    never this security's account snapshot."""
+    sec = _held_sec(evidence=_canonical_ref("synthetic-daily-1d"))
+    req = _req([sec, f._security("600001", _DAYS)])
+    out = e_run_e1_replay(req, f.T1, assets)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
+
+
+def test_c8_r2_order_source_does_not_qualify(assets):
+    """R1 hole: a pending order source_receipt is a caller-declared field, not
+    an independently-read account fact."""
+    sec = _held_sec(evidence=_canonical_ref("src.b1"))
+    sec["pending"] = [
+        {"kind": "open_buy_order", "quantity": 5, "order_key": "ord1", "source_receipt": "src.b"}
+    ]
+    req = _req([sec, f._security("600001", _DAYS)])
+    out = e_run_e1_replay(req, f.T1, assets)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
+
+
+def test_c8_r2_same_account_prefix_is_rejected(assets):
+    """A bare prefix share of the same account id (acct-x vs acct) never
+    binds: the match is exact on the same-read unit."""
+    sec = _held_sec_with_account("acct", evidence=_canonical_ref("acct-x"))
+    req = _req([sec, f._security("600001", _DAYS)])
+    out = e_run_e1_replay(req, f.T1, assets)
+    held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
+    assert ("600000", "hold_alert") in held
+
+
+def test_c8_r1_wrong_digest_only_alerts(assets):
+    """A canonical-shaped ref whose digest does NOT recompute over the
+    declared value payload cannot drive an exit: the member degrades to a
+    named hold_alert."""
+    unit_id = "acct-spdb-20261008-snap"
+    ref = _canonical_ref(unit_id)
+    ref["digest"] = "sha256:" + "0" * 64  # bogus digest, same source
+    sec = _held_sec_with_account(unit_id, evidence=ref)
+    req = _req([sec, f._security("600001", _DAYS)])
     out = e_run_e1_replay(req, f.T1, assets)
     held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
     assert ("600000", "hold_alert") in held
@@ -553,14 +620,11 @@ def test_c8_r1_ref_without_unit_id_recovers_when_bound(assets):
     """A canonical ref carrying only kind/evidence_id/version/digest (no
     non-standard unit_id) recovers the unit from evidence_id and binds the
     account anchor -- the legal shape the audit named."""
-    unit_id = "ledger-snapshot-74b96148"
+    unit_id = "acct-spdb-20261008-snap"
     ref = _canonical_ref(unit_id)
     # do NOT pass unit_id on the wire; it is recovered from evidence_id
-    sec = _held_sec(evidence=ref)
+    sec = _held_sec_with_account(unit_id, evidence=ref)
     req = _req([sec, f._security("600001", _DAYS)])
-    req["account"]["unresolved"] = [
-        {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
-    ]
     out = e_run_e1_replay(req, f.T1, assets)
     memb = [
         m for m in out["source_closure"]["account_membership"] if m.get("security_code") == "600000"
@@ -571,13 +635,10 @@ def test_c8_r1_ref_without_unit_id_recovers_when_bound(assets):
 def test_c8_r1_changed_value_same_digest_alerts(assets):
     """Changing the value but keeping the original digest is a payload
     mismatch: named hold_alert, never an exit."""
-    unit_id = "ledger-snapshot-74b96148"
+    unit_id = "acct-spdb-20261008-snap"
     ref = _canonical_ref(unit_id, holding=40)  # digest computed for holding=40
-    sec = _held_sec(evidence=ref, holding=41)  # different declared value
+    sec = _held_sec_with_account(unit_id, evidence=ref, holding=41)  # declared value differs
     req = _req([sec, f._security("600001", _DAYS)])
-    req["account"]["unresolved"] = [
-        {"account_key": "outside-x", "role": "held", "quantity": 1, "source": "ledger-snapshot"}
-    ]
     out = e_run_e1_replay(req, f.T1, assets)
     held = [(h.get("security_code"), h.get("action")) for h in out.get("held_signals", [])]
     assert ("600000", "hold_alert") in held

@@ -991,46 +991,41 @@ def _position_facts_from(
 
 
 def _same_read_sources(sec: Mapping[str, Any], history: RawHistory) -> frozenset[str]:
-    """The same-read account/source anchor ids declared on THIS security row
-    plus the run-level account/member evidence.  A serializable
-    position_facts.evidence.unit_id must resolve to one of these to bind; a
-    self-consistent digest over an unbound source id is still rejected.
+    """The same-read anchors that may bind THIS security's position_facts.
 
-    Anchors: the run's account.unresolved[].source/account_key, every
-    pending_securities[] source_receipt/order_key, every declared
-    source_members[]/member_evidence member id, and this row's own nested
-    account.unresolved[].source / pending[].source_receipt.  A unit_id that
-    is none of these was never read into this account and cannot
-    masquerade as a trusted position fact."""
+    The trusted anchor must name the SAME account on the SAME security triple
+    (security_id / listing_id / venue_id) that this run actually verified - it
+    can never be a pool-external unresolved key, another security's member, a
+    pending-order receipt, or a generic market/source member id (all caller-
+    declared fields, never an independently-read account fact).
+
+    Admissible anchors, all exact (never a prefix share):
+      * this security's own nested account snapshot id (account.account_id) -
+        the same-account same-security snapshot unit the position facts were
+        read into;
+      * this security's three-key identity (security_id / listing_id /
+        venue_id / listing_code) plus its own depends_on_member_ids: a member
+        bound to THIS security's identity is a same-read account source, while
+        a member shared by the whole pool or owned by a neighbour is not.
+
+    Any other source id - an empty anchor set, a neighbour's member, a pending
+    order key, a generic member/package id or a pool-external unresolved
+    source - is not bound to this security's account and cannot qualify the
+    position facts for an exit disposition.
+    """
     sources: set[str] = set()
-    for m in getattr(history, "source_members", ()) or ():
-        for key in ("member_id", "package_id"):
-            v = getattr(m, key, None)
-            if isinstance(v, str) and v.strip():
-                sources.add(v.strip())
-    for r in history.account_unresolved or ():
-        if isinstance(r, dict):
-            for key in ("source", "account_key"):
-                if isinstance(r.get(key), str) and r[key].strip():
-                    sources.add(r[key].strip())
-    for r in history.pending_securities or ():
-        if isinstance(r, dict):
-            for key in ("source_receipt", "order_key"):
-                if isinstance(r.get(key), str) and r[key].strip():
-                    sources.add(r[key].strip())
     acct = sec.get("account") or {}
     if isinstance(acct.get("account_id"), str) and acct["account_id"].strip():
         sources.add(acct["account_id"].strip())
-    for r in _seq(sec.get("unresolved") or (), "securities[].unresolved"):
-        if isinstance(r, dict):
-            for key in ("source", "account_key"):
-                if isinstance(r.get(key), str) and r[key].strip():
-                    sources.add(r[key].strip())
-    for r in _seq(sec.get("pending") or (), "securities[].pending"):
-        if isinstance(r, dict):
-            for key in ("source_receipt", "order_key"):
-                if isinstance(r.get(key), str) and r[key].strip():
-                    sources.add(r[key].strip())
+    ident = sec.get("identity") or {}
+    if isinstance(ident, Mapping):
+        for key in ("security_id", "listing_id", "venue_id", "listing_code"):
+            v = ident.get(key)
+            if isinstance(v, str) and v.strip():
+                sources.add(v.strip())
+        for mid in _seq(ident.get("depends_on_member_ids") or (), "depends_on_member_ids"):
+            if isinstance(mid, str) and mid.strip():
+                sources.add(mid.strip())
     return frozenset(s for s in sources if s)
 
 
@@ -1115,19 +1110,18 @@ def _position_facts_ref_from_evidence(
             "value payload (wrong digest or changed value)"
         )
     # The declared unit must be a same-read source actually bound to THIS
-    # run's account: an exact anchor id or an anchor-namespaced unit
-    # (e.g. a ledger-snapshot-<digest> under the declared "ledger-snapshot"
-    # account source).  A source id that is merely self-consistent but was
-    # never read into this account cannot masquerade as a trusted fact.
-    if allowed_sources:
-        bound = any(
-            unit_id == anchor or unit_id.startswith(anchor + "-") for anchor in allowed_sources
+    # security's account on the SAME three-key identity.  An empty anchor set
+    # never qualifies: there is nothing the read verified, so a position fact
+    # cannot masquerade as trusted on a bare caller self-declaration.  The
+    # match is EXACT (never a prefix share): a pool-external source, a
+    # neighbour's member, a pending order or a generic member/package id is
+    # not this account's position snapshot.
+    if not allowed_sources or unit_id not in allowed_sources:
+        return None, (
+            f"position_facts.evidence unit {unit_id!r} is not a same-read "
+            "account/source anchor bound to this security's verified account "
+            "(exact match on the same-read account/three-key member required)"
         )
-        if not bound:
-            return None, (
-                f"position_facts.evidence unit {unit_id!r} is not a same-read "
-                "account/source anchor bound to this run"
-            )
     ref = position_facts_evidence(
         unit_id=unit_id,
         holding_sessions=holding,

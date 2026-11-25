@@ -464,16 +464,46 @@ class SourceMap:
                self._base_doc.get("manifest_sha256"))
         for day in self.daily_open_days():
             e = self._daily_entries.get(day) or {}
-            desc = e.get("descriptor") or {}
-            if isinstance(desc, dict):
-                _probe(f"dates_index:{day}", desc.get("path"),
-                       desc.get("index_sha256") or desc.get("sha256"))
-            sd = e.get("standard_descriptor") or {}
-            if isinstance(sd, dict):
-                _probe(f"daily_manifest:{day}", sd.get("path"),
-                       sd.get("sha256"))
-            core = e.get("core_manifest") or {}
-            if isinstance(core, dict) and core.get("path"):
+            # Four external frozen links, each verified for its declared
+            # identity, a readable JSON-object shape, the external SHA and
+            # the associated identity - a non-object descriptor, a missing
+            # path or a wrong-shape link is a NAMED per-link fault, never
+            # silently skipped (audit R4 segment A closeout).
+            def _descriptor_probe(artifact, obj, sha_keys):
+                verified_at = iso(VerificationClock.now())
+                if not isinstance(obj, dict):
+                    out.append({
+                        "artifact": artifact, "path": None,
+                        "declared_sha256": None, "actual_sha256": None,
+                        "status": "NON_OBJECT_DESCRIPTOR",
+                        "object_shape": type(obj).__name__,
+                        "verified_at": verified_at})
+                    return
+                _probe(artifact, obj.get("path"),
+                       next((obj.get(k) for k in sha_keys
+                             if obj.get(k) is not None), None))
+            _descriptor_probe(f"dates_index:{day}", e.get("descriptor"),
+                              ("index_sha256", "sha256"))
+            _descriptor_probe(f"daily_manifest:{day}",
+                              e.get("standard_descriptor"), ("sha256",))
+            core = e.get("core_manifest")
+            if core is None:
+                out.append({
+                    "artifact": f"core_manifest:{day}", "path": None,
+                    "declared_sha256": None, "actual_sha256": None,
+                    "status": "MISSING_DECLARED_SHA256",
+                    "verified_at": iso(VerificationClock.now())})
+            elif not isinstance(core, dict):
+                out.append({
+                    "artifact": f"core_manifest:{day}", "path": None,
+                    "declared_sha256": None, "actual_sha256": None,
+                    "status": "NON_OBJECT_DESCRIPTOR",
+                    "object_shape": type(core).__name__,
+                    "verified_at": iso(VerificationClock.now())})
+            else:
+                # A declared digest with no path is a named missing-path
+                # fault; the digest-declared-but-path-absent case must not
+                # slip to a silent skip.
                 _probe(f"core_manifest:{day}", core.get("path"),
                        core.get("sha256"))
         return out

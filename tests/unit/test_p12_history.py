@@ -2140,3 +2140,146 @@ def test_seg_b_generation_receipt_sha_verified(tmp_path):
     codes = {r["reason_code"] for r in res.coverage["account_binding"]["rejections"]}
     assert "ACCOUNT_RECEIPT_SHA_MISMATCH" in codes
 
+
+# ---- R4 segment A closeout ---------------------------------------------
+
+def _formal_read(smap, tmp_path, T=date(2026, 11, 24),
+                 CUT=datetime(2026, 11, 24, 14, 30, tzinfo=UTC)):
+    return reader_mod.read_history(
+        T, CUT, source_map=smap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+
+
+def test_segA_nonobject_descriptor_named_fault(tmp_path):
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    smap.manifest_chain = lambda: [
+        {"artifact": "dates_index:2026-11-24", "path": None,
+         "declared_sha256": None, "actual_sha256": None,
+         "status": "NON_OBJECT_DESCRIPTOR", "object_shape": "str",
+         "verified_at": "2026-11-24T14:00:00Z"},
+    ]
+    res = _formal_read(smap, tmp_path)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert calls == []
+
+
+def test_segA_declared_digest_no_path_named_fault(tmp_path):
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    smap.manifest_chain = lambda: [
+        {"artifact": "core_manifest:2026-11-24", "path": None,
+         "declared_sha256": "sha256:" + "c" * 64, "actual_sha256": None,
+         "status": "NO_PATH", "verified_at": "2026-11-24T14:00:00Z"},
+    ]
+    res = _formal_read(smap, tmp_path)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert calls == []
+
+
+def test_segA_manifest_chain_probes_nonobject_and_missing_core(tmp_path):
+    smap = _build_map(tmp_path)
+    dm = _formal_daily_member(tmp_path, "2026-11-24")
+    smap._daily = {"2026-11-24": [dm]}
+    smap._base_doc = {"manifest_path": "/x/base.json",
+                      "manifest_sha256": "sha256:" + "a" * 64}
+    smap._daily_entries = {
+        "2026-11-24": {
+            "descriptor": "not-an-object",
+            "standard_descriptor": {"path": "/x/std.json",
+                                    "sha256": "sha256:" + "b" * 64},
+            "core_manifest": {"sha256": "sha256:" + "c" * 64},
+        },
+    }
+    chain = SourceMap.manifest_chain(smap)
+    by_art = {c["artifact"]: c for c in chain}
+    assert by_art["dates_index:2026-11-24"]["status"] == "NON_OBJECT_DESCRIPTOR"
+    assert by_art["core_manifest:2026-11-24"]["status"] == "NO_PATH"
+
+
+def test_segA_null_row_knowledge_rejected_formal(tmp_path):
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    days = _sessions(330)
+    rows = _bar_table(days).to_pylist()
+    rows[-1]["knowledge_from"] = None
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    pq.write_table(pa.table({k: [r.get(k) for r in rows]
+                             for k in rows[0].keys()}), tmp_path / rel)
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
+    res = _formal_read(StubSourceMap(members, {}), tmp_path, T, CUT)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    last_sessions = {b["session_date"] for b in sec["bars"]}
+    assert days[-1].isoformat() not in last_sessions
+
+
+def test_segA_same_clock_conflict_no_bar_both_orders(tmp_path):
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    for order in (0, 1):
+        smap = _build_map(tmp_path)
+        members = smap._members_by_table
+        days = _sessions(330)
+        rows = _bar_table(days).to_pylist()
+        kf = datetime(2026, 11, 24, 10, 0, tzinfo=UTC)
+        a = dict(rows[-1], close=61.0, source_revision="A",
+                 knowledge_from=kf)
+        b = dict(rows[-1], close=71.0, source_revision="B",
+                 knowledge_from=kf)
+        pair = [a, b] if order == 0 else [b, a]
+        all_rows = rows[:-1] + pair
+        rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+        pq.write_table(pa.table({k: [r.get(k) for r in all_rows]
+                                 for k in rows[0].keys()}), tmp_path / rel)
+        members["dwd_security_bar"] = [_member(tmp_path, rel)]
+        res = _formal_read(StubSourceMap(members, {}), tmp_path, T, CUT)
+        sec = next(x for x in res.raw_history["securities"]
+                   if x["identity"]["security_id"] == "security-600000")
+        last_sessions = {x["session_date"] for x in sec["bars"]}
+        assert days[-1].isoformat() not in last_sessions
+        assert "same_knowledge_conflicting_values" in json.dumps(
+            sec["dependency_reasons"], default=str)
+
+
+def test_segA_prior_window_day_shared_gap_blocks(tmp_path):
+    """Class 3 closeout: a PRIOR in-window trading day whose Daily price
+    member is the pool's source for that needed session and has no proven
+    channel clock blocks new entries (SHARED_INPUT_GAP)."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    dm = _formal_daily_member(tmp_path, "2026-11-23")
+    clocks = {"2026-11-23": {"knowledge": None, "producer": None,
+                             "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-11-23": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_INPUT_GAP"
+    assert "2026-11-23" in json.dumps(
+        res.coverage["day_block"]["failed_members"])
+
+
+def test_segA_out_of_window_day_gap_does_not_block(tmp_path):
+    """Class 3 adjacent: a Daily member for a day OUTSIDE the needed
+    window keeps its gap for the record but does not block this T."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    dm = _formal_daily_member(tmp_path, "2026-05-01")  # far outside window
+    clocks = {"2026-05-01": {"knowledge": None, "producer": None,
+                             "channel": None}}
+    fmap = _FormalStubSourceMap(members, {"2026-05-01": [dm]}, clocks)
+    res = _formal_read(fmap, tmp_path, T, CUT)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None

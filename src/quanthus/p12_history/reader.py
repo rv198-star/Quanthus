@@ -216,7 +216,8 @@ def read_history(
     _chain_faults = [
         c for c in manifest_chain
         if c.get("status") in ("NO_PATH", "MISSING_DECLARED_SHA256",
-                               "UNREADABLE", "SHA_MISMATCH")
+                               "NON_OBJECT_DESCRIPTOR", "UNREADABLE",
+                               "SHA_MISMATCH")
     ]
     if _chain_faults:
         return HistoryResult(
@@ -467,7 +468,21 @@ def read_history(
                 # declared for a different day (market_date != T) is an
                 # out-of-window registration whose gap is kept for the
                 # record but must NOT block this T's day.
-                in_t_window = (day == market_date.isoformat())
+                # Shared-dependency scope (audit R4 segment A closeout):
+                # a member is a shared hard dependency when its day is one
+                # of THIS read's actually-needed sessions - not only the
+                # market_date.  A prior in-window trading day whose Daily
+                # price/calendar member is the pool's sole source for that
+                # session and is channel-unknown or late blocks new
+                # entries.  Members for days outside the needed window are
+                # kept for the record but do not block.
+                needed_days = {
+                    (d.isoformat() if hasattr(d, "isoformat") else str(d))
+                    for d in sessions_needed
+                }
+                in_t_window = (
+                    day in needed_days or day == market_date.isoformat())
+
                 # dwd_security_valuation is a DECLARED_NOT_READ_ONLY
                 # member per the P10 named supply - it only shares the
                 # "dwd_security" PREFIX, so it is tested before the
@@ -857,15 +872,21 @@ def read_history(
             # in the chain verbatim but does not win the select; a row
             # whose source clock post-dates the cutoff is recorded in the
             # chain and flagged late, never selected for a formal read.
-            eligible = [
-                b for b in ordered
-                if (parse_ts(b.get("knowledge_from")) is None
-                    or parse_ts(b.get("knowledge_from")) <= decision_cutoff)
-                and (parse_ts(b.get("knowledge_to")) is None
-                    or parse_ts(b.get("knowledge_to")) > decision_cutoff)
-                and (not formal
-                     or b.get("member_key") not in formal_inadmissible_keys)
-            ]
+            def _row_eligible(b):
+                kf = parse_ts(b.get("knowledge_from"))
+                # Null row-knowledge is REJECTED under a formal read -
+                # it cannot be proven known by the cutoff.
+                if formal and kf is None:
+                    return False
+                if kf is not None and kf > decision_cutoff:
+                    return False
+                kt = parse_ts(b.get("knowledge_to"))
+                if kt is not None and kt <= decision_cutoff:
+                    return False
+                if formal and b.get("member_key") in formal_inadmissible_keys:
+                    return False
+                return True
+            eligible = [b for b in ordered if _row_eligible(b)]
             # Formal read (audit R4 second segment): when NO revision is
             # eligible - every row is late, withdrawn or channel-ineligible
             # - the reader emits NO selected bar for this session.  The
@@ -892,7 +913,47 @@ def read_history(
                     ],
                 })
             else:
-                chosen = (eligible or ordered)[-1]
+                # Same-clock equivalent replicas collapse to one before
+                # conflict detection (audit R4 segment A closeout): among
+                # eligible rows sharing the LATEST knowledge clock, rows
+                # carrying the same value are one business fact - fold
+                # them to the newest source_revision, keeping the original
+                # row sources.  Two different values at the SAME latest
+                # clock are a genuine ambiguity: record it per security
+                # and session for BOTH physical orders, emit NO chosen
+                # bar - never pick by physical order.
+                chosen = None
+                if eligible:
+                    latest_kf = max(
+                        parse_ts(b.get("knowledge_from"))
+                        for b in eligible)
+                    same_clock = [
+                        b for b in eligible
+                        if parse_ts(b.get("knowledge_from")) == latest_kf]
+                    values = {b.get("close_price") for b in same_clock}
+                    values.discard(None)
+                    if len(values) <= 1:
+                        # Collapse equivalent replicas: keep the newest
+                        # source_revision at the same clock.
+                        chosen = same_clock[-1]
+                    else:
+                        chosen = None
+                        formal_ineligible_sessions.append({
+                            "session_date": ordered[-1]["session_date"],
+                            "ambiguity": "same_knowledge_conflicting_values",
+                            "conflicting_values": sorted(str(v) for v in values),
+                            "rejected_rows": [
+                                {
+                                    "source_revision": b.get("source_revision"),
+                                    "knowledge_from": b.get("knowledge_from"),
+                                    "close_price": b.get("close_price"),
+                                    "member_key": b.get("member_key"),
+                                }
+                                for b in same_clock
+                            ],
+                        })
+                elif not formal and ordered:
+                    chosen = ordered[-1]
             if chosen is not None:
                 chosen["late_for_cutoff"] = bool(
                     parse_ts(chosen.get("knowledge_from"))
@@ -1439,7 +1500,8 @@ def read_history(
     chain_faults = [
         c for c in manifest_chain
         if c.get("status") in ("NO_PATH", "MISSING_DECLARED_SHA256",
-                               "UNREADABLE", "SHA_MISMATCH")
+                               "NON_OBJECT_DESCRIPTOR", "UNREADABLE",
+                               "SHA_MISMATCH")
     ]
     if chain_faults and day_block is None:
         day_block = {

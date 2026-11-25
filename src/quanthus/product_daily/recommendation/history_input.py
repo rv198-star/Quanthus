@@ -962,9 +962,22 @@ def history_receipt_for_security(
     }
 
 
+def _is_typed_position_facts(pf: Any) -> bool:
+    """An already-typed HeldPositionFacts carries verified session/return /
+    reduction fields plus an evidence block; a wire dict or other shape does
+    not.  Duck-typed so the trusted internal object is recognised without a
+    hard import cycle into the strategy layer."""
+    return (
+        hasattr(pf, "holding_sessions")
+        and hasattr(pf, "marked_return")
+        and hasattr(pf, "prior_strategy_reduction_count")
+        and hasattr(pf, "evidence")
+    )
+
+
 def _position_facts_from(
     sec: Mapping[str, Any],
-) -> tuple[Any, int | None, str | None]:
+) -> tuple[Any, int | None, str | None, bool]:
     """Project the caller-declared position facts through, unchanged.
 
     position_facts arrives already typed (the P12 RunnerRequest projection passes
@@ -976,14 +989,27 @@ def _position_facts_from(
     """
     unverifiable: str | None = None
     pf = sec.get("position_facts")
-    # A declared position_facts dict marks a held-existence record whose risk
-    # fields cannot be verified.  Track that existence separately from the
-    # resulting facts value: the wire dict is degraded to None below (never a
+    # A declared position_facts value marks a held-existence record whose risk
+    # fields cannot be verified.  Only an already-typed HeldPositionFacts (the
+    # P12 verified snapshot projection) passes through unchanged; a wire dict
+    # or any other unverifiable shape is degraded to None below (never a
     # fabricated HeldPositionFacts), but the member is still a declared-held
-    # account record, not an ordinary not-held security.
-    declared_position_facts = isinstance(pf, dict)
+    # account record, not an ordinary not-held security.  Track that existence
+    # separately from the resulting facts value.
+    declared_position_facts = pf is not None
     if pf is not None and isinstance(pf, dict):
         pf, unverifiable = _adapt_position_facts_dict(pf, sec)
+    elif pf is not None and not _is_typed_position_facts(pf):
+        # An unverifiable non-dict shape (a bare list/string/number/bool is not
+        # a snapshot of held-risk facts): degrade to the declared-held-only
+        # path, never a pass-through that would crash the closure or leak into
+        # a fabricated disposition.
+        pf = None
+        unverifiable = (
+            "position_facts arrived as an unverifiable non-dict shape with no "
+            "same-read verified account snapshot behind it; it can never "
+            "qualify an exit disposition (typed HeldPositionFacts only)"
+        )
     pds = sec.get("prior_deterioration_sessions")
     if pds is not None and (type(pds) is not int or pds < 0):
         _fail(

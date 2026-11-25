@@ -1386,6 +1386,34 @@ class ReplayEngine:
         out["reports"] = 0
         return out
 
+    def _readonly_evidence(self) -> dict:
+        """The sealed first-day rule evidence for the page header + package card.
+
+        Read-only preview shows the sealed P11 day receipt's own fields:
+        the logical decision cutoff (logical_decision_at = 21:30+08, never
+        the engine's 09:00 initial clock or the local preview shell's
+        published_at), the original P11 package identity and the scenario
+        it was produced under.  Everything is None when no sealed receipt
+        is bound - the page must not fall back to the preview shell fields.
+        """
+        r = self._day_replay_receipt() or {}
+        pkg = r.get("package") or {}
+        decision_sets = pkg.get("decision_sets") or []
+        audit = (decision_sets[0].get("audit") or {}) if decision_sets else {}
+        return {
+            "logical_decision_at": r.get("logical_decision_at"),
+            "package_id": r.get("package_id"),
+            "package_schema": r.get("package_schema"),
+            "package_digest": r.get("package_digest"),
+            "policy_id": audit.get("policy_id"),
+            "policy_version": audit.get("policy_version"),
+            "producer_version": audit.get("producer_version"),
+            "decision_cutoff": audit.get("decision_cutoff"),
+            "scenario_id": r.get("scenario_id"),
+            "source_id": r.get("source_id"),
+            "read_only_preview": True,
+        }
+
     def _readonly_workbench(self) -> dict:
         """The workbench payload for a sealed read-only day.
 
@@ -1481,6 +1509,9 @@ class ReplayEngine:
             "runs": runs,
             "coverage": self._coverage_block(),
             "account": ledger,
+            "readonly_evidence": (
+                self._readonly_evidence() if self.read_only else None
+            ),
         })
 
     def _coverage_block(self) -> dict:

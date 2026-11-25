@@ -118,7 +118,7 @@ tabs{display:flex;gap:0;margin-bottom:0}
   <tabs><div class="tab on" id=tab-today onclick=showTab('today')>今日操作</div><div class=tab id=tab-review onclick=showTab('review')>每日回顾</div></tabs>
   <div class=tabbody id=body-today>
    <h2>今日建议</h2><div id=plans><p class=empty>尚未生成本日建议。点「运行当晚任务」生成。</p></div>
-   <div class=actions><button class=primary id=runbtn>运行当晚任务</button><span id=runstatus></span></div>
+   <div class=actions data-write><button class=primary id=runbtn>运行当晚任务</button><span id=runstatus></span></div>
    <div id=reviewbanner style="display:none;margin:8px 0;padding:8px 10px;border:1px solid var(--warn,#a55);border-radius:6px;color:var(--warn,#a55);font-size:13px"></div>
   <div id=coverage></div>
    <h2 style="margin-top:18px">记录</h2><div id=orders class=empty>—</div>
@@ -169,11 +169,11 @@ function renderCoverage(){
  const el=document.getElementById('coverage');const c=(S&&S.coverage)||null;
  if(!c){el.innerHTML='';return}
  let h='<p class=covnote><b>'+esc(c.note_text||'')+'</b>'+(c.replay_message?'<span style="font-weight:400;color:var(--muted)"> · '+esc(c.replay_message)+'</span>':'')+'</p>';
- const rows=c.securities||[];
+ const _all=c.securities||[];const rows=_all.slice().sort((a,b)=>{const ea=a.evaluated?1:0,eb=b.evaluated?1:0;if(ea!==eb)return eb-ea;const ha=a.scan_detail?1:0,hb=b.scan_detail?1:0;if(ha!==hb)return hb-ha;return String(a.security_code).localeCompare(String(b.security_code))});
  if(rows.length){h+='<div style="margin-top:4px">';
   for(const r of rows){
-   const st=r.state||'';const tag=st==='evaluated'?'<span class="covtag cov-eval">已评估</span>':(st==='blocked'?'<span class="covtag cov-block">时钟阻断</span>':(st==='pending'?'<span class="covtag cov-pend">待核</span>':'<span class="covtag cov-na">'+esc(st||'—')+'</span>'));
-   h+='<div class=covrow><span class=c>'+esc(r.security_code)+'</span>'+tag+(r.verdict?'<span class=v>'+esc(r.verdict)+'</span>':'')+(r.scan_reason?'<span class=r>'+esc(r.scan_reason)+'</span>':'')+'</div>';   const sd=r.scan_detail||null;   if(sd){    let dh='<div class=covdetail>';    if((sd.gates||[]).length){dh+='<span class=gates>'+sd.gates.map(esc).join(' · ')+'</span>'}    for(const ck of (sd.checks||[])){dh+='<span class="chk '+(ck.passed?'pass':'fail')+'">'+esc(ck.label)+' 实测 '+esc(ck.actual)+(ck.passed?' ✓':' ✗')+'</span>'}    if(sd.verdict){dh+='<span class=gates>判定 '+esc(sd.verdict)+'</span>'}    dh+='</div>';h+=dh;   }
+   const evd=!!r.evaluated;const st=r.state||'';const tag=evd?'<span class="covtag cov-eval">已评估</span>':(st==='blocked'?'<span class="covtag cov-block">时钟阻断</span>':'<span class="covtag cov-pend">待核</span>');const verdict=evd&&r.verdict?'<span class=v>'+esc(r.verdict)+'</span>':'';const srl=evd&&r.scan_reason?esc(r.scan_reason):(evd?'':esc(r.scan_reason||'未评估'));
+    h+='<div class=covrow><span class=c>'+esc(r.security_code)+'</span>'+tag+verdict+(srl?'<span class=r>'+srl+'</span>':'')+'</div>';   const sd=r.scan_detail||null;   if(sd){    let dh='<div class=covdetail>';    if((sd.gates
   }
   h+='</div>'
  }
@@ -185,7 +185,18 @@ function renderCoverage(){
 async function refresh(){
  S=await api('/api/state');const r=S.replay||{};const rb=document.getElementById('reviewbanner');if(rb){rb.style.display=S.review_notice?'':'none';rb.textContent=S.review_notice||''}
  document.getElementById('day').textContent=(r.current_day||'—')+' · 第 '+(r.day_index+1)+'/'+r.sessions_total+' 个交易日';
- document.getElementById('meta').innerHTML='回放时刻 '+fmt(r.now)+'<br>下一交易日 '+fmt(r.next_day);
+ const ev=S.readonly_evidence||{};
+ if(S.read_only){
+  document.querySelectorAll('[data-write]').forEach(x=>x.style.display='none');
+  const an=document.getElementById('advancenote');if(an)an.style.display='none';
+  const au=document.getElementById('autonote');if(au)au.style.display='none';
+  document.getElementById('meta').innerHTML='<span style="color:var(--warn,#a55);font-weight:600">只读预览 · 未正式采用</span><br>逻辑决定时点 '+fmt(ev.logical_decision_at);
+ }else{
+  document.querySelectorAll('[data-write]').forEach(x=>x.style.display='');
+  const an=document.getElementById('advancenote');if(an)an.style.display='';
+  const au=document.getElementById('autonote');if(au)au.style.display='';
+  document.getElementById('meta').innerHTML='回放时刻 '+fmt(r.now)+'<br>下一交易日 '+fmt(r.next_day);
+ }
  const wb=S.workbench||{};
  const ops=S.opportunities_cn||[];
  let ph='';
@@ -216,7 +227,11 @@ async function refresh(){
  document.getElementById('ord').textContent=fmt(a.orders);document.getElementById('recon').textContent=a.rebuild_matches?'通过':'—';
  const ords=(wb.orders||[]);document.getElementById('orders').innerHTML=ords.length?ords.map(o=>esc(o.order_id)+' · '+esc(o.side)+' '+esc(o.security_code)+' ×'+esc(o.accepted_total_qty)+' · '+esc(o.status)).join('<br>'):'—';
  const pkg=S.package||{};const runs=S.runs||[];
- document.getElementById('pkg').textContent=(pkg.package_id?('pkg '+pkg.package_id+' · '+String(pkg.file_sha256||'').slice(0,19)+'… · '+fmt(pkg.published_at)+(pkg.retracted?' [已撤回]':'')):'无包')+(runs.length?'\n回执：'+runs.map(x=>x.market_date+':'+x.status).join('  '):'');
+  if(S.read_only){
+   document.getElementById('pkg').textContent='原 P11 包 '+(ev.package_id||'—')+' · '+String(ev.package_digest||'').slice(0,26)+'… · 策略 '+(ev.policy_id||'—')+' '+(ev.policy_version||'')+' · 决定时点 '+fmt(ev.decision_cutoff||ev.logical_decision_at)+' · 只读预览';
+  }else{
+   document.getElementById('pkg').textContent=(pkg.package_id?('pkg '+pkg.package_id+' · '+String(pkg.file_sha256||'').slice(0,19)+'… · '+fmt(pkg.published_at)+(pkg.retracted?' [已撤回]':'')):'无包')+(runs.length?'\n回执：'+runs.map(x=>x.market_date+':'+x.status).join('  '):'');
+  }
  document.getElementById('adv').disabled=(S.replay&&!S.replay.next_day);
  if(document.getElementById('body-review').style.display!=='none')loadReview();
 }

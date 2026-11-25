@@ -2163,15 +2163,28 @@ export default {
           limit_price: plan.price_cap,
           occurred_at: nowIso
         })
-        // Issue #723 E8 r5 (buy): a confirm-time re-size comes back as a
-        // CONFIRM_RESIZED advisory carrying the new quantity.  Nothing was
-        // written - surface the new figure on the card and let the user
-        // confirm THAT number; the resubmit below binds the same id.
+        // Issue #723 E8 r5 (buy, fix-2): a confirm-time re-size comes back as
+        // a CONFIRM_RESIZED advisory carrying the new quantity.  Nothing was
+        // written.  Re-read the authoritative workbench so the queue, the
+        // detail "还差" figure AND the confirm card all show the SAME
+        // server-computed confirmable quantity (the resized confirm_qty), then
+        // let the user's second click send that figure - never the stale echo.
+        // A re-size to zero leaves confirm_qty=0 on the refreshed plan: the
+        // confirmablePlan getter then yields nothing to confirm and the entry
+        // closes immediately, with zero orders and zero ledger change.
         if (result && result.reason_code === 'CONFIRM_RESIZED' && result.confirm_qty != null) {
-          const sel = this.selected
-          if (sel && sel.plan) sel.plan = { ...sel.plan, accepted_qty: result.confirm_qty, confirm_qty: result.confirm_qty }
+          const resizedQty = result.confirm_qty
+          const [wb, simRes] = await Promise.all([
+            loadWorkbench(this.accountId),
+            listSimOrders(this.accountId)
+          ])
+          this.suppressSelectionReset = true
+          this.workbench = wb
+          this.simOrders = simRes.orders
+          this.simOrdersAvailable = simRes.available
+          this.ensureSameSecuritySelected(targetCode)
           this.simOutcome = result
-          this.simSubmitting = false
+          this.$nextTick(() => { this.suppressSelectionReset = false })
           return
         }
         this.simForm.order_id = newClientId('sim')

@@ -101,15 +101,23 @@ class Replay:
         point = info["points"][count - 1]
         fields = [""] * 40
         fields[1:5] = [info["name"], code, point["price"], info["previous_close"]]
-        # Field 5 is the CURRENT session's OPEN print - the first completed
-        # minute's price stamped on the session the replay clock is sitting
-        # in.  A bound-session buy confirming on that session's open sizes on
-        # it (e.g. 10-08 09:30), never a later last price and never an
-        # earlier session's print on a multi-day tape (Issue #723 E8 r5).
+        # Field 5 is the CURRENT session's OPEN print - the bound session's
+        # qualified 09:30 first price (the continuous-auction open), never a
+        # later last price, an earlier session's print on a multi-day tape,
+        # or a PRE-OPEN imprint such as a 09:29 52.00 tick stamped on the same
+        # day (Issue #723 E8 r5 fix-2).  The open is the first point at or
+        # after the session's 09:30 mark; anything before it is call-auction /
+        # pre-open noise and never the bound open.
         points = info["points"]
         day_digits = now.strftime("%Y%m%d")
+        open_floor = day_digits + "0930"
         open_point = next(
-            (row for row in points if str(row.get("time", "")).startswith(day_digits)),
+            (
+                row
+                for row in points
+                if str(row.get("time", "")).startswith(day_digits)
+                and str(row.get("time", "")) >= open_floor
+            ),
             None,
         )
         fields[5] = open_point["price"] if open_point is not None else ""

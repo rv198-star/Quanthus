@@ -73,6 +73,33 @@ STATUS_FAILED = "FAILED"
 # it writes a run receipt, never a package (issue #719 publish-time note).
 STATUS_PRECHECK = "PRECHECK"
 
+
+def _runtime_environment() -> dict[str, Any]:
+    """The interpreter identity persisted on every same-T run receipt.
+
+    Owner freeze 2026-11-25: the receipt must let an auditor rebind the
+    actual executable path, Python version and feature-panel DuckDB version
+    that produced it, so a rerun on a different environment is visible
+    instead of silently comparing outcomes.
+    """
+
+    env: dict[str, Any] = {
+        "python_executable": sys.executable,
+        "python_version": sys.version.split()[0],
+    }
+    try:
+        import duckdb as _duckdb
+
+        env["duckdb_version"] = getattr(_duckdb, "__version__", None)
+    except ModuleNotFoundError:
+        env["duckdb_version"] = None
+        env["duckdb_unavailable"] = (
+            "duckdb is not importable in this interpreter; the feature "
+            "panel cannot compute, so scan-eligible securities fail closed"
+        )
+    return env
+
+
 DEFAULT_JOB_ROOT = "/srv/quanthus-base22-data/jobs/cn02-standard-daily-base251-a5"
 ZERO_QUALIFIED_TABLES = ("dwd_security_bar",)
 PUBLISH_GATE_CONFIG = (
@@ -730,6 +757,7 @@ def run_daily(
                 }
             ],
             "status": STATUS_FAILED,
+            "runtime_environment": _runtime_environment(),
             "error": {
                 "reason_code": "INPUT_UNAVAILABLE",
                 "detail": (
@@ -806,6 +834,7 @@ def _run_daily_inner(
         "started_at": moment.isoformat(),
         "stages": [],
         "status": STATUS_FAILED,
+        "runtime_environment": _runtime_environment(),
     }
     # Product directive 2026-11-25: whatever status this run lands, the
     # receipt carries the SAME input evidence the entry bound for this

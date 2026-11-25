@@ -1464,6 +1464,21 @@ def run_daily_advice_from_history(
         run_daily_advice_from_raw,
     )
 
+    # Feature-panel dependency preflight (Owner freeze 2026-11-25): every
+    # scan-eligible security's feature row computes through
+    # feature_adapter's DuckDB query.  A missing dependency must surface as
+    # ONE named whole-day block BEFORE the per-security loop - never as
+    # thousands of buried raw_input_closure_invalid entries collapsing into
+    # an uninformative missing_raw_inputs day_block.
+    try:
+        import duckdb as _duckdb_preflight  # noqa: F401
+    except ModuleNotFoundError as exc:
+        _fail(
+            "feature_adapter_dependency",
+            "duckdb is required for the feature panel; the runtime "
+            "environment lacks it, so no security could be evaluated",
+        )
+
     # Versioned as-observed replay mode (explicit consumer config, strict is
     # the default): members/calendar/listing sealed AFTER the logical decision
     # cutoff are admitted as named post-cutoff archives on observed_sink, never

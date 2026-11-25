@@ -586,6 +586,7 @@ class ReplayEngine:
         encoding, input assembly, the rule runner or persistence."""
         from quanthus.p12_daily.daily_job import _run_id
         from quanthus.p12_daily.daily_job import STATUS_FAILED
+        from quanthus.p12_daily.daily_job import _runtime_environment
         from quanthus.p12_daily.package_store import RUN_SCHEMA
 
         moment = self.now()
@@ -631,6 +632,7 @@ class ReplayEngine:
                 }
             ],
             "status": STATUS_FAILED,
+            "runtime_environment": _runtime_environment(),
             "error": {
                 "reason_code": reason_code,
                 "stage": stage,

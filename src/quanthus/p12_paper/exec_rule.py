@@ -65,6 +65,11 @@ REJECT = {
     "PREOPEN_SUSPENSION_UNAVAILABLE": "suspension/resumption fact for this plan has no named supply",
     "PREOPEN_LIMIT_PRICE_UNAVAILABLE": "native limit-price fact for this plan has no named supply",
     "PREOPEN_AUCTION_UNAVAILABLE": "call-auction fact for this plan has no named supply",
+    # Issue #723 E8 r5 fix-4: the bound session has no qualified 09:30 open
+    # print - only a pre-open imprint or a later last-price bar.  Refuse by
+    # name, write no order, and leave the ledger untouched until the real
+    # opening fact is supplied and the same id retries in the legal window.
+    "PREOPEN_OPEN_PRICE_UNAVAILABLE": "the bound session's qualified 09:30 opening print has no named supply",
 }
 
 ORDER_STATUS = {

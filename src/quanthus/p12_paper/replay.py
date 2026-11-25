@@ -102,21 +102,33 @@ class Replay:
         fields = [""] * 40
         fields[1:5] = [info["name"], code, point["price"], info["previous_close"]]
         # Field 5 is the CURRENT session's OPEN print - the bound session's
-        # qualified 09:30 first price (the continuous-auction open), never a
-        # later last price, an earlier session's print on a multi-day tape,
-        # or a PRE-OPEN imprint such as a 09:29 52.00 tick stamped on the same
-        # day (Issue #723 E8 r5 fix-2).  The open is the first point at or
-        # after the session's 09:30 mark; anything before it is call-auction /
-        # pre-open noise and never the bound open.
-        points = info["points"]
+        # qualified 09:30 opening price (the continuous-auction open), never a
+        # later last-price tick, an earlier session's print on a multi-day
+        # tape, a PRE-OPEN imprint such as a 09:29 52.00 tick stamped on the
+        # same day (Issue #723 E8 r5 fix-2), or a LATER bar merely stamped at
+        # or after the 09:30 mark (Issue #723 E8 r5 fix-4).  The open must be
+        # the tape's real 09:30 minute-bar - the point whose minute closes at
+        # 09:31 - AND it must already be VISIBLE at the replay clock, so a
+        # later not-yet-visible 09:32 quote never pre-fills the open before
+        # its own timestamp, and a tape that has no true 09:30 bar at all
+        # leaves the open empty for the named rejection.
+        points = info["points"][:count]
         day_digits = now.strftime("%Y%m%d")
-        open_floor = day_digits + "0930"
+        # The session's qualified open is the minute-bar that ENDS at 09:31 -
+        # the 09:30-09:31 continuous-auction opening minute.  Comparing the
+        # bar's minute-end keeps it independent of the tape's stored label
+        # convention while still matching exactly one real bar; anything
+        # earlier (pre-open) or later (a 09:32+ last-price tick) is excluded.
+        open_minute_end = datetime(
+            now.year, now.month, now.day, 9, 31, tzinfo=now.tzinfo
+        )
         open_point = next(
             (
                 row
                 for row in points
                 if str(row.get("time", "")).startswith(day_digits)
-                and str(row.get("time", "")) >= open_floor
+                and IntradaySeries._minute_end(str(row.get("time", "")))
+                == open_minute_end
             ),
             None,
         )

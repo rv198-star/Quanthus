@@ -550,6 +550,20 @@ class PaperAccount:
                 return self._reject(command, "PLAN_NOT_FOUND", None)
             if plan.side != command.side or plan.security_code != command.security_code:
                 return self._reject(command, "ORDER_CONTEXT_MISMATCH", None)
+            # Issue #723 E8 r5 fix-4 (ruling 7153294321): a buy bound to a
+            # session that has no qualified 09:30 opening print cannot size -
+            # a pre-open imprint or a later last-price tick is not the bound
+            # open fact.  Refuse by name, write no order row and leave cash /
+            # position / ledger untouched; the same id resolves again once
+            # the real opening print is supplied inside the legal window.
+            if command.side == "buy" and live_quote is not None:
+                if getattr(live_quote, "open", None) is None:
+                    return self._reject(
+                        command,
+                        "PREOPEN_OPEN_PRICE_UNAVAILABLE",
+                        None,
+                        persist=False,
+                    )
             # Issue #723 E8 r5 (buy): the confirm-time mark may re-size the
             # plan.  When the resolved quantity differs from the client-
             # echoed figure the order is NOT written - the user must accept

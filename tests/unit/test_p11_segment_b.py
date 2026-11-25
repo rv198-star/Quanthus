@@ -386,8 +386,13 @@ def test_b_752_mixed_bad_digest_keeps_clean_neighbour(assets):
 
 
 def test_b_752_missing_digest_mixed_also_isolated(assets):
-    """An empty-digest sibling in a mixed run is the same contract breach:
-    named per-security exclusion, legal neighbour unaffected."""
+    """An empty-digest sibling in a mixed replay run is isolated at the same
+    per-security boundary: the raw_history_security_invalid receipt names
+    the identity_parse breach verbatim (never silently dropped), while the
+    legal neighbour still evaluates and gets its real entry.  The exclusion
+    keys on the securities[] index because the malformed row never reached a
+    usable identity -- the same named isolation semantics as the malformed
+    EventContractError path, at the earlier identity-parse boundary."""
     out = e_run_e1_replay(
         _req([f._security("600000", _DAYS), _missing_digest_sec("600001")]),
         f.T1,
@@ -395,9 +400,10 @@ def test_b_752_missing_digest_mixed_also_isolated(assets):
     )
     excl = [
         e for e in out["source_closure"].get("exclusions", [])
-        if e.get("security_code") == "600001"
+        if e.get("security_code") == "securities[1]"
     ]
-    assert excl and "EventContractError" in excl[0]["member_or_field"]
-    assert excl[0].get("source_evidence_digest") == ""
-    # Legal neighbour still evaluates.
-    assert any(c == "600000" for c, s in _decisions(out))
+    assert excl and excl[0]["reason"] == "raw_history_security_invalid"
+    assert "source_evidence_digest" in excl[0]["member_or_field"]
+    assert excl[0]["scope"] == "per_security"
+    # Legal neighbour still evaluates and publishes its real entry.
+    assert ("600000", "entry_plan") in _decisions(out)

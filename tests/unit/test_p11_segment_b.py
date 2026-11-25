@@ -154,9 +154,13 @@ def test_b_pool_external_unresolved_preserved(assets):
     sc = out["source_closure"]
     keys = {r["account_key"] for r in sc["account_unresolved"]}
     assert {"outside-held-x", "outside-held-y", "outside-pend"} <= keys
-    # Neither an entry nor a held review was admitted for a pool-external key.
-    codes = {c for c, _ in _decisions(out)}
-    assert "outside-held-x" not in codes and "outside-pend" not in codes
+    # A pool-external key never receives a NEW entry; a held role may surface
+    # its own hold_alert (named, not a fabricated market identity), while a
+    # pending/sell role never produces any decision at all.
+    decs = {c: s for c, s in _decisions(out)}
+    assert decs.get("outside-pend") is None
+    assert decs.get("outside-held-x") in (None, "holding")
+    assert decs.get("outside-held-y") in (None, "holding")
 
 
 # ---- nested account conflict ----------------------------------------------------

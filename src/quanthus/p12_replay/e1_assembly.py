@@ -99,15 +99,32 @@ def build_e1_entry(
         file, and the decoded object P11 consumes.  Whitelist: Decimal ->
         exact source-precision text (never float), datetime -> ISO-8601
         preserving its own offset, date -> ISO date.  Any other object is
-        a named wire error - it never reaches a silent default=str.
+        a named wire error - it never reaches a silent default=str.  An
+        already-JSON-native object is returned UNCHANGED (identity kept),
+        so a same-value round-trip never breaks callers holding the
+        original reference.
         """
         from decimal import Decimal as _Dec
         from quanthus.p12_history.clocks import iso as _iso
 
         if isinstance(value, dict):
-            return {k: _wire_norm(v) for k, v in value.items()}
+            out = {}
+            dirty = False
+            for k, v in value.items():
+                nv = _wire_norm(v)
+                if nv is not v:
+                    dirty = True
+                out[k] = nv
+            return out if dirty else value
         if isinstance(value, (list, tuple)):
-            return [_wire_norm(v) for v in value]
+            out = []
+            dirty = False
+            for v in value:
+                nv = _wire_norm(v)
+                if nv is not v:
+                    dirty = True
+                out.append(nv)
+            return out if dirty else value
         if isinstance(value, _Dec):
             return str(value)
         if isinstance(value, datetime):
@@ -235,10 +252,12 @@ def build_e1_entry(
             )
         # The snapshot_manifest_digest binds THIS run's produced raw_history
         # envelope: the P11 package-clock compares it to p12_evidence's
-        # declared envelope sha256.  It is recomputed over the actual bytes
-        # of this run's envelope - never the frozen v6 file digest and never
-        # the scenario's static snapshot digest.
-        envelope_digest = sha256_digest(result.raw_history)
+        # declared envelope sha256.  It is recomputed over the SAME
+        # normalized wire object _write_artifact persists - never the
+        # frozen v6 file digest, the scenario's static snapshot digest, or
+        # a raw object whose native datetime/date/Decimal would differ
+        # from the canonical bytes P11 re-hashes.
+        envelope_digest = sha256_digest(_wire_norm(result.raw_history))
         # Persist THIS run's actual input artefacts as standalone
         # recomputable files (canonical JSON, so sha256(file) equals the
         # declared digest), then bind p12_evidence's artefact refs to
@@ -292,7 +311,10 @@ def build_e1_entry(
             "run_read_at": run_read_at,
             "logical_decision_cutoff": decision_cutoff.isoformat(),
         }
-        p12_evidence["coverage"] = result.coverage
+        # P11 consumes the SAME normalized wire object as the digest and
+        # the artefact file - never the raw pre-normalization object whose
+        # datetime/date/Decimal would not round-trip through canonical.
+        p12_evidence["coverage"] = _wire_norm(result.coverage)
         # Preserve this run P1 exception-ledger read evidence verbatim
         # next to the ordinary member_consumption: the P11 e1_runtime
         # _p1_read_evidence pairing bypasses when p12_evidence lacks the
@@ -321,7 +343,7 @@ def build_e1_entry(
             action_coverage=action_coverage,
             p12_evidence=p12_evidence,
         )
-        return result.raw_history
+        return _wire_norm(result.raw_history)
 
     def context_supplier(day: date) -> E1ReplayContext | None:
         return state["contexts"].get(day.isoformat())

@@ -196,10 +196,14 @@ def _build_map(tmp_path: Path, n_sessions=130, with_bars=True, with_listing=True
 
 def test_envelope_shape_and_membership(tmp_path):
     smap = _build_map(tmp_path, n_sessions=130)
+    excl = tmp_path / "excl-empty.json"
+    excl.write_text(json.dumps({"securities": [], "excluded_dates": []}))
+    import hashlib as _hl
+    _sha = "sha256:" + _hl.sha256(excl.read_bytes()).hexdigest()
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=smap,
         observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC),
-    )
+        replay_exclusion={"path": excl, "sha256": _sha})
     rh = res.raw_history
     assert rh["schema_version"] == "p11.raw-history-input.v1"
     assert rh["market_date"] == "2026-11-24"
@@ -263,7 +267,7 @@ def test_missing_listing_leaves_membership_unproven(tmp_path):
     smap = _build_map(tmp_path, with_listing=False)
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=smap,
-    )
+        purpose="production_daily")
     # no listing rows -> P11 derives no membership; reader does not invent one
     assert res.raw_history["listing_rows"] == []
 
@@ -272,7 +276,7 @@ def test_missing_bars_yield_empty_bars_not_fabrication(tmp_path):
     smap = _build_map(tmp_path, with_bars=False)
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=smap,
-    )
+        purpose="production_daily")
     assert res.raw_history["securities"][0]["bars"] == []
 
 
@@ -280,7 +284,7 @@ def test_bar_window_is_last_61_sessions(tmp_path):
     smap = _build_map(tmp_path, n_sessions=200)
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=smap,
-    )
+        purpose="production_daily")
     bars = res.raw_history["securities"][0]["bars"]
     assert len(bars) == 61
     # last session is the market date itself
@@ -371,7 +375,7 @@ def test_shared_calendar_missing_yields_day_block_not_crash(tmp_path):
     # not a silent READ.
     smap = _build_map(tmp_path, n_sessions=130)
     (tmp_path / "cal.parquet").unlink()
-    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap)
+    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap, purpose="production_daily")
     assert res.status == "INPUT_BLOCKED"
     block = res.coverage["day_block"]
     assert block["reason_code"] == "SHARED_CALENDAR_UNAVAILABLE"
@@ -385,14 +389,14 @@ def test_shared_calendar_bad_sha_yields_day_block(tmp_path):
     smap = _build_map(tmp_path, n_sessions=130)
     bad = _member(tmp_path, "cal.parquet", declared_sha256="sha256:" + "b" * 64)
     smap._members_by_table["dwd_trading_calendar"] = [bad]
-    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap)
+    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap, purpose="production_daily")
     assert res.status == "INPUT_BLOCKED"
     assert res.coverage["day_block"]["reason_code"] == "SHARED_CALENDAR_UNAVAILABLE"
 
 
 def test_bars_carry_member_and_source_provenance(tmp_path):
     smap = _build_map(tmp_path, n_sessions=130)
-    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap)
+    res = reader_mod.read_history(date(2026, 11, 24), CUTOFF, source_map=smap, purpose="production_daily")
     bar = res.raw_history["securities"][0]["bars"][0]
     assert bar["member_id"] == (
         "payload/dwd_security_bar/interval_size=1d/"
@@ -410,7 +414,7 @@ def test_account_roles_separated_on_universe(tmp_path):
                   {"security_id": "outside-held", "quantity": None}],
         pending=[{"security_id": "outside-pending", "pending_kind": "sell",
                   "pending_quantity": 20}],
-    )
+        purpose="production_daily")
     uni = res.coverage["universe"]
     assert "security-600000" in uni["held_in_pool"]
     assert "outside-held" in uni["held_unknown_quantity"]
@@ -459,7 +463,7 @@ def test_future_listing_and_industry_not_admitted(tmp_path):
     smap2 = StubSourceMap(members, {})
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=smap2,
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     secs = [x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000"]
     assert len(secs) == 1
     assert secs[0]["identity"]["listing_id"] == "listing-600000"
@@ -483,7 +487,7 @@ def test_retired_at_open_boundary_not_candidate(tmp_path):
     members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     assert all(x["identity"]["security_id"] != "security-600000" for x in res.raw_history["securities"])
 
 
@@ -504,7 +508,7 @@ def test_duplicate_security_id_collapses(tmp_path):
     members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     ids = [x["identity"]["security_id"] for x in res.raw_history["securities"]]
     # Two listing rows in-force at the same instant on different listing_id
     # is a genuine ambiguity: the security is blocked from new candidates
@@ -532,7 +536,7 @@ def test_overlapping_listing_resolves_to_latest(tmp_path):
     members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     secs = [x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000"]
     # Two distinct listing_ids both cover the open with different
     # effective_from: no named version proves one is live -> ambiguous,
@@ -567,7 +571,7 @@ def test_late_bar_revision_preserved(tmp_path):
     members["dwd_security_bar"] = [_member(tmp_path, "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet")]
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     sec = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000")
     last_bar = sec["bars"][-1]
     assert last_bar["close_price"] == "25.5"
@@ -603,7 +607,7 @@ def test_same_day_half_open_at_native_open(tmp_path):
     members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     assert all(x["identity"]["security_id"] != "security-600000" for x in res.raw_history["securities"])
 
     # ends AFTER the venue open -> still in force at the open
@@ -615,7 +619,7 @@ def test_same_day_half_open_at_native_open(tmp_path):
     members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
     res2 = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     assert any(x["identity"]["security_id"] == "security-600000" for x in res2.raw_history["securities"])
 
 
@@ -644,7 +648,7 @@ def test_formal_selects_pre_cutoff_revision(tmp_path):
         # Formal 14:30Z cutoff (Shanghai 22:30) - the 17:00Z late row post-dates it.
         date(2026, 11, 24), datetime(2026, 11, 24, 14, 30, tzinfo=UTC),
         source_map=StubSourceMap(members, {}),
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     sec = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000")
     # The late 17:00Z correction (close 25.5, knowledge 17:00Z > cutoff)
     # is not selected; the earlier known revision wins.
@@ -663,7 +667,7 @@ def test_out_of_pool_holding_on_wire(tmp_path):
         holdings=[{"security_id": "security-600000", "quantity": 100},
                   {"security_id": "outside-held", "quantity": 50}],
         pending=[{"security_id": "outside-pend", "pending_kind": "sell", "pending_quantity": 5}],
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     sids = {x["identity"]["security_id"] for x in res.raw_history["securities"]}
     assert "outside-held" in sids and "outside-pend" in sids
     held = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "outside-held")
@@ -702,10 +706,15 @@ def test_late_archive_listing_kept_for_replay(tmp_path):
     members = smap._members_by_table
     members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
     # October replay purpose keeps it + flags late_visible.
+    excl = tmp_path / "excl-empty.json"
+    excl.write_text(json.dumps({"securities": [], "excluded_dates": []}))
+    import hashlib as _hl
+    _sha = "sha256:" + _hl.sha256(excl.read_bytes()).hexdigest()
     res = reader_mod.read_history(
         date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
         source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC),
+        replay_exclusion={"path": excl, "sha256": _sha})
     sec = next((x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000"), None)
     assert sec is not None
     assert sec["identity"]["late_visible"] is True
@@ -742,7 +751,7 @@ def test_exception_window_intersection(tmp_path):
     members["dwd_quality_exception"] = [_member(tmp_path, "dwd_quality_exception.parquet")]
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
-        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
     sec = next(x for x in res.raw_history["securities"] if x["identity"]["security_id"] == "security-600000")
     dates = [_j.loads(e["affected_business_key_json"]).get("session_date") for e in sec["exceptions"]]
     assert in_win in dates and out_win not in dates
@@ -790,6 +799,458 @@ def test_all_bars_bad_blocks_day(tmp_path):
     ]
     res = reader_mod.read_history(
         date(2026, 11, 24), CUTOFF, source_map=StubSourceMap(members, {}),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC), purpose="production_daily")
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_PRICE_UNAVAILABLE"
+
+
+def _write_exclusion(tmp_path: Path, name="excl-ok.json"):
+    """A pinned, correctly-hashed empty #737 exclusion binding."""
+    excl = tmp_path / name
+    excl.write_text(json.dumps({"securities": [], "excluded_dates": []}))
+    sha = "sha256:" + hashlib.sha256(excl.read_bytes()).hexdigest()
+    return {"path": excl, "sha256": sha}
+
+
+def test_exclusion_binding_absent_blocks_replay(tmp_path):
+    """R4: REPLAY_AS_OBSERVED with NO binding -> INPUT_BLOCKED, zero members opened."""
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=smap, purpose=reader_mod.REPLAY_AS_OBSERVED,
+        replay_exclusion=None,
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "REPLAY_EXCLUSION_UNPINNED"
+    assert calls == []  # binding resolves before any member is opened
+
+
+def test_exclusion_binding_empty_object_blocks_replay(tmp_path):
+    """R4: an EMPTY binding {} is the same UNPINNED case, not a silent pass."""
+    smap = _build_map(tmp_path)
+    calls = []
+    orig = smap.verify_member
+    smap.verify_member = lambda m: (calls.append(m.member_id), orig(m))[1]
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=smap, purpose=reader_mod.REPLAY_AS_OBSERVED,
+        replay_exclusion={},
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "REPLAY_EXCLUSION_UNPINNED"
+    assert calls == []
+    # A non-replay purpose with no binding is unaffected: production reads
+    # do not carry the pinned October exclusion list.
+    res2 = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=_build_map(tmp_path),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC),
+        purpose="production_daily")
+    assert res2.status == "READ"
+
+
+def test_no_bar_member_declared_blocks_day(tmp_path):
+    """R4: ZERO declared bar members is SHARED_PRICE_UNAVAILABLE, never READ."""
+    smap = _build_map(tmp_path, with_bars=False)
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=smap, purpose=reader_mod.REPLAY_AS_OBSERVED,
+        replay_exclusion=_write_exclusion(tmp_path),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block["reason_code"] == "SHARED_PRICE_UNAVAILABLE"
+    assert block["failed_members"] == []  # nothing declared: no failed member list
+
+
+def test_same_listing_id_version_order_independent(tmp_path):
+    """R4: two versions of the same listing_id resolve to the pre-cutoff one,
+    regardless of the physical row order in the member."""
+    def run(rows):
+        smap = _build_map(tmp_path)
+        lp = tmp_path / "listing.parquet"
+        pq.write_table(_listing_table_custom(rows), lp)
+        members = smap._members_by_table
+        members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+        return reader_mod.read_history(
+            date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+            source_map=StubSourceMap(members, {}),
+            purpose=reader_mod.REPLAY_AS_OBSERVED,
+            replay_exclusion=_write_exclusion(tmp_path),
+            observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    # Same fact (identical effective interval); v1 archived pre-cutoff,
+    # v2 a post-cutoff re-post.  The pre-cutoff version must win in BOTH
+    # row orders - the earlier code took qualifying[0], so reversed rows
+    # flipped late_visible on.
+    v1 = ("security-600000", "listing-600000", "SSE",
+          datetime(2026, 1, 1, tzinfo=UTC), None,
+          datetime(2026, 7, 18, tzinfo=UTC))
+    v2 = ("security-600000", "listing-600000", "SSE",
+          datetime(2026, 1, 1, tzinfo=UTC), None,
+          datetime(2026, 11, 20, tzinfo=UTC))  # re-posted after the 10-08 cutoff
+    res_fwd = run([v1, v2])
+    res_rev = run([v2, v1])
+
+    def proj(res):
+        sec = next(
+            (x for x in res.raw_history["securities"]
+             if x["identity"]["security_id"] == "security-600000"), None)
+        return sec and (
+            sec["identity"]["listing_id"],
+            sec["identity"]["late_visible"],
+            sec["identity"]["source_evidence_digest"],
+        )
+    pf, pr = proj(res_fwd), proj(res_rev)
+    assert pf == pr
+    assert pf == ("listing-600000", False, pf[2])
+    # A genuine conflict - same listing_id, different effective interval -
+    # stays ambiguous in either order.
+    c1 = ("security-600000", "listing-600000", "SSE",
+          datetime(2026, 1, 1, tzinfo=UTC), None,
+          datetime(2026, 7, 18, tzinfo=UTC))
+    c2 = ("security-600000", "listing-600000", "SSE",
+          datetime(2026, 6, 1, tzinfo=UTC), None,
+          datetime(2026, 7, 19, tzinfo=UTC))
+    for rows in ([c1, c2], [c2, c1]):
+        r = run(rows)
+        assert "security-600000" in r.coverage["universe"]["ambiguous_security_ids"]
+
+
+def test_p1_unverified_blocks_factor_dependent_action(tmp_path):
+    """R4: P1 ledger missing/bad-sha + a security carrying an action ->
+    named dependency block; no fabricated empty exception list."""
+    smap = _build_map(tmp_path)
+    # StubSourceMap inherits p1_exception_member() pointing at the CN02
+    # path, absent locally -> p1_unverified=True without extra staging.
+    ca = tmp_path / "dwd_corporate_action.parquet"
+    _write(ca, pa.table({
+        "corporate_action_id": ["ca-1"],
+        "security_id": ["security-600000"],
+        "action_type": ["cash_dividend"],
+        "action_status": ["announced"],
+        "record_date": [date(2026, 11, 20)],
+        "ex_date": [date(2026, 11, 21)],
+        "payment_date": [date(2026, 11, 28)],
+        "announced_at": [datetime(2026, 11, 18, tzinfo=UTC)],
+        "record_source": ["primary"],
+        "source_record_id": ["src/ca-1"],
+        "source_revision": ["rev-1"],
+        "knowledge_from": [datetime(2026, 11, 18, tzinfo=UTC)],
+        "knowledge_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+    }))
+    smap._members_by_table["dwd_corporate_action"] = [
+        _member(tmp_path, "dwd_corporate_action.parquet")]
+    res = reader_mod.read_history(
+        date(2026, 11, 24), CUTOFF, source_map=smap,
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC),
+        purpose="production_daily")
+    sec = next(
+        x for x in res.raw_history["securities"]
+        if x["identity"]["security_id"] == "security-600000")
+    assert sec["actions"]  # the action itself is still delivered verbatim
+    dep = sec["dependency_reasons"]
+    assert dep["p1_factor_ledger"] == "unverified_or_missing"
+    assert dep["factor_dependent_actions"] == "blocked"
+    # The unverified ledger must not project a fabricated "no exception":
+    # no P1_factor_pit_exception row is emitted for this security.
+    assert all(
+        e.get("ledger") != "P1_factor_pit_exception"
+        for e in sec["exceptions"])
+    # Coverage still records the real member read state.
+    assert res.coverage["p1_exceptions"]["p1_unverified"] is True
+
+
+def test_out_of_window_only_price_member_blocks_day(tmp_path):
+    """R4-second: only out-of-window Daily/Base members declared -> SHARED_PRICE_UNAVAILABLE."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    members.pop("dwd_security_bar", None)
+    # A Daily member pinned ONLY for an out-of-window date (11-23 for an
+    # Oct-8 T).  Its member_id carries the 1d interval tag so it is a real
+    # declared price member - just not for THIS window.
+    rel_n = "daily/dwd_security_bar/interval_size=1d/market_date=2026-11-23/part-0.parquet"
+    _write(tmp_path / rel_n, _bar_table([date(2026, 11, 23)]))
+    class _NovDaily(StubSourceMap):
+        def daily_open_days(self):
+            return ["2026-11-23"]
+        def daily_member(self, day, frag):
+            m = _member(tmp_path, rel_n, package_id="daily-2026-11-23", kind="daily", market_date="2026-11-23")
+            return m if frag in m.member_id else None
+    sm = _NovDaily(members, {})
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=sm, purpose=reader_mod.REPLAY_AS_OBSERVED,
+        replay_exclusion=_write_exclusion(tmp_path),
         observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
     assert res.status == "INPUT_BLOCKED"
     assert res.coverage["day_block"]["reason_code"] == "SHARED_PRICE_UNAVAILABLE"
+
+
+def test_in_window_bad_out_window_good_price_blocks(tmp_path):
+    """R4-second: in-window member all-bad-sha stays blocked even with a good out-of-window member."""
+    smap = _build_map(tmp_path)
+    members = smap._members_by_table
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=10/part-0.parquet"
+    _write(tmp_path / rel, _bar_table(_sessions(61, end=date(2026, 10, 8))))
+    bad = _member(tmp_path, rel, declared_sha256="sha256:" + "a" * 64)
+    grel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    _write(tmp_path / grel, _bar_table(_sessions(5, end=date(2026, 11, 24))))
+    good = _member(tmp_path, grel)
+    members["dwd_security_bar"] = [bad, good]
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+        replay_exclusion=_write_exclusion(tmp_path),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SHARED_PRICE_UNAVAILABLE"
+
+
+def test_qualified_empty_pool_stays_read(tmp_path):
+    """R4-second: qualified in-window price member + retired listing (empty pool) -> READ, not a block."""
+    smap = _build_map(tmp_path)
+    lp = tmp_path / "listing.parquet"
+    pq.write_table(_listing_table_custom([
+        ("security-600000", "listing-600000", "SSE",
+         datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 10, 1, tzinfo=UTC),
+         datetime(2026, 1, 1, tzinfo=UTC)),
+    ]), lp)
+    members = smap._members_by_table
+    members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=10/part-0.parquet"
+    _write(tmp_path / rel, _bar_table(_sessions(61, end=date(2026, 10, 8))))
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
+    res = reader_mod.read_history(
+        date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+        source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+        replay_exclusion=_write_exclusion(tmp_path),
+        observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+    assert res.coverage["universe"]["pool_size"] == 0
+
+
+def test_same_listing_id_same_clock_conflict_isolated(tmp_path):
+    """R4-second: same listing_id/interval/clock but conflicting code -> ambiguous isolation, order-independent."""
+    def run(id_rows):
+        smap = _build_map(tmp_path)
+        lp = tmp_path / "listing.parquet"
+        pq.write_table(_listing_table_custom([
+            ("security-600000", "listing-600000", "SSE",
+             datetime(2026, 1, 1, tzinfo=UTC), None, datetime(2026, 7, 18, tzinfo=UTC)),
+        ]), lp)
+        members = smap._members_by_table
+        members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+        ip = tmp_path / "dwd_security_identifier.parquet"
+        pq.write_table(pa.table({
+            "security_id": [r[0] for r in id_rows],
+            "identifier_namespace": [r[1] for r in id_rows],
+            "identifier_value": [r[2] for r in id_rows],
+            "venue_id": [r[3] for r in id_rows],
+        }), ip)
+        members["dwd_security_identifier"] = [_member(tmp_path, "dwd_security_identifier.parquet")]
+        return reader_mod.read_history(
+            date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+            source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+            replay_exclusion=_write_exclusion(tmp_path),
+            observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    i_a = ("security-600000", "code", "300308", "SSE")
+    i_b = ("security-600000", "code", "300309", "SSE")
+    for rows in ([i_a, i_b], [i_b, i_a]):
+        r = run(rows)
+        assert "security-600000" in r.coverage["universe"]["ambiguous_security_ids"]
+        assert all(
+            x["identity"]["security_id"] != "security-600000"
+            for x in r.raw_history["securities"])
+
+
+def _listing_table_with_code(rows):
+    """Listing rows carrying listing_code + board_code for key-fact tests."""
+    return pa.table({
+        "security_id": [r[0] for r in rows],
+        "listing_id": [r[1] for r in rows],
+        "venue_id": [r[2] for r in rows],
+        "listing_code": [r[6] for r in rows],
+        "board_code": [r[7] for r in rows],
+        "effective_from": [r[3] for r in rows],
+        "effective_to": pa.array([r[4] for r in rows], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [r[5] for r in rows],
+    })
+
+
+def test_listing_same_id_same_clock_conflict_isolated(tmp_path):
+    """R4-3rd: same listing_id/interval/clock but different listing_code ->
+    named ambiguous isolation, identical under row-order swap."""
+    def run(rows):
+        smap = _build_map(tmp_path)
+        lp = tmp_path / "listing.parquet"
+        pq.write_table(_listing_table_with_code(rows), lp)
+        members = smap._members_by_table
+        members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+        return reader_mod.read_history(
+            date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+            source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+            replay_exclusion=_write_exclusion(tmp_path),
+            observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+    a = ("security-600000", "listing-600000", "SSE", datetime(2026, 1, 1, tzinfo=UTC),
+         None, datetime(2026, 7, 18, tzinfo=UTC), "300308", "main")
+    b = ("security-600000", "listing-600000", "SSE", datetime(2026, 1, 1, tzinfo=UTC),
+         None, datetime(2026, 7, 18, tzinfo=UTC), "300309", "main")
+    for rows in ([a, b], [b, a]):
+        r = run(rows)
+        assert "security-600000" in r.coverage["universe"]["ambiguous_security_ids"]
+        assert all(
+            x["identity"]["security_id"] != "security-600000"
+            for x in r.raw_history["securities"])
+
+
+def test_mutually_exclusive_code_change_not_isolated(tmp_path):
+    """R4-3rd: a historical code-change with non-overlapping effective
+    intervals resolves to the open-time-valid code, not ambiguity."""
+    def run(order):
+        smap = _build_map(tmp_path)
+        members = smap._members_by_table
+        lp = tmp_path / "listing.parquet"
+        pq.write_table(_listing_table_custom([
+            ("security-600000", "listing-600000", "SSE",
+             datetime(2026, 1, 1, tzinfo=UTC), None, datetime(2026, 7, 18, tzinfo=UTC)),
+        ]), lp)
+        members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+        ip = tmp_path / "dwd_security_identifier.parquet"
+        rows = [
+            ("security-600000", "CN_STOCK_CODE:SSE", "600849", "SSE",
+             datetime(1994, 3, 23, tzinfo=UTC), datetime(2010, 3, 4, tzinfo=UTC),
+             datetime(2026, 8, 3, tzinfo=UTC)),
+            ("security-600000", "CN_STOCK_CODE:SSE", "601607", "SSE",
+             datetime(2010, 3, 4, tzinfo=UTC), None,
+             datetime(2026, 8, 3, tzinfo=UTC)),
+        ]
+        if order:
+            rows = rows[::-1]
+        pq.write_table(pa.table({
+            "security_id": [r[0] for r in rows],
+            "identifier_namespace": [r[1] for r in rows],
+            "identifier_value": [r[2] for r in rows],
+            "venue_id": [r[3] for r in rows],
+            "effective_from": [r[4] for r in rows],
+            "effective_to": pa.array([r[5] for r in rows], type=pa.timestamp("us", tz="UTC")),
+            "knowledge_from": [r[6] for r in rows],
+        }), ip)
+        members["dwd_security_identifier"] = [_member(tmp_path, "dwd_security_identifier.parquet")]
+        rr = reader_mod.read_history(
+            date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+            source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+            replay_exclusion=_write_exclusion(tmp_path),
+            observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        sec = next((x for x in rr.raw_history["securities"]
+                    if x["identity"]["security_id"] == "security-600000"), None)
+        return sec and sec["identity"]["stock_code"], rr.coverage["universe"]["ambiguous_security_ids"]
+    assert run(False) == ("601607", [])
+    assert run(True) == ("601607", [])
+
+
+def _identifier_table_full(rows):
+    """security_identifier rows carrying namespace/value/venue plus the
+    effective interval and the knowledge clock (audit R4 fourth pass)."""
+    return pa.table({
+        "security_id": [r[0] for r in rows],
+        "identifier_namespace": [r[1] for r in rows],
+        "identifier_value": [r[2] for r in rows],
+        "venue_id": [r[3] for r in rows],
+        "effective_from": [r[4] for r in rows],
+        "effective_to": pa.array([r[5] for r in rows], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [r[6] for r in rows],
+    })
+
+
+def test_identifier_uses_listing_open_instant(tmp_path):
+    """R4-4th: the trading code resolves at the SAME venue open instant
+    as the listing row.  A code-change effective only at 02:00Z must NOT
+    be adopted when the venue opened at 01:30Z - both physical orders
+    keep 300308; a change effective before/at the open does switch."""
+    OPEN = datetime(2026, 10, 8, 1, 30, tzinfo=UTC)  # matches _calendar_table
+
+    def run(swap, change_at):
+        smap = _build_map(tmp_path)
+        members = smap._members_by_table
+        lp = tmp_path / "listing.parquet"
+        pq.write_table(_listing_table_with_code([
+            ("security-600000", "listing-600000", "SSE",
+             datetime(2026, 1, 1, tzinfo=UTC), None,
+             datetime(2026, 7, 18, tzinfo=UTC), "300308", "main"),
+        ]), lp)
+        members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+        ip = tmp_path / "dwd_security_identifier.parquet"
+        prev = ("security-600000", "CN_STOCK_CODE:SSE", "300308", "SSE",
+                datetime(2026, 1, 1, tzinfo=UTC), change_at,
+                datetime(2026, 7, 18, tzinfo=UTC))
+        nxt = ("security-600000", "CN_STOCK_CODE:SSE", "300309", "SSE",
+               change_at, None, datetime(2026, 7, 18, tzinfo=UTC))
+        rows = [prev, nxt] if not swap else [nxt, prev]
+        pq.write_table(_identifier_table_full(rows), ip)
+        members["dwd_security_identifier"] = [_member(tmp_path, "dwd_security_identifier.parquet")]
+        rr = reader_mod.read_history(
+            date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+            source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+            replay_exclusion=_write_exclusion(tmp_path),
+            observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        sec = next((x for x in rr.raw_history["securities"]
+                    if x["identity"]["security_id"] == "security-600000"), None)
+        return sec and sec["identity"]["stock_code"]
+
+    from datetime import timedelta
+    # 02:00Z change is AFTER the 01:30Z open -> still the listed 300308.
+    for swap in (False, True):
+        assert run(swap, OPEN + timedelta(minutes=30)) == "300308"
+    # Change exactly AT the open (half-open: new effective_from == open)
+    # and BEFORE the open both switch to the new code.
+    for swap in (False, True):
+        assert run(swap, OPEN) == "300309"
+        assert run(swap, OPEN - timedelta(minutes=30)) == "300309"
+
+
+def test_listing_latest_replica_collapses_before_conflict(tmp_path):
+    """R4-4th: pick the qualified latest knowledge version first, then
+    collapse equivalent replicas of the SAME business fact.  An older
+    different value plus TWO identical latest rows must yield ONE unique
+    identity under both physical orders - not an ambiguity; a genuinely
+    different value at the same latest clock still isolates."""
+    def run(rows):
+        smap = _build_map(tmp_path)
+        members = smap._members_by_table
+        lp = tmp_path / "listing.parquet"
+        pq.write_table(_listing_table_with_code(rows), lp)
+        members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+        return reader_mod.read_history(
+            date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+            source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+            replay_exclusion=_write_exclusion(tmp_path),
+            observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+
+    older = ("security-600000", "listing-600000", "SSE",
+             datetime(2026, 1, 1, tzinfo=UTC), None,
+             datetime(2026, 7, 18, tzinfo=UTC), "300308", "main")
+    latest = ("security-600000", "listing-600000", "SSE",
+              datetime(2026, 1, 1, tzinfo=UTC), None,
+              datetime(2026, 7, 19, tzinfo=UTC), "300309", "main")
+    replica = tuple(latest)  # byte-identical copy of the latest fact
+
+    # Older different value + TWO identical latest versions -> unique.
+    for rows in ([older, latest, replica], [latest, replica, older],
+                 [replica, older, latest]):
+        r = run(rows)
+        sec = next((x for x in r.raw_history["securities"]
+                    if x["identity"]["security_id"] == "security-600000"), None)
+        # Unique identity admitted: the latest version's listing_code wins.
+        assert sec is not None and sec["identity"]["listing_code"] == "300309"
+        assert "security-600000" not in r.coverage["universe"]["ambiguous_security_ids"]
+
+    # A genuinely DIFFERENT value at the same latest clock still isolates.
+    conflict = ("security-600000", "listing-600000", "SSE",
+                datetime(2026, 1, 1, tzinfo=UTC), None,
+                datetime(2026, 7, 19, tzinfo=UTC), "300310", "main")
+    for rows in ([older, latest, conflict], [conflict, latest, older]):
+        r = run(rows)
+        assert "security-600000" in r.coverage["universe"]["ambiguous_security_ids"]

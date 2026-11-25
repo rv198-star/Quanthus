@@ -317,6 +317,7 @@ def load_e1_scenario(
     *,
     repo_root: str | Path,
     evidence_dir: str | Path | None = None,
+    replay_exclusion: dict | None = None,
 ) -> tuple[E1ReplayRunner, Callable[[date, datetime], dict]]:
     """Load a frozen E1 scenario JSON and assemble runner + history_reader.
 
@@ -389,10 +390,12 @@ def load_e1_scenario(
     if isinstance(exclusions, dict) and set(exclusions) == {"path"}:
         exclusions = tuple(json.loads(Path(exclusions["path"]).read_text()))
 
-    # #737 replay-exclusion gate: the scenario may pin the frozen list
-    # inline ({"path","sha256"}) or only name the file; the declared sha
-    # must still come from the scenario or the run env, never inferred.
-    replay_exclusion = doc.get("replay_exclusion")
+    # #737 replay-exclusion gate: the formal entry passes the verified
+    # frozen binding EXPLICITLY (the kwarg wins over the scenario and the
+    # run env - a caller-pinned value can never be overridden by either).
+    # The scenario may also pin it inline as a fallback for lab use.
+    if replay_exclusion is None:
+        replay_exclusion = doc.get("replay_exclusion")
     if isinstance(replay_exclusion, str):
         replay_exclusion = {"path": replay_exclusion}
     if isinstance(replay_exclusion, dict) and "sha256" not in replay_exclusion:

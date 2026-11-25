@@ -10,6 +10,7 @@ carried, with UNKNOWN where coverage is unproven.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
@@ -76,7 +77,22 @@ def read_history(
     exclusion_block = None
     excluded_codes = set()
     excluded_dates = set()
-    if replay_exclusion:
+    # A missing or empty binding is itself a named block (audit R4):
+    # the October replay entry always carries the pinned list, so a
+    # caller that supplies None or {} is the UNPINNED case - never a
+    # silent pass.
+    if not replay_exclusion and purpose == REPLAY_AS_OBSERVED:
+        exclusion_block = {
+            "reason_code": "REPLAY_EXCLUSION_UNPINNED",
+            "detail": (
+                "#737 exclusion binding is absent or empty; the replay "
+                "entry requires the pinned list before any member read"
+            ),
+            "affected_scope": "whole_day",
+            "disposition": "block_new_entries",
+        }
+        replay_exclusion = {}
+    if not exclusion_block and replay_exclusion:
         excl_path = replay_exclusion.get("path")
         excl_sha = replay_exclusion.get("sha256")
         # A missing pin is itself a block (audit 749-09): the exclusion gate
@@ -387,6 +403,7 @@ def read_history(
             "ledger": "P1_factor_pit_exception",
         })
 
+    p1_unverified = bool(p1_exc_cov.get("p1_unverified"))
     # #737: a (stock_code, market_date) hit on the frozen exclusion list is
     # dropped BEFORE the envelope is assembled - the security never enters
     # this replay day.  The October window does not intersect the listed
@@ -537,6 +554,20 @@ def read_history(
         dep_reasons = {}
         if not sec_bars:
             dep_reasons["bars"] = "no_qualified_1d_rows"
+        # P1 factor-PIT ledger missing or failed sha (audit R4 item 2a):
+        # actions that consume the factor evidence must see a named
+        # block, never a silently-empty exception list on a security
+        # whose corporate-action evaluation depends on it.
+        if p1_unverified and sec_actions:
+            dep_reasons["p1_factor_ledger"] = "unverified_or_missing"
+            dep_reasons["factor_dependent_actions"] = "blocked"
+            # Do not project P1 exceptions from an unverified ledger -
+            # the empty list would read as "no exception", a fabricated
+            # negative.  Keep the real block marker in dep_reasons.
+            sec_exceptions = [
+                e for e in sec_exceptions
+                if e.get("ledger") != "P1_factor_pit_exception"
+            ]
         if not any(k[0] == ident.listing_id for k in tradability_by_key):
             dep_reasons["tradability_state"] = "no_tradability_state_rows"
         if not sec_limits:
@@ -831,16 +862,50 @@ def read_history(
     # Distinct from a real zero-bar day (members READ, just no rows).
     if day_block is None:
         bar_reads = bar_cov.get("reads") or []
+        # Only members that can actually project into THIS T's window
+        # count as declared price supply (audit R4 second pass): a member
+        # is window-relevant when its observation month intersects the
+        # needed sessions (Base) or its market_date is a needed session
+        # (Daily).  Members pinned only for OTHER windows are not supply
+        # for this T - a map that declares only out-of-window members
+        # still has no usable price input and must block.
+        sessions_set = set(sessions_sorted)
+        months_needed = {(s.year, s.month) for s in sessions_sorted}
+        def _bar_member_in_window(m):
+            if "interval_size=1d" not in m.member_id:
+                return False
+            if m.market_date is not None:
+                return _date_iso(m.market_date) in sessions_set
+            ym = re.search(
+                r"observation_start_year=(\d{4})/observation_start_month=(\d+)",
+                m.member_id,
+            )
+            if ym:
+                return (int(ym.group(1)), int(ym.group(2))) in months_needed
+            # No decodable window key: keep it as a conservative declared
+            # member rather than silently dropping a possible supplier.
+            return True
         bar_members = [
             m for m in smap.base_members("dwd_security_bar")
-            if "interval_size=1d" in m.member_id
+            if _bar_member_in_window(m)
         ]
         bar_members += [
             m for d in smap.daily_open_days()
             for m in ([smap.daily_member(d, "dwd_security_bar")] or [])
-            if m is not None
+            if m is not None and _bar_member_in_window(m)
         ]
-        if bar_members and bar_reads and all(
+        # No bar member declared at all: the pool has no price input -
+        # a named shared-input block, distinct from a real zero-signal day
+        # whose members READ and simply carry no rows (audit R4 item 3).
+        if not bar_members:
+            day_block = {
+                "reason_code": "SHARED_PRICE_UNAVAILABLE",
+                "detail": "no 1d bar member is declared in the pinned map",
+                "affected_scope": "whole_day",
+                "failed_members": [],
+                "disposition": "block_new_entries",
+            }
+        elif bar_reads and all(
             r.get("status") in ("SHA_MISMATCH", "UNREADABLE")
             for r in bar_reads if r.get("member_id")
         ):

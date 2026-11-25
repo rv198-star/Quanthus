@@ -578,3 +578,63 @@ def test_p12_evidence_carries_p1_exceptions_from_this_read(monkeypatch):
     ctx = runner._context_supplier(T)
     assert ctx.p12_evidence["p1_exceptions"] is p1_reads
     assert ctx.p12_evidence["member_consumption"] is COVERAGE["member_consumption"]
+
+
+def test_explicit_replay_exclusion_overrides_scenario_pin(tmp_path, monkeypatch):
+    """The formal entry's explicitly-passed verified #737 binding wins
+    over a conflicting scenario pin - the scenario can never redirect the
+    read to a different self-consistent path/digest pair (audit ruling)."""
+    import json as _json
+
+    from quanthus.p12_replay import e1_assembly as asm
+
+    captured = {}
+
+    def fake(day, cutoff, *, holdings, pending, source_map, replay_exclusion=None):
+        captured["replay_exclusion"] = replay_exclusion
+        return _Result()
+
+    monkeypatch.setattr(asm, "read_history", fake)
+    monkeypatch.setattr(
+        _e1_rt, "load_e1_rule_assets", lambda root: {"assets": "fake"}
+    )
+    doc = _scenario_doc(tmp_path)
+    d = _json.loads(doc.read_text())
+    d["replay_exclusion"] = {
+        "path": "/attacker/other.json",
+        "sha256": "sha256:" + "0" * 64,
+    }
+    doc.write_text(_json.dumps(d))
+    verified = {"path": "/frozen/737.json", "sha256": "sha256:" + "9" * 64}
+    _runner, reader = asm.load_e1_scenario(
+        doc, repo_root=tmp_path, replay_exclusion=verified
+    )
+    reader(T, CUTOFF)
+    assert captured["replay_exclusion"] == verified
+
+
+def test_scenario_replay_exclusion_used_when_no_explicit_pin(tmp_path, monkeypatch):
+    """A scenario-pinned #737 binding is honoured when the caller does not
+    pass an explicit verified binding (lab path only)."""
+    import json as _json
+
+    from quanthus.p12_replay import e1_assembly as asm
+
+    captured = {}
+
+    def fake(day, cutoff, *, holdings, pending, source_map, replay_exclusion=None):
+        captured["replay_exclusion"] = replay_exclusion
+        return _Result()
+
+    monkeypatch.setattr(asm, "read_history", fake)
+    monkeypatch.setattr(
+        _e1_rt, "load_e1_rule_assets", lambda root: {"assets": "fake"}
+    )
+    doc = _scenario_doc(tmp_path)
+    d = _json.loads(doc.read_text())
+    pin = {"path": "/frozen/737.json", "sha256": "sha256:" + "9" * 64}
+    d["replay_exclusion"] = pin
+    doc.write_text(_json.dumps(d))
+    _runner, reader = asm.load_e1_scenario(doc, repo_root=tmp_path)
+    reader(T, CUTOFF)
+    assert captured["replay_exclusion"] == pin

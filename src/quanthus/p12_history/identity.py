@@ -221,7 +221,32 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
                 # Several distinct listing ids cover the open - ambiguous.
                 ambiguous_ids.add(sid)
                 continue
-            chosen_lst, venue, _, chosen_late = qualifying[0]
+            # Same listing_id may carry several source versions of the
+            # same fact (audit R4 item 3): the row must resolve to ONE
+            # version deterministically - the newest version known by
+            # the decision cutoff - independent of physical row order.
+            # Rows whose intervals genuinely differ name a real
+            # conflict and are ambiguous; identical intervals collapse.
+            eff_pairs = {
+                (str(q[0].get("effective_from") or ""), str(q[0].get("effective_to") or ""))
+                for q in qualifying
+            }
+            if len(eff_pairs) > 1:
+                ambiguous_ids.add(sid)
+                continue
+            known = [q for q in qualifying if not q[3]]
+            pool = known if known else qualifying
+            chosen_lst, venue, _, chosen_late = max(
+                pool,
+                key=lambda q: (
+                    str(q[0].get("knowledge_from") or ""),
+                    str(q[0].get("effective_from") or ""),
+                ),
+            )
+            # A late-observed row chosen only because no earlier version
+            # exists keeps its late_visible mark; a pre-cutoff version
+            # always wins over a later re-post of the same fact.
+            chosen_late = chosen_late and not known
             pair = (sid, str(chosen_lst.get("listing_id") or ""))
             if pair in seen:
                 continue

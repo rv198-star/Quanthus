@@ -305,6 +305,7 @@ def make_engine(
     knowledge_cutoff: str | None = None,
     publish_time: time = time(22, 30, tzinfo=EXCHANGE_TZ),
     read_only_account_snapshot: dict | None = None,
+    read_only_name_map: dict | None = None,
     reset: bool = False,
 ) -> ReplayEngine:
     """Build a ReplayEngine bound to the replay's own state dir."""
@@ -360,6 +361,7 @@ def make_engine(
         publish_time=publish_time,
         read_only=os.environ.get("P12_REPLAY_READONLY") in ("1", "true", "yes"),
         read_only_account_snapshot=read_only_account_snapshot,
+        read_only_name_map=read_only_name_map,
         app_builder=lambda **kw: build_replay_app(
             fixture_path=fixture_path, **kw
         ),
@@ -420,6 +422,16 @@ def main(argv=None) -> int:
         default=None,
         metavar="ID",
         help="expected scenario_id inside --account-snapshot.",
+    )
+    parser.add_argument(
+        "--name-map",
+        default=None,
+        metavar="PATH",
+        help=(
+            "optional read-only display name-map JSON "
+            "({names:{code:name},source_envelope_sha256}) exported from the "
+            "same-T sealed envelope; display only, never mutates evidence."
+        ),
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8792)
@@ -611,6 +623,11 @@ def main(argv=None) -> int:
                     "scenario_id": args.account_snapshot_scenario,
                 }
                 if args.account_snapshot is not None
+                else None
+            ),
+            read_only_name_map=(
+                json.loads(Path(args.name_map).read_text())
+                if getattr(args, "name_map", None)
                 else None
             ),
             reset=reset,

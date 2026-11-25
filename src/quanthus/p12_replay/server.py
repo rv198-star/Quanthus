@@ -200,7 +200,7 @@ function renderCoverage(){
 }
 async function refresh(){
  S=await api('/api/state');const r=S.replay||{};const rb=document.getElementById('reviewbanner');if(rb){rb.style.display=S.review_notice?'':'none';rb.textContent=S.review_notice||''}
- document.getElementById('day').textContent='回放日历共 '+r.sessions_total+' 个交易日 · 只读展示 '+(r.current_day||'—');
+ document.getElementById('day').textContent=S.read_only?('回放日历共 '+r.sessions_total+' 个交易日 · 只读展示 '+(r.current_day||'—')):((r.current_day||'—')+' · 第 '+(r.day_index+1)+'/'+r.sessions_total+' 个交易日');
  const ev=S.readonly_evidence||{};
  if(S.read_only){
   document.querySelectorAll('[data-write]').forEach(x=>x.style.display='none');

@@ -156,6 +156,11 @@ class ReplayEngine:
     # evidence read, never a hard-coded balance.  Absent, unreadable or
     # mismatched, the projection reports snapshot-unavailable instead.
     read_only_account_snapshot: dict | None = None
+    # Optional bound display name-map for the read-only page: a small
+    # {names: {listing_code: security_name}} export from the same-T sealed
+    # envelope, used only when _real_raw_history is empty so the page can
+    # show signed-off names without opening a market member.  Display only.
+    read_only_name_map: dict | None = None
 
     # runtime state
     day_index: int = 0
@@ -1555,21 +1560,31 @@ class ReplayEngine:
 
     def _security_name_map(self) -> dict:
         raw = getattr(self, "_real_raw_history", None)
-        if not isinstance(raw, Mapping):
-            return {}
-        secs = raw.get("securities")
-        if not isinstance(secs, (list, tuple)):
-            return {}
-        out = {}
-        for s in secs:
-            if not isinstance(s, Mapping):
-                continue
-            idn = s.get("identity") or {}
-            code = idn.get("listing_code") or idn.get("security_code")
-            name = idn.get("security_name")
-            if code and name:
-                out[str(code)] = str(name)
-        return out
+        if isinstance(raw, Mapping):
+            secs = raw.get("securities")
+            if isinstance(secs, (list, tuple)):
+                out = {}
+                for s in secs:
+                    if not isinstance(s, Mapping):
+                        continue
+                    idn = s.get("identity") or {}
+                    code = idn.get("listing_code") or idn.get("security_code")
+                    name = idn.get("security_name")
+                    if code and name:
+                        out[str(code)] = str(name)
+                if out:
+                    return out
+        # Read-only preview never runs evening_run, so _real_raw_history is
+        # empty - fall back to the bound display name-map (a small export
+        # from the same-T sealed envelope, bound by source sha) so the page
+        # still shows signed-off names without opening a market member or
+        # the ledger.
+        bound = getattr(self, "read_only_name_map", None)
+        if isinstance(bound, Mapping):
+            names = bound.get("names")
+            if isinstance(names, Mapping):
+                return {str(k): str(v) for k, v in names.items()}
+        return {}
 
     def _day_replay_receipt(self) -> dict | None:
         """The same-day ``p11.paper-replay-day.v1`` receipt bound to THIS run.

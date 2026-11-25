@@ -430,7 +430,8 @@ class SourceMap:
         out = []
 
         def _probe(artifact, path, declared, content_shape=None,
-                   content_identity=None, declared_identity=None):
+                   content_identity=None, declared_identity=None,
+                   required_identity_key=None):
             """One frozen-chain link: declaration, hash, content shape and
             the associated identity all verified before members open.
 
@@ -442,7 +443,13 @@ class SourceMap:
             declared_identity=(key, expected): the file's own identity value
             must equal the identity the map declared for it.  A mismatch is
             ASSOCIATED_IDENTITY_MISMATCH - a hash-verified body that names a
-            DIFFERENT package/date than the one it was bound to is refused."""
+            DIFFERENT package/date than the one it was bound to is refused.
+
+            required_identity_key: the versioned structure of this link
+            carries an identity field that MUST be present - a hash-verified
+            body that decodes to an object missing the key (e.g. a bare {})
+            is a named CONTENT_MISSING_IDENTITY_FIELD fault before members
+            open, not a byte-match MATCH (audit R4 seg-A intake)."""
             verified_at = iso(VerificationClock.now())
             if declared is None:
                 out.append({"artifact": artifact, "path": str(path) if path else None,
@@ -472,7 +479,8 @@ class SourceMap:
                             "verified_at": verified_at})
                 return
             doc = None
-            if content_shape is not None or declared_identity is not None:
+            if (content_shape is not None or declared_identity is not None
+                    or required_identity_key is not None):
                 try:
                     doc = json.loads(body.decode("utf-8"))
                 except Exception as exc:  # noqa: BLE001
@@ -489,6 +497,18 @@ class SourceMap:
                                 "object_shape": type(doc).__name__,
                                 "verified_at": verified_at})
                     return
+            # A hash-verified object that lacks the link's versioned
+            # identity field is a named structural fault - it must be
+            # refused before members open, never silently matched.
+            if (required_identity_key is not None
+                    and isinstance(doc, dict)
+                    and required_identity_key not in doc):
+                out.append({"artifact": artifact, "path": str(path),
+                            "declared_sha256": declared, "actual_sha256": actual,
+                            "status": "CONTENT_MISSING_IDENTITY_FIELD",
+                            "missing_field": required_identity_key,
+                            "verified_at": verified_at})
+                return
             if declared_identity is not None:
                 key, expected = declared_identity
                 actual_id = doc.get(key) if isinstance(doc, dict) else None
@@ -514,7 +534,8 @@ class SourceMap:
 
         _probe("base_manifest", self._base_doc.get("manifest_path"),
                self._base_doc.get("manifest_sha256"),
-               content_shape="json_object")
+               content_shape="json_object",
+               required_identity_key="package_id")
         for day in self.daily_open_days():
             e = self._daily_entries.get(day) or {}
             # Four external frozen links, each verified for its declared
@@ -541,10 +562,17 @@ class SourceMap:
                 _probe(artifact, obj.get("path"), declared,
                        content_shape="json_object",
                        declared_identity=(identity_key, expected)
-                       if identity_key else None)
+                       if identity_key else None,
+                       required_identity_key=identity_key)
+            # The DATES index and the Standard descriptor are both bound to
+            # THIS day - the file's own market_date must equal the bound day
+            # (a hash-verified body naming another date is refused), and the
+            # versioned market_date field must be present (a bare {} is a
+            # named missing-field fault, not a MATCH).
             _descriptor_probe(f"dates_index:{day}", e.get("descriptor"),
                               ("index_sha256", "sha256"),
-                              identity_key="market_date")
+                              identity_key="market_date",
+                              expected_identity=day)
             _descriptor_probe(f"daily_manifest:{day}",
                               e.get("standard_descriptor"), ("sha256",),
                               identity_key="market_date",
@@ -571,7 +599,8 @@ class SourceMap:
                        core.get("sha256"),
                        content_shape="json_object",
                        declared_identity=("package_id",
-                                          core.get("package_id")))
+                                          core.get("package_id")),
+                       required_identity_key="package_id")
         return out
 
     def resolve(self, member_id: str) -> ResolvedMember | None:

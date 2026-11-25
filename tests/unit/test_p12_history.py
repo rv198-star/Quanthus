@@ -1432,12 +1432,22 @@ def test_same_name_member_two_packages_kept_distinct(tmp_path):
 def test_formal_missing_channel_shared_dep_blocks_day(tmp_path):
     """R4 second segment: under a formal read a member with NO qualified
     channel/knowledge proof that is a shared hard dependency (a needed
-    price source) blocks the whole day as SHARED_INPUT_GAP; the producer
-    completion clock is never a silent substitute."""
+    price source) blocks the whole day as SHARED_INPUT_GAP when NO
+    qualified source covers that session; the producer completion clock is
+    never a silent substitute.  (Coverage rule: a qualified backup row the
+    formal read could select supplies the session - this case removes the
+    T base bar so the unknown-channel Daily is the only T supply -> starved
+    -> block.)"""
     T = date(2026, 11, 24)
     CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
     smap = _build_map(tmp_path)
     members = smap._members_by_table
+    # Remove the T session from the qualified Base supply so the
+    # unknown-channel Daily member is the ONLY T source -> starved.
+    rel = "payload/dwd_security_bar/interval_size=1d/observation_start_year=2026/observation_start_month=11/part-0.parquet"
+    no_t = _bar_table(_sessions(330, end=date(2026, 11, 23)))
+    pq.write_table(no_t, tmp_path / rel)
+    members["dwd_security_bar"] = [_member(tmp_path, rel)]
     # A daily bar member with NO channel/knowledge proof at all.
     dm = _formal_daily_member(tmp_path, "2026-11-24")
     clocks = {"2026-11-24": {
@@ -1450,6 +1460,36 @@ def test_formal_missing_channel_shared_dep_blocks_day(tmp_path):
         observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
     assert res.status == "INPUT_BLOCKED"
     assert res.coverage["day_block"]["reason_code"] == "SHARED_INPUT_GAP"
+
+
+def test_formal_missing_channel_T_covered_by_qualified_base_reads(tmp_path):
+    """Coverage rule (coord-return item): a T-day Daily price member whose
+    channel is UNKNOWN does NOT block when a qualified Base backup actually
+    supplies a T bar the formal read can select - T and prior sessions are
+    judged the same way by actual session x security coverage, single-
+    security gaps isolated.  (Mirror of the prior-day READ case, now true
+    for T too.)"""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap = _build_map(tmp_path)   # qualified Base bar member covers T
+    members = smap._members_by_table
+    # Daily T member: production done, but NO channel proof.
+    dm = _formal_daily_member(tmp_path, "2026-11-24")
+    clocks = {"2026-11-24": {
+        "knowledge": None, "producer": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+        "channel": None,
+    }}
+    fmap = _FormalStubSourceMap(members, {"2026-11-24": [dm]}, clocks)
+    res = reader_mod.read_history(
+        T, CUT, source_map=fmap, purpose=reader_mod.FORMAL_DAILY_UPDATE,
+        observed_at=datetime(2026, 11, 24, 18, 0, tzinfo=UTC))
+    # The qualified Base row supplies the session -> READ, not a day block;
+    # the unknown-channel member is still named on the gap receipt.
+    assert res.status == "READ"
+    assert res.coverage.get("day_block") is None
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    assert any(b["session_date"] == "2026-11-24" for b in sec["bars"])
 
 
 def test_formal_missing_channel_single_member_named_not_day_block(tmp_path):
@@ -2312,6 +2352,33 @@ def test_seg_b_bind_window_unchanged_path_reads(tmp_path):
     assert sec["held_quantity"] == 1200
 
 
+def test_segA_bar_fact_field_contract_matches_consumer_set(tmp_path):
+    """Whole-bar field contract: ``BAR_FACT_KEYS`` is the versioned checklist
+    of source-row fields the consumer actually reads to judge one bar's
+    business fact.  ``_bar_fact`` collapses equivalent same-clock replicas
+    over EXACTLY this set - the contract test pins the checklist to the
+    consumed-field set so a future consumed-field change must update the
+    contract AND this test, not drift silently (audit R4 seg-A intake)."""
+    # The consumed OHLCVA fact fields - what the consumer reads to compare
+    # one bar's business fact.  ``BAR_FACT_KEYS`` must equal exactly this set.
+    assert set(reader_mod.BAR_FACT_KEYS) == {
+        "open_price", "high_price", "low_price",
+        "close_price", "volume", "amount",
+    }
+    # The default ``_keys`` of the same-clock conflict comparator is the
+    # contract constant - proving the collapse uses the versioned checklist,
+    # not a drifting literal.  A behavioural check: every BAR_FACT_KEYS field
+    # is present on a produced T bar (the consumer can read it).
+    res = _formal_read(_build_map(tmp_path), tmp_path)
+    sec = next(x for x in res.raw_history["securities"]
+               if x["identity"]["security_id"] == "security-600000")
+    t_bars = [b for b in sec["bars"] if b["session_date"] == "2026-11-24"]
+    assert t_bars, "fixture must produce a T bar"
+    for b in t_bars:
+        for k in reader_mod.BAR_FACT_KEYS:
+            assert k in b, f"consumed fact field {k} absent on produced bar"
+
+
 # ---- R4 segment A closeout ---------------------------------------------
 
 def _formal_read(smap, tmp_path, T=date(2026, 11, 24),
@@ -2473,6 +2540,67 @@ def test_segA_chain_associated_identity_named_fault(tmp_path):
     chain3 = SourceMap.manifest_chain(smap3)
     assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
                for c in chain3)
+
+
+def test_segA_chain_missing_identity_field_named_fault(tmp_path):
+    """Class 1 intake: a hash-verified body that decodes to a bare ``{}`` -
+    an object MISSING the link's versioned identity field - is a named
+    CONTENT_MISSING_IDENTITY_FIELD fault before members open, not a MATCH.
+    Each of the four links (base package_id, dates/std market_date, core
+    package_id) is checked against its real versioned field."""
+    for key, identity_field in (("base", "package_id"),
+                                ("dates", "market_date"),
+                                ("std", "market_date"),
+                                ("core", "package_id")):
+        smap, files = _segA_chain_fixture(tmp_path)
+        files[key].write_text("{}")  # hash-verified empty object, no identity
+        d = "sha256:" + hashlib.sha256(files[key].read_bytes()).hexdigest()
+        if key == "base":
+            smap._base_doc["manifest_sha256"] = d
+        elif key == "dates":
+            smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+        elif key == "std":
+            smap._daily_entries["2026-11-24"]["standard_descriptor"]["sha256"] = d
+        else:
+            smap._daily_entries["2026-11-24"]["core_manifest"]["sha256"] = d
+        chain = SourceMap.manifest_chain(smap)
+        fault = [c for c in chain
+                 if c["status"] == "CONTENT_MISSING_IDENTITY_FIELD"]
+        assert fault, key
+        assert fault[0]["missing_field"] == identity_field
+
+
+def test_segA_chain_dates_foreign_date_named_fault(tmp_path):
+    """Class 1 intake negative: the DATES index file's own market_date must
+    equal the day it is bound to - a hash-verified body naming a foreign
+    date (1999-01-01) is an ASSOCIATED_IDENTITY_MISMATCH, never a MATCH.
+    The real versioned field (market_date) is checked, no invented root
+    field."""
+    smap, files = _segA_chain_fixture(tmp_path)
+    files["dates"].write_text(json.dumps({"market_date": "1999-01-01"}))
+    d = "sha256:" + hashlib.sha256(files["dates"].read_bytes()).hexdigest()
+    smap._daily_entries["2026-11-24"]["descriptor"]["index_sha256"] = d
+    chain = SourceMap.manifest_chain(smap)
+    assert any(c["status"] == "ASSOCIATED_IDENTITY_MISMATCH"
+               and c.get("identity_key") == "market_date"
+               and c.get("actual_identity") == "1999-01-01"
+               for c in chain)
+
+
+def test_segA_chain_missing_field_blocks_read_before_members(tmp_path):
+    """Class 1 intake: a CONTENT_MISSING_IDENTITY_FIELD chain fault is a
+    hard pre-read gate - INPUT_BLOCKED with ZERO member opens (the empty
+    object must not silently pass the four-chain and reach member reads)."""
+    T = date(2026, 11, 24)
+    CUT = datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
+    smap, files = _segA_chain_fixture(tmp_path)
+    files["base"].write_text("{}")
+    smap._base_doc["manifest_sha256"] = (
+        "sha256:" + hashlib.sha256(files["base"].read_bytes()).hexdigest())
+    res = _formal_read(smap, tmp_path, T, CUT)
+    assert res.status == "INPUT_BLOCKED"
+    assert res.coverage["day_block"]["reason_code"] == "SUMMARY_CHAIN_FAULT"
+    assert res.coverage["member_consumption"]["members_opened"] == 0
 
 
 def test_segA_chain_fault_blocks_read_before_members(tmp_path):

@@ -28,6 +28,19 @@ from quanthus.p12_history.source_pins import BASE_BUSINESS_THROUGH, SourceMap, s
 BAR_SESSIONS = bars_mod.BAR_SESSIONS
 LISTING_PROOF_SESSIONS = cal_mod.LISTING_PROOF_SESSIONS
 
+# Versioned whole-bar consumed-fact contract (audit R4 seg-A intake): the
+# set of source-row fields the consumer actually reads to judge one bar's
+# business fact at a knowledge clock.  ``_bar_fact`` collapses equivalent
+# same-clock replicas ONLY over exactly this set - two rows that differ on
+# any consumed field are a genuine conflict, never picked by physical
+# order.  Kept as a module constant so a versioned contract test can assert
+# the consumed-field set equals this checklist (a future field change must
+# update the contract and the test, not drift silently).
+BAR_FACT_KEYS = (
+    "open_price", "high_price", "low_price",
+    "close_price", "volume", "amount",
+)
+
 
 @dataclass
 class HistoryResult:
@@ -234,6 +247,7 @@ def read_history(
                                "NON_OBJECT_DESCRIPTOR", "UNREADABLE",
                                "SHA_MISMATCH", "CONTENT_NON_OBJECT",
                                "CONTENT_MALFORMED_JSON",
+                               "CONTENT_MISSING_IDENTITY_FIELD",
                                "ASSOCIATED_IDENTITY_MISMATCH")
     ]
     # Window scope (audit R4 segment A closeout): only a link for a session
@@ -1073,9 +1087,7 @@ def read_history(
                     # close but differing on open/high/volume are a genuine
                     # conflict - never picked by physical order (audit R4
                     # seg-A closeout second pass).
-                    def _bar_fact(b, _keys=(
-                            "open_price", "high_price", "low_price",
-                            "close_price", "volume", "amount")):
+                    def _bar_fact(b, _keys=BAR_FACT_KEYS):
                         return tuple(b.get(k) for k in _keys)
                     facts = {_bar_fact(b) for b in same_clock}
                     if len(facts) <= 1:
@@ -1770,22 +1782,29 @@ def read_history(
             starved_here = sorted(
                 sid for sid in supplied
                 if not _sec_session_qualified.get((sid, _gday)))
-            if _gday == market_date.isoformat():
-                # A gap on T's OWN session is always shared - a formal
-                # update whose declared T supply has no proven channel or
-                # is genuinely late cannot open new entries, regardless of
-                # whether a monthly aggregate happens to carry a T row.
+            if e.get("dependency_type") != "SHARED_T_PRICE":
+                # A non-price shared hard dependency (the T session/calendar,
+                # the fixed summary chain) has no qualified-backup concept -
+                # a channel-unknown or late member on a needed session is an
+                # unconditional whole-day block, T and prior alike.
                 _shared_failed.append(e)
                 _failed_days.append(_gday)
                 _starved_set.update(
-                    ident.security_id for ident in identities
-                    if not _sec_session_qualified.get(
-                        (ident.security_id, _gday)))
+                    ident.security_id for ident in identities)
             elif not starved_here:
+                # T and prior days judged the same way: a gapped shared
+                # PRICE member whose session a qualified backup actually
+                # covered (an independent same-session member OR a base
+                # aggregate row the formal read could select) leaves nothing
+                # starved - the session is supplied, no block (audit R4
+                # seg-A second-segment intake: drop the T-day always-block
+                # for price supply).  A T-day price supply that leaves
+                # securities starved falls through to the shared/isolated
+                # split below like any session.
                 continue
             elif len(supplied) <= 1 and not _declared_pool:
-                # Single-security supply on a PRIOR day: the gap is local
-                # to that security's dependency, not a whole-day block.
+                # Single-security price supply (T or prior): the gap is
+                # local to that security's dependency, not a whole-day block.
                 _local_gaps.append((e, starved_here))
                 _starved_set.update(starved_here)
             else:

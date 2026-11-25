@@ -113,7 +113,10 @@ class _Result:
         self.coverage = COVERAGE
 
 
-def _fake_read_history(market_date, decision_cutoff, *, holdings, pending, source_map):
+def _fake_read_history(
+    market_date, decision_cutoff, *, holdings, pending, source_map,
+    replay_exclusion=None,
+):
     return _Result()
 
 
@@ -195,7 +198,7 @@ def test_build_e1_entry_returns_runner_and_per_t_context(monkeypatch):
 def test_history_reader_passes_holdings_and_pending(monkeypatch):
     seen = {}
 
-    def fake(day, cutoff, *, holdings, pending, source_map):
+    def fake(day, cutoff, *, holdings, pending, source_map, replay_exclusion=None):
         seen["holdings"] = holdings
         seen["pending"] = pending
         return _Result()
@@ -381,7 +384,7 @@ def test_load_e1_scenario_builds_runner(tmp_path, monkeypatch):
 
     captured = {}
 
-    def fake_read(day, cutoff, *, holdings, pending, source_map):
+    def fake_read(day, cutoff, *, holdings, pending, source_map, replay_exclusion=None):
         captured["args"] = (day, holdings, pending, source_map is not None)
         return _Result()
 
@@ -516,3 +519,62 @@ def test_evidence_dir_writes_recomputable_artefacts(tmp_path, monkeypatch):
             hashlib.sha256(Path(uri).read_bytes()).hexdigest()
             == ev[key]["sha256"]
         )
+
+
+def test_history_reader_forwards_replay_exclusion_pin(monkeypatch):
+    """The #737 replay-exclusion pin assembled by the driver reaches
+    read_history verbatim so a missing/wrong pin blocks before any member
+    is opened (audit 749-09)."""
+    captured = {}
+
+    def fake(day, cutoff, *, holdings, pending, source_map, replay_exclusion=None):
+        captured["replay_exclusion"] = replay_exclusion
+        return _Result()
+
+    monkeypatch.setattr(e1_assembly, "read_history", fake)
+    monkeypatch.setattr(
+        _e1_rt, "load_e1_rule_assets", lambda root: {"assets": "fake"}
+    )
+    pin = {"path": "/frozen/737.json", "sha256": "sha256:" + "9" * 64}
+    _runner, reader = e1_assembly.build_e1_entry(
+        repo_root=Path("/tmp/repo"),
+        scenario=SCENARIO,
+        action_coverage=ACTION_COVERAGE,
+        replay_exclusion=pin,
+    )
+    reader(T, CUTOFF)
+    assert captured["replay_exclusion"] == pin
+
+
+def test_p12_evidence_carries_p1_exceptions_from_this_read(monkeypatch):
+    """The specialised-P1 ledger read evidence rides p12_evidence beside
+    the ordinary member_consumption so e1_runtime._p1_read_evidence can
+    pair it (bypass when the key is absent)."""
+    p1_reads = {
+        "reads": [
+            {"status": "FAILED", "reason_code": "X", "member_id": "pkg::P1-ledger"},
+            {"status": "READ", "member_id": "pkg::P1-ledger", "sha256": "f" * 64},
+        ]
+    }
+
+    class _Res:
+        raw_history = ENVELOPE
+        coverage = {**COVERAGE, "p1_exceptions": p1_reads}
+
+    monkeypatch.setattr(
+        e1_assembly,
+        "read_history",
+        lambda *a, **k: _Res(),
+    )
+    monkeypatch.setattr(
+        _e1_rt, "load_e1_rule_assets", lambda root: {"assets": "fake"}
+    )
+    runner, reader = e1_assembly.build_e1_entry(
+        repo_root=Path("/tmp/repo"),
+        scenario=SCENARIO,
+        action_coverage=ACTION_COVERAGE,
+    )
+    reader(T, CUTOFF)
+    ctx = runner._context_supplier(T)
+    assert ctx.p12_evidence["p1_exceptions"] is p1_reads
+    assert ctx.p12_evidence["member_consumption"] is COVERAGE["member_consumption"]

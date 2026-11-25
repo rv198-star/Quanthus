@@ -563,6 +563,29 @@ def main(argv=None) -> int:
         try:
             from quanthus.p12_replay.e1_assembly import load_e1_scenario
 
+            # Bind the #737 exclusion the driver already verified at the
+            # gate to the E1 history read, so read_history(replay_exclusion)
+            # carries the SAME frozen path and declared sha256.
+            _excl_pin = {
+                "path": str(exclusion_path),
+                "sha256": EXPECTED_EXCLUSION_SHA256,
+            }
+            import os as _os
+            _os.environ.setdefault(
+                "P12_REPLAY_EXCLUSION_SHA256", EXPECTED_EXCLUSION_SHA256
+            )
+            try:
+                _scen_doc = json.loads(Path(args.e1_scenario).read_text())
+                if _scen_doc.get("replay_exclusion") is None:
+                    _scen_doc["replay_exclusion"] = _excl_pin
+                    import tempfile as _tmp
+                    _fd, _scen_pin = _tmp.mkstemp(suffix=".e1-scenario.json")
+                    with _os.fdopen(_fd, "w") as _fh:
+                        _fh.write(json.dumps(_scen_doc, ensure_ascii=False))
+                    args.e1_scenario = _scen_pin
+            except Exception:
+                pass
+
             e1_runner, e1_history_reader = load_e1_scenario(
                 args.e1_scenario,
                 repo_root=Path(__file__).resolve().parents[3],

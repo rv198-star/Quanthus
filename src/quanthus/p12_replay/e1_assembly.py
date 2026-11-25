@@ -48,6 +48,7 @@ def build_e1_entry(
     action_coverage: dict,
     exclusions: tuple[dict, ...] | list[dict] = (),
     source_map: SourceMap | None = None,
+    replay_exclusion: dict | None = None,
     holdings=(),  # tuple of holding rows OR callable(day) -> rows
     pending=(),   # tuple of pending rows OR callable(day) -> rows
     open_sessions: tuple[str, ...] | list[str] = (),
@@ -114,6 +115,7 @@ def build_e1_entry(
             holdings=day_holdings,
             pending=day_pending,
             source_map=smap,
+            replay_exclusion=replay_exclusion,
         )
         state["result"] = result
         mc = (result.coverage or {}).get("member_consumption") or {}
@@ -262,6 +264,16 @@ def build_e1_entry(
             "logical_decision_cutoff": decision_cutoff.isoformat(),
         }
         p12_evidence["coverage"] = result.coverage
+        # Preserve this run P1 exception-ledger read evidence verbatim
+        # next to the ordinary member_consumption: the P11 e1_runtime
+        # _p1_read_evidence pairing bypasses when p12_evidence lacks the
+        # key, so the specialised (and ordinary) original identity, digest,
+        # verification clocks and failed-then-successful attempts are
+        # carried through from THIS read, never re-derived from a stale
+        # scenario draft.
+        p12_evidence["p1_exceptions"] = (result.coverage or {}).get(
+            "p1_exceptions"
+        )
 
         state["contexts"][day.isoformat()] = E1ReplayContext(
             scenario_id=scenario["scenario_id"],
@@ -377,12 +389,26 @@ def load_e1_scenario(
     if isinstance(exclusions, dict) and set(exclusions) == {"path"}:
         exclusions = tuple(json.loads(Path(exclusions["path"]).read_text()))
 
+    # #737 replay-exclusion gate: the scenario may pin the frozen list
+    # inline ({"path","sha256"}) or only name the file; the declared sha
+    # must still come from the scenario or the run env, never inferred.
+    replay_exclusion = doc.get("replay_exclusion")
+    if isinstance(replay_exclusion, str):
+        replay_exclusion = {"path": replay_exclusion}
+    if isinstance(replay_exclusion, dict) and "sha256" not in replay_exclusion:
+        import os as _os
+        env_sha = _os.environ.get("P12_REPLAY_EXCLUSION_SHA256")
+        if env_sha:
+            replay_exclusion = dict(replay_exclusion)
+            replay_exclusion["sha256"] = env_sha
+
     return build_e1_entry(
         repo_root=repo_root,
         scenario=scenario,
         action_coverage=coverage,
         exclusions=tuple(exclusions),
         source_map=smap,
+        replay_exclusion=replay_exclusion,
         holdings=doc.get("holdings") or (),
         pending=doc.get("pending") or (),
         open_sessions=tuple(doc.get("open_sessions") or ()),

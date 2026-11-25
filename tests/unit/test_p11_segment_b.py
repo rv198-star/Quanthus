@@ -36,7 +36,6 @@ from tests.unit.test_p11_history_input import (
     _listing,
     _run_kwargs,
     _security_entry,
-    _trend_envelope,
 )
 
 

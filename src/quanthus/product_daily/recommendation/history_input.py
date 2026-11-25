@@ -968,12 +968,11 @@ def _position_facts_from(
     """Project the caller-declared position facts through, unchanged.
 
     position_facts arrives already typed (the P12 RunnerRequest projection passes
-    the real HeldPositionFacts object).  A versioned serializable dict is the
-    B-segment wire shape: it is adapted into a typed HeldPositionFacts when it
-    carries the required named fields (holding_sessions int > 0, optional
-    marked_return, prior_strategy_reduction_count int >= 0, and an evidence
-    unit_id); an unqualified dict stays a contract breach.  An already-typed
-    object passes through unchanged.
+    the real HeldPositionFacts object) and passes through unchanged.  A
+    serializable wire dict is the B-segment shape: its numeric fields keep
+    strict validation, but the dict itself carries no same-read verified
+    account snapshot, so it can never qualify an exit - the member degrades to
+    a named hold_alert rather than fabricating a disposition.
     """
     unverifiable: str | None = None
     pf = sec.get("position_facts")

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import pytest
+
 from quanthus.product_daily.recommendation.paper_replay import (
     build_replay_envelope,
     load_replay_request,
@@ -52,11 +54,30 @@ def _bind_artifacts(req, authority=None):
     # credential actually verified.  The catalogue carries a digest + producer
     # + authority/receipt identity (B02/B03/B10 lineage) so a caller-assembled
     # minimal or self-copied list is not an authority.
+    # oct08-projection-r2 / 8f82e24d: the signed-identity gate rejects rows
+    # whose security_id/listing_id/venue_id are absent or placeholders.  A
+    # signed P10 row must name the security it belongs to - bind the NAMED
+    # security/listing/venue the coverage record declares (per security_code),
+    # falling back to the security's own identity and the register's venue.
+    coverage = req["action_coverage"]
+    declared = {}
+    for s in coverage.get("securities") or ():
+        declared[str(s.get("security_code"))] = s
+    ident_by_code = {
+        str(sec["identity"].get("listing_code")): sec["identity"]
+        for sec in req.get("securities") or ()
+    }
+    reg_venue = {}
+    for reg in coverage.get("registers") or ():
+        reg_venue[reg.get("coverage_id")] = reg.get("venue_id")
     arts = []
-    for ev in req["action_coverage"]["window_evidence"]:
+    for ev in coverage["window_evidence"]:
         if ev["purpose"] != "returns_61_session" or ev["event_state"] != "verified_event":
             continue
         cid = ev["coverage_id"]
+        code = str(ev.get("security_code"))
+        decl = declared.get(code) or {}
+        ident = ident_by_code.get(code) or {}
         rows = []
         for e in ev.get("events") or []:
             rows.append(
@@ -70,9 +91,19 @@ def _bind_artifacts(req, authority=None):
                     "bonus_share_ratio": e.get("bonus_share_ratio"),
                     "transfer_share_ratio": e.get("transfer_share_ratio"),
                     "currency": e.get("currency"),
-                    "security_id": e.get("security_id"),
-                    "listing_id": e.get("listing_id"),
-                    "venue_id": e.get("venue_id"),
+                    # Named identity: the declared coverage security (bound
+                    # venue) first, else the security's own identity, else the
+                    # register venue - never a null/placeholder.
+                    "security_id": e.get("security_id")
+                    or decl.get("security_id")
+                    or ident.get("security_id"),
+                    "listing_id": e.get("listing_id")
+                    or decl.get("listing_id")
+                    or ident.get("listing_id"),
+                    "venue_id": e.get("venue_id")
+                    or decl.get("venue_id")
+                    or ident.get("venue_id")
+                    or reg_venue.get(cid),
                 }
             )
         arts.append(
@@ -92,6 +123,55 @@ def _bind_artifacts(req, authority=None):
     if arts:
         req["action_coverage"]["verified_artifacts"] = arts
     return req
+
+
+def _signed_artifacts(req, mutate_row):
+    # Re-label the bound catalogue as the signed P10 producer (identity
+    # REQUIRED per row) and mutate each row as the negative case dictates.
+    for art in req["action_coverage"]["verified_artifacts"]:
+        art["producer"] = "p10.signed-action-members.v1"
+        for row in art["rows"]:
+            mutate_row(row)
+    return req
+
+
+@pytest.mark.parametrize(
+    "mutate, expected_reason",
+    [
+        # literal 'None' placeholder on a signed row -> invalid identity.
+        (
+            lambda r: r.update(security_id="None", listing_id="None", venue_id="None"),
+            "action_artifact_invalid_identity",
+        ),
+        # the id fields are simply absent from a signed row -> invalid identity.
+        (
+            lambda r: (r.pop("security_id"), r.pop("listing_id"), r.pop("venue_id")),
+            "action_artifact_invalid_identity",
+        ),
+        # a row naming a venue outside the bound pair -> coverage gate
+        # (distinct from the artifact-identity rejection).
+        (
+            lambda r: r.update(venue_id="NYSE"),
+            "replay_action_coverage_unknown",
+        ),
+    ],
+    ids=["literal_none", "missing_field", "wrong_venue"],
+)
+def test_r2_artifact_identity_negatives_fail_with_named_reason(mutate, expected_reason):
+    # oct08-projection-r2 fixture fix keeps these three true negatives each
+    # reachable through its OWN gate with its OWN reason - a positive that
+    # fails on the wrong interception cannot false-green.
+    win = _returns_window()
+    ex_day = win[30]
+    req = _r5_req(
+        [_r5_event(ex_day, cash="0.116", bonus="0", transfer="0")],
+        [_r5_action("600000", ex_day, cash="0.116", bonus="0")],
+    )
+    _signed_artifacts(req, mutate)
+    request = load_replay_request(req)
+    _, _, window_info, exclusions = build_replay_envelope(request, T1)
+    assert window_info["delivered"]["600000"]["entry_eligible"] is False
+    assert any(e["reason"] == expected_reason for e in exclusions), exclusions
 
 
 def _r5_req(events, actions, market_date=T1):

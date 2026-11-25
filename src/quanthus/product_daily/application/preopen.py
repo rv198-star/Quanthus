@@ -53,15 +53,13 @@ AUCTION_CLOSE = dtime(9, 25)
 CHECK_OPEN = dtime(9, 0)
 CHECK_CLOSE = dtime(9, 25)
 
-# Purpose qualification for the opening auction: the ordinary intraday
-# quote surface (production Quote always stamps a ``market_state`` session
-# value) carries the day's open price as a regular post-hoc tape field, not
-# as an auction-purpose record visible inside 09:15-09:25.  An ordinary
-# snapshot therefore never qualifies as the auction print no matter which
-# clocks it carries; only a record shape that does not declare an ordinary
-# session state (the pre-qualified auction record, e.g. a future #727-named
-# supply) can be admitted, and only after the same-security/same-session/
-# in-window/point-in-time gates in resolve_auction.
+# Purpose qualification for the opening auction: a quote record qualifies
+# only when an already approved receipt explicitly attests this security,
+# session, source and ``opening_auction`` purpose.  The ordinary intraday
+# tape never becomes qualified merely because its session field is absent
+# or null; ``market_state`` is evidence of ordinary-tape usage, never proof
+# of auction purpose.  A missing or unverifiable qualification seam stays
+# typed ``unavailable`` and names the actual missing seam.
 
 _ROUND_LOT = 100
 
@@ -392,20 +390,69 @@ def resolve_auction(quote, code, now) -> FactVerdict:
             f"quote surface is {quote_status}; no usable auction print",
             getattr(quote, "source", "tencent") or "tencent", now, quote=quote,
         )
-    # Purpose qualification: an auction verdict is only available from a
-    # record qualified for THIS purpose.  An ordinary intraday snapshot
-    # whose source stamps a continuous/post-auction session state
-    # (trading/lunch/closing-auction/closed, or the pre/holiday states that
-    # never carry a print) reports the day's open price as a post-hoc
-    # field of the regular tape; it is not the opening-auction print that
-    # was visible inside 09:15-09:25.  Only a quote surface that does not
-    # declare such a session state (the pre-qualified auction record
-    # shape) can qualify, and the time-window gates below still apply.
-    market_state = getattr(quote, 'market_state', None)
-    if market_state is not None:
+    # Purpose qualification: an auction verdict is available only from a
+    # record carrying an explicit, verifiable receipt for THIS purpose.  The
+    # mere presence, absence or nullness of ``market_state`` proves nothing;
+    # every shape takes the same receipt-first path.  The receipt must name
+    # the auction record and approval scope and attest the open field, this
+    # security, its source, the same trading session and the opening-auction
+    # purpose.  Production's ordinary Quote carries no such receipt and
+    # therefore stays typed unavailable; this consumes only the contract
+    # seam when a qualified record is already supplied and does not admit or
+    # repair P10 #727 data.
+    qualification = getattr(quote, 'auction_qualification', None)
+    if qualification is None:
+        qualification = getattr(quote, 'qualification_receipt', None)
+    if not isinstance(qualification, dict):
+        market_state = getattr(quote, 'market_state', None)
+        ordinary = (
+            'ordinary intraday snapshot has no auction-purpose qualification receipt'
+            if market_state is not None
+            else 'opening-auction purpose has no verifiable qualification receipt seam'
+        )
         return _unavailable(
             code, FACT_AUCTION,
-            'ordinary intraday snapshot open is not an auction-purpose print (market_state='+str(market_state)+')',
+            ordinary + ' (P10 #727 supply admission pending)',
+            getattr(quote, 'source', 'tencent') or 'tencent', now, quote=quote,
+        )
+    purpose = qualification.get('purpose')
+    purposes = purpose if isinstance(purpose, (list, tuple, set)) else (purpose,)
+    fields = qualification.get('fields')
+    field_names = fields if isinstance(fields, (list, tuple, set)) else (fields,)
+    session = qualification.get('session') or qualification.get('trading_date')
+    quote_session = getattr(quote, 'market_state', None)
+    ordinary_sessions = {'trading', 'lunch_break', 'call_auction_close', 'closed', 'holiday'}
+    source = getattr(quote, 'source', 'tencent') or 'tencent'
+    receipt_id = (
+        qualification.get('receipt_id')
+        or qualification.get('record_id')
+        or qualification.get('supply_id')
+    )
+    approval = (
+        qualification.get('approval')
+        or qualification.get('approved_by')
+        or qualification.get('contract_ref')
+    )
+    qualified = (
+        bool(receipt_id)
+        and bool(approval)
+        and qualification.get('security_code') == code
+        and qualification.get('qualified') is True
+        and any(item in ('opening_auction', 'preopen_auction') for item in purposes)
+        and qualification.get('source') == source
+        and 'open' in field_names
+        and session in (now.date().isoformat(), now.date(), 'same_session')
+        # A receipt for the opening auction cannot describe the ordinary
+        # continuous/closing tape.  ``market_state`` still is not the proof;
+        # this only rejects a direct contradiction between the receipt's
+        # declared auction session and the record's own ordinary-tape use.
+        and quote_session not in ordinary_sessions
+    )
+    if not qualified:
+        return _unavailable(
+            code, FACT_AUCTION,
+            'opening-auction qualification receipt does not verifiably attest '
+            'this security/field/source/session/purpose',
             getattr(quote, 'source', 'tencent') or 'tencent', now, quote=quote,
         )
 
@@ -681,6 +728,29 @@ def run_check(
                 "reason_codes": reasons,
             }
         )
+
+    if not in_window:
+        # E6核对只在09:00-09:25有效。越窗结果保留为审计回执，但不能让任何
+        # 依赖竞价的新增在该回执下表现为可执行；事实仍按PIT原值记录。
+        for row in results:
+            depends_on_auction = any(
+                _canonical_fact(fact) == FACT_AUCTION for fact in row["depends_on_preopen"]
+            )
+            if row["side"] == "buy" and depends_on_auction:
+                was_executable = row["executable"]
+                row["executable"] = False
+                for fact in row["facts"]:
+                    if fact["fact"] == FACT_AUCTION and fact["status"] == "verified":
+                        fact["status"] = "unavailable"
+                        fact["reason"] = (
+                            "pre-open check is outside the 09:00-09:25 verification window"
+                        )
+                auction_reason = f"PREOPEN_{FACT_AUCTION}_UNAVAILABLE"
+                if auction_reason not in row["reason_codes"]:
+                    row["reason_codes"].append(auction_reason)
+                row["reason_codes"] = list(dict.fromkeys(row["reason_codes"]))
+                if was_executable:
+                    blocked += 1
 
     receipt = {
         "schema_version": CHECK_SCHEMA,

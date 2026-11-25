@@ -70,6 +70,7 @@ class _Quote:
     stale: bool = False
     quote_time: datetime | None = None
     received_at: datetime | None = None
+    auction_qualification: dict | None = None
 
 
 class _Quotes:
@@ -78,6 +79,32 @@ class _Quotes:
 
     def quote(self, code):
         return self._m.get(code)
+
+
+def _qualified_auction_quote(**overrides):
+    """Isolated positive fixture carrying an explicit auction-purpose receipt.
+
+    This is a synthetic receipt for the contract seam only: it does not claim
+    P10 #727 admission, it merely represents the already-qualified input shape
+    that the E6 checker is allowed to consume.
+    """
+    values = {
+        "open": Decimal("10.90"),
+        "quote_time": _at(9, 20),
+        "received_at": _at(9, 20),
+        "auction_qualification": {
+            "receipt_id": "synthetic-opening-auction-receipt-20261120",
+            "approval": "issue-723-contract-fixture",
+            "qualified": True,
+            "purpose": "opening_auction",
+            "fields": ("open",),
+            "security_code": "600000",
+            "source": "tencent",
+            "session": "same_session",
+        },
+    }
+    values.update(overrides)
+    return _Quote(**values)
 
 
 def _at(h, m=0):
@@ -145,8 +172,10 @@ def test_auction_unavailable_before_window():
 
 
 def test_auction_verified_with_open_print_in_window():
-    # A print already observed AND received at the check instant verifies.
-    q = _Quote(open=Decimal("10.9"), quote_time=_at(9, 20), received_at=_at(9, 20))
+    # A print already observed AND received at the check instant verifies only
+    # when an explicit opening-auction qualification receipt attests the same
+    # security/purpose/source.
+    q = _qualified_auction_quote(open=Decimal("10.9"))
     v = preopen.resolve_auction(q, "600000", _at(9, 20))
     assert v.status == "verified"
     assert v.source == "tencent"
@@ -268,10 +297,12 @@ def test_buy_blocked_when_auction_above_price_cap():
     # actually declares the auction dependency - an undeclared plan keeps
     # its original result even above the cap.
     plan = _Plan(price_cap=Decimal("10.80"), depends_on_preopen=(preopen.FACT_AUCTION,))
-    # a qualified (already observed+received, auction-purpose shape) print
-    # above the cap still fails.  The fixture quote carries no ordinary
-    # session market_state, i.e. it is the pre-qualified auction record.
-    q = _Quote(open=Decimal("11.50"), quote_time=_at(9, 18), received_at=_at(9, 18))
+    # a qualified (already observed+received, explicit auction-purpose
+    # receipt) print above the cap still fails.  The fixture represents only
+    # the contract-qualified seam, never an inferred market_state shape.
+    q = _qualified_auction_quote(
+        open=Decimal("11.50"), quote_time=_at(9, 18), received_at=_at(9, 18)
+    )
     receipt = preopen.run_check(
         package=_Package(plans=(plan,)),
         projection=_Projection(),
@@ -323,6 +354,119 @@ def test_ordinary_intraday_snapshot_never_qualified_for_auction():
     assert v.status == "unavailable"
     assert v.observed_at == _at(9, 19).isoformat()
     assert v.received_at == _at(9, 19).isoformat()
+
+
+def test_auction_missing_or_wrong_qualification_receipt_is_unavailable():
+    # adjacent negatives: no receipt, wrong security and wrong purpose never
+    # become qualified merely because the ordinary session field is absent.
+    for overrides, needle in (
+        ({"auction_qualification": None}, "no verifiable qualification receipt seam"),
+        (
+            {"auction_qualification": {
+                "qualified": True,
+                "purpose": "opening_auction",
+                "security_code": "000001",
+                "source": "tencent",
+            }},
+            "does not verifiably attest this security/field/source/session/purpose",
+        ),
+        (
+            {"auction_qualification": {
+                "qualified": True,
+                "purpose": "continuous_trading",
+                "security_code": "600000",
+                "source": "tencent",
+            }},
+            "does not verifiably attest this security/field/source/session/purpose",
+        ),
+    ):
+        q = _qualified_auction_quote(**overrides)
+        v = preopen.resolve_auction(q, "600000", _at(9, 20))
+        assert v.status == "unavailable"
+        assert needle in (v.reason or "")
+
+
+def test_auction_receipt_missing_identity_field_or_session_is_unavailable():
+    # The receipt is a verifiable qualification receipt, not a boolean shape:
+    # missing receipt identity/approval, missing open-field scope or missing
+    # session scope each fail closed.
+    base = {
+        "receipt_id": "receipt-1",
+        "approval": "issue-723-contract-fixture",
+        "qualified": True,
+        "purpose": "opening_auction",
+        "fields": ("open",),
+        "security_code": "600000",
+        "source": "tencent",
+        "session": "same_session",
+    }
+    for remove in ("receipt_id", "approval", "fields", "session"):
+        receipt = dict(base)
+        receipt.pop(remove)
+        q = _qualified_auction_quote(auction_qualification=receipt)
+        v = preopen.resolve_auction(q, "600000", _at(9, 20))
+        assert v.status == "unavailable"
+        assert "security/field/source/session/purpose" in (v.reason or "")
+
+
+def test_market_state_shape_does_not_override_a_verifiable_receipt():
+    # market_state is neither positive nor negative proof.  A complete
+    # contract-qualified record is judged by the receipt first; this keeps all
+    # market_state shapes on one rule instead of using the field as a gate.
+    class _QualifiedWithState(_Quote):
+        market_state = "pre_open"
+
+    q = _QualifiedWithState(**vars(_qualified_auction_quote()))
+    v = preopen.resolve_auction(q, "600000", _at(9, 20))
+    assert v.status == "verified"
+
+
+def test_auction_receipt_conflicting_with_ordinary_tape_is_unavailable():
+    # A purported opening-auction receipt cannot reclassify the ordinary
+    # continuous-trading tape; ordinary intraday open keeps its original use.
+    class _QualifiedTradingTape(_Quote):
+        market_state = "trading"
+
+    q = _QualifiedTradingTape(**vars(_qualified_auction_quote()))
+    v = preopen.resolve_auction(q, "600000", _at(9, 20))
+    assert v.status == "unavailable"
+    assert "security/field/source/session/purpose" in (v.reason or "")
+
+
+def test_auction_0915_and_0925_exact_boundaries_verify_when_qualified():
+    # exact lower/upper auction boundaries qualify when both source clocks are
+    # same-day, same-security and not later than the check instant.
+    for minute in (15, 25):
+        q = _qualified_auction_quote(
+            quote_time=_at(9, minute), received_at=_at(9, minute)
+        )
+        v = preopen.resolve_auction(q, "600000", _at(9, 25))
+        assert v.status == "verified"
+        assert v.observed_at == _at(9, minute).isoformat()
+        assert v.received_at == _at(9, minute).isoformat()
+
+
+def test_run_check_after_0925_blocks_dependent_buy_even_with_qualified_print():
+    # 09:26 is outside the E6 check window.  The receipt is still written, but
+    # it cannot be used to confirm a new buy depending on the auction fact.
+    plan = _Plan(price_cap=Decimal("11.80"), depends_on_preopen=(preopen.FACT_AUCTION,))
+    q = _qualified_auction_quote(
+        open=Decimal("10.90"), quote_time=_at(9, 25), received_at=_at(9, 25)
+    )
+    receipt = preopen.run_check(
+        package=_Package(plans=(plan,)),
+        projection=_Projection(),
+        history=_History(),
+        quotes=_Quotes({"600000": q}),
+        now=_at(9, 26),
+        account_mode="real",
+    )
+    row = receipt["plans"][0]
+    assert receipt["in_window"] is False
+    assert row["executable"] is False
+    assert "PREOPEN_AUCTION_UNAVAILABLE" in row["reason_codes"]
+    assert row["facts"][0]["status"] == "unavailable"
+    assert "outside the 09:00-09:25 verification window" in (row["facts"][0]["reason"] or "")
 
 
 def test_check_marks_window_and_never_mints_signal():

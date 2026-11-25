@@ -13,6 +13,8 @@ import json
 import sqlite3
 from pathlib import Path
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from quanthus.nvda_case_assembly import (
@@ -44,9 +46,19 @@ def make_news_root(tmp_path: Path) -> tuple[Path, dict]:
     )
     shas: dict[str, str] = {}
     rows = []
-    for key, role, kind in [
-        ("sina-7x24:pre1", "INPUT_VISIBLE_BEFORE_CUTOFF", "case-input"),
-        ("sina-7x24:post1", "POST_CUTOFF_RESULT_CAPTURE", "case-result-capture"),
+    for key, role, kind, seen_at in [
+        (
+            "sina-7x24:pre1",
+            "INPUT_VISIBLE_BEFORE_CUTOFF",
+            "case-input",
+            "2026-11-24T00:00:00Z",
+        ),
+        (
+            "sina-7x24:post1",
+            "POST_CUTOFF_RESULT_CAPTURE",
+            "case-result-capture",
+            "2026-11-24T10:30:00Z",
+        ),
     ]:
         wire_sha = put_object(objects, "wire", ("synthetic wire " + key).encode())
         record = {
@@ -56,13 +68,13 @@ def make_news_root(tmp_path: Path) -> tuple[Path, dict]:
                 "source_record_id": key.split(":")[1],
                 "synthetic": True,
             },
-            "first_seen_at": "2026-11-24T00:00:00Z",
-            "version_first_seen_at": "2026-11-24T00:00:00Z",
-            "source_artifact_known_at": "2026-11-24T00:00:00Z",
+            "first_seen_at": seen_at,
+            "version_first_seen_at": seen_at,
+            "source_artifact_known_at": seen_at,
             "case_id": CASE_ID,
             "case_role": role,
             "raw_source_receipt": {
-                "response_completed_at": "2026-11-24T00:00:00Z",
+                "response_completed_at": seen_at,
                 "source_http_date": "Tue, 24 Nov 2026 00:00:00 GMT",
                 "raw": {"sha256": wire_sha, "size_bytes": 10},
             },
@@ -91,7 +103,25 @@ def write_core_day(root: Path, market_date: str, use_dates_key: bool = True):
         )
         part = core / rel
         part.parent.mkdir(parents=True, exist_ok=True)
-        part.write_bytes(("synthetic bytes " + market_date + " " + table).encode())
+        if table == "dwd_security_bar":
+            identity_values = [
+                "CN_STOCK_CODE:" + exchange + ":" + code
+                for exchange in ("SZSE", "SSE")
+                for code in FROZEN_EQUITIES
+            ] + ["CN_STOCK_CODE:SZSE:000001"]
+            frame = pa.table(
+                {"listing_id": identity_values, "interval_size": ["1d"] * len(identity_values)}
+            )
+        else:
+            frame = pa.table(
+                {"index_id": ["399006", "000300", "999999"], "interval_size": ["1d", "1d", "1d"]}
+            )
+        frame = frame.add_column(
+            frame.num_columns,
+            "source_marker",
+            pa.array([market_date] * frame.num_rows),
+        )
+        pq.write_table(frame, part)
         files.append(
             {"path": rel, "sha256": sha(part.read_bytes()), "size_bytes": part.stat().st_size}
         )
@@ -216,6 +246,15 @@ def universe_file(tmp_path: Path) -> Path:
     universe = {
         "codes": list(FROZEN_EQUITIES) + ["000001"],
         "company_org_ids": org,
+        "source_identity_by_code": {
+            c: (
+                "CN_STOCK_CODE:"
+                + ("SSE" if c.startswith(("600", "601", "688")) else "SZSE")
+                + ":"
+                + c
+            )
+            for c in FROZEN_EQUITIES
+        },
         "population": 5224,
     }
     path = tmp_path / "source-universe.json"
@@ -611,33 +650,237 @@ def test_news_revision_versions_split_across_sides(tmp_path: Path) -> None:
         universe_path=universe_file(tmp_path),
     )
     inp, result = manifests(out)
-    result_keys = {m["source_key"]: m for m in result["news_members"]}
-    assert "sina-7x24:rev1" in result_keys
-    # the late revision carries the revision chain pointer to the pre-cutoff original
-    assert result_keys["sina-7x24:rev1"]["previous_member_sha256"] == shas["v1"]
+    input_members = [m for m in inp["news_members"] if m["source_key"] == "sina-7x24:rev1"]
+    result_members = [m for m in result["news_members"] if m["source_key"] == "sina-7x24:rev1"]
+    # one assembly run keeps both chain versions even though sqlite head is v2:
+    # v1 before the input cutoff on the input side, v2 after it on the result side.
+    assert [m["member_sha256"] for m in input_members] == [shas["v1"]]
+    assert [m["member_sha256"] for m in result_members] == [shas["v2"]]
+    assert result_members[0]["previous_member_sha256"] == shas["v1"]
+    assert result_members[0]["sqlite_head_is_this_member"] is True
+    assert input_members[0]["sqlite_head_is_this_member"] is False
+    assert input_members[0]["clock_evidence"]["first_seen_at"] == "2026-11-24T01:00:00Z"
     # the pre-cutoff original object remains sealed by sha in the store tree
     v1_obj = news_root / "objects" / "case-input" / shas["v1"][:2] / shas["v1"]
     assert v1_obj.exists()
-    # and when the original version is the enumerated head (pre-revision store),
-    # it lands in the input closure instead
-    out2 = tmp_path / "sealed-first-version"
-    db = sqlite3.connect(str(news_root / "state.sqlite3"))
-    db.execute("UPDATE items SET member_sha=? WHERE id=?", (shas["v1"], "sina-7x24:rev1"))
-    db.commit()
-    db.close()
-    assemble(
+    result_obj = out / "result" / "news" / "members" / shas["v2"]
+    input_obj = out / "input" / "news" / "members" / shas["v1"]
+    assert result_obj.exists() and input_obj.exists()
+
+
+def test_member_projection_counts_and_excludes_unrelated(tmp_path: Path) -> None:
+    receipt, out, _s = run_assemble(tmp_path)
+    inp, result = manifests(out)
+    assert receipt["status"] == "SEALED"
+    input_projection = inp["member_projection"]
+    assert input_projection
+    assert all(row["projection_member"] is True for row in input_projection)
+    assert all(row["row_count"] == 1 for row in input_projection)
+    assert all(row["benchmark"] is False for row in input_projection)
+    # each frozen equity is projected per input date, while unrelated universe
+    # members such as 000001 never become named projection rows.
+    assert len(input_projection) == 2 * len(FROZEN_EQUITIES)
+    assert "000001" not in {row["code"] for row in input_projection}
+    assert all("open" not in row and "close" not in row for row in input_projection)
+    assert inp["counts"]["benchmark_projection"] == 0
+    result_projection = result["member_projection"]
+    assert len(result_projection) == 2 * len(FROZEN_EQUITIES)
+    benchmark_projection = result["benchmark_projection"]
+    assert len(benchmark_projection) == 4
+    assert {row["code"] for row in benchmark_projection} == {"399006", "000300"}
+    assert all(row["row_count"] == 1 for row in benchmark_projection)
+
+
+def test_member_projection_absent_and_duplicate_are_named_gaps(tmp_path: Path) -> None:
+    news_root, _s = make_news_root(tmp_path)
+    inventory = make_inventory(tmp_path, ["2026-11-23"])
+    index = make_index(tmp_path, ["2026-11-24"])
+    anchor_result, anchor_root = anchor_files(tmp_path)
+    # Rewrite one input security member so one frozen identity is absent and
+    # another occurs twice. Values are synthetic identity strings only.
+    core = tmp_path / "invcore" / "core-2026-11-23"
+    part = (
+        core
+        / "payload"
+        / "security_market_observation"
+        / "dwd_security_bar"
+        / "market_date=2026-11-23"
+        / "part-00000.parquet"
+    )
+    first = FROZEN_EQUITIES[0]
+    second = FROZEN_EQUITIES[1]
+    rest = [
+        "CN_STOCK_CODE:" + ("SSE" if c.startswith(("600", "601", "688")) else "SZSE") + ":" + c
+        for c in FROZEN_EQUITIES[2:]
+    ]
+    duplicate = "CN_STOCK_CODE:SZSE:" + second
+    frame = pa.table({"listing_id": [duplicate, duplicate] + rest})
+    pq.write_table(frame, part)
+    raw = part.read_bytes()
+    inv = json.loads(inventory.read_bytes())
+    for member in inv["members"]:
+        if member["path"] == str(part):
+            member["sha256"] = sha(raw)
+            member["bytes"] = len(raw)
+    inventory.write_bytes(encoded(inv))
+    out = tmp_path / "sealed"
+    receipt = assemble(
         policy_path=policy_file(tmp_path),
         inventory_path=inventory,
         anchor_result_path=anchor_result,
         anchor_input_root=anchor_root,
         news_root=news_root,
-        output_root=out2,
+        output_root=out,
         job_index_path=index,
         result_dates=["2026-11-24"],
         universe_path=universe_file(tmp_path),
     )
-    inp2, result2 = manifests(out2)
-    input_keys = {m["source_key"]: m for m in inp2["news_members"]}
-    assert input_keys["sina-7x24:rev1"]["member_sha256"] == shas["v1"]
-    assert input_keys["sina-7x24:rev1"]["case_role"] == "INPUT_VISIBLE_BEFORE_CUTOFF"
-    assert result2["news_members"] == []
+    assert receipt["status"] == "PARTIAL"
+    reasons = {(g.get("item") or "", g["reason"]) for g in receipt["gaps"]}
+    assert any(
+        item.endswith(":dwd_security_bar:" + first) and reason == "IDENTITY_NOT_IN_SOURCE_MEMBER"
+        for item, reason in reasons
+    )
+    assert any(
+        item.endswith(":dwd_security_bar:" + second)
+        and reason == "DUPLICATE_IDENTITY_ROWS_IN_SOURCE_MEMBER"
+        for item, reason in reasons
+    )
+
+
+def test_preexisting_empty_and_junk_output_roots_refuse_before_write(tmp_path: Path) -> None:
+    news_root, _s = make_news_root(tmp_path)
+    inventory = make_inventory(tmp_path, ["2026-11-23"])
+    index = make_index(tmp_path, ["2026-11-24"])
+    anchor_result, anchor_root = anchor_files(tmp_path)
+    for name in ("empty-root", "junk-root"):
+        root = tmp_path / name
+        root.mkdir()
+        if name == "junk-root":
+            (root / "unrelated.txt").write_text("junk")
+        before = sorted(str(x.relative_to(root)) for x in root.rglob("*"))
+        with pytest.raises(FileExistsError, match="OUTPUT_ROOT_ALREADY_EXISTS"):
+            assemble(
+                policy_path=policy_file(tmp_path),
+                inventory_path=inventory,
+                anchor_result_path=anchor_result,
+                anchor_input_root=anchor_root,
+                news_root=news_root,
+                output_root=root,
+                job_index_path=index,
+                result_dates=["2026-11-24"],
+                universe_path=universe_file(tmp_path),
+            )
+        after = sorted(str(x.relative_to(root)) for x in root.rglob("*"))
+        assert after == before
+
+
+def test_news_conflicting_or_missing_clocks_are_named_gaps(tmp_path: Path) -> None:
+    root = tmp_path / "newsclock"
+    objects = root / "objects"
+    objects.mkdir(parents=True)
+    sqlite3.connect(str(root / "state.sqlite3")).execute(
+        "CREATE TABLE items(id TEXT PRIMARY KEY,semantic TEXT,member_sha TEXT,first_seen TEXT)"
+    ).connection.close()
+
+    def write_record(record_id: str, record: dict) -> str:
+        wire_sha = put_object(objects, "wire", ("wire-" + record_id).encode())
+        record.setdefault("schema", "quanthus.p10.forward-text-record.v1")
+        record.setdefault("payload", {"source": "sina-7x24", "source_record_id": record_id})
+        record.setdefault("case_id", CASE_ID)
+        record.setdefault("case_role", "POST_CUTOFF_RESULT_CAPTURE")
+        record.setdefault(
+            "raw_source_receipt",
+            {
+                "response_completed_at": record.get("version_first_seen_at"),
+                "raw": {"sha256": wire_sha, "size_bytes": 4},
+            },
+        )
+        return put_object(objects, "case-result-capture", encoded(record))
+
+    write_record(
+        "clock-conflict",
+        {
+            "first_seen_at": "2026-11-24T01:00:00Z",
+            "version_first_seen_at": "2026-11-24T00:30:00Z",
+            "source_artifact_known_at": "2026-11-24T10:00:00Z",
+        },
+    )
+    missing_sha = write_record(
+        "clock-missing",
+        {
+            "first_seen_at": "2026-11-24T01:00:00Z",
+            "version_first_seen_at": "2026-11-24T10:30:00Z",
+        },
+    )
+    # Remove every decision clock from the missing-clock object after construction.
+    missing_path = objects / "case-result-capture" / missing_sha[:2] / missing_sha
+    missing_record = json.loads(missing_path.read_bytes())
+    missing_record.pop("version_first_seen_at", None)
+    missing_record["raw_source_receipt"]["response_completed_at"] = None
+    raw = encoded(missing_record)
+    assert sha(raw) != missing_sha
+    # Keep the object at its original content-addressed path as a corrupt/missing
+    # clock input: the test does not require production write semantics here.
+    missing_path.write_bytes(raw)
+
+    inventory = make_inventory(tmp_path, ["2026-11-23"])
+    index = make_index(tmp_path, ["2026-11-24"])
+    anchor_result, anchor_root = anchor_files(tmp_path)
+    out = tmp_path / "sealed"
+    receipt = assemble(
+        policy_path=policy_file(tmp_path),
+        inventory_path=inventory,
+        anchor_result_path=anchor_result,
+        anchor_input_root=anchor_root,
+        news_root=root,
+        output_root=out,
+        job_index_path=index,
+        result_dates=["2026-11-24"],
+        universe_path=universe_file(tmp_path),
+    )
+    assert receipt["status"] == "PARTIAL"
+    reasons = {g["reason"] for g in receipt["gaps"]}
+    assert "VISIBILITY_CLOCK_CONFLICT" in reasons
+    assert "VISIBILITY_CLOCK_MISSING" in reasons
+
+
+def test_news_role_clock_mismatch_is_named_gap(tmp_path: Path) -> None:
+    news_root, shas = make_revised_news_root(tmp_path)
+    v2_path = (
+        news_root / "objects" / "case-result-capture" / shas["v2"][:2] / shas["v2"]
+    )
+    v2_record = json.loads(v2_path.read_bytes())
+    # Producer metadata claims input visibility, while the actual version clocks
+    # are post-cutoff. This must not enter either side merely because a role string
+    # or sqlite head says so.
+    v2_record["case_role"] = "INPUT_VISIBLE_BEFORE_CUTOFF"
+    v2_path.write_bytes(encoded(v2_record))
+    inventory = make_inventory(tmp_path, ["2026-11-23"])
+    index = make_index(tmp_path, ["2026-11-24"])
+    anchor_result, anchor_root = anchor_files(tmp_path)
+    out = tmp_path / "sealed"
+    receipt = assemble(
+        policy_path=policy_file(tmp_path),
+        inventory_path=inventory,
+        anchor_result_path=anchor_result,
+        anchor_input_root=anchor_root,
+        news_root=news_root,
+        output_root=out,
+        job_index_path=index,
+        result_dates=["2026-11-24"],
+        universe_path=universe_file(tmp_path),
+    )
+    assert receipt["status"] == "PARTIAL"
+    mismatch = [
+        g
+        for g in receipt["gaps"]
+        if g["reason"] in {"CASE_ROLE_OBJECT_KIND_MISMATCH", "CASE_ROLE_VISIBILITY_SIDE_MISMATCH"}
+    ]
+    assert mismatch
+    assert any(g.get("member_sha256") == shas["v2"] for g in mismatch)
+    inp, result = manifests(out)
+    input_members = [m for m in inp["news_members"] if m["source_key"] == "sina-7x24:rev1"]
+    result_members = [m for m in result["news_members"] if m["source_key"] == "sina-7x24:rev1"]
+    assert [m["member_sha256"] for m in input_members] == [shas["v1"]]
+    assert result_members == []

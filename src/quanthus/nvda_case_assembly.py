@@ -28,9 +28,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-ASSEMBLER_VERSION = "nvda-case-assembly.v2"
+try:
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+except ImportError:  # pragma: no cover - exercised in runtimes without parquet support
+    pq = None
+
+ASSEMBLER_VERSION = "nvda-case-assembly.v3"
 
 RAW_OBJECT_KINDS = ("wire", "document-events", "markdown")
+
+EXPECTED_OBJECT_KIND_BY_ROLE = {
+    "INPUT_VISIBLE_BEFORE_CUTOFF": "case-input",
+    "POST_CUTOFF_RESULT_CAPTURE": "case-result-capture",
+}
+
+EXPECTED_SIDE_BY_ROLE = {
+    "INPUT_VISIBLE_BEFORE_CUTOFF": "input",
+    "POST_CUTOFF_RESULT_CAPTURE": "result",
+}
 
 FROZEN_EQUITIES = (
     "300308",
@@ -141,39 +156,519 @@ def inventory_items(state_db: Path) -> list[dict[str, Any]]:
     return [{"id": row[0], "member_sha": row[1], "first_seen": row[2]} for row in rows]
 
 
-def collect_case_members(
-    objects_root: Path, state_db: Path, case_id: str
-) -> dict[str, list[dict[str, Any]]]:
-    sides: dict[str, list[dict[str, Any]]] = {"input": [], "result": []}
-    for row in inventory_items(state_db):
-        record = read_record(objects_root, row["member_sha"])
-        if not record or record.get("case_id") != case_id:
-            continue
-        receipt = record.get("raw_source_receipt") or {}
-        entry = {
-            "source_key": row["id"],
-            "member_sha256": row["member_sha"],
-            "object_kind": record["_object_kind"],
-            "case_role": record.get("case_role"),
-            "first_seen_at": record.get("first_seen_at"),
-            "version_first_seen_at": record.get("version_first_seen_at"),
-            "source_artifact_known_at": record.get("source_artifact_known_at"),
-            "response_completed_at": receipt.get("response_completed_at"),
-            "source_http_date": receipt.get("source_http_date"),
-            "previous_member_sha256": record.get("previous_member_sha256"),
+def parquet_shape(path: Path) -> dict[str, Any]:
+    """Return footer/schema shape only. This never decodes market observations."""
+    if pq is None:
+        return {"available": False, "reason": "PYARROW_UNAVAILABLE"}
+    try:
+        pf = pq.ParquetFile(path)
+        metadata = pf.metadata
+        return {
+            "available": True,
+            "num_rows": metadata.num_rows,
+            "num_row_groups": metadata.num_row_groups,
+            "num_columns": metadata.num_columns,
+            "columns": list(pf.schema_arrow.names),
         }
-        raw = receipt.get("raw") or {}
-        raw_sha = raw.get("sha256")
-        if raw_sha:
-            locations = member_locations(objects_root, raw_sha)
-            if locations:
-                entry["raw_object_sha256"] = raw_sha
-                entry["raw_object_kind"] = locations[0].parent.parent.name
-        side = "input" if record.get("case_role") == "INPUT_VISIBLE_BEFORE_CUTOFF" else "result"
-        sides[side].append(entry)
+    except Exception as exc:  # malformed input is a data availability gap, not a row read
+        return {"available": False, "reason": type(exc).__name__}
+
+
+def read_identity_values(path: Path, column: str) -> dict[str, Any]:
+    """Read only the requested identity column from a parquet member.
+
+    The assembly never reads open/high/low/close/volume/turnover or any other market
+    value column. Identity-column access is necessary because the production DWD bar
+    contract keys observations by listing_id/index_id rather than by the frozen
+    display code. If the column is absent or unreadable, callers receive a named gap.
+    """
+    if pq is None:
+        return {"available": False, "reason": "PYARROW_UNAVAILABLE", "values": []}
+    try:
+        pf = pq.ParquetFile(path)
+        if column not in pf.schema_arrow.names:
+            return {"available": False, "reason": "IDENTITY_COLUMN_MISSING", "values": []}
+        values = pf.read(columns=[column]).column(column).to_pylist()
+        counts: dict[str, int] = {}
+        for value in values:
+            if value is None:
+                continue
+            key = str(value)
+            counts[key] = counts.get(key, 0) + 1
+        unique = sorted(counts)
+        return {
+            "available": True,
+            "values": unique,
+            "counts": counts,
+            "identity_rows": len(values),
+            "non_null_rows": sum(1 for v in values if v is not None),
+        }
+    except Exception as exc:
+        return {"available": False, "reason": type(exc).__name__, "values": []}
+
+
+def table_identity_column(table: str) -> str | None:
+    if table == "dwd_security_bar":
+        return "listing_id"
+    if table == "dwd_index_bar":
+        return "index_id"
+    return None
+
+
+def projection_member_digest(parts: dict[str, Any]) -> str:
+    return sha(encoded(parts))
+
+
+def project_table_members(
+    *,
+    table_path: Path,
+    table: str,
+    market_date: str,
+    source_sha256: str,
+    identities: list[dict[str, Any]],
+    side: str,
+    gaps: list[dict[str, Any]],
+    label: str,
+) -> list[dict[str, Any]]:
+    """Project one whole-table member into named per-date/per-identity closure rows.
+
+    Whole-table bytes remain source evidence only. The closure rows are deterministic
+    metadata members: source date, exact identity, source member SHA, parquet shape,
+    identity value binding, row count and projection digest. Absent and duplicate
+    identity facts are explicit; presence of the table never implies coverage.
+    """
+    shape = parquet_shape(table_path)
+    column = table_identity_column(table)
+    rows: list[dict[str, Any]] = []
+    if not shape.get("available"):
+        for identity in identities:
+            code = str(identity.get("code"))
+            gaps.append(
+                {
+                    "item": label + ":" + market_date + ":" + table + ":" + code,
+                    "status": "unavailable",
+                    "reason": "SOURCE_PARQUET_SHAPE_UNREADABLE:" + str(shape.get("reason")),
+                    "side": side,
+                }
+            )
+        return rows
+    if column is None or column not in shape.get("columns", []):
+        for identity in identities:
+            code = str(identity.get("code"))
+            gaps.append(
+                {
+                    "item": label + ":" + market_date + ":" + table + ":" + code,
+                    "status": "unavailable",
+                    "reason": "IDENTITY_COLUMN_MISSING",
+                    "side": side,
+                }
+            )
+        return rows
+
+    # The identity column is read exactly once per source member. Its value counts
+    # are the only evidence for presence, absence and duplicate facts; neither an
+    # expected universe identity nor the existence of a whole table can substitute
+    # for this member-level check.
+    identity_read = read_identity_values(table_path, column)
+
+    observed_values = set(identity_read.get("values") or [])
+    observed_counts = identity_read.get("counts") or {}
+    for identity in identities:
+        code = str(identity.get("code"))
+        expected = identity.get("expected_source_identity")
+        if expected is None and identity.get("source_identity") is not None:
+            expected = identity.get("source_identity")
+        item_label = label + ":" + market_date + ":" + table + ":" + code
+        if not identity_read.get("available"):
+            gaps.append(
+                {
+                    "item": item_label,
+                    "status": "unavailable",
+                    "reason": "SOURCE_IDENTITY_READ_FAILED:" + str(identity_read.get("reason")),
+                    "side": side,
+                }
+            )
+            continue
+        matches: list[str] = []
+        duplicate_count = 0
+        if expected is not None:
+            expected_text = str(expected)
+            if expected_text in observed_values:
+                matches = [expected_text]
+                duplicate_count = int(observed_counts.get(expected_text) or 0)
+        else:
+            namespace = identity.get("source_identity_namespace")
+            aliases = {str(x) for x in identity.get("source_identity_aliases") or []}
+            candidates = sorted((aliases | {code}) & observed_values)
+            if namespace:
+                namespaced = sorted(
+                    {namespace + ":" + x for x in aliases | {code}} & observed_values
+                )
+                candidates = sorted(set(candidates + namespaced))
+            matches = candidates
+            duplicate_count = sum(int(observed_counts.get(x) or 0) for x in candidates)
+        if len(matches) > 1:
+            gaps.append(
+                {
+                    "item": item_label,
+                    "status": "unavailable",
+                    "reason": "AMBIGUOUS_IDENTITY_BINDINGS",
+                    "identity_bindings": matches,
+                    "side": side,
+                }
+            )
+            continue
+        if duplicate_count > 1:
+            gaps.append(
+                {
+                    "item": item_label,
+                    "status": "unavailable",
+                    "reason": "DUPLICATE_IDENTITY_ROWS_IN_SOURCE_MEMBER",
+                    "identity_bindings": matches,
+                    "matching_identity_rows": duplicate_count,
+                    "side": side,
+                }
+            )
+            continue
+        if not matches:
+            gaps.append(
+                {
+                    "item": item_label,
+                    "status": "unavailable",
+                    "reason": "IDENTITY_NOT_IN_SOURCE_MEMBER",
+                    "side": side,
+                }
+            )
+            continue
+        bound_identity = matches[0]
+        row_count = int(observed_counts.get(bound_identity) or 0)
+        parts = {
+            "side": side,
+            "market_date": market_date,
+            "table": table,
+            "code": code,
+            "exchange": identity.get("exchange"),
+            "cninfo_org_id": identity.get("cninfo_org_id"),
+            "benchmark": bool(identity.get("benchmark")),
+            "source_member_sha256": source_sha256,
+            "source_path": str(table_path),
+            "identity_column": column,
+            "bound_source_identity": bound_identity,
+            "row_count": row_count,
+            "table_num_rows": shape.get("num_rows"),
+            "table_num_row_groups": shape.get("num_row_groups"),
+            "shape_columns": shape.get("columns"),
+            "identity_evidence": (
+                "identity-column value counts; expected identity verified in source member"
+            ),
+        }
+        rows.append(
+            {
+                **parts,
+                "projection_member": True,
+                "projection_sha256": projection_member_digest(parts),
+                "projection_scope": "per-date per-identity metadata closure",
+                "row_access": "identity columns only; no market values decoded",
+            }
+        )
+    return rows
+
+
+def identity_rows_for_frozen(
+    universe: dict[str, Any] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    rows = []
+    gaps = []
+    codes = set((universe or {}).get("codes") or [])
+    org = (universe or {}).get("company_org_ids") or {}
+    source_identity = (universe or {}).get("source_identity_by_code") or {}
+    for code in FROZEN_EQUITIES:
+        if universe is None or code not in codes:
+            gaps.append(
+                {
+                    "item": "equity-identity:" + code,
+                    "status": "unavailable",
+                    "reason": "FROZEN_CODE_NOT_IN_QUALIFIED_UNIVERSE",
+                }
+            )
+            continue
+        rows.append(
+            {
+                "code": code,
+                "exchange": exchange_for(code),
+                "cninfo_org_id": org.get(code),
+                "source_identity": source_identity.get(code),
+                "source_identity_aliases": [code],
+                "source_identity_namespace": "CN_STOCK_CODE:" + exchange_for(code),
+            }
+        )
+    return rows, gaps
+
+
+def benchmark_identity_rows() -> list[dict[str, Any]]:
+    rows = []
+    for code in RESULT_BENCHMARKS:
+        rows.append(
+            {
+                "code": code,
+                "exchange": "INDEX",
+                "benchmark": True,
+                "source_identity": code,
+                "source_identity_aliases": [code],
+                "source_identity_namespace": "CN_INDEX_CODE",
+            }
+        )
+    return rows
+
+
+def expected_input_trade_dates(inventory: dict[str, Any]) -> list[str]:
+    dates = sorted(
+        {
+            str(m.get("market_date"))
+            for m in inventory.get("members") or []
+            if m.get("market_date")
+        }
+    )
+    return dates
+
+
+def project_inventory_members(
+    members: list[dict[str, Any]],
+    identities: list[dict[str, Any]],
+    side: str,
+    gaps: list[dict[str, Any]],
+    label: str,
+) -> list[dict[str, Any]]:
+    projected = []
+    by_date: dict[str, dict[str, dict[str, Any]]] = {}
+    for member in members:
+        date = str(member.get("market_date"))
+        table = (
+            "dwd_index_bar"
+            if "dwd_index_bar" in str(member.get("path"))
+            else "dwd_security_bar"
+        )
+        by_date.setdefault(date, {})[table] = member
+    for date in sorted(by_date):
+        for table in sorted(by_date[date]):
+            member = by_date[date][table]
+            path = Path(member["path"])
+            if not path.exists():
+                for identity in identities:
+                    gaps.append(
+                        {
+                            "item": (
+                                label + ":" + date + ":" + table + ":" + str(identity.get("code"))
+                            ),
+                            "status": "unavailable",
+                            "reason": "SOURCE_FILE_MISSING",
+                            "side": side,
+                        }
+                    )
+                continue
+            if table == "dwd_security_bar":
+                projected.extend(
+                    project_table_members(
+                        table_path=path,
+                        table=table,
+                        market_date=date,
+                        source_sha256=member["sha256"],
+                        identities=identities,
+                        side=side,
+                        gaps=gaps,
+                        label=label,
+                    )
+                )
+    return projected
+
+
+def collect_projection_unavailable(gaps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        [g for g in gaps if g.get("status") == "unavailable"],
+        key=lambda x: (
+            str(x.get("side") or ""),
+            str(x.get("item") or ""),
+            str(x.get("reason") or ""),
+        ),
+    )
+
+
+def parse_clock(value: Any) -> datetime | None:
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def object_records(objects_root: Path) -> list[tuple[str, Path, dict[str, Any]]]:
+    records = []
+    for kind in ("case-input", "case-result-capture"):
+        kind_root = objects_root / kind
+        if not kind_root.exists():
+            continue
+        for path in sorted(kind_root.glob("*/*")):
+            if not path.is_file():
+                continue
+            try:
+                record = json.loads(path.read_bytes())
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            record["_object_kind"] = kind
+            records.append((path.name, path, record))
+    return records
+
+
+def classify_member_side(
+    record: dict[str, Any], input_cutoff: str, window_end: str | None
+) -> tuple[str | None, str | None, dict[str, Any]]:
+    """Classify one member version independently by observed visibility clocks.
+
+    Producer case_role is evidence, not authority. For a version chain,
+    first_seen_at is the item's original visibility clock and is retained as
+    provenance, while version_first_seen_at/source_artifact_known_at and the raw
+    response completion clock decide this particular member version. Input
+    membership requires all relevant version-visibility clocks to be before the
+    cutoff; result membership requires post-cutoff visibility no later than the
+    declared assembly-window end. Missing or contradictory clocks are gaps and
+    do not silently choose a side.
+    """
+    cutoff = parse_clock(input_cutoff)
+    end = parse_clock(window_end) if window_end else None
+    receipt = record.get("raw_source_receipt") or {}
+    clocks = {
+        "first_seen_at": parse_clock(record.get("first_seen_at")),
+        "version_first_seen_at": parse_clock(record.get("version_first_seen_at")),
+        "source_artifact_known_at": parse_clock(record.get("source_artifact_known_at")),
+        "response_completed_at": parse_clock(receipt.get("response_completed_at")),
+    }
+    if cutoff is None:
+        return None, "INPUT_CUTOFF_CLOCK_INVALID", clocks
+    decision_values = [
+        value
+        for key, value in clocks.items()
+        if key != "first_seen_at" and value is not None
+    ]
+    if not decision_values:
+        return None, "VISIBILITY_CLOCK_MISSING", clocks
+    if all(v < cutoff for v in decision_values):
+        return "input", None, clocks
+    if all(v >= cutoff for v in decision_values):
+        if end is not None and any(v > end for v in decision_values):
+            return None, "VISIBLE_AFTER_ASSEMBLY_WINDOW_END", clocks
+        return "result", None, clocks
+    return None, "VISIBILITY_CLOCK_CONFLICT", clocks
+
+
+def collect_case_members(
+    objects_root: Path,
+    state_db: Path,
+    case_id: str,
+    input_cutoff: str,
+    assembly_window_end: str | None,
+) -> dict[str, Any]:
+    """Enumerate the version chain in one run, including versions no longer at
+    the sqlite head. Each version is independently classified by its own actual
+    visibility clocks; the sqlite head remains provenance, not a substitute for
+    chain enumeration."""
+    sides: dict[str, list[dict[str, Any]]] = {"input": [], "result": []}
+    gaps: list[dict[str, Any]] = []
+    head_rows = inventory_items(state_db)
+    heads = {row["id"]: row for row in head_rows}
+    key_to_head = {row["member_sha"]: row["id"] for row in head_rows}
+    chains: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+    for member_sha, _path, record in object_records(objects_root):
+        if record.get("case_id") != case_id:
+            continue
+        payload = record.get("payload") or {}
+        source = payload.get("source") or record.get("source") or "unknown-source"
+        source_record_id = (
+            payload.get("source_record_id") or record.get("source_record_id") or member_sha
+        )
+        source_key = str(source) + ":" + str(source_record_id)
+        chains.setdefault(source_key, []).append((member_sha, record))
+
+    # Head-only items whose member object is absent remain named gaps.
+    for row in head_rows:
+        object_missing = not any(
+            row["member_sha"] == member for entries in chains.values() for member, _ in entries
+        )
+        if object_missing and key_to_head.get(row["member_sha"]):
+            gaps.append(
+                {
+                    "item": "news-version:" + row["id"],
+                    "status": "unavailable",
+                    "reason": "SQLITE_HEAD_MEMBER_OBJECT_MISSING",
+                    "member_sha256": row["member_sha"],
+                }
+            )
+
+    for source_key, versions in sorted(chains.items()):
+        versions.sort(key=lambda item: (item[1].get("version_first_seen_at") or "", item[0]))
+        previous_sha = None
+        for member_sha, record in versions:
+            receipt = record.get("raw_source_receipt") or {}
+            declared_previous = record.get("previous_member_sha256")
+            side, gap_reason, clocks = classify_member_side(
+                record, input_cutoff, assembly_window_end
+            )
+            role = record.get("case_role")
+            object_kind = record["_object_kind"]
+            expected_object_kind = EXPECTED_OBJECT_KIND_BY_ROLE.get(role)
+            expected_side = EXPECTED_SIDE_BY_ROLE.get(role)
+            if expected_object_kind is None:
+                gap_reason = "CASE_ROLE_UNRECOGNIZED"
+            elif object_kind != expected_object_kind:
+                gap_reason = "CASE_ROLE_OBJECT_KIND_MISMATCH"
+            elif side is not None and expected_side != side:
+                gap_reason = "CASE_ROLE_VISIBILITY_SIDE_MISMATCH"
+            entry = {
+                "source_key": source_key,
+                "member_sha256": member_sha,
+                "object_kind": object_kind,
+                "case_role": role,
+                "sqlite_head_member_sha256": (heads.get(source_key) or {}).get("member_sha"),
+                "sqlite_head_is_this_member": any(
+                    row["member_sha"] == member_sha for row in head_rows
+                ),
+                "first_seen_at": record.get("first_seen_at"),
+                "version_first_seen_at": record.get("version_first_seen_at"),
+                "source_artifact_known_at": record.get("source_artifact_known_at"),
+                "response_completed_at": receipt.get("response_completed_at"),
+                "source_http_date": receipt.get("source_http_date"),
+                "previous_member_sha256": declared_previous or previous_sha,
+                "clock_evidence": {
+                    key: value.isoformat().replace("+00:00", "Z") if value else None
+                    for key, value in clocks.items()
+                },
+                "side_decision": "independent actual visibility clocks, not sqlite head role alone",
+            }
+            raw = receipt.get("raw") or {}
+            raw_sha = raw.get("sha256")
+            if raw_sha:
+                locations = member_locations(objects_root, raw_sha)
+                if locations:
+                    entry["raw_object_sha256"] = raw_sha
+                    entry["raw_object_kind"] = locations[0].parent.parent.name
+            if gap_reason:
+                gaps.append(
+                    {
+                        "item": "news-version:" + source_key + ":" + member_sha,
+                        "status": "unavailable",
+                        "reason": gap_reason,
+                        "member_sha256": member_sha,
+                        "clock_evidence": entry["clock_evidence"],
+                    }
+                )
+            elif side in sides:
+                sides[side].append(entry)
+            previous_sha = member_sha
     for side in sides:
-        sides[side].sort(key=lambda x: (x["source_key"], x["first_seen_at"] or ""))
-    return sides
+        sides[side].sort(
+            key=lambda x: (x["source_key"], x["version_first_seen_at"] or "", x["member_sha256"])
+        )
+    return {"input": sides["input"], "result": sides["result"], "gaps": gaps}
 
 
 def exchange_for(code: str) -> str:
@@ -427,6 +922,22 @@ def seal_anchor(
         )
         entry["status"] = "unavailable"
         return entry
+    original_path = Path(snap["raw_path"]) if snap.get("raw_path") else raw_path
+    if original_path != raw_path:
+        if not original_path.exists():
+            gaps.append(
+                {
+                    "item": "anchor:" + snap["source"],
+                    "status": "unavailable",
+                    "reason": "ORIGINAL_WIRE_FILE_MISSING",
+                }
+            )
+            entry["status"] = "unavailable"
+            return entry
+        if sha_file(original_path) != snap["raw_sha256"]:
+            raise ValueError("ANCHOR_ORIGINAL_SHA_MISMATCH:" + snap["source"])
+    if sha_file(raw_path) != snap["raw_sha256"]:
+        raise ValueError("ANCHOR_STAGED_SHA_MISMATCH:" + snap["source"])
     seal = link_bytes(raw_path, dest_dir, snap["raw_sha256"])
     blocked = (
         snap.get("status") in BLOCKED_REFERENCE_STATUSES or (snap.get("http_status") or 0) >= 400
@@ -456,18 +967,19 @@ def seal_anchor(
 
 
 def assert_output_root_exclusive(output_root: Path) -> None:
-    """The seal root is append-once: a rerun over an existing seal refuses before
-    writing anything, so original sealed bytes can never be replaced in place."""
-    sentinels = [
-        output_root / "RECEIPT.json",
-        output_root / "input" / "manifest.json",
-        output_root / "input" / "SEALED.json",
-        output_root / "result" / "manifest.json",
-        output_root / "result" / "SEALED.json",
-    ]
-    existing = [str(p) for p in sentinels if p.exists()]
-    if existing:
-        raise FileExistsError("SEALED_ROOT_ALREADY_PRESENT:" + ";".join(sorted(existing)))
+    """Create a genuinely new seal root exactly once.
+
+    Any pre-existing root is refused before writing: an existing sealed package,
+    an empty directory and a directory containing unrelated junk all receive the
+    same fail-closed treatment. os.mkdir is atomic for the final path component,
+    so two concurrent assemblers cannot both treat the root as newly available.
+    """
+    try:
+        output_root.mkdir()
+    except FileExistsError:
+        if any((output_root / name).exists() for name in ("RECEIPT.json", "input", "result")):
+            raise FileExistsError("SEALED_ROOT_ALREADY_PRESENT:" + str(output_root)) from None
+        raise FileExistsError("OUTPUT_ROOT_ALREADY_EXISTS:" + str(output_root)) from None
 
 
 def dedupe_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -497,6 +1009,7 @@ def assemble(
     result_dates: list[str],
     universe_path: Path | None = None,
 ) -> dict[str, Any]:
+    # Exclusive creation happens before reading or deriving any result object.
     assert_output_root_exclusive(output_root)
     started = now()
     policy = load_json(policy_path)
@@ -540,12 +1053,37 @@ def assemble(
         if result_start is not None and str(m.get("market_date") or "") >= result_start
     ]
     bars_input = verify_inventory_bars(pre_members, input_root / "bars", "input-bars", gaps)
+    frozen_identities, frozen_identity_gaps = identity_rows_for_frozen(universe)
+    gaps.extend(frozen_identity_gaps)
+    input_member_projection = project_inventory_members(
+        pre_members,
+        frozen_identities,
+        "input",
+        gaps,
+        "input-projection",
+    )
+    write_json_atomic(
+        input_root / "member-projection.json",
+        {
+            "schema": "quanthus.p10.nvda-case-input-member-projection.v1",
+            "scope": "frozen 12 equities only; benchmark count zero",
+            "dates": expected_input_trade_dates(inventory),
+            "members": input_member_projection,
+        },
+    )
     bars_overlap = verify_inventory_bars(
         overlap_members, result_root / "overlap-inventory", "overlap-inventory-bars", gaps
     )
     for row in bars_overlap:
         row["side"] = "RESULT_SIDE_POST_CUTOFF"
         row["sealed_blind_at"] = now()
+    overlap_member_projection = project_inventory_members(
+        overlap_members,
+        benchmark_identity_rows(),
+        "result",
+        gaps,
+        "result-overlap-benchmark-projection",
+    )
 
     # Input anchors: fixed-sha binding against staged originals.
     anchor_entries = []
@@ -563,7 +1101,14 @@ def assemble(
         digest = sha_file(receipt)
         link_bytes(receipt, input_root / "anchor-receipts", digest)
 
-    case_members = collect_case_members(objects_root, state_db, case_id)
+    case_members = collect_case_members(
+        objects_root,
+        state_db,
+        case_id,
+        policy["input_cutoff"],
+        "2026-11-26T05:00:00+08:00",
+    )
+    gaps.extend(case_members["gaps"])
     input_news = seal_news_side(
         case_members["input"], objects_root, input_root / "news", gaps, "input-news"
     )
@@ -574,6 +1119,8 @@ def assemble(
     # Result side bars through the DATES index: "dates" entries bind core dir +
     # core manifest sha + manifest-declared member sha.
     bars_result: list[dict[str, Any]] = []
+    result_member_projection: list[dict[str, Any]] = []
+    result_benchmark_projection: list[dict[str, Any]] = []
     index_binding: dict[str, Any] = {
         "job_index_path": str(job_index_path) if job_index_path else None,
         "days": {},
@@ -613,6 +1160,34 @@ def assemble(
                 "RESULT_SIDE_POST_CUTOFF",
             )
             bars_result.extend(rows)
+            benchmark_identities = benchmark_identity_rows()
+            for row in rows:
+                if row.get("table") == "dwd_security_bar":
+                    result_member_projection.extend(
+                        project_table_members(
+                            table_path=Path(row["source_path"]),
+                            table="dwd_security_bar",
+                            market_date=date,
+                            source_sha256=row["sha256"],
+                            identities=frozen_identities,
+                            side="result",
+                            gaps=gaps,
+                            label="result-projection",
+                        )
+                    )
+                elif row.get("table") == "dwd_index_bar":
+                    result_benchmark_projection.extend(
+                        project_table_members(
+                            table_path=Path(row["source_path"]),
+                            table="dwd_index_bar",
+                            market_date=date,
+                            source_sha256=row["sha256"],
+                            identities=benchmark_identities,
+                            side="result",
+                            gaps=gaps,
+                            label="result-benchmark-projection",
+                        )
+                    )
             index_binding["days"][date] = {
                 "status": day.get("status"),
                 "collector_revision": day.get("collector_revision"),
@@ -639,12 +1214,18 @@ def assemble(
         "inventory_sha256": sha_file(inventory_path),
         "anchor_result_sha256": sha_file(anchor_result_path),
         "bars": bars_input,
+        "member_projection": input_member_projection,
+        "member_projection_unavailable": [
+            g for g in collect_projection_unavailable(gaps) if g.get("side") == "input"
+        ],
         "anchors": anchor_entries,
         "news_members": input_news,
         "counts": {
             "bars": len(bars_input),
             "anchors": len(anchor_entries),
             "news_members": len(input_news),
+            "member_projection": len(input_member_projection),
+            "benchmark_projection": 0,
         },
         "assembled_at_actual": finished,
         "sealed_at_actual": finished,
@@ -676,10 +1257,20 @@ def assemble(
         ],
         "benchmark_role": "RESULT_SIDE_ONLY_NOT_DECISION_INPUT",
         "bars": all_result_bars,
+        "member_projection": result_member_projection,
+        "benchmark_projection": result_benchmark_projection + overlap_member_projection,
+        "member_projection_unavailable": [
+            g for g in collect_projection_unavailable(gaps) if g.get("side") == "result"
+        ],
         "overlap_inventory_bars_resealed_blind": len(bars_overlap),
         "index_binding": index_binding,
         "news_members": result_news,
-        "counts": {"bars": len(all_result_bars), "news_members": len(result_news)},
+        "counts": {
+            "bars": len(all_result_bars),
+            "news_members": len(result_news),
+            "member_projection": len(result_member_projection),
+            "benchmark_projection": len(result_benchmark_projection + overlap_member_projection),
+        },
         "assembled_at_actual": finished,
         "sealed_at_actual": finished,
         "access": {

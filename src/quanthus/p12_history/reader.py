@@ -1975,6 +1975,9 @@ def read_history(
                  "member_id": e.get("member_id"),
                  "session_date": e.get("gap_session_day"),
                  "gap": e.get("named_input_gap") or "LATE_FOR_CUTOFF",
+                 **({"row_rejection_reasons": e["row_rejection_reasons"],
+                     "row_rejected_rows": e["row_rejected_rows"]}
+                    if e.get("row_rejection_reasons") else {}),
                  "affected_securities": sids,
                  "disposition": "block_new_entries_for_security"}
                 for e, sids in _local_gaps

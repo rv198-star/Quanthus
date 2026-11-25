@@ -3720,7 +3720,6 @@ def test_segA_final_qualified_row_gap_matrix(
     backup covers the session, isolated when a partial backup does, clean
     READ when a full qualified backup does.  Physical row order is
     irrelevant."""
-    T = date(2026, 11, 24)
     smap = _build_map(tmp_path)
     members = smap._members_by_table
     res = _row_coverage_map(

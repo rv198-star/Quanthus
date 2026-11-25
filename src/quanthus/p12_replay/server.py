@@ -119,7 +119,8 @@ tabs{display:flex;gap:0;margin-bottom:0}
   <div class=tabbody id=body-today>
    <h2>今日建议</h2><div id=plans><p class=empty>尚未生成本日建议。点「运行当晚任务」生成。</p></div>
    <div class=actions><button class=primary id=runbtn>运行当晚任务</button><span id=runstatus></span></div>
-   <div id=coverage></div>
+   <div id=reviewbanner style="display:none;margin:8px 0;padding:8px 10px;border:1px solid var(--warn,#a55);border-radius:6px;color:var(--warn,#a55);font-size:13px"></div>
+  <div id=coverage></div>
    <h2 style="margin-top:18px">记录</h2><div id=orders class=empty>—</div>
    <h2 style="margin-top:14px">引擎日志</h2><div class=log id=log>—</div>
   </div>
@@ -182,7 +183,7 @@ function renderCoverage(){
  const rse=document.getElementById('rulesrc');if(rse)rse.textContent='规则来源 '+src
 }
 async function refresh(){
- S=await api('/api/state');const r=S.replay||{};
+ S=await api('/api/state');const r=S.replay||{};const rb=document.getElementById('reviewbanner');if(rb){rb.style.display=S.review_notice?'':'none';rb.textContent=S.review_notice||''}
  document.getElementById('day').textContent=(r.current_day||'—')+' · 第 '+(r.day_index+1)+'/'+r.sessions_total+' 个交易日';
  document.getElementById('meta').innerHTML='回放时刻 '+fmt(r.now)+'<br>下一交易日 '+fmt(r.next_day);
  const wb=S.workbench||{};
@@ -202,7 +203,7 @@ async function refresh(){
    +lines(it.reason_lines)
    +lines(it.condition_lines,'cond')
    +(it.constraint?'<div class=note>约束：'+esc(it.constraint)+'</div>':'')
-   +(it.plan_id&&st!=='SKIPPED'&&st!=='ENDED'&&st!=='EXPIRED'?'<div class=actions><button class=primary onclick=act("confirm","'+it.plan_id+'")>确认</button><button class=warn onclick=act("skip","'+it.plan_id+'")>跳过</button></div>':'')
+   +((!S.read_only)&&it.plan_id&&st!=='SKIPPED'&&st!=='ENDED'&&st!=='EXPIRED'?'<div class=actions><button class=primary onclick=act("confirm","'+it.plan_id+'")>确认</button><button class=warn onclick=act("skip","'+it.plan_id+'")>跳过</button></div>':'')
    +'</div>';
  }
  document.getElementById('plans').innerHTML=ph;
@@ -230,6 +231,11 @@ async function loadLog(){const t=await fetch('/api/log').then(r=>r.text());docum
 refresh();loadLog();setInterval(()=>{refresh();loadLog()},5000);
 </script></body></html>
 """
+
+
+import os as _os
+
+_READ_ONLY = _os.environ.get("P12_REPLAY_READONLY") in ("1", "true", "yes")
 
 
 def _read_body(handler) -> dict:
@@ -313,9 +319,23 @@ def make_handler(engine_factory, users: dict | None = None):
             if users and _check_auth(self.headers) is None:
                 return self._json({"error": "unauthorized"}, 401)
             if path == "/api/state":
-                return self._json(self._engine().day_state())
+                payload = self._engine().day_state()
+                if _READ_ONLY:
+                    payload = dict(payload)
+                    payload["read_only"] = True
+                    payload["review_notice"] = (
+                        "读数据模块复审中，未正式采用；确认与运行入口已关闭。"
+                    )
+                return self._json(payload)
             if path == "/api/review":
-                return self._json(self._engine().day_review())
+                payload = self._engine().day_review()
+                if _READ_ONLY:
+                    payload = dict(payload)
+                    payload["read_only"] = True
+                    payload["review_notice"] = (
+                        "读数据模块复审中，未正式采用；确认与运行入口已关闭。"
+                    )
+                return self._json(payload)
             if path == "/api/log":
                 log = self._engine().state_dir / "replay-log.jsonl"
                 text = log.read_text(encoding="utf-8") if log.is_file() else ""
@@ -325,6 +345,19 @@ def make_handler(engine_factory, users: dict | None = None):
         def do_POST(self):
             path = urlparse(self.path).path
             body = _read_body(self)
+            # Read-only review mode (P12_REPLAY_READONLY=1, coordinator-approved
+            # fallback for the in-review #749 input): the console still serves
+            # login + GET, but every mutating POST is refused at the server
+            # with an explicit locked receipt - never a silent no-op.
+            if _READ_ONLY and path != "/api/login":
+                return self._json(
+                    {
+                        "error": "read_only",
+                        "status": "REVIEW_LOCKED",
+                        "detail": "读数据模块复审中，未正式采用；所有确认/运行/推进入口在服务端关闭。",
+                    },
+                    403,
+                )
             if path == "/api/login":
                 username = str(body.get("username") or "")
                 password = str(body.get("password") or "")

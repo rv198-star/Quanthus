@@ -6,6 +6,21 @@ real sampling mornings, 2026-11-25 and 2026-11-26, after the missed Nov24 window
 
 ## Current recovery checkpoint
 
+2026-11-25 09:00 node run failed in prepare-choose with
+HOLDING_IDENTITY_UNAVAILABLE before POOL/FREEZE. Bounded diagnosis showed the
+join produced zero usable CN stock identities because the literal match
+identifier_namespace equals CN_STOCK_CODE never matches the warehouse's
+actual exchange-suffixed vocabulary (CN_STOCK_CODE:SSE, :SZSE, :BSE). The
+selector now matches the CN_STOCK_CODE: prefix, the same convention every
+other warehouse pipeline uses; the fixture emits the real namespaced form and
+regression tests cover both the suffixed match and rejection of bare or
+non-CN namespaces. Verified on the real 2026-11-24 T reference: both
+holdings join cleanly and a bounded sample is selected. Owner extended the
+finite coverage to the two actual trading days 2026-11-26 and 2026-11-27
+(11-24 missed window and 11-25 pre-freeze failure remain sealed history); the
+finite vocabulary, per-day T-reference map and plan sample_dates now carry
+11-27 with no change to slots, budgets, excluded universe or freeze rules.
+
 Task base is `0faca06923cab6130d7107319c7e21412615515c`, branch
 `codex/issue-727-preopen-sampling`. Fixed source
 `406cd7adc227f10769ab14df37991eef62f35579`, tree

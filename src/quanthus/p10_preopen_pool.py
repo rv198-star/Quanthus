@@ -74,7 +74,11 @@ def prepare(plan: dict[str, Any], sample_date: str, observed_at: datetime) -> di
     """Read only identity/venue/T-state columns from pinned manifests, at most 8MiB."""
     import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
-    reference_day = {"2026-11-25": "2026-11-24", "2026-11-26": "2026-11-25"}.get(sample_date)
+    reference_day = {
+        "2026-11-25": "2026-11-24",
+        "2026-11-26": "2026-11-25",
+        "2026-11-27": "2026-11-26",
+    }.get(sample_date)
     if reference_day is None:
         raise SamplingError("DATE_OUTSIDE_FINITE_PLAN")
     if (
@@ -215,7 +219,7 @@ def prepare(plan: dict[str, Any], sample_date: str, observed_at: datetime) -> di
     codes = {
         (r["security_id"], r["identifier_value"])
         for r in tables["dwd_security_identifier"]
-        if r["identifier_namespace"] == "CN_STOCK_CODE" and _active(r, at, observed_at)
+        if r["identifier_namespace"].startswith("CN_STOCK_CODE:") and _active(r, at, observed_at)
     }
     listings: dict[str, dict[str, Any]] = {}
     ambiguous: set[str] = set()

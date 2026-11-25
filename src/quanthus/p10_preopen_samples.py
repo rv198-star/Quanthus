@@ -24,7 +24,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
-DATES = {"2026-11-25", "2026-11-26"}
+DATES = {"2026-11-25", "2026-11-26", "2026-11-27"}
 SLOTS = ("09:15:05", "09:20:05", "09:24:50", "09:25:10", "09:29:50")
 EXCLUDED = {
     "300308",
@@ -98,7 +98,10 @@ def freeze_pool(raw: Mapping[str, Any], frozen_at: datetime) -> dict[str, Any]:
     if frozen_at >= boundary(day, "09:15:00"):
         raise SamplingError("POOL_FREEZE_TOO_LATE")
     reference_day = raw.get("reference_trade_date")
-    if reference_day != {"2026-11-25": "2026-11-24", "2026-11-26": "2026-11-25"}[day]:
+    if (
+        reference_day
+        != {"2026-11-25": "2026-11-24", "2026-11-26": "2026-11-25", "2026-11-27": "2026-11-26"}[day]
+    ):
         raise SamplingError("T_REFERENCE_DATE_MISMATCH")
     items = raw.get("securities")
     if not isinstance(items, list) or not 2 <= len(items) <= 18:

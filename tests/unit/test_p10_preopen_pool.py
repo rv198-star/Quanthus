@@ -21,7 +21,7 @@ def synthetic_references(tmp_path, monkeypatch, *, duplicate=False, conflict=Fal
         "effective_to": None,
     }
     listings, identifiers, venues, states = [], [], [], []
-    for code, venue, board in [("002517", "XSHE", "SZ_main"), ("600000", "XSHG", "SSE_main")]:
+    for code, venue, board in [("002517", "SZSE", "SZ_main"), ("600000", "SSE", "SSE_main")]:
         listings.append(
             {
                 **clocks,
@@ -36,11 +36,13 @@ def synthetic_references(tmp_path, monkeypatch, *, duplicate=False, conflict=Fal
             {
                 **clocks,
                 "security_id": "s" + code,
-                "identifier_namespace": "CN_STOCK_CODE",
+                "identifier_namespace": "CN_STOCK_CODE:" + venue,
                 "identifier_value": code,
             }
         )
-        venues.append({**clocks, "venue_id": venue, "mic_code": venue})
+        venues.append(
+            {**clocks, "venue_id": venue, "mic_code": {"SZSE": "XSHE", "SSE": "XSHG"}[venue]}
+        )
         states.append(
             {
                 "listing_id": "l" + code,
@@ -113,7 +115,7 @@ def synthetic_references(tmp_path, monkeypatch, *, duplicate=False, conflict=Fal
         )
     )
     return {
-        "sample_dates": ["2026-11-25", "2026-11-26"],
+        "sample_dates": ["2026-11-25", "2026-11-26", "2026-11-27"],
         "slots": list(SLOTS),
         "endpoint": URL,
         "max_securities": 18,
@@ -144,6 +146,137 @@ def test_domain_identical_increment_keeps_both_provenance_clocks(tmp_path, monke
 
 def test_conflicting_holding_identity_blocks_instead_of_prioritizing_source(tmp_path, monkeypatch):
     plan = synthetic_references(tmp_path, monkeypatch, duplicate=True, conflict=True)
+    with pytest.raises(SamplingError, match="HOLDING_IDENTITY_UNAVAILABLE"):
+        module.prepare(plan, "2026-11-25", instant("2026-11-25T09:00:00+08:00"))
+
+
+def test_exchange_suffixed_cn_stock_code_is_the_holding_identity(tmp_path, monkeypatch):
+    """Regression for 2026-11-25: warehouse emits CN_STOCK_CODE:<EXCHANGE>."""
+    plan = synthetic_references(tmp_path, monkeypatch)
+    pool = module.prepare(plan, "2026-11-25", instant("2026-11-25T09:00:00+08:00"))
+    assert {s["security_code"] for s in pool["securities"]} == {"002517", "600000"}
+
+
+def test_non_cn_stock_code_namespace_never_satisfies_holding_identity(tmp_path, monkeypatch):
+    """A foreign or unprefixed namespace must not stand in for CN_STOCK_CODE:<EXCHANGE>."""
+    base, core = tmp_path / "base", tmp_path / "core"
+    stamp = instant("2026-11-24T18:00:00+08:00")
+    clocks = {
+        "knowledge_from": stamp,
+        "knowledge_to": None,
+        "effective_from": instant("2020-01-01T00:00:00Z"),
+        "effective_to": None,
+    }
+    listings, identifiers, venues, states = [], [], [], []
+    for code, exchange, mic, board in [
+        ("002517", "SZSE", "XSHE", "SZ_main"),
+        ("600000", "SSE", "XSHG", "SSE_main"),
+    ]:
+        listings.append(
+            {
+                **clocks,
+                "listing_id": "l" + code,
+                "security_id": "s" + code,
+                "venue_id": exchange,
+                "listing_code": code,
+                "board_code": board,
+            }
+        )
+        # wrong namespaces: bare CN_STOCK_CODE and a non-CN alias
+        identifiers.append(
+            {
+                **clocks,
+                "security_id": "s" + code,
+                "identifier_namespace": "CN_STOCK_CODE",
+                "identifier_value": code,
+            }
+        )
+        identifiers.append(
+            {
+                **clocks,
+                "security_id": "s" + code,
+                "identifier_namespace": "BAOSTOCK_CODE",
+                "identifier_value": code,
+            }
+        )
+        venues.append({**clocks, "venue_id": exchange, "mic_code": mic})
+        states.append(
+            {
+                "listing_id": "l" + code,
+                "reason_code": "NORMAL",
+                "knowledge_from": stamp,
+                "knowledge_to": None,
+                "observation_start": instant("2026-11-24T00:00:00+08:00"),
+                "observation_end": instant("2026-11-25T00:00:00+08:00"),
+            }
+        )
+
+    def manifest(root, tables, **header):
+        files = []
+        for table, rows in tables.items():
+            path = root / table / "part.parquet"
+            path.parent.mkdir()
+            pq.write_table(pa.Table.from_pylist(rows), path)
+            body = path.read_bytes()
+            files.append(
+                {
+                    "path": str(path.relative_to(root)),
+                    "sha256": "sha256:" + sha(body),
+                    "size_bytes": len(body),
+                }
+            )
+        body = encoded({**header, "files": files})
+        (root / "manifest.json").write_bytes(body)
+        return sha(body)
+
+    base.mkdir()
+    core.mkdir()
+    base_sha = manifest(
+        base,
+        {
+            "dwd_listing": listings,
+            "dwd_security_identifier": identifiers,
+            "dwd_trading_venue": venues,
+        },
+    )
+    core_sha = manifest(core, {"dwd_tradability_state": states}, market_date="2026-11-24")
+    fallback = tmp_path / "fallback.json"
+    fallback.write_bytes(b"synthetic fallback")
+    monkeypatch.setattr(module, "BASE_SHA", base_sha)
+    monkeypatch.setattr(module, "FALLBACK_SHA", sha(fallback.read_bytes()))
+    cal = tmp_path / "calendar.json"
+    cal.write_bytes(
+        encoded(
+            {"venues": {v: {"sessions": ["2026-11-24", "2026-11-25"]} for v in ["SSE", "SZSE"]}}
+        )
+    )
+    dates = tmp_path / "DATES.json"
+    dates.write_bytes(
+        encoded(
+            {
+                "dates": {
+                    "2026-11-24": {
+                        "market_date": "2026-11-24",
+                        "status": "QUALIFIED_1D_NATIVE5M",
+                        "core": str(core),
+                        "core_manifest_sha256": core_sha,
+                    }
+                }
+            }
+        )
+    )
+    plan = {
+        "sample_dates": ["2026-11-25", "2026-11-26", "2026-11-27"],
+        "slots": list(SLOTS),
+        "endpoint": URL,
+        "max_securities": 18,
+        "max_requests_per_day": 6,
+        "calendar_descriptor": str(cal),
+        "calendar_sha256": sha(cal.read_bytes()),
+        "fallback": str(fallback),
+        "dates": str(dates),
+        "base": str(base),
+    }
     with pytest.raises(SamplingError, match="HOLDING_IDENTITY_UNAVAILABLE"):
         module.prepare(plan, "2026-11-25", instant("2026-11-25T09:00:00+08:00"))
 

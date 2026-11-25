@@ -73,6 +73,66 @@ def _read_table(source_map, table, columns):
     return rows, reads
 
 
+def _in_open_interval(row, open_instant, market_date):
+    """Half-open [effective_from, effective_to) test at the venue's real
+    open instant (audit R4 fourth pass).  Both the listing row and the
+    trading-identifier row must describe the SAME instant so a code that
+    only becomes effective after the open is never adopted early.
+    Falls back to the session date only when the open instant is null."""
+    eff_from = parse_ts(row.get("effective_from"))
+    eff_to = parse_ts(row.get("effective_to"))
+    if open_instant is not None:
+        if eff_from is not None and eff_from > open_instant:
+            return False
+        if eff_to is not None and eff_to <= open_instant:
+            return False
+        return True
+    if eff_from is not None and eff_from.date() > market_date:
+        return False
+    if eff_to is not None and eff_to.date() <= market_date:
+        return False
+    return True
+
+
+def _pick_unique_version(items, fact_key, cutoff_ts, row_of=lambda x: x):
+    """Select the unique qualified latest knowledge version, then collapse
+    equivalent replicas of the SAME business fact before judging a
+    conflict (audit R4 fourth pass).
+
+    Steps:
+      1. keep items known by the decision cutoff (knowledge_from <= cutoff);
+      2. find the max knowledge_from among them - the latest version;
+      3. collapse items at that latest version into distinct business
+         facts; identical facts (same fact_key fields) are equivalent
+         replicas and fold to one;
+      4. if exactly one distinct fact survives -> unique winner;
+         several distinct facts at the same latest clock -> conflict.
+
+    ``row_of`` extracts the source row from each item (a plain row is its
+    own source; a qualifying tuple keeps the row at index 0).  Returns
+    (winner_item, conflict, known_items): the chosen original item keeps
+    its source record; conflict True means no unique named winner."""
+    def kf(it):
+        return parse_ts(row_of(it).get("knowledge_from"))
+
+    known = [it for it in items if cutoff_ts is None
+             or kf(it) is None or kf(it) <= cutoff_ts]
+    if not known:
+        return None, False, []
+    kfs = [kf(it) for it in known if kf(it) is not None]
+    best = max(kfs) if kfs else None
+    latest = [it for it in known
+              if (kf(it) == best or (best is None and kf(it) is None))]
+    # Collapse equivalent replicas of the same business fact at the latest
+    # version; keep one original item per distinct fact (source preserved).
+    distinct = {}
+    for it in latest:
+        distinct.setdefault(fact_key(it), it)
+    if len(distinct) == 1:
+        return next(iter(distinct.values())), False, known
+    return None, True, known
+
+
 def build_universe(source_map: SourceMap, market_date, holdings, pending, verify, decision_cutoff=None, open_at_by_venue=None, late_archive_as_observed=False):
     """Scan-domain identities: SSE/SZSE common_equity + account members.
 
@@ -160,44 +220,10 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
         if not sid or not val:
             continue
         code_eff_by_ns.setdefault((sid, ns), []).append(i)
-    code_by_ns = {}
-    conflict_ns = {}
-    for (sid, ns), rows in code_eff_by_ns.items():
-        # Rows effective at the open instant and known by the cutoff.
-        effective = []
-        for r in rows:
-            eff_from = parse_ts(r.get("effective_from"))
-            eff_to = parse_ts(r.get("effective_to"))
-            if eff_from is not None and eff_from.date() > mkt_date:
-                continue
-            if eff_to is not None and eff_to.date() <= mkt_date:
-                continue
-            kf = parse_ts(r.get("knowledge_from"))
-            if cutoff_ts is not None and kf is not None and kf > cutoff_ts:
-                continue
-            effective.append(r)
-        if not effective:
-            continue
-        vals = {str(r.get("identifier_value") or "") for r in effective}
-        if len(vals) == 1:
-            code_by_ns[(sid, ns)] = next(iter(vals))
-            continue
-        # Multiple effective rows in one namespace: a strictly-latest
-        # knowledge_from may uniquely name the live code.
-        best_kf = None
-        winners = []
-        for r in effective:
-            kf = parse_ts(r.get("knowledge_from"))
-            if best_kf is None or (kf is not None and kf > best_kf):
-                best_kf = kf
-                winners = [r]
-            elif kf is not None and best_kf is not None and kf == best_kf:
-                winners.append(r)
-        win_vals = {str(w.get("identifier_value") or "") for w in winners}
-        if best_kf is not None and len(winners) == 1 and len(win_vals) == 1:
-            code_by_ns[(sid, ns)] = next(iter(win_vals))
-        else:
-            conflict_ns.setdefault(sid, set()).add(ns)
+    # The identifier effective interval is judged against the SAME venue
+    # open instant as the listing row (audit R4 fourth pass), so it is
+    # resolved per-security inside the loop once the venue is known; the
+    # version pick + replica collapse lives in _pick_unique_version.
     # The primary trading code comes from the CN_STOCK_CODE:{venue}
     # namespace, not an arbitrary first row - so #737 and the P1 key stay
     # stable regardless of identifier row order or a non-trading
@@ -297,49 +323,40 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
                 continue
             known = [q for q in qualifying if not q[3]]
             pool = known if known else qualifying
-            chosen_lst, venue, _, chosen_late = max(
-                pool,
-                key=lambda q: (
-                    str(q[0].get("knowledge_from") or ""),
-                    str(q[0].get("effective_from") or ""),
-                ),
-            )
+            # First select the qualified latest knowledge version, then
+            # collapse equivalent replicas of the SAME business fact at
+            # that version before judging a conflict (audit R4 fourth
+            # pass).  An exact duplicate latest row folds into the one
+            # real version and never counts as a second conflicting fact;
+            # a genuinely different value at the same latest clock still
+            # isolates the security by name.  The fact key covers the
+            # business fields, so two byte-identical latest originals are
+            # one fact while a same-clock board/code difference is not.
+            def _lst_fact(q):
+                r = q[0]
+                return tuple(str(r.get(f) or "") for f in (
+                    "listing_id", "listing_code", "board_code",
+                    "venue_id", "effective_from", "effective_to"))
+            def _lst_kf(q):
+                return q[0]
+            # Reuse the shared picker over the (lst, ...) tuples: the
+            # knowledge version and the equivalence test both read the
+            # original row, and the chosen tuple keeps its source record.
+            # The pool was already split into pre-cutoff known rows vs
+            # late-observed-as-observed rows above, so the version pick
+            # must NOT re-filter by the decision cutoff (a late row is a
+            # deliberately retained observation).  Pass cutoff=None so
+            # the picker selects the latest version within this pool.
+            winner_q, lst_conflict, _known_pool = _pick_unique_version(
+                pool, _lst_fact, None, row_of=lambda q: q[0])
+            if lst_conflict:
+                ambiguous_ids.add(sid)
+                continue
+            chosen_lst, venue, _, chosen_late = winner_q
             # A late-observed row chosen only because no earlier version
             # exists keeps its late_visible mark; a pre-cutoff version
             # always wins over a later re-post of the same fact.
             chosen_late = chosen_late and not known
-            # Key-fact conflict among the surviving same-listing_id rows
-            # (audit R4 third pass): same listing_id + same effective
-            # interval + same knowledge clock but a different listing_code
-            # is a real conflict with no named unique winner -> isolate,
-            # identical order.  Equivalent replicas collapse; a strictly-
-            # newer knowledge_from names the unique winner.
-            fact_keys = {
-                (str(q[0].get("listing_code") or ""),
-                 str(q[0].get("board_code") or ""))
-                for q in pool
-            }
-            if len(fact_keys) > 1:
-                best_kf2 = None
-                winners2 = []
-                for q in pool:
-                    kf2 = parse_ts(q[0].get("knowledge_from"))
-                    if best_kf2 is None or (kf2 is not None and kf2 > best_kf2):
-                        best_kf2 = kf2
-                        winners2 = [q]
-                    elif kf2 is not None and best_kf2 is not None and kf2 == best_kf2:
-                        winners2.append(q)
-                win_facts = {
-                    (str(w[0].get("listing_code") or ""),
-                     str(w[0].get("board_code") or ""))
-                    for w in winners2
-                }
-                if best_kf2 is not None and len(winners2) == 1 and len(win_facts) == 1:
-                    chosen_lst, venue, _, chosen_late = winners2[0]
-                    chosen_late = chosen_late and not known
-                else:
-                    ambiguous_ids.add(sid)
-                    continue
             pair = (sid, str(chosen_lst.get("listing_id") or ""))
             if pair in seen:
                 continue
@@ -348,21 +365,40 @@ def build_universe(source_map: SourceMap, market_date, holdings, pending, verify
                 continue
             # Primary trading code: prefer CN_STOCK_CODE:{venue}; fall
             # back to the generic "code" namespace, then listing_code.
-            # A namespace that is in unresolved conflict must never be
-            # picked by physical order - isolate the security instead.
+            # The identifier effective interval is judged at the SAME
+            # venue open instant as the listing row (audit R4 fourth
+            # pass): a code that only becomes effective after the open is
+            # never adopted early.  Within each namespace the newest
+            # qualified knowledge version is chosen first and equivalent
+            # replicas of the same business fact collapse before any
+            # conflict is declared; same-clock differing values still
+            # isolate the security.
+            id_open_instant = open_at_by_venue.get(venue)
             cand_nss = ["CN_STOCK_CODE:" + str(venue), "code"]
             code = None
+            code_conflict = set()
             for ns_c in cand_nss:
-                if ns_c in conflict_ns.get(sid, set()):
-                    continue  # conflicting namespace: skip to next candidate
-                if code_by_ns.get((sid, ns_c)) is not None:
-                    code = code_by_ns[(sid, ns_c)]
+                rows = code_eff_by_ns.get((sid, ns_c), ())
+                effective = [r for r in rows
+                             if _in_open_interval(r, id_open_instant, market_date)]
+                if not effective:
+                    continue
+                winner, conflict, _known = _pick_unique_version(
+                    effective,
+                    lambda r: str(r.get("identifier_value") or ""),
+                    cutoff_ts,
+                )
+                if conflict:
+                    code_conflict.add(ns_c)
+                    continue
+                if winner is not None:
+                    code = str(winner.get("identifier_value") or "")
                     break
             # If a trading-code namespace exists but ALL of them are in
             # unresolved conflict, the code cannot be proven unique.
             trading_nss = [n for n in cand_nss if (sid, n) in code_eff_by_ns]
             if code is None and trading_nss and all(
-                n in conflict_ns.get(sid, set()) for n in trading_nss
+                n in code_conflict for n in trading_nss
             ):
                 ambiguous_ids.add(sid)
                 continue

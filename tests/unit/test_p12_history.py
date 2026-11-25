@@ -1149,3 +1149,108 @@ def test_mutually_exclusive_code_change_not_isolated(tmp_path):
         return sec and sec["identity"]["stock_code"], rr.coverage["universe"]["ambiguous_security_ids"]
     assert run(False) == ("601607", [])
     assert run(True) == ("601607", [])
+
+
+def _identifier_table_full(rows):
+    """security_identifier rows carrying namespace/value/venue plus the
+    effective interval and the knowledge clock (audit R4 fourth pass)."""
+    return pa.table({
+        "security_id": [r[0] for r in rows],
+        "identifier_namespace": [r[1] for r in rows],
+        "identifier_value": [r[2] for r in rows],
+        "venue_id": [r[3] for r in rows],
+        "effective_from": [r[4] for r in rows],
+        "effective_to": pa.array([r[5] for r in rows], type=pa.timestamp("us", tz="UTC")),
+        "knowledge_from": [r[6] for r in rows],
+    })
+
+
+def test_identifier_uses_listing_open_instant(tmp_path):
+    """R4-4th: the trading code resolves at the SAME venue open instant
+    as the listing row.  A code-change effective only at 02:00Z must NOT
+    be adopted when the venue opened at 01:30Z - both physical orders
+    keep 300308; a change effective before/at the open does switch."""
+    OPEN = datetime(2026, 10, 8, 1, 30, tzinfo=UTC)  # matches _calendar_table
+
+    def run(swap, change_at):
+        smap = _build_map(tmp_path)
+        members = smap._members_by_table
+        lp = tmp_path / "listing.parquet"
+        pq.write_table(_listing_table_with_code([
+            ("security-600000", "listing-600000", "SSE",
+             datetime(2026, 1, 1, tzinfo=UTC), None,
+             datetime(2026, 7, 18, tzinfo=UTC), "300308", "main"),
+        ]), lp)
+        members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+        ip = tmp_path / "dwd_security_identifier.parquet"
+        prev = ("security-600000", "CN_STOCK_CODE:SSE", "300308", "SSE",
+                datetime(2026, 1, 1, tzinfo=UTC), change_at,
+                datetime(2026, 7, 18, tzinfo=UTC))
+        nxt = ("security-600000", "CN_STOCK_CODE:SSE", "300309", "SSE",
+               change_at, None, datetime(2026, 7, 18, tzinfo=UTC))
+        rows = [prev, nxt] if not swap else [nxt, prev]
+        pq.write_table(_identifier_table_full(rows), ip)
+        members["dwd_security_identifier"] = [_member(tmp_path, "dwd_security_identifier.parquet")]
+        rr = reader_mod.read_history(
+            date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+            source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+            replay_exclusion=_write_exclusion(tmp_path),
+            observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+        sec = next((x for x in rr.raw_history["securities"]
+                    if x["identity"]["security_id"] == "security-600000"), None)
+        return sec and sec["identity"]["stock_code"]
+
+    from datetime import timedelta
+    # 02:00Z change is AFTER the 01:30Z open -> still the listed 300308.
+    for swap in (False, True):
+        assert run(swap, OPEN + timedelta(minutes=30)) == "300308"
+    # Change exactly AT the open (half-open: new effective_from == open)
+    # and BEFORE the open both switch to the new code.
+    for swap in (False, True):
+        assert run(swap, OPEN) == "300309"
+        assert run(swap, OPEN - timedelta(minutes=30)) == "300309"
+
+
+def test_listing_latest_replica_collapses_before_conflict(tmp_path):
+    """R4-4th: pick the qualified latest knowledge version first, then
+    collapse equivalent replicas of the SAME business fact.  An older
+    different value plus TWO identical latest rows must yield ONE unique
+    identity under both physical orders - not an ambiguity; a genuinely
+    different value at the same latest clock still isolates."""
+    def run(rows):
+        smap = _build_map(tmp_path)
+        members = smap._members_by_table
+        lp = tmp_path / "listing.parquet"
+        pq.write_table(_listing_table_with_code(rows), lp)
+        members["dwd_listing"] = [_member(tmp_path, "listing.parquet")]
+        return reader_mod.read_history(
+            date(2026, 10, 8), datetime(2026, 10, 8, 13, 30, tzinfo=UTC),
+            source_map=StubSourceMap(members, {}), purpose=reader_mod.REPLAY_AS_OBSERVED,
+            replay_exclusion=_write_exclusion(tmp_path),
+            observed_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC))
+
+    older = ("security-600000", "listing-600000", "SSE",
+             datetime(2026, 1, 1, tzinfo=UTC), None,
+             datetime(2026, 7, 18, tzinfo=UTC), "300308", "main")
+    latest = ("security-600000", "listing-600000", "SSE",
+              datetime(2026, 1, 1, tzinfo=UTC), None,
+              datetime(2026, 7, 19, tzinfo=UTC), "300309", "main")
+    replica = tuple(latest)  # byte-identical copy of the latest fact
+
+    # Older different value + TWO identical latest versions -> unique.
+    for rows in ([older, latest, replica], [latest, replica, older],
+                 [replica, older, latest]):
+        r = run(rows)
+        sec = next((x for x in r.raw_history["securities"]
+                    if x["identity"]["security_id"] == "security-600000"), None)
+        # Unique identity admitted: the latest version's listing_code wins.
+        assert sec is not None and sec["identity"]["listing_code"] == "300309"
+        assert "security-600000" not in r.coverage["universe"]["ambiguous_security_ids"]
+
+    # A genuinely DIFFERENT value at the same latest clock still isolates.
+    conflict = ("security-600000", "listing-600000", "SSE",
+                datetime(2026, 1, 1, tzinfo=UTC), None,
+                datetime(2026, 7, 19, tzinfo=UTC), "300310", "main")
+    for rows in ([older, latest, conflict], [conflict, latest, older]):
+        r = run(rows)
+        assert "security-600000" in r.coverage["universe"]["ambiguous_security_ids"]

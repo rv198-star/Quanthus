@@ -33,7 +33,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from quanthus.event_library.contracts import sha256_digest
+from quanthus.event_library.contracts import EventContractError, sha256_digest
 from quanthus.event_library.scan import CandidateDailyInput, CandidateScanError
 from quanthus.expert_strategy.position_risk import HeldPositionFacts
 from quanthus.expert_strategy.runner import FormalStrategyRunner
@@ -428,13 +428,17 @@ def run_daily_advice_from_raw(
                         adjustment_effective=day in action_dates,
                     )
                 )
-        except (ProductDailyError, CandidateScanError) as exc:
+        except (ProductDailyError, CandidateScanError, EventContractError) as exc:
             detail = f"{type(exc).__name__}: {exc}"
             input_exclusions.append(
                 {
                     "security_code": code,
                     "reason": "raw_input_closure_invalid",
                     "member_or_field": detail,
+                    # The malformed field is named so the audit shows exactly
+                    # which contract row failed (e.g. source_evidence_digest),
+                    # not a buried exception type alone.
+                    "source_evidence_digest": getattr(identity, "source_evidence_digest", None),
                     "at": signal_date.isoformat(),
                     "scope": "per_security",
                 }

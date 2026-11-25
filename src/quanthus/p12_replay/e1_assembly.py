@@ -93,12 +93,41 @@ def build_e1_entry(
     state: dict[str, Any] = {"contexts": {}, "result": None}
     ev_dir = Path(evidence_dir) if evidence_dir is not None else None
 
+    def _wire_norm(value: Any) -> Any:
+        """Project one wire payload onto JSON-native values ONLY, once -
+        the same canonical bytes feed the declared digest, the artefact
+        file, and the decoded object P11 consumes.  Whitelist: Decimal ->
+        exact source-precision text (never float), datetime -> ISO-8601
+        preserving its own offset, date -> ISO date.  Any other object is
+        a named wire error - it never reaches a silent default=str.
+        """
+        from decimal import Decimal as _Dec
+        from quanthus.p12_history.clocks import iso as _iso
+
+        if isinstance(value, dict):
+            return {k: _wire_norm(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [_wire_norm(v) for v in value]
+        if isinstance(value, _Dec):
+            return str(value)
+        if isinstance(value, datetime):
+            return _iso(value)
+        if isinstance(value, date):
+            return value.isoformat()
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        raise TypeError(
+            "e1 wire boundary: unmapped object "
+            + type(value).__name__
+            + " cannot be canonicalized"
+        )
+
     def _write_artifact(name: str, payload: Any) -> tuple[str, str]:
         """Persist THIS run's input artefact as a standalone recomputable
         file and return (uri, sha256).  The bytes are the canonical JSON so
         sha256(file) == the declared digest - the auditor recomputes the
         binding from the file alone, never from a frozen sibling's digest."""
-        data = canonical_json_bytes(payload)
+        data = canonical_json_bytes(_wire_norm(payload))
         if ev_dir is None:
             return "mem://" + name, hashlib.sha256(data).hexdigest()
         ev_dir.mkdir(parents=True, exist_ok=True)

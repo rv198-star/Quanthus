@@ -353,6 +353,29 @@ def test_non_object_contract_root_is_a_named_rejection():
     assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
 
 
+def test_provided_null_contract_root_is_a_named_rejection():
+    # An explicitly-provided ``_contract: null`` is a DECLARED wrong type -
+    # a structural invalid contract (INVALID), never merged into the
+    # missing-contract path (MISSING).  Missing means the key is absent.
+    tape = _tape(_POINTS_BASE, contract=None)
+    tape["_contract"] = None
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is not None
+    assert "non-object" in replay._contract_error
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
+
+
+def test_provided_non_dict_contract_roots_are_named_rejections():
+    # Any provided non-dict root (list / scalar / bool) is structural INVALID.
+    for raw in ([], 42, "x", True, 3.5):
+        tape = _tape(_POINTS_BASE, contract=None)
+        tape["_contract"] = raw
+        replay = Replay(tape, day="2026-10-07", source="t")
+        assert replay._contract_error is not None
+        assert "non-object" in replay._contract_error
+        assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
+
+
 def test_non_array_opens_is_a_named_rejection():
     contract = dict(MINUTE_START)
     contract["opens"] = {"security": "600000"}

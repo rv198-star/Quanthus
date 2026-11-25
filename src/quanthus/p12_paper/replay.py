@@ -43,6 +43,12 @@ class Replay:
         self._tape = tape
         self._day = day
         self._source = source
+        # Distinguish "no _contract key" (missing contract) from an
+        # explicitly-provided key (present, possibly null or non-object).
+        # A provided null is a DECLARED wrong type - a structural violation,
+        # never merged into the missing-contract path.  Keep the raw value
+        # so the validator can reject it by name.
+        self._contract_key_provided = "_contract" in tape
         raw_contract = tape.get("_contract")
         # A present but non-object contract root is itself a structural
         # violation (distinct from a missing contract); keep it for the
@@ -144,14 +150,20 @@ class Replay:
         unsupplied).  A present contract must declare a supported version and
         a coherent label/visibility pair, else it is invalid.
         """
-        # A missing contract (None) is legal-but-openless.  A present contract
-        # must be an object declaring the supported version and a coherent
-        # label/visibility pair; ``opens`` when present must be a list of
-        # objects each carrying string security/time and a scalar price.
-        if self._contract_raw is None:
+        # A missing contract (no ``_contract`` key) is legal-but-openless.
+        # A present contract must be an object declaring the supported version
+        # and a coherent label/visibility pair; ``opens`` when present must be
+        # a list of objects each carrying string security/time and a scalar
+        # price.  Key PRESENCE decides the missing/invalid split: no key at
+        # all is missing; any provided key - even a null value - is a declared
+        # contract that must be a legal object.
+        if not self._contract_key_provided:
             return None
         if not isinstance(self._contract_raw, dict):
-            return f"non-object tape contract root {type(self._contract_raw).__name__}"
+            return (
+                f"non-object tape contract root field _contract "
+                f"{type(self._contract_raw).__name__}"
+            )
         version = self._contract.get("version")
         if version != self._CONTRACT_VERSION:
             return f"unsupported tape contract version {version!r}"
@@ -311,8 +323,14 @@ class Replay:
             # A tape with NO source contract at all is a different failure
             # from a legal contract that simply declares no opens - the
             # closeout matrix keeps the two reasons separate and named.
+            # Key PRESENCE decides missing vs unsupplied: a tape with no
+            # ``_contract`` key at all is missing_contract; a provided
+            # contract (even one whose opens list is legal-empty) that
+            # simply declares no open for this bound day is unsupplied.
             self._open_errors[code] = (
-                "missing_contract" if self._contract_raw is None else "unsupplied"
+                "missing_contract"
+                if not self._contract_key_provided
+                else "unsupplied"
             )
         else:
             self._open_errors.pop(code, None)

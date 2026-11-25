@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from quanthus.p12_history.calendar_listing import _date, _rows
+from quanthus.p12_history.clocks import parse_ts
 from quanthus.p12_history.source_pins import SourceMap
 
 ADMITTED_PRICE_BASIS = {"UNADJUSTED", "none", "NONE"}
@@ -39,8 +40,11 @@ def _session_day(value):
     if value is None:
         return None
     try:
-        end = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
-    except ValueError:
+        # The wire carries ISO-8601 with a Z suffix; parse_ts accepts it
+        # (and every other source clock shape) instead of a bare
+        # fromisoformat that rejects Z on older runtimes.
+        end = value if isinstance(value, datetime) else parse_ts(value)
+    except (ValueError, TypeError):
         return None
     if end.tzinfo is None:
         end = end.replace(tzinfo=timezone.utc)

@@ -96,6 +96,7 @@ def _calendar_table(days, venue="SSE"):
         "venue_id": [venue] * len(days),
         "trade_date": days,
         "is_open": [True] * len(days),
+        "calendar_session_id": [f"cal-{d.isoformat()}" for d in days],
         "open_at": [datetime(d.year, d.month, d.day, 1, 30, tzinfo=UTC) for d in days],
         "close_at": [datetime(d.year, d.month, d.day, 15, 0, tzinfo=UTC) for d in days],
         "observation_start": [datetime(d.year, d.month, d.day, 9, 30, tzinfo=UTC) for d in days],

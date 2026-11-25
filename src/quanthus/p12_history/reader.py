@@ -772,7 +772,17 @@ def read_history(
             "excluded_security_hits": exclusion_hits,
             "excluded_count": len(exclusion_hits),
         },
-        "calendar": cal_cov,
+        # session_ids carries (venue, trade_date) tuples for the internal
+        # tradability join; at the coverage boundary the trade_date is
+        # normalized to its ISO string so the receipt serializes into the
+        # same canonical bytes as the wire (no date objects on JSON).
+        "calendar": {
+            **cal_cov,
+            "session_ids": {
+                k: (v[0], v[1].isoformat() if isinstance(v[1], date) else v[1])
+                for k, v in (cal_cov.get("session_ids") or {}).items()
+            },
+        },
         "listing": list_cov,
         "universe": uni_cov,
         "bars": bar_cov,

@@ -74,18 +74,29 @@ def _rows(path: Path, columns):
     import pyarrow.parquet as pq
 
     recs = pq.ParquetFile(str(path)).read(columns=columns).to_pylist()
-    # pyarrow returns Decimal for every fixed-precision numeric column;
-    # keep each at source precision as text so the fixed reader wire is
-    # JSON-serializable verbatim (Decimal -> str, never float, never a
-    # global default).  Downstream _num/iso projections stay unchanged.
+    # The frozen reader wire carries only JSON-native values verbatim:
+    # Decimal -> exact source-precision text (never float), native
+    # datetime -> ISO-8601 preserving its own offset, date -> ISO date.
+    # No field's business instant is shifted - only its representation is
+    # normalized so the envelope/coverage canonical bytes serialize once
+    # for the digest + disk + P11 wire without a global default=str.
+    from quanthus.p12_history.clocks import iso as _iso
+
+    def _norm(v):
+        if isinstance(v, Decimal):
+            return str(v)
+        # datetime -> ISO-8601 preserving its own offset; the business
+        # instant is unchanged, only the representation is normalized so
+        # the wire is JSON-native.  A bare date stays a date object here -
+        # internal joins key on date; the coverage/envelope boundary is
+        # where dates become ISO strings.
+        if isinstance(v, datetime):
+            return _iso(v)
+        return v
+
     out = []
     for rec in recs:
-        out.append(
-            {
-                k: (str(v) if isinstance(v, Decimal) else v)
-                for k, v in rec.items()
-            }
-        )
+        out.append({k: _norm(v) for k, v in rec.items()})
     return out
 
 
@@ -193,6 +204,8 @@ def read_calendar_rows(source_map: SourceMap, market_date: date):
             # back to the session the bar projects onto.
             csid = str(rec.get("calendar_session_id") or "")
             if csid and session is not None and venue_id is not None:
+                # Keep the trade_date as a date for internal joins; the
+                # coverage boundary (read_history) normalizes it to ISO.
                 session_ids[csid] = (venue_id, session)
         reads.append({"member_id": member.member_id, "member_key": f"{member.package_id}::{member.member_id}", "status": "READ", "rows": len(records), "kept": n, "sha256": member.sha256, "sha_match": True, "verified_at": verify.get("verified_at")})
     out = sorted(rows.values(), key=lambda r: (r.venue_id, r.session_date))

@@ -187,6 +187,23 @@ def test_missing_contract_supplies_no_open():
     assert _open_at(replay, "600000", "2026-10-08T10:00") == ""
 
 
+def test_missing_contract_is_named_missing_not_unsupplied():
+    # A tape with NO source contract carries a distinct named reason from
+    # a legal contract that simply declares no opens (unsupplied).
+    tape = _tape(
+        [
+            _point("202609301859", "49.80"),
+            _point("202610080929", "49.80"),
+            _point("202610080933", "49.85"),
+            _point("202610081500", "51.50"),
+        ],
+        contract=None,
+    )
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is None
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "missing_contract"
+
+
 def test_wrong_version_contract_supplies_no_open():
     contract = dict(MINUTE_START, version="BOGUS")
     contract["opens"] = [
@@ -384,6 +401,29 @@ def test_legal_empty_opens_is_unsupplied_not_invalid():
     replay = Replay(tape, day="2026-10-07", source="t")
     assert replay._contract_error is None
     assert _open_err(replay, "600000", "2026-10-08T10:00") == "unsupplied"
+
+
+def test_invalid_contract_carries_auditable_structural_detail():
+    # Each illegal-structure case surfaces its specific reason via
+    # contract_error() so the public receipt can record it.
+    for raw in ("not a dict", [], 42):
+        tape = _tape(_POINTS_BASE, contract=None)
+        tape["_contract"] = raw
+        replay = Replay(tape, day="2026-10-07", source="t")
+        assert replay._contract_error is not None
+        assert "non-object" in replay._contract_error
+    # Non-array opens.
+    contract = dict(MINUTE_START)
+    contract["opens"] = {"x": 1}
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert "not an array" in replay._contract_error
+    # Missing field.
+    contract = dict(MINUTE_START)
+    contract["opens"] = [{"security": "600000", "time": "202610080929"}]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert "missing" in replay._contract_error
 
 
 # ---- Decimal equivalence vs real conflict ----------------------------------

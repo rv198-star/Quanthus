@@ -268,7 +268,12 @@ class Replay:
         elif len(seen_norm) > 1:
             self._open_errors[code] = "ambiguous"
         elif not declared:
-            self._open_errors[code] = "unsupplied"
+            # A tape with NO source contract at all is a different failure
+            # from a legal contract that simply declares no opens - the
+            # closeout matrix keeps the two reasons separate and named.
+            self._open_errors[code] = (
+                "missing_contract" if self._contract_raw is None else "unsupplied"
+            )
         else:
             self._open_errors.pop(code, None)
         # The surfaced open is a single CLEAN value only; any invalid literal
@@ -362,3 +367,12 @@ class ReplayQuotes(QuoteService):
 
     def open_error(self, code: str):
         return getattr(self._replay, "_open_errors", {}).get(code)
+
+    def contract_error(self):
+        """The specific structural reason the source contract is illegal.
+
+        Exposed so the public confirm receipt can carry an auditable
+        named structural cause (non-object root / non-array opens /
+        missing or mistyped field), not only the class-level code.
+        """
+        return getattr(self._replay, "_contract_error", None)

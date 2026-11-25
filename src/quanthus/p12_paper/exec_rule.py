@@ -81,6 +81,11 @@ REJECT = {
     # decimal within the source tick precision (zero / negative / NaN /
     # Infinity / empty / null / non-numeric / over-precision).
     "PREOPEN_OPEN_PRICE_INVALID": "the declared bound-session open is not a finite positive decimal within tick precision"
+    ,
+    # E8 r5 closeout: the tape carries NO versioned source contract at all -
+    # a named refusal kept distinct both from a legal contract that simply
+    # declares no opens (UNAVAILABLE) and from a present-but-illegal one.
+    "PREOPEN_OPEN_CONTRACT_MISSING": "the bound session's replay tape carries no versioned open source contract"
 }
 
 ORDER_STATUS = {

@@ -126,6 +126,10 @@ class SubmitOutcome:
     # Issue #723 E8 r5 (buy): the confirm-time re-sized quantity the server
     # asks the user to accept.  Set only on a CONFIRM_RESIZED advisory.
     confirm_qty: int | None = None
+    # E8 r5 closeout: the specific, auditable structural detail behind a
+    # named rejection (e.g. the exact contract violation), surfaced in the
+    # public receipt so the refuse cause is not only a class-level code.
+    reason_detail: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         out = {
@@ -141,6 +145,8 @@ class SubmitOutcome:
         }
         if self.confirm_qty is not None:
             out["confirm_qty"] = self.confirm_qty
+        if self.reason_detail is not None:
+            out["reason_detail"] = self.reason_detail
         return out
 
 
@@ -571,12 +577,25 @@ class PaperAccount:
                         "invalid_contract": "PREOPEN_OPEN_CONTRACT_INVALID",
                         "invalid_value": "PREOPEN_OPEN_PRICE_INVALID",
                         "ambiguous": "PREOPEN_OPEN_PRICE_AMBIGUOUS",
+                        # A tape with no source contract at all is a named
+                        # refusal distinct from a legal contract that merely
+                        # declares no opens for this bound day.
+                        "missing_contract": "PREOPEN_OPEN_CONTRACT_MISSING",
                     }.get(_open_err, "PREOPEN_OPEN_PRICE_UNAVAILABLE")
+                    # Carry the auditable structural detail into the public
+                    # receipt: the exact contract violation for an illegal
+                    # contract, or which named supply is absent otherwise.
+                    _detail = None
+                    if _open_err == "invalid_contract":
+                        _cerr_probe = getattr(self._quotes, "contract_error", None)
+                        if callable(_cerr_probe):
+                            _detail = _cerr_probe()
                     return self._reject(
                         command,
                         _reason,
                         None,
                         persist=False,
+                        reason_detail=_detail,
                     )
             # Issue #723 E8 r5 (buy): the confirm-time mark may re-size the
             # plan.  When the resolved quantity differs from the client-
@@ -720,6 +739,7 @@ class PaperAccount:
         *,
         persist: bool = True,
         resized_qty: int | None = None,
+        reason_detail: str | None = None,
     ) -> SubmitOutcome:
         order = PaperOrder(
             account_id=self._account_id,
@@ -741,7 +761,7 @@ class PaperAccount:
         if persist:
             self._store.insert(order)
         return SubmitOutcome(command.order_id, "rejected", reason, REJECT[reason], 0, None, RULE_VERSION,
-                             (quote.quote_time if quote else None), None, resized_qty)
+                             (quote.quote_time if quote else None), None, resized_qty, reason_detail)
 
     def _register_order(self, order: PaperOrder) -> str | None:
         """Post the order's opening observation to the shared ledger.

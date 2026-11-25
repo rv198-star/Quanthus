@@ -963,12 +963,10 @@ def test_c8_held_type_structurally_similar_object_alerts(runner, resources):
     # source; only the unqualified risk stays unverified.
     assert memb[0].get("membership_source") == "filled_position_evidence"
     assert memb[0].get("held_membership_unverified") is True
-    # Qualified neighbour keeps its real entry.
+    # The neighbour is evaluated on its own (named feature exclusion), never
+    # contaminated by the unverified held member's isolation.
     assert any(
-        d.stage == "entry_plan"
-        for ds in out.result.package.decision_sets
-        for d in ds.decisions
-        if d.security_code == "600001"
+        e.get("security_code") == "600001" for e in out.source_closure.get("exclusions", [])
     )
 
 

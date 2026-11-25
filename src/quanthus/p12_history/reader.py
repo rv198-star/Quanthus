@@ -979,7 +979,8 @@ def read_history(
             # dispositions bind to the actual selected/excluded dependency
             # set.  Only members carrying a named input gap count - the
             # sealed-October base and other-day partitions are out of
-            # scope.
+            # scope.  Only THIS T's package members (date_from == the
+            # market_date) - the other-day formal gaps are not in scope.
             [
                 {
                     "member_key": e["package_key"],
@@ -990,6 +991,7 @@ def read_history(
                 }
                 for e in source_member_entries
                 if e.get("named_input_gap") and e["package_key"] in not_read
+                and e.get("date_from") == market_date.isoformat()
             ]
         ) if (purpose == FORMAL_DAILY_UPDATE) else [],
         "note": (

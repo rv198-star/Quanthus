@@ -43,7 +43,14 @@ class Replay:
         self._tape = tape
         self._day = day
         self._source = source
-        self._contract: dict[str, Any] = dict(tape.get("_contract") or {})
+        raw_contract = tape.get("_contract")
+        # A present but non-object contract root is itself a structural
+        # violation (distinct from a missing contract); keep it for the
+        # validator to reject by name rather than coercing or crashing.
+        self._contract_raw = raw_contract
+        self._contract: dict[str, Any] = (
+            dict(raw_contract) if isinstance(raw_contract, dict) else {}
+        )
         # Ruling 7153294321: the contract must be a LEGAL versioned source
         # contract before any of its declarations are honoured.  A wrong
         # version, an undefined time_label/visible_at, or a contradictory
@@ -137,8 +144,14 @@ class Replay:
         unsupplied).  A present contract must declare a supported version and
         a coherent label/visibility pair, else it is invalid.
         """
-        if not self._contract:
+        # A missing contract (None) is legal-but-openless.  A present contract
+        # must be an object declaring the supported version and a coherent
+        # label/visibility pair; ``opens`` when present must be a list of
+        # objects each carrying string security/time and a scalar price.
+        if self._contract_raw is None:
             return None
+        if not isinstance(self._contract_raw, dict):
+            return f"non-object tape contract root {type(self._contract_raw).__name__}"
         version = self._contract.get("version")
         if version != self._CONTRACT_VERSION:
             return f"unsupported tape contract version {version!r}"
@@ -151,6 +164,18 @@ class Replay:
                 f"contradictory tape label pair time_label={time_label!r} "
                 f"visible_at={visible_at!r}"
             )
+        opens = self._contract.get("opens")
+        if opens is not None:
+            if not isinstance(opens, list):
+                return "tape contract opens is not an array"
+            for decl in opens:
+                if not isinstance(decl, dict):
+                    return "tape contract opens entry is not an object"
+                for key in ("security", "time", "price"):
+                    if key not in decl:
+                        return f"tape contract opens entry missing {key!r}"
+                if not isinstance(decl["security"], str) or not isinstance(decl["time"], str):
+                    return "tape contract opens entry field has the wrong type"
         return None
 
     def _point_visible_at(self, row: dict[str, Any]) -> datetime | None:
@@ -188,14 +213,25 @@ class Replay:
             self._open_errors[code] = "invalid_contract"
             return ""
         day_digits = now.strftime("%Y%m%d")
+        # E8 r5 closeout (ruling): each declared open must be a FINITE,
+        # POSITIVE decimal within the source-declared tick precision.  Raw
+        # literals that fail the value domain are refused by name; Decimal-
+        # equivalent literals merge to one value while every original
+        # literal/label/source is preserved for the ledger.
         declared: list[str] = []
-        seen: set[str] = set()
+        seen_norm: set[str] = set()
+        invalid_value = False
+        min_tick = self._contract_min_tick()
 
         def _note(value) -> None:
-            text = str(value).strip() if value is not None else ""
-            if text and text not in seen:
-                seen.add(text)
-                declared.append(text)
+            nonlocal invalid_value
+            ok, norm = self._open_price_ok(value, min_tick)
+            if not ok:
+                invalid_value = True
+                return
+            if norm not in seen_norm:
+                seen_norm.add(norm)
+                declared.append(str(value).strip())
 
         # Declaration channel 1: a point row on the bound day declares the
         # session open via the contract's named ``open_field``.
@@ -204,26 +240,79 @@ class Replay:
             for row in info["points"][:count]:
                 if not str(row.get("time", "")).startswith(day_digits):
                     continue
-                _note(row.get(open_field))
+                # A row that does not carry the named field DECLARES NOTHING;
+                # only a populated (but possibly illegal) literal is a
+                # declared value that can poison the supply.
+                if open_field in row:
+                    _note(row.get(open_field))
         # Declaration channel 2: the source contract declares the open fact
         # directly as {security, time, price}; it becomes visible at the same
         # replay-visible moment as the label it names.
-        for decl in self._contract.get("opens", ()) or ():
-            if decl.get("security") != code:
-                continue
-            label = str(decl.get("time", ""))
-            if not label.startswith(day_digits):
-                continue
-            visible = self._point_visible_at({"time": label})
-            if visible is not None and visible <= now:
-                _note(decl.get("price"))
-        if len(declared) > 1:
+        opens = self._contract.get("opens")
+        if isinstance(opens, list):
+            for decl in opens:
+                if not isinstance(decl, dict) or decl.get("security") != code:
+                    continue
+                label = str(decl.get("time", ""))
+                if not label.startswith(day_digits):
+                    continue
+                visible = self._point_visible_at({"time": label})
+                if visible is not None and visible <= now:
+                    _note(decl.get("price"))
+        # A declared open literal outside the value domain poisons the whole
+        # supply for this confirm: it is refused BY NAME (PREOPEN_OPEN_PRICE_INVALID)
+        # rather than silently merged away - the ledger must see the raw
+        # violating literal, not a laundered pass.
+        if invalid_value:
+            self._open_errors[code] = "invalid_value"
+        elif len(seen_norm) > 1:
             self._open_errors[code] = "ambiguous"
         elif not declared:
             self._open_errors[code] = "unsupplied"
         else:
             self._open_errors.pop(code, None)
-        return declared[0] if len(declared) == 1 else ""
+        # The surfaced open is a single CLEAN value only; any invalid literal
+        # or real conflict leaves the field empty so the confirm path refuses
+        # by name against the recorded reason.
+        if invalid_value or len(seen_norm) != 1:
+            return ""
+        return declared[0]
+
+    def _contract_min_tick(self):
+        """The source-declared minimum price increment, as a Decimal, or None."""
+        from decimal import Decimal, InvalidOperation
+        raw = self._contract.get("min_tick")
+        if raw is None:
+            return None
+        try:
+            tick = Decimal(str(raw))
+        except (InvalidOperation, ValueError):
+            return None
+        return tick if tick.is_finite() and tick > 0 else None
+
+    @staticmethod
+    def _open_price_ok(value, min_tick):
+        """Validate a declared open literal: finite, positive Decimal within tick.
+
+        Returns (ok, normalized).  ``normalized`` is the Decimal-normalized
+        form used to merge Decimal-equivalent literals (49.80 == 49.8).
+        """
+        from decimal import Decimal, InvalidOperation
+        text = str(value).strip() if value is not None else ""
+        if not text:
+            return False, None
+        try:
+            dec = Decimal(text)
+        except (InvalidOperation, ValueError):
+            return False, None
+        if not dec.is_finite() or dec <= 0:
+            return False, None
+        if min_tick is not None:
+            # Precision gate: the literal must not carry more fractional
+            # digits than the source's declared minimum tick allows.
+            if abs(dec.as_tuple().exponent) > abs(min_tick.as_tuple().exponent):
+                return False, None
+        return True, dec.normalize().to_eng_string()
 
     def fetch(self, code: str) -> dict[str, Any]:
         now = self.now()

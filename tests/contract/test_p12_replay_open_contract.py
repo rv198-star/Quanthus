@@ -238,3 +238,201 @@ def test_open_field_alone_does_not_supply_open():
     )
     replay = Replay(tape, day="2026-10-07", source="t")
     assert _open_at(replay, "600000", "2026-10-08T10:00") == ""
+
+
+# ---------------------------------------------------------------------------
+# E8 R5 closeout matrix (合同收口补充单): named-open value domain, contract
+# structure and Decimal equivalence.  Every illegal input is refused BY NAME
+# via ReplayQuotes.open_error -> the confirm path's named reject; the ledger
+# must keep cash, holdings, orders and fills untouched.
+# ---------------------------------------------------------------------------
+
+
+def _open_err(replay, code, instant):
+    replay.set_now(_instant(instant))
+    replay.fetch_raw(code)
+    return replay._open_errors.get(code)
+
+
+_POINTS_BASE = [
+    _point("202609301859", "49.80"),
+    _point("202610080932", "52.00"),
+    _point("202610080933", "49.85"),
+    _point("202610081500", "51.50"),
+]
+
+
+def _contract_opens(price, **extra):
+    contract = dict(MINUTE_START, min_tick="0.01")
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": price}
+    ]
+    contract.update(extra)
+    return contract
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["0", "-1.00", "NaN", "Infinity", "-Infinity", "", "abc", "  ", "49.8x", "1e2x"],
+    ids=["zero", "negative", "nan", "inf", "neg_inf", "empty", "nonnum", "blank", "mixed", "exp_bad"],
+)
+def test_named_open_illegal_literals_are_refused_by_name(bad):
+    tape = _tape(_POINTS_BASE, contract=_contract_opens(bad))
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == ""
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_value"
+
+
+def test_named_open_null_literal_is_refused():
+    tape = _tape(_POINTS_BASE, contract=_contract_opens(None))
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_value"
+
+
+def test_named_open_over_tick_precision_is_refused():
+    # min_tick 0.01 allows at most 2 decimal places; 49.801 carries three.
+    tape = _tape(_POINTS_BASE, contract=_contract_opens("49.801"))
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_value"
+
+
+def test_named_open_at_tick_precision_is_accepted():
+    tape = _tape(_POINTS_BASE, contract=_contract_opens("49.80"))
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == "49.80"
+
+
+def test_illegal_literal_poisons_a_valid_sibling():
+    # One violating literal refuses the whole supply even beside a legal one;
+    # it is never silently laundered into a pass.
+    contract = dict(MINUTE_START, min_tick="0.01")
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": "0"},
+        {"security": "600000", "time": "202610080930", "price": "49.80"},
+    ]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_value"
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == ""
+
+
+def test_illegal_open_field_row_is_refused_by_name():
+    tape = _tape(
+        _POINTS_BASE + [_point("202610080929", "49.80", open="-1.00")],
+        contract=dict(MINUTE_START, min_tick="0.01"),
+    )
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_value"
+
+
+# ---- contract structure ----------------------------------------------------
+
+
+def test_non_object_contract_root_is_a_named_rejection():
+    tape = _tape(_POINTS_BASE, contract="not-an-object")
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is not None
+    assert "non-object" in replay._contract_error
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "invalid_contract"
+
+
+def test_non_array_opens_is_a_named_rejection():
+    contract = dict(MINUTE_START)
+    contract["opens"] = {"security": "600000"}
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is not None
+    assert "not an array" in replay._contract_error
+
+
+def test_non_object_opens_entry_is_a_named_rejection():
+    contract = dict(MINUTE_START)
+    contract["opens"] = ["600000@202610080929"]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is not None
+    assert "not an object" in replay._contract_error
+
+
+@pytest.mark.parametrize("missing", ["security", "time", "price"])
+def test_opens_entry_missing_required_field(missing):
+    entry = {"security": "600000", "time": "202610080929", "price": "49.80"}
+    del entry[missing]
+    contract = dict(MINUTE_START)
+    contract["opens"] = [entry]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is not None
+    assert "missing" in replay._contract_error
+
+
+def test_opens_entry_wrong_field_type_is_a_named_rejection():
+    contract = dict(MINUTE_START)
+    contract["opens"] = [{"security": 600000, "time": "202610080929", "price": "49.80"}]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is not None
+    assert "wrong type" in replay._contract_error
+
+
+def test_legal_empty_opens_is_unsupplied_not_invalid():
+    # Missing contract / legal empty supply / illegal structure are three
+    # distinct audit categories.
+    contract = dict(MINUTE_START)
+    contract["opens"] = []
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is None
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "unsupplied"
+
+
+# ---- Decimal equivalence vs real conflict ----------------------------------
+
+
+def test_decimal_equivalent_literals_merge_to_one_open():
+    contract = dict(MINUTE_START, min_tick="0.01")
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": "49.80"},
+        {"security": "600000", "time": "202610080930", "price": "49.8"},
+    ]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    # Both literals are visible; Decimal-equivalent so one value surfaces.
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == "49.80"
+    assert replay._open_errors.get("600000") is None
+
+
+def test_duplicate_identical_declaration_confirms_once():
+    contract = dict(MINUTE_START, min_tick="0.01")
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": "49.80"},
+        {"security": "600000", "time": "202610080930", "price": "49.80"},
+    ]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == "49.80"
+
+
+def test_real_conflict_remains_ambiguous():
+    contract = dict(MINUTE_START, min_tick="0.01")
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": "49.80"},
+        {"security": "600000", "time": "202610080930", "price": "52.00"},
+    ]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_err(replay, "600000", "2026-10-08T10:00") == "ambiguous"
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == ""
+
+
+def test_conflict_entry_not_yet_visible_stays_clock_gated():
+    # A second declaration whose label is not yet replay-visible does not
+    # yet create ambiguity; the first visible value supplies the open.
+    contract = dict(MINUTE_START, min_tick="0.01")
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": "49.80"},
+        {"security": "600000", "time": "202610081500", "price": "52.00"},
+    ]
+    tape = _tape(_POINTS_BASE, contract=contract)
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == "49.80"

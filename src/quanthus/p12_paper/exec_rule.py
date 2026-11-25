@@ -76,7 +76,11 @@ REJECT = {
     "PREOPEN_OPEN_CONTRACT_INVALID": "the replay tape source contract is not a legal versioned open supply",
     # Two conflicting declared opens on the bound day are refused as
     # ambiguous - both original facts are preserved, never merged.
-    "PREOPEN_OPEN_PRICE_AMBIGUOUS": "the bound session has conflicting declared opening prices"
+    "PREOPEN_OPEN_PRICE_AMBIGUOUS": "the bound session has conflicting declared opening prices",
+    # E8 r5 closeout: a declared open that is not a finite positive
+    # decimal within the source tick precision (zero / negative / NaN /
+    # Infinity / empty / null / non-numeric / over-precision).
+    "PREOPEN_OPEN_PRICE_INVALID": "the declared bound-session open is not a finite positive decimal within tick precision"
 }
 
 ORDER_STATUS = {

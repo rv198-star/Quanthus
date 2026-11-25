@@ -569,6 +569,7 @@ class PaperAccount:
                         _open_err = _err_probe(command.security_code)
                     _reason = {
                         "invalid_contract": "PREOPEN_OPEN_CONTRACT_INVALID",
+                        "invalid_value": "PREOPEN_OPEN_PRICE_INVALID",
                         "ambiguous": "PREOPEN_OPEN_PRICE_AMBIGUOUS",
                     }.get(_open_err, "PREOPEN_OPEN_PRICE_UNAVAILABLE")
                     return self._reject(

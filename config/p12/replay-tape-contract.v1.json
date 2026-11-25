@@ -26,11 +26,18 @@
       "type": "array",
       "items": {"security": "code", "time": "yyyymmddHHMM", "price": "decimal"},
       "note": "Source-declared named opens; visible at the replay-visible moment of the named label."
+    },
+    "min_tick": {
+      "required": false,
+      "type": "decimal-string",
+      "note": "Source-declared minimum price increment (e.g. 0.01). A declared open carrying more fractional precision than min_tick allows is refused by name as outside the value domain."
     }
   },
   "rules": [
     "The bound open is a NAMED fact the source declares via open_field rows or contract.opens entries, on the same security and bound day, already visible at the confirm clock.",
-    "Exactly one declared open is used; zero leaves the quote open empty (named refuse), two or more distinct declared values are refused as ambiguous.",
+    "Exactly one declared open is used; zero leaves the quote open empty (named refuse), two or more Decimal-distinct declared values are refused as ambiguous. Decimal-equivalent literals (49.80 vs 49.8) merge to one value while every original literal, label and source is preserved.",
+    "A declared open must be a finite, positive decimal within min_tick precision; zero, negative, NaN, Infinity, empty, null, non-numeric and over-precision literals are each refused by name (PREOPEN_OPEN_PRICE_INVALID), and one violating literal poisons the whole open supply for that confirm.",
+    "A present _contract must be an object with the required version and a coherent time_label/visible_at pair; opens when present must be an array of objects each carrying string security/time and a price field. Non-object roots, non-array opens, missing or wrongly-typed required fields are named contract rejections distinct from a missing contract.",
     "A tape with no _contract, or a contract missing time_label/open declaration, supplies no open and the buy confirm refuses by name.",
     "Pre-open imprints, the first-minute bar and later last-price ticks keep their own timestamps and are never the open unless the source declares them so."
   ]

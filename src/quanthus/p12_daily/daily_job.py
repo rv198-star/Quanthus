@@ -673,6 +673,7 @@ def run_daily(
     publish_gate_config: Path | None = None,
     calendar_root: Path | None = None,
     raw_history: dict | None = None,
+    input_evidence: dict | None = None,
 ) -> dict:
     '''Public entry: run one daily job and ALWAYS land a run receipt.
 
@@ -702,6 +703,7 @@ def run_daily(
             publish_gate_config=publish_gate_config,
             calendar_root=calendar_root,
             raw_history=raw_history,
+            input_evidence=input_evidence,
         )
     except Exception as exc:  # noqa: BLE001 - last line: still leave a receipt
         receipt: dict[str, Any] = {
@@ -753,6 +755,12 @@ def run_daily(
             },
             "elapsed_ms": 0,
         }
+        # Product directive 2026-11-25: this FAILED wrapper receipt carries
+        # the SAME input evidence the caller bound for this attempt - the
+        # materialized-envelope digest, or the verified entry binding plus
+        # the honest unavailable reason.  One record, same run_id.
+        if input_evidence is not None:
+            receipt["input_evidence"] = input_evidence
         with contextlib.suppress(Exception):  # nothing left to persist
             DailyPackageStore(state_dir).write_run(receipt)
         return receipt
@@ -774,6 +782,7 @@ def _run_daily_inner(
     publish_gate_config: Path | None = None,
     calendar_root: Path | None = None,
     raw_history: dict | None = None,
+    input_evidence: dict | None = None,
 ) -> dict:
     '''Execute one daily run and persist its receipt; returns the receipt.'''
 
@@ -798,6 +807,12 @@ def _run_daily_inner(
         "stages": [],
         "status": STATUS_FAILED,
     }
+    # Product directive 2026-11-25: whatever status this run lands, the
+    # receipt carries the SAME input evidence the entry bound for this
+    # attempt - the materialized-envelope digest, or the verified entry
+    # binding plus the honest unavailable reason - under one run_id.
+    if input_evidence is not None:
+        receipt["input_evidence"] = input_evidence
 
     def stage(name: str, started_mono: float, **fields: Any) -> float:
         receipt["stages"].append(
@@ -1433,6 +1448,8 @@ def _run_daily_inner(
         t = stage("rule", t, result="failed", reason_code=str(exc.reason_code))
         receipt["status"] = STATUS_FAILED
         receipt["error"] = {"reason_code": str(exc.reason_code), "detail": str(exc)}
+        if input_evidence is not None:
+            receipt["input_evidence"] = input_evidence
         receipt["elapsed_ms"] = int((time.monotonic() - started) * 1000)
         store.write_run(receipt)
         return receipt

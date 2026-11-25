@@ -1526,3 +1526,57 @@ class TestRunFailureReceipt:
         assert (
             tmp_path / "st" / "daily-runs" / (receipt["run_id"] + ".json")
         ).is_file()
+
+    def test_http_run_day_failure_binds_same_receipt(self, tmp_path):
+        """The HTTP entry, on an internal failure, returns a non-200 whose
+        body carries the SAME run_id that landed under daily-runs/ - one
+        call, one record, retrievable from the same T's run log."""
+        import json as _json
+        import threading
+        import urllib.error
+        import urllib.request
+
+        from quanthus.p12_replay.server import serve
+
+        eng = self._engine(
+            tmp_path,
+            materialize_side_effect=TypeError(
+                "Object of type Decimal is not JSON serializable"
+            ),
+            failure_context={
+                "scenario_id": "spdb-20261008",
+                "sealed_source": {"envelope_sha256": "sha256:" + "a" * 64},
+            },
+        )
+        httpd = serve(lambda reset=False: eng, "127.0.0.1", 0)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/run-day",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                urllib.request.urlopen(req, timeout=10)
+                raise AssertionError("expected a non-200 run-day failure")
+            except urllib.error.HTTPError as http_exc:
+                assert http_exc.code == 503
+                body = _json.loads(http_exc.read().decode("utf-8"))
+            assert body["status"] == "FAILED"
+            run_id = body["run_id"]
+            path = tmp_path / "st" / "daily-runs" / (run_id + ".json")
+            assert path.is_file()
+            on_disk = _json.loads(path.read_text())
+            # The returned identity IS the persisted record's identity -
+            # not a second receipt or a fabricated digest.
+            assert on_disk["run_id"] == run_id
+            assert on_disk["status"] == "FAILED"
+            assert (
+                on_disk["input_evidence"]["entry_bindings"]["scenario_id"]
+                == "spdb-20261008"
+            )
+        finally:
+            httpd.shutdown()
+            httpd.server_close()

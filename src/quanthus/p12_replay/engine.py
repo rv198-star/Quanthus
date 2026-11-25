@@ -532,14 +532,15 @@ class ReplayEngine:
 
     def _input_evidence(self) -> dict:
         """The input closure a FAILED receipt can still honestly bind."""
-        import hashlib as _hl
+        from quanthus.event_library.contracts import (
+            canonical_json_bytes,
+            sha256_digest,
+        )
 
         envelope = getattr(self, "_real_raw_history", None)
         if isinstance(envelope, dict):
             try:
-                canonical = json.dumps(
-                    envelope, ensure_ascii=False, sort_keys=True
-                ).encode("utf-8")
+                canonical = canonical_json_bytes(envelope)
             except (TypeError, ValueError):
                 return {
                     "kind": "materialized_envelope",
@@ -557,7 +558,9 @@ class ReplayEngine:
                 "kind": "materialized_envelope",
                 "schema_version": envelope.get("schema_version"),
                 "market_date": envelope.get("market_date"),
-                "sha256": "sha256:" + _hl.sha256(canonical).hexdigest(),
+                # SAME digest the E1/normal input summary uses: repository
+                # canonical JSON bytes -> sha256:<64-hex>.
+                "digest": sha256_digest(envelope),
                 "entry_bindings": dict(self.run_failure_context or {}),
             }
         ctx = dict(self.run_failure_context or {})
@@ -736,6 +739,7 @@ class ReplayEngine:
                 decision_cutoff=_sh_now(day, self.decision_cutoff_time),
                 calendar_root=self._calendar_root,
                 raw_history=getattr(self, "_real_raw_history", None),
+                input_evidence=self._input_evidence(),
             )
         except Exception as exc:  # noqa: BLE001 - last engine line
             receipt = self._failed_receipt(

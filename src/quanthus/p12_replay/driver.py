@@ -646,32 +646,76 @@ def main(argv=None) -> int:
                 _scen_full = json.loads(Path(args.e1_scenario).read_text())
             except Exception:
                 _scen_full = {}
-            _sealed = _scen_full.get("sealed_source") or {}
+            # The real v15 scenario nests identity under doc.scenario and
+            # names the SourceMap members *_members_path; read THAT shape so
+            # the binding records the actual sealed refs + member digests,
+            # not a flattened guess that resolves to null.
+            _scen = _scen_full.get("scenario") or {}
+            _pe = _scen.get("p12_evidence") or {}
+            _env = _pe.get("envelope") or {}
+            _cov = _pe.get("coverage_receipt") or {}
             _smap = _scen_full.get("source_map") or {}
+
+            def _member_digest(obj):
+                # A SourceMap member-map: either {uri,sha256}, {path,sha256},
+                # or a bare path string whose bytes we hash NOW so the
+                # receipt binds this run's actual member-map identity.
+                if isinstance(obj, dict):
+                    return (
+                        obj.get("sha256")
+                        or obj.get("envelope_sha256")
+                        or obj.get("coverage_sha256")
+                    )
+                return None
+
+            def _member_path(obj):
+                if isinstance(obj, dict):
+                    return obj.get("uri") or obj.get("path")
+                if isinstance(obj, str):
+                    return obj
+                return None
+
+            import hashlib as _hl
+
+            def _read_member(ref):
+                path = _member_path(ref)
+                out = {"path": path, "sha256": _member_digest(ref)}
+                if out["sha256"] is None and path:
+                    try:
+                        out["sha256"] = (
+                            "sha256:"
+                            + _hl.sha256(
+                                Path(path).read_bytes()
+                            ).hexdigest()
+                        )
+                        out["digest_source"] = "read_at_entry"
+                    except OSError:
+                        out["sha256"] = None
+                        out["digest_source"] = "unreadable"
+                else:
+                    out["digest_source"] = (
+                        "scenario_declared"
+                        if out["sha256"]
+                        else "unavailable"
+                    )
+                return out
+
             run_failure_context = {
                 "scenario_path": str(args.e1_scenario),
-                "scenario_id": _scen_full.get("scenario_id"),
+                "scenario_id": _scen.get("scenario_id"),
                 "sealed_source": {
-                    "path": _sealed.get("path"),
-                    "sha256": _sealed.get("sha256"),
-                    "envelope_sha256": _sealed.get("envelope_sha256"),
-                    "coverage_sha256": _sealed.get("coverage_sha256"),
-                }
-                if isinstance(_sealed, dict) and _sealed
-                else None,
+                    "envelope_uri": _member_path(_env),
+                    "envelope_sha256": _member_digest(_env),
+                    "coverage_uri": _member_path(_cov),
+                    "coverage_sha256": _member_digest(_cov),
+                },
                 "source_map": {
-                    "base": (_smap.get("base") or {}).get("sha256")
-                    if isinstance(_smap.get("base"), dict)
-                    else _smap.get("base"),
-                    "daily": (_smap.get("daily") or {}).get("sha256")
-                    if isinstance(_smap.get("daily"), dict)
-                    else _smap.get("daily"),
-                    "calendar": (_smap.get("calendar") or {}).get("sha256")
-                    if isinstance(_smap.get("calendar"), dict)
-                    else _smap.get("calendar"),
-                }
-                if isinstance(_smap, dict) and _smap
-                else None,
+                    "base": _read_member(_smap.get("base_members_path")),
+                    "daily": _read_member(_smap.get("daily_members_path")),
+                    "calendar": _read_member(
+                        _smap.get("calendar_members_path")
+                    ),
+                },
                 "replay_exclusion": {
                     "path": str(exclusion_path),
                     "sha256": EXPECTED_EXCLUSION_SHA256,

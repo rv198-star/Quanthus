@@ -1532,7 +1532,11 @@ class ReplayEngine:
 
         run = self._run_receipt()
         receipt = self._day_replay_receipt() or run
-        block = coverage_block(receipt) if receipt else None
+        block = (
+            coverage_block(receipt, name_map=self._security_name_map())
+            if receipt
+            else None
+        )
         # The page footer names the rule that produced THIS day's receipt:
         # the bound P12 run's runner ref (synthetic now, the adopted P11
         # runner later) - never the static "合成规则驱动" line.
@@ -1548,6 +1552,24 @@ class ReplayEngine:
         if runner:
             block["runner"] = runner
         return block
+
+    def _security_name_map(self) -> dict:
+        raw = getattr(self, "_real_raw_history", None)
+        if not isinstance(raw, Mapping):
+            return {}
+        secs = raw.get("securities")
+        if not isinstance(secs, (list, tuple)):
+            return {}
+        out = {}
+        for s in secs:
+            if not isinstance(s, Mapping):
+                continue
+            idn = s.get("identity") or {}
+            code = idn.get("listing_code") or idn.get("security_code")
+            name = idn.get("security_name")
+            if code and name:
+                out[str(code)] = str(name)
+        return out
 
     def _day_replay_receipt(self) -> dict | None:
         """The same-day ``p11.paper-replay-day.v1`` receipt bound to THIS run.

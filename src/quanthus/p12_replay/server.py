@@ -101,6 +101,7 @@ footer{max-width:1120px;margin:0 auto 40px;padding:0 20px;color:var(--muted);fon
 .cov-block{background:#f6e8e8;color:#b03a3a}
 .covrow .v{color:var(--info);font-weight:600}
 .covrow .r{color:var(--muted);flex:1;min-width:160px}.covdetail{margin:2px 0 4px 0;padding-left:4px;font-size:12px;line-height:1.7;color:var(--muted)}.covdetail .chk{display:inline-block;margin-right:14px}.covdetail .chk.pass{color:#1a7f37}.covdetail .chk.fail{color:#b03a3a}.covdetail .gates{color:#6a737d;margin-right:14px}
+details.covdetail summary{cursor:pointer;color:var(--info,#06c);font-size:12px;list-style:none}details.covdetail summary::-webkit-details-marker{display:none}details.covdetail summary:before{content:'▸ '}details.covdetail[open] summary:before{content:'▾ '}.pendwrap{margin-top:6px}.pendwrap summary{cursor:pointer;font-size:13px;color:var(--muted);padding:6px 0}.pendwrap summary::-webkit-details-marker{display:none}.pendwrap summary:before{content:'▸ '}details.pendwrap[open] summary:before{content:'▾ '}.en{color:#6a737d;font-style:italic;font-size:11px;display:block;margin:2px 0}
 tabs{display:flex;gap:0;margin-bottom:0}
 .tab{padding:8px 18px;cursor:pointer;border:1px solid var(--line);border-bottom:none;border-radius:5px 5px 0 0;background:#f3f4f5;font-size:13px}
 .tab.on{background:#fff;font-weight:600;border-bottom:1px solid #fff;margin-bottom:-1px}
@@ -141,6 +142,7 @@ tabs{display:flex;gap:0;margin-bottom:0}
   <div class=disc>历史回放 · 模拟，不代表策略评估</div>
  </div>
  <div class=card><h2>推进</h2>
+  <p class=note id=advanceclosed style="display:none">只读预览 · 推进已关闭</p>
   <p class=note id=advancenote data-write>结束当前交易时段：持仓与资金进入下一交易日，未成交委托按当日规则失效。</p>
   <button class=next id=adv data-write>下一交易日 →</button>
   <div class=auto data-write>
@@ -169,39 +171,50 @@ function renderCoverage(){
  const el=document.getElementById('coverage');const c=(S&&S.coverage)||null;
  if(!c){el.innerHTML='';return}
  let h='<p class=covnote><b>'+esc(c.note_text||'')+'</b>'+(c.replay_message?'<span style="font-weight:400;color:var(--muted)"> · '+esc(c.replay_message)+'</span>':'')+'</p>';
- const _all=c.securities||[];const rows=_all.slice().sort((a,b)=>{const ea=a.evaluated?1:0,eb=b.evaluated?1:0;if(ea!==eb)return eb-ea;const ha=a.scan_detail?1:0,hb=b.scan_detail?1:0;if(ha!==hb)return hb-ha;return String(a.security_code).localeCompare(String(b.security_code))});
- if(rows.length){h+='<div style="margin-top:4px">';
-  for(const r of rows){
-   const evd=!!r.evaluated;const st=r.state||'';const tag=evd?'<span class="covtag cov-eval">已评估</span>':(st==='blocked'?'<span class="covtag cov-block">时钟阻断</span>':'<span class="covtag cov-pend">待核</span>');const verdict=evd&&r.verdict?'<span class=v>'+esc(r.verdict)+'</span>':'';const srl=evd&&r.scan_reason?esc(r.scan_reason):(evd?'':esc(r.scan_reason||'未评估'));
-    h+='<div class=covrow><span class=c>'+esc(r.security_code)+'</span>'+tag+verdict+(srl?'<span class=r>'+srl+'</span>':'')+'</div>';   const sd=r.scan_detail||null;   if(sd){    let dh='<div class=covdetail>';    if((sd.gates
-||[]).length){dh+='<span class=gates>'+sd.gates.map(esc).join(' · ')+'</span>'}    for(const ck of (sd.checks||[])){dh+='<span class="chk '+(ck.passed?'pass':'fail')+'">'+esc(ck.label)+' 实测 '+esc(ck.actual)+(ck.passed?' ✓':' ✗')+'</span>'}    if(sd.verdict){dh+='<span class=gates>判定 '+esc(sd.verdict)+'</span>'}    dh+='</div>';h+=dh;   }
+ const all=c.securities||[];const ev=all.filter(x=>x.evaluated);const pend=all.filter(x=>!x.evaluated);
+ if(ev.length){
+  for(const r of ev){
+   const sd=r.scan_detail||{};
+   h+='<div class=covrow><span class=c>'+esc(r.security_code)+(r.security_name?' '+esc(r.security_name):'')+'</span><span class="covtag cov-eval">已评估</span>'+(sd.conclusion_cn?'<span class=v>'+esc(sd.conclusion_cn)+'</span>':'')+'</div>';
+   if(sd.checks||sd.gates||sd.verdict||sd.original_en){
+    let dh='<details class=covdetail data-code="'+esc(r.security_code)+'"><summary>依据详情</summary>';
+    if((sd.gates||[]).length){dh+='<span class=gates>'+sd.gates.map(esc).join(' · ')+'</span>'}
+    for(const ck of (sd.checks||[])){dh+='<span class="chk '+(ck.passed?'pass':'fail')+'">'+esc(ck.label)+' 实测 '+esc(ck.actual)+(ck.passed?' ✓':' ✗')+'</span>'}
+    if(sd.original_en){dh+='<div class=en>原解释 '+esc(sd.original_en)+'</div>'}
+    if(sd.verdict){dh+='<span class=gates>判定 '+esc(sd.verdict)+'</span>'}
+    if(sd.prior_session||sd.signal_date){dh+='<div class=gates>前一交易日 '+esc(sd.prior_session||'')+' · 信号日 '+esc(sd.signal_date||'')+'</div>'}
+    dh+='</details>';h+=dh;
+   }
   }
-  h+='</div>'
+ }
+ if(pend.length){
+  const pr=pend[0]&&pend[0].scan_reason?pend[0].scan_reason:'今日未评估';
+  h+='<details id=pendwrap class=pendwrap><summary>'+pend.length+' 只因 '+esc(pr)+'，今日未评估（点击展开清单）</summary><div id=pendlist></div></details>';
  }
  el.innerHTML=h
+ const pw=document.getElementById('pendwrap');
+ if(pw){pw.addEventListener('toggle',()=>{if(pw.open&&!pw._fill){pw._fill=1;const pl=document.getElementById('pendlist');let ph='';for(const r of pend){ph+='<div class=covrow><span class=c>'+esc(r.security_code)+(r.security_name?' '+esc(r.security_name):'')+'</span><span class="covtag cov-pend">待核</span><span class=r>'+esc(r.scan_reason||'未评估')+'</span></div>'}pl.innerHTML=ph}})}
  const rn=c.runner||{};
  const src=(rn.ref_id?(rn.ref_id+(rn.version?('@'+rn.version):'')):'')||'合成规则驱动';
  const rse=document.getElementById('rulesrc');if(rse)rse.textContent='规则来源 '+src
 }
 async function refresh(){
  S=await api('/api/state');const r=S.replay||{};const rb=document.getElementById('reviewbanner');if(rb){rb.style.display=S.review_notice?'':'none';rb.textContent=S.review_notice||''}
- document.getElementById('day').textContent=(r.current_day||'—')+' · 第 '+(r.day_index+1)+'/'+r.sessions_total+' 个交易日';
+ document.getElementById('day').textContent='回放日历共 '+r.sessions_total+' 个交易日 · 只读展示 '+(r.current_day||'—');
  const ev=S.readonly_evidence||{};
  if(S.read_only){
   document.querySelectorAll('[data-write]').forEach(x=>x.style.display='none');
-  const an=document.getElementById('advancenote');if(an)an.style.display='none';
-  const au=document.getElementById('autonote');if(au)au.style.display='none';
+  const ac=document.getElementById('advanceclosed');if(ac)ac.style.display='';
   document.getElementById('meta').innerHTML='<span style="color:var(--warn,#a55);font-weight:600">只读预览 · 未正式采用</span><br>逻辑决定时点 '+fmt(ev.logical_decision_at);
  }else{
   document.querySelectorAll('[data-write]').forEach(x=>x.style.display='');
-  const an=document.getElementById('advancenote');if(an)an.style.display='';
-  const au=document.getElementById('autonote');if(au)au.style.display='';
+  const ac=document.getElementById('advanceclosed');if(ac)ac.style.display='none';
   document.getElementById('meta').innerHTML='回放时刻 '+fmt(r.now)+'<br>下一交易日 '+fmt(r.next_day);
  }
  const wb=S.workbench||{};
  const ops=S.opportunities_cn||[];
  let ph='';
- if(!ops.length){ph='<p class=empty>本日无可执行建议'+(wb.run_receipt?('（回执 '+wb.run_receipt.status+'）'):'')+'</p>'}
+ if(!ops.length){ph='<p class=empty>今日无操作</p>'}
  for(const it of ops){
   const st=(it.status||'').toUpperCase();
   ph+='<div class=plan><span class=code>'+esc(it.security_code)+' <span class=name>'+esc(it.security_name||'')+'</span></span>'
@@ -221,15 +234,17 @@ async function refresh(){
  document.getElementById('plans').innerHTML=ph;
  renderCoverage();
  const a=S.account||{};const acct=(wb.account||{});
- document.getElementById('cash').textContent=fmt(a.cash);
- const mkt=acct.market_value||acct.total_value||null;
- document.getElementById('mkt').textContent=mkt?fmt(mkt):'—';
+ document.getElementById('cash').textContent=(a.cash==null)?'—':fmt(a.cash);
+ // Empty positions -> market value is a real 0.00, not a missing field.
+ const mkt=(a.positions&&a.positions.length)?(acct.market_value||acct.total_value):((a.cash!=null)?0:null);
+ document.getElementById('mkt').textContent=(mkt==null)?'—':fmt(mkt);
  document.getElementById('pos').textContent=(a.positions||[]).map(p=>p.security_code+'×'+p.quantity).join('，')||'无';
  document.getElementById('ord').textContent=fmt(a.orders);document.getElementById('recon').textContent=a.rebuild_matches?'通过':'—';
  const ords=(wb.orders||[]);document.getElementById('orders').innerHTML=ords.length?ords.map(o=>esc(o.order_id)+' · '+esc(o.side)+' '+esc(o.security_code)+' ×'+esc(o.accepted_total_qty)+' · '+esc(o.status)).join('<br>'):'—';
  const pkg=S.package||{};const runs=S.runs||[];
   if(S.read_only){
-   document.getElementById('pkg').textContent='原 P11 包 '+(ev.package_id||'—')+' · '+String(ev.package_digest||'').slice(0,26)+'… · 策略 '+(ev.policy_id||'—')+' '+(ev.policy_version||'')+' · 决定时点 '+fmt(ev.decision_cutoff||ev.logical_decision_at)+' · 只读预览';
+   const rs=wb.run_receipt&&wb.run_receipt.status?(' · 回执 '+wb.run_receipt.status):'';
+   document.getElementById('pkg').textContent='原 P11 包 '+(ev.package_id||'—')+' · '+String(ev.package_digest||'').slice(0,26)+'… · 策略 '+(ev.policy_id||'—')+' '+(ev.policy_version||'')+' · 决定时点 '+fmt(ev.decision_cutoff||ev.logical_decision_at)+rs+' · 只读预览';
   }else{
    document.getElementById('pkg').textContent=(pkg.package_id?('pkg '+pkg.package_id+' · '+String(pkg.file_sha256||'').slice(0,19)+'… · '+fmt(pkg.published_at)+(pkg.retracted?' [已撤回]':'')):'无包')+(runs.length?'\n回执：'+runs.map(x=>x.market_date+':'+x.status).join('  '):'');
   }

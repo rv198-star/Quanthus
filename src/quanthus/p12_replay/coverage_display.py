@@ -133,6 +133,57 @@ _CHECK_LABELS = {
     "active_turnover_ratio_min": "当日成交额",
 }
 
+# The four transition checks in the order the Owner reads them: quiet
+# pair first (did the prior session contract?), then the active pair (did
+# today expand?).  Keys absent from the scan keep their original order at
+# the tail so nothing is silently dropped.
+_CHECK_ORDER = (
+    "quiet_range_ratio_max",
+    "quiet_turnover_ratio_max",
+    "active_range_ratio_min",
+    "active_turnover_ratio_min",
+)
+
+
+def _conclusion_cn(scan: Mapping[str, Any], checks: list[dict]) -> str | None:
+    """The Chinese one-line verdict from the same-T transition outcome.
+
+    Reads the transition's own prior_quiet / current_active booleans (the
+    rule's recorded judgement), falling back to the check pass/fail pair
+    when the booleans are absent.  Both quiet conditions failed -> the
+    prior session never contracted; both active conditions failed ->
+    today never expanded.  Mixed / unknown transitions degrade to the
+    verdict label rather than inventing a reason.
+    """
+    transition = scan.get("transition") or {}
+    prior_quiet = transition.get("prior_quiet")
+    current_active = transition.get("current_active")
+    if prior_quiet is None or current_active is None:
+        by_key = {c.get("key"): c.get("passed") for c in checks}
+        quiet = [
+            by_key.get("quiet_range_ratio_max"),
+            by_key.get("quiet_turnover_ratio_max"),
+        ]
+        active = [
+            by_key.get("active_range_ratio_min"),
+            by_key.get("active_turnover_ratio_min"),
+        ]
+        if all(v is False for v in quiet):
+            prior_quiet = False
+        elif all(v is True for v in quiet):
+            prior_quiet = True
+        if all(v is False for v in active):
+            current_active = False
+        elif all(v is True for v in active):
+            current_active = True
+    if prior_quiet is False:
+        return "没触发：前一交易日振幅和成交额没有收缩"
+    if current_active is False:
+        return "没触发：当天振幅和成交额没有放大"
+    if prior_quiet is True and current_active is True:
+        return "已触发"
+    return None
+
 
 def _ratio_text(check: Mapping[str, Any]) -> str | None:
     """'626587/367434' -> '1.7053x' - actual as a plain multiple."""
@@ -224,14 +275,18 @@ def _scan_details_from_package(receipt: Mapping[str, Any]) -> dict[str, dict]:
                     "passed": bool(check.get("passed")),
                 }
             )
+        order = {k: i for i, k in enumerate(_CHECK_ORDER)}
+        checks.sort(key=lambda c: order.get(c["key"], len(_CHECK_ORDER)))
         out[code] = {
             "verdict": scan.get("verdict"),
+            "conclusion_cn": _conclusion_cn(scan, checks),
             "gates": gate_lines,
             "checks": checks,
             "prior_session": transition.get("prior_session"),
             "signal_date": transition.get("signal_date"),
             "prior_quiet": transition.get("prior_quiet"),
             "current_active": transition.get("current_active"),
+            "original_en": scan.get("explanation") or scan.get("reason"),
             "message": rna.get("message"),
             "candidate_count": rna.get("candidate_count"),
         }
@@ -338,7 +393,10 @@ def _day_block_of(
     return out or None
 
 
-def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
+def coverage_block(
+    receipt: Mapping[str, Any] | None,
+    name_map: Mapping[str, str] | None = None,
+) -> dict | None:
     """Build the display block from one same-run day receipt.
 
     Accepts either the ``p11.paper-replay-day.v1`` dict or a P12 run
@@ -514,6 +572,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
         rows.append(
             {
                 "security_code": code,
+                "security_name": (name_map or {}).get(code),
                 "evaluated": state == "evaluated",
                 "state": state,
                 "verdict": verdict,
@@ -544,6 +603,7 @@ def coverage_block(receipt: Mapping[str, Any] | None) -> dict | None:
         rows.append(
             {
                 "security_code": code,
+                "security_name": (name_map or {}).get(code),
                 "evaluated": False,
                 "state": "held",
                 "verdict": verdict,

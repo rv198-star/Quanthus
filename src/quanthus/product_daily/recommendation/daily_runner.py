@@ -342,13 +342,10 @@ def _normalize_account_inputs(
         has_held_existence = has_facts or item.held_membership_unverified
         positive_quantity = item.held_quantity is not None and item.held_quantity > 0
         if (item.held_membership is False and (has_held_existence or positive_quantity)) or (
-            item.held_quantity == 0
-            and (item.held_membership is True or has_held_existence)
+            item.held_quantity == 0 and (item.held_membership is True or has_held_existence)
         ):
             raise ProductDailyError("contradictory_account_membership", code)
-        is_held = (
-            item.held_membership is True or has_held_existence or positive_quantity
-        )
+        is_held = item.held_membership is True or has_held_existence or positive_quantity
         is_pending = (
             item.pending_kind is not None or code in pending or (code in hints and not is_held)
         )

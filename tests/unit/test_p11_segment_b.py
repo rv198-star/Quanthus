@@ -737,9 +737,7 @@ def _stages(out, code="600000"):
 
 
 def _held_action(out, code="600000"):
-    return [
-        h.get("action") for h in out.get("held_signals", []) if h.get("security_code") == code
-    ]
+    return [h.get("action") for h in out.get("held_signals", []) if h.get("security_code") == code]
 
 
 def _membership(out, code="600000"):

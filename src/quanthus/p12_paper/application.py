@@ -558,9 +558,22 @@ class PaperAccount:
             # the real opening print is supplied inside the legal window.
             if command.side == "buy" and live_quote is not None:
                 if getattr(live_quote, "open", None) is None:
+                    # E8 r5 fix-5: name the exact reason the qualified open is
+                    # absent - an illegal source contract, two conflicting
+                    # declared opens, or simply no named open supplied.  Each
+                    # keeps its own reject code so an ambiguous tape is not
+                    # misread as merely missing data.
+                    _open_err = None
+                    _err_probe = getattr(self._quotes, "open_error", None)
+                    if callable(_err_probe):
+                        _open_err = _err_probe(command.security_code)
+                    _reason = {
+                        "invalid_contract": "PREOPEN_OPEN_CONTRACT_INVALID",
+                        "ambiguous": "PREOPEN_OPEN_PRICE_AMBIGUOUS",
+                    }.get(_open_err, "PREOPEN_OPEN_PRICE_UNAVAILABLE")
                     return self._reject(
                         command,
-                        "PREOPEN_OPEN_PRICE_UNAVAILABLE",
+                        _reason,
                         None,
                         persist=False,
                     )

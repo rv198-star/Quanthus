@@ -185,3 +185,56 @@ def test_missing_contract_supplies_no_open():
     )
     replay = Replay(tape, day="2026-10-07", source="t")
     assert _open_at(replay, "600000", "2026-10-08T10:00") == ""
+
+
+def test_wrong_version_contract_supplies_no_open():
+    contract = dict(MINUTE_START, version="BOGUS")
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": "49.80"}
+    ]
+    tape = _tape(
+        [
+            _point("202609301859", "49.80"),
+            _point("202610080929", "49.80"),
+            _point("202610080933", "49.85"),
+            _point("202610081500", "51.50"),
+        ],
+        contract=contract,
+    )
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is not None
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == ""
+
+
+def test_contradictory_label_pair_is_invalid():
+    contract = dict(MINUTE_START, time_label="minute_end", visible_at="label_end")
+    contract["opens"] = [
+        {"security": "600000", "time": "202610080929", "price": "49.80"}
+    ]
+    tape = _tape(
+        [
+            _point("202609301859", "49.80"),
+            _point("202610080931", "49.80"),
+            _point("202610080933", "49.85"),
+            _point("202610081500", "51.50"),
+        ],
+        contract=contract,
+    )
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert replay._contract_error is not None
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == ""
+
+
+def test_open_field_alone_does_not_supply_open():
+    # A contract that only names open_field but no row declares it supplies
+    # no open - the field must actually be populated on a bound-day row.
+    tape = _tape(
+        [
+            _point("202609301859", "49.80"),
+            _point("202610080929", "49.80"),
+            _point("202610080933", "49.85"),
+            _point("202610081500", "51.50"),
+        ]
+    )
+    replay = Replay(tape, day="2026-10-07", source="t")
+    assert _open_at(replay, "600000", "2026-10-08T10:00") == ""

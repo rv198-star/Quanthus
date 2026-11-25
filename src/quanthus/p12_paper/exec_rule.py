@@ -70,6 +70,13 @@ REJECT = {
     # name, write no order, and leave the ledger untouched until the real
     # opening fact is supplied and the same id retries in the legal window.
     "PREOPEN_OPEN_PRICE_UNAVAILABLE": "the bound session's qualified 09:30 opening print has no named supply",
+    # E8 r5 fix-5 (收口 ruling): a tape whose versioned source contract is
+    # illegal (wrong version / undefined or contradictory label+visibility
+    # pair) supplies no qualified open either - named contract rejection.
+    "PREOPEN_OPEN_CONTRACT_INVALID": "the replay tape source contract is not a legal versioned open supply",
+    # Two conflicting declared opens on the bound day are refused as
+    # ambiguous - both original facts are preserved, never merged.
+    "PREOPEN_OPEN_PRICE_AMBIGUOUS": "the bound session has conflicting declared opening prices"
 }
 
 ORDER_STATUS = {

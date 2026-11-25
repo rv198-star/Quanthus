@@ -44,6 +44,13 @@ class Replay:
         self._day = day
         self._source = source
         self._contract: dict[str, Any] = dict(tape.get("_contract") or {})
+        # Ruling 7153294321: the contract must be a LEGAL versioned source
+        # contract before any of its declarations are honoured.  A wrong
+        # version, an undefined time_label/visible_at, or a contradictory
+        # label/visibility pair is an INVALID contract - the open is left
+        # unsupplied so the confirm path refuses by name (contract error),
+        # never silently falling back to inferring a price.
+        self._contract_error: str | None = self._validate_contract()
         self._times = {
             code: [self._point_visible_at(row) for row in info["points"]]
             for code, info in tape.items()
@@ -117,6 +124,35 @@ class Replay:
         fields[30] = self._times[code][count - 1].strftime("%Y%m%d%H%M%S")
         return fields, now
 
+    _CONTRACT_VERSION = "p12-replay-tape.v1"
+    # Legal (time_label, visible_at) pairings: minute_start bars are visible
+    # when their labelled minute ends; minute_end bars are visible at the
+    # label itself.  Any other pairing is contradictory.
+    _LABEL_VISIBLE = {"minute_start": "label_end", "minute_end": "label_time"}
+
+    def _validate_contract(self) -> str | None:
+        """Return a contract-error string, or None when the contract is legal.
+
+        A tape with NO contract is legal-but-openless (the open is simply
+        unsupplied).  A present contract must declare a supported version and
+        a coherent label/visibility pair, else it is invalid.
+        """
+        if not self._contract:
+            return None
+        version = self._contract.get("version")
+        if version != self._CONTRACT_VERSION:
+            return f"unsupported tape contract version {version!r}"
+        time_label = self._contract.get("time_label")
+        visible_at = self._contract.get("visible_at")
+        if time_label not in self._LABEL_VISIBLE:
+            return f"undefined tape time_label {time_label!r}"
+        if self._LABEL_VISIBLE[time_label] != visible_at:
+            return (
+                f"contradictory tape label pair time_label={time_label!r} "
+                f"visible_at={visible_at!r}"
+            )
+        return None
+
     def _point_visible_at(self, row: dict[str, Any]) -> datetime | None:
         """When a tape point becomes visible on the replay clock.
 
@@ -127,7 +163,10 @@ class Replay:
         minute that CLOSES at the label, visible at the label itself).
         """
         label = str(row.get("time", ""))
-        if self._contract.get("time_label") == "minute_end":
+        if (
+            self._contract_error is None
+            and self._contract.get("time_label") == "minute_end"
+        ):
             try:
                 return datetime(
                     int(label[:4]), int(label[4:6]), int(label[6:8]),
@@ -144,6 +183,10 @@ class Replay:
         open field, no visible point declares it, or the visible points
         declare conflicting opens (the confirm path then refuses by name).
         """
+        self._open_errors: dict = getattr(self, "_open_errors", {})
+        if self._contract_error is not None:
+            self._open_errors[code] = "invalid_contract"
+            return ""
         day_digits = now.strftime("%Y%m%d")
         declared: list[str] = []
         seen: set[str] = set()
@@ -174,6 +217,12 @@ class Replay:
             visible = self._point_visible_at({"time": label})
             if visible is not None and visible <= now:
                 _note(decl.get("price"))
+        if len(declared) > 1:
+            self._open_errors[code] = "ambiguous"
+        elif not declared:
+            self._open_errors[code] = "unsupplied"
+        else:
+            self._open_errors.pop(code, None)
         return declared[0] if len(declared) == 1 else ""
 
     def fetch(self, code: str) -> dict[str, Any]:
@@ -221,3 +270,6 @@ class ReplayQuotes(QuoteService):
             source=self._source,
             reason=quote.reason if quote.last_price else "该股票未纳入本次历史回放",
         )
+
+    def open_error(self, code: str):
+        return getattr(self._replay, "_open_errors", {}).get(code)

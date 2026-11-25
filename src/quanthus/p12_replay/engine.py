@@ -532,10 +532,9 @@ class ReplayEngine:
 
     def _input_evidence(self) -> dict:
         """The input closure a FAILED receipt can still honestly bind."""
-        from quanthus.event_library.contracts import (
-            canonical_json_bytes,
-            sha256_digest,
-        )
+        import hashlib as _hl
+
+        from quanthus.event_library.contracts import canonical_json_bytes
 
         envelope = getattr(self, "_real_raw_history", None)
         if isinstance(envelope, dict):
@@ -560,7 +559,7 @@ class ReplayEngine:
                 "market_date": envelope.get("market_date"),
                 # SAME digest the E1/normal input summary uses: repository
                 # canonical JSON bytes -> sha256:<64-hex>.
-                "digest": sha256_digest(envelope),
+                "digest": "sha256:" + _hl.sha256(canonical).hexdigest(),
                 "entry_bindings": dict(self.run_failure_context or {}),
             }
         ctx = dict(self.run_failure_context or {})
@@ -699,6 +698,10 @@ class ReplayEngine:
         # Input assembly / materialization is the stage BEFORE run_daily's
         # own guards.  An exception escaping here (encode, reader, product
         # write) still lands ONE FAIL-closed run receipt bound to this T.
+        # Entering a REAL new run clears the prior day/attempt's envelope
+        # FIRST - an early materialize fault must not sign the previous
+        # attempt's digest into THIS T's failure receipt.
+        self._real_raw_history = None
         try:
             product = self.materialize_day(day)
         except Exception as exc:  # noqa: BLE001 - every internal fault lands

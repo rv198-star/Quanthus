@@ -1527,6 +1527,35 @@ class TestRunFailureReceipt:
             tmp_path / "st" / "daily-runs" / (receipt["run_id"] + ".json")
         ).is_file()
 
+    def test_early_fault_never_signs_prior_envelope(self, tmp_path):
+        """A fresh run that aborts EARLY in materialize must not sign the
+        previous attempt's envelope digest into THIS T's failure receipt -
+        _real_raw_history is cleared the moment a real run starts."""
+        eng = self._engine(
+            tmp_path,
+            materialize_side_effect=None,
+            failure_context={"scenario_id": "spdb-20261008"},
+        )
+        # Simulate a prior attempt having materialized an envelope.
+        eng._real_raw_history = {
+            "schema_version": "p11.raw-history-input.v1",
+            "market_date": "2026-10-08",
+            "securities": {"stale": "prior attempt"},
+        }
+        # Now a new run aborts early in materialize - before the reader
+        # could overwrite the stale envelope.
+        def _boom(*a, **kw):
+            raise OSError("early product-write fault before any read")
+        eng.materialize_day = _boom
+        receipt = eng.evening_run()
+        assert receipt["status"] == "FAILED"
+        ev = receipt["input_evidence"]
+        # The stale prior envelope is NOT the evidence - the entry binding
+        # is, with no materialized-envelope digest.
+        assert ev["kind"] == "entry_binding"
+        assert "digest" not in ev or not ev.get("digest")
+        assert ev["entry_bindings"]["scenario_id"] == "spdb-20261008"
+
     def test_http_run_day_failure_binds_same_receipt(self, tmp_path):
         """The HTTP entry, on an internal failure, returns a non-200 whose
         body carries the SAME run_id that landed under daily-runs/ - one

@@ -843,6 +843,35 @@ def evaluate_day(
                 )
                 facts = _held_source_only(row)
             assert facts is not None
+            # Held-position feature-eligibility gate (issue #751): a feature row
+            # that is not ready, or has an active exception, is NOT qualified
+            # domain evidence.  It must not drive a reduce/exit through the
+            # feature-dependent deterioration path.  Degrade to the source-only
+            # base review so that only the independent raw position facts
+            # (holding_sessions -> max-holding, marked_return -> stop-loss) can
+            # still legally trigger the fixed base guardian; the unqualified
+            # feature can no longer drive a reduce/exit and the resulting
+            # decision collapses to hold+alert when nothing else qualifies.
+            # feature_ready is None means the row was not evaluated for the
+            # panel; the frozen contract treats "not evaluated" as not-a-defect
+            # (only an explicit False unqualifies).  We degrade only on an
+            # explicit feature_ready=False or an active exception.
+            feature_unqualified = facts.feature_ready is False or facts.exception_active is True
+            if feature_unqualified:
+                excluded.append(
+                    {
+                        "security_code": code,
+                        "reason": "held_feature_not_ready_or_exception_hold_alert",
+                        "member_or_field": (
+                            "feature_ready" if facts.feature_ready is False else "exception_active"
+                        ),
+                        "at": knowledge_cutoff.isoformat(),
+                        "scope": "held_features",
+                        "fallback": "source_only_base_review",
+                    }
+                )
+                facts = _held_source_only(row)
+                assert facts is not None
             review = HeldReviewSubject(
                 identity=EventIdentity(
                     row.security_id,

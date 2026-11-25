@@ -55,6 +55,7 @@ def build_e1_entry(
     runner_ref_id: str = "p11.e1-replay-day",
     runner_version: str = "1.0.0",
     evidence_dir: str | Path | None = None,
+    account_snapshot: dict | None = None,
 ) -> tuple[E1ReplayRunner, Callable[[date, datetime], dict]]:
     """Assemble the E1 runner + the per-T #749 history_reader.
 
@@ -155,11 +156,42 @@ def build_e1_entry(
     def history_reader(day: date, decision_cutoff: datetime) -> dict:
         day_holdings = holdings(day) if callable(holdings) else holdings
         day_pending = pending(day) if callable(pending) else pending
+        # 749 B first slice: pass the bound account-snapshot reference to
+        # the SAME read_history call.  The explicit build-time kwarg wins;
+        # the scenario account mapping may also carry the existing
+        # snapshot_path / snapshot_sha256 reference pair, and its own
+        # account identity is the fallback frame.  With no reference
+        # bound the call passes None and the original no-snapshot
+        # behavior and original rejections are byte-identical.  The
+        # scenario namespace is forwarded only when present - it is never
+        # invented for a snapshot that lacks the field.
+        snap_ref = account_snapshot
+        if snap_ref is None:
+            acct_src = scenario.get("account") or {}
+            if isinstance(acct_src, dict) and (
+                acct_src.get("snapshot_path") or acct_src.get("snapshot_sha256")
+            ):
+                snap_ref = acct_src
+        forward = None
+        if snap_ref is not None:
+            forward = dict(snap_ref)
+            if "account_id" not in forward:
+                acct_src = scenario.get("account") or {}
+                if isinstance(acct_src, dict) and acct_src.get("account_id"):
+                    forward["account_id"] = acct_src["account_id"]
+            if "scenario" not in forward:
+                sc_id = scenario.get("scenario_id")
+                if sc_id:
+                    forward["scenario"] = sc_id
+            ns = (snap_ref.get("account_namespace") if isinstance(snap_ref, dict) else None) or scenario.get("account_namespace")
+            if ns and "account_namespace" not in forward:
+                forward["account_namespace"] = ns
         result = read_history(
             day,
             decision_cutoff,
             holdings=day_holdings,
             pending=day_pending,
+            account_snapshot=forward,
             source_map=smap,
             replay_exclusion=replay_exclusion,
         )
@@ -369,6 +401,7 @@ def load_e1_scenario(
     repo_root: str | Path,
     evidence_dir: str | Path | None = None,
     replay_exclusion: dict | None = None,
+    account_snapshot: dict | None = None,
 ) -> tuple[E1ReplayRunner, Callable[[date, datetime], dict]]:
     """Load a frozen E1 scenario JSON and assemble runner + history_reader.
 
@@ -467,6 +500,7 @@ def load_e1_scenario(
         pending=doc.get("pending") or (),
         open_sessions=tuple(doc.get("open_sessions") or ()),
         evidence_dir=evidence_dir,
+        account_snapshot=account_snapshot if account_snapshot is not None else doc.get("account_snapshot"),
     )
 
 __all__ = ["build_e1_entry", "load_e1_scenario"]

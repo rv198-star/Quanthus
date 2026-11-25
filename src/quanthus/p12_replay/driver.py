@@ -615,11 +615,25 @@ def main(argv=None) -> int:
                 "path": str(exclusion_path),
                 "sha256": EXPECTED_EXCLUSION_SHA256,
             }
+            # 749 B first slice: the entry passes the SAME verified
+            # account-snapshot reference (path + sha256 + scenario id)
+            # into the e1 read seam, so the per-T read_history binds the
+            # snapshot in the same call instead of only serving the
+            # read-only projection.  Absent CLI binding keeps None.
+            _e1_snap = None
+            if args.account_snapshot is not None:
+                _e1_snap = {
+                    "snapshot_path": str(args.account_snapshot),
+                    "snapshot_sha256": args.account_snapshot_sha256,
+                    "scenario": args.account_snapshot_scenario,
+                    "account_id": args.account,
+                }
             e1_runner, e1_history_reader = load_e1_scenario(
                 args.e1_scenario,
                 repo_root=Path(__file__).resolve().parents[3],
                 evidence_dir=args.state_dir / "e1-evidence",
                 replay_exclusion=_verified_pin,
+                account_snapshot=_e1_snap,
             )
             # Frozen October decision cutoff: the scenario may pin
             # decision_cutoff_time; the phase-1 default is 21:30+08 (the

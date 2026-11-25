@@ -3773,3 +3773,79 @@ def test_segA_final_qualified_same_clock_conflict_blocks(
     assert block["affected_scope"] == "whole_day"
     assert set(block["affected_securities"]) == {
         "security-600000", "security-600001"}
+
+
+def _absent_row_map(tmp_path, members, day, listings_in_daily, order=0):
+    """Two-security universe; the Base aggregate does NOT carry the prior
+    session's rows; a channel-qualified Daily member READs successfully and
+    carries rows only for ``listings_in_daily`` (possibly none - a
+    well-formed empty table)."""
+    _two_security_universe(members, tmp_path)
+    days = _sessions(330)
+    cal_only = [d for d in days if str(d) != day]
+    rel_base = ("payload/dwd_security_bar/interval_size=1d/"
+                "observation_start_year=2026/observation_start_month=11/"
+                "part-0.parquet")
+    rows = (_bar_table(cal_only).to_pylist()
+            + _bar_table(cal_only, listing="listing-600001").to_pylist())
+    _write(tmp_path / rel_base,
+           pa.table({k: [r.get(k) for r in rows] for k in rows[0]}))
+    members["dwd_security_bar"] = [_member(tmp_path, rel_base)]
+    daily_rows = []
+    for lid in listings_in_daily:
+        daily_rows += [r for r in _bar_table(days, listing=lid).to_pylist()
+                       if str(r["observation_end"].date()) == day]
+    if order:
+        rows.reverse()
+        daily_rows.reverse()
+    rel = "payload/dwd_security_bar/day=" + day + "/dwd_security_bar.parquet"
+    _write(tmp_path / rel,
+           pa.table({k: [r.get(k) for r in daily_rows]
+                     for k in rows[0].keys()}))
+    dm = _member(tmp_path, rel, package_id="daily-" + day,
+                 kind="daily", market_date=day)
+    at = datetime(2026, 11, 23, 10, 0, tzinfo=UTC)
+    clocks = {day: {"knowledge": at, "producer": at, "channel": at}}
+    fmap = _FormalStubSourceMap(members, {day: [dm]}, clocks)
+    return _formal_read(fmap, tmp_path)
+
+
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_final_cells_absent_rows_empty_daily_blocks(tmp_path, order):
+    """Required-cells closeout: a needed session whose ONLY registered
+    Daily price member READ + channel-admitted but carries a well-formed
+    EMPTY table leaves every pool cell without a qualified bar - the cell
+    matrix names it a SHARED_INPUT_GAP/INPUT_BLOCKED without any physical
+    rejected row to record."""
+    smap = _build_map(tmp_path)
+    res = _absent_row_map(tmp_path, smap._members_by_table,
+                          "2026-11-23", [], order)
+    assert res.status == "INPUT_BLOCKED"
+    block = res.coverage["day_block"]
+    assert block["reason_code"] == "SHARED_INPUT_GAP"
+    assert block["affected_scope"] == "whole_day"
+    assert set(block["affected_securities"]) == {
+        "security-600000", "security-600001"}
+
+
+@pytest.mark.parametrize("order", (0, 1))
+def test_segA_final_cells_absent_rows_one_security_isolated(tmp_path, order):
+    """Required-cells closeout: a Daily member that READs with rows only
+    for 600001 leaves 600000's cell starved - READ with the gap isolated
+    to security-600000 while the qualified neighbour keeps its bar and
+    the held account fact survives."""
+    smap = _build_map(tmp_path)
+    res = _absent_row_map(tmp_path, smap._members_by_table,
+                          "2026-11-23", ["listing-600001"], order)
+    assert res.status == "READ"
+    assert res.coverage["day_block"] is None
+    gaps = res.coverage["isolated_input_gaps"]
+    assert gaps
+    assert {sid for g in gaps for sid in g["affected_securities"]
+            } == {"security-600000"}
+    sec = {x["identity"]["security_id"]: x
+           for x in res.raw_history["securities"]}
+    assert any(b["session_date"] == "2026-11-23"
+               for b in sec["security-600001"]["bars"])
+    assert not any(b["session_date"] == "2026-11-23"
+                   for b in sec["security-600000"]["bars"])

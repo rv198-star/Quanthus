@@ -1874,31 +1874,113 @@ def read_history(
             (e.get("package_key") or e.get("member_key")): e
             for e in source_member_entries
         }
-        for (_mk, _sess_iso), _rg in sorted(_member_session_row_gaps.items()):
-            if _sess_iso not in needed_day_set:
+        # Members already on the unified ledger (channel gap, physical read
+        # failure, late admission) already carry the session's supply gap on
+        # their own gap_session_day - do not inject a second row-level entry
+        # for the same member.  The cell matrix below only names members
+        # whose starved cells have NO ledger entry yet.
+        _gap_member_ids = {
+            e.get("package_key") or e.get("member_key") for e in _gap_members
+        }
+        # Required-cells coverage (audit R4 seg-A final-qualified-coverage
+        # fix1): the final matrix starts from the actual needed
+        # sessions x active-pool identities, not from a member that already
+        # carries a failed row or gap flag.  A member that READ and was
+        # channel-admitted but surfaced NO usable rows for a needed session
+        # (an empty table, or only the other security's rows) still starves
+        # the cell it was registered to supply.  Attribute each starved
+        # session to the member(s) that were registered for it: a Daily
+        # member pinned for that day, or a window member that physically
+        # surfaced rows for that session, plus every row-gap ledger member
+        # recorded above.  The radius judgement below then decides shared vs
+        # isolated exactly as a channel gap - a pool-wide collapse names
+        # SHARED_INPUT_GAP, a partial one isolates the actually-starved
+        # securities.
+        _pool_sids0 = {ident.security_id for ident in identities}
+        # For each needed session compute the pool cells that ended with no
+        # qualified bar, then attribute them to the member(s) registered to
+        # supply them: the Daily member pinned for that exact session, a
+        # member that physically surfaced rows for a starved security there
+        # (row-PIT failures already recorded above), or - when a starved
+        # security had NO row at all - the in-window Base month member that
+        # was the pool's declared aggregate supply for the session.
+        for _sess_iso in sorted(needed_day_set):
+            _starved_here = {
+                sid for sid in _pool_sids0
+                if not _sec_session_qualified.get((sid, _sess_iso))
+            }
+            if not _starved_here:
                 continue
-            if not _rg["securities"]:
-                continue
-            _src = _entries_by_key.get(_mk)
-            if _src is None:
-                continue
-            # Dependency class comes from the member id (the same rule the
-            # registration loop applies): an admitted member never earned a
-            # stored dependency_type, so the field is absent here.
-            _mid_l = str(_src.get("member_id") or "")
-            if not ("dwd_security_bar" in _mid_l
-                    and "dwd_security_valuation" not in _mid_l):
-                continue
-            if (_mk, _sess_iso) in _gap_member_keys:
-                continue
-            _inj = dict(_src)
-            _inj["dependency_type"] = "SHARED_T_PRICE"
-            _inj["shared_hard_dependency"] = True
-            _inj["gap_session_day"] = _sess_iso
-            _inj["named_input_gap"] = "NO_QUALIFIED_FORMAL_REVISION"
-            _inj["row_rejection_reasons"] = sorted(_rg["reasons"])
-            _inj["row_rejected_rows"] = _rg["rows"]
-            _gap_members.append(_inj)
+            _attributed = []
+            for e in source_member_entries:
+                _mk = e.get("package_key") or e.get("member_key")
+                _mid_l = str(e.get("member_id") or "")
+                if not ("dwd_security_bar" in _mid_l
+                        and "dwd_security_valuation" not in _mid_l):
+                    continue
+                if (e.get("named_input_gap")
+                        or e.get("formal_admission") in (
+                            "late_for_cutoff", "rejected_no_channel_proof")
+                        or _mk in _member_read_failures
+                        or _mk in _gap_member_ids):
+                    continue
+                _df = e.get("date_from")
+                _df_iso = (_df.isoformat()
+                           if hasattr(_df, "isoformat") else str(_df))
+                _declared_sids = _member_session_sids.get(
+                    (_mk, _sess_iso)) or set()
+                _is_pinned_daily = (_df_iso == _sess_iso)
+                _supplies_starved = bool(_starved_here & _declared_sids)
+                if _is_pinned_daily or _supplies_starved:
+                    _attributed.append(e)
+            if not _attributed and not any(
+                    _sec_session_has_rows.get((sid, _sess_iso))
+                    for sid in _starved_here):
+                # No Daily pinned, no member surfaced a starved row, and the
+                # starved securities carried NO physical row on the session
+                # at all - fall back to the in-window Base month member(s)
+                # that were the declared aggregate supply for the session's
+                # month.  Starved cells that DID carry rows are already
+                # named by the row-gap ledger / channel member above.
+                for e in source_member_entries:
+                    _mk = e.get("package_key") or e.get("member_key")
+                    _mid_l = str(e.get("member_id") or "")
+                    if not ("dwd_security_bar" in _mid_l
+                            and "dwd_security_valuation" not in _mid_l):
+                        continue
+                    if (e.get("named_input_gap")
+                            or e.get("formal_admission") in (
+                                "late_for_cutoff",
+                                "rejected_no_channel_proof")
+                            or _mk in _member_read_failures
+                            or _mk in _gap_member_ids):
+                        continue
+                    _ym = re.search(
+                        r"observation_start_year=(\d{4})/"
+                        r"observation_start_month=(\d+)",
+                        _mid_l)
+                    if not _ym:
+                        continue
+                    try:
+                        _yy, _mm, _ = _sess_iso.split("-")
+                    except ValueError:
+                        continue
+                    if (int(_yy), int(_mm)) == (
+                            int(_ym.group(1)), int(_ym.group(2))):
+                        _attributed.append(e)
+            for _e in _attributed:
+                _mk = _e.get("package_key") or _e.get("member_key")
+                _rg = _member_session_row_gaps.get((_mk, _sess_iso)) or {}
+                _inj = dict(_e)
+                _inj["dependency_type"] = "SHARED_T_PRICE"
+                _inj["shared_hard_dependency"] = True
+                _inj["gap_session_day"] = _sess_iso
+                _inj["named_input_gap"] = "NO_QUALIFIED_FORMAL_REVISION"
+                if _rg.get("reasons"):
+                    _inj["row_rejection_reasons"] = sorted(_rg["reasons"])
+                if _rg.get("rows"):
+                    _inj["row_rejected_rows"] = _rg["rows"]
+                _gap_members.append(_inj)
         for e in _gap_members:
             _gday = e.get("gap_session_day")
             _gday_iso = (_gday.isoformat()

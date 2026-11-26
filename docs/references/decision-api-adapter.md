@@ -78,14 +78,14 @@ P11 消费侧（对齐 v2.3 L3 文本边界与 PRD v1.1.2）应在上游完成�
 * GA 官方的逐问图像 instructions（`instructions` 数组内嵌 `input_image`）在本网关**不被支持**，网关 400 原文「System One has no counterpart for in a question's instructions」——该能力缺口是上游协议实现边界，即使适配器未来实现数组形态也无法在此网关使用。
 * `input_json` 实测 200（155 input tokens / 0.96s），结构化证据（指标、分桶结果）可不经字符串拼接直接送入，与 PRD 定量前置原则一致。
 
-## 6. OpenAI 官方直连路径（2026-11-27 核对）
+## 6. OpenAI 官方直连路径（2026-11-27 实测通过）
 
 | 事实 | 证据 |
 | --- | --- |
-| `POST https://api.openai.com/v1/decisions` 真实存在且已 GA，官方字段名为 `instructions`（复数），与适配器实现一致 | OpenAI 官方文档与 OpenAPI 规范；唯一支持模型 `gpt-6-luna`，定价 $0.10/1M input tokens、输出免费 |
-| 官方 schema 与适配器 canonical 方言同构：三原语、`choices[{value,description}]`、`levels[{label,description}]`、`input_text/input_image/input_json`、上限 400 问、逐问 `instructions` 可为图像部件数组 | 官方指南逐节核对（choice/score 响应语义、概率加权平均分、confidence 字段全部与适配器解析一致） |
-| 访问凭证是 platform.openai.com 的 API key，按量计费 | 官方示例统一 `Authorization: Bearer $OPENAI_API_KEY`；ChatGPT 订阅凭证不是 API key，订阅是否附带 Decisions 配额在本机无凭证可验证 |
-| 本机当前无法直连实测：`~/.codex/auth.json` 的 `OPENAI_API_KEY` 为空（仅有 ChatGPT 订阅 tokens），环境变量无 `OPENAI_API_KEY` | 2026-11-27 本机凭证清点 |
-| 网关不代理 OpenAI 系模型的 decisions 端点 | 网关 400 原文「Codex/G-OpenAI has no OpenAI-style API for /decisions」（gpt-6-luna 各变体实测） |
+| `POST https://api.openai.com/v1/decisions` 已 GA 且适配器**零改动实测通过**：`OpenAIDecisionsBackend` 仅替换 URL 与 model（`gpt-6-luna`）即完整工作 | smoke 脚本 `--base-url https://api.openai.com --model gpt-6-luna` 200 返回；中文新闻三问批次 580 input tokens / 0 output tokens / 1.1s；封存夹具 `sha256:4265ec20…`（`artifacts/p11-decision-adapter-755/smoke-20261127-openai.replay.json`），回放往返一致 |
+| 官方 schema 与适配器 canonical 方言逐字段同构 | 三原语批次 200（predicate 1.0 / choice positive+confidence 1.0 / score 0.99+confidence 0.93）；**布尔选项实测 200**（choice 回传 JSON true/false，官方文档未记载但与适配器设计一致）；`input_json` 200（175 tokens）；`input_image` 200 且硬边缘方向判别正确（probability 1.0，190 tokens） |
+| 官方逐问图像 instructions（数组形态）实测可用 | 2026-11-27 直连 200（191 tokens）——官方路径补齐了网关缺失的能力，适配器当前仅支持字符串 instructions，数组形态为已登记的实现缺口 |
+| 官方 PDF 拒绝与文档一致 | 直连 400 原文「Supported values are: 'input_text', 'input_image', and 'input_json'」——文件通道在官方同样不存在，上游文本化/栅格化原则不受路径选择影响 |
+| 访问凭证是 platform.openai.com 的 API key，按量计费（$0.10/1M input tokens、输出免费） | Owner 提供 key 后本机实测通过；网关不代理 OpenAI 系模型的 decisions 端点（400），两条路径互不替代 |
 
-若后续取得 platform API key，`OpenAIDecisionsBackend` 仅需把 `HttpBackendConfig.url` 指向 `https://api.openai.com/v1/decisions`、model 用 `gpt-6-luna` 即可零改动复用；smoke 脚本 `--base-url https://api.openai.com` 同一流程可产出官方直连封存夹具。
+直连与网关的取舍：直连校准质量在实测样本上更锐利（方向判别 1.0 对网关 0.82/0.84 错判样本），逐问配图可用，输出 token 恒零（计费只有 input）；网关路径提供 gemini 与 jev 双模型交叉校准能力。消费侧选型属于 G1 后的专家链设计决策，适配器对两条路径同等支持。

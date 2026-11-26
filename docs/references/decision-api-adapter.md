@@ -73,8 +73,9 @@ P11 消费侧（对齐 v2.3 L3 文本边界与 PRD v1.1.2）应在上游完成�
 
 ### 5.3 图像实测事实与校准警示
 
-* `google/gemini-decision-1` 实测接受 base64 `input_image`（2026-11-27：120x80 测试图，1297 input tokens / 2.76s 返回）。
-* **像素级定向问答不可靠**：对一张左红右蓝渐变图，模型以 0.84 置信度错判为左蓝右红；对角线方向判别 0.84 命中。结论：图像通道可用于版式/存在性粗判，像素级方向与细节问答必须配合独立真值校验或弃用，高置信度不等于正确性。
+* 图像输入是**逐模型能力而非方言能力**：`google/gemini-decision-1` 实测接受 base64 `input_image`（120x80 测试图约 1200–1300 input tokens / 2.7s 返回）；`typesafe/jev-latest` 拒绝图像，网关 400 原文「System One takes images only for Cloudflare's Clef and Google's gemini-decision-1」。PDF 栅格化路径因此只能用 gemini-decision-1（或同能力的 Clef 类模型），jev 仅限文本/JSON 证据。
+* **像素级定向问答可靠性不稳定**：左红右蓝硬边缘图判别正确（0.82），左红右蓝渐变图以 0.84 置信度错判为左蓝右红，对角线方向判别 0.84 命中。同一模型的置信度无法区分对错样本——图像通道可用于版式/存在性粗判，像素级方向与细节问答必须配合独立真值校验或弃用。
+* GA 官方的逐问图像 instructions（`instructions` 数组内嵌 `input_image`）在本网关**不被支持**，网关 400 原文「System One has no counterpart for in a question's instructions」——该能力缺口是上游协议实现边界，即使适配器未来实现数组形态也无法在此网关使用。
 * `input_json` 实测 200（155 input tokens / 0.96s），结构化证据（指标、分桶结果）可不经字符串拼接直接送入，与 PRD 定量前置原则一致。
 
 ## 6. OpenAI 官方直连路径（2026-11-27 核对）

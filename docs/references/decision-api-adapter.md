@@ -27,14 +27,15 @@
 | --- | --- |
 | `google/gemini-decision-1` 完整兼容 OpenAI GA Schema（三原语、校准概率、置信度、usage） | 实测 200 返回；单批 3 问约 1.6–2.0s、300–424 input tokens、output tokens 恒 0 |
 | 消息数组输入、混合批次、布尔选项、无名问题（响应 `name: null`）全部可用 | 适配器烟测 `sha256:9d607582…`（`artifacts/p11-decision-adapter-755/`） |
-| `typesafe/jev-1.13/1.14` 在该网关是路由判别器存根，`/v1/decisions` 与 `/v1/systemone` 均不可用 | 网关 400 原文「jev-1.x is not a model of TypeSafe Jev」 |
-| `/v1/systemone` 是 OpenRouter 方言入口（`choice/noul/score`，无 `predicate`） | 网关 400 原文列举支持类型 |
-| OpenRouter 真实密钥本机不可用，Jev 联调未执行 | `openrouter-alpha` 后端以离线固件验收 |
+| `typesafe/jev-latest` 在 `/v1/decisions` 完整兼容 GA Schema（三原语、布尔选项、`input_json`），响应回传真实版本 `jev-1.14.0` | 适配器原样序列化载荷实测 200：三原语批次 419 input tokens / 0.73s；布尔选项批次 200（choice 回传 JSON true/false）；smoke 封存 `sha256:48773352…` 回放往返一致 |
+| `typesafe/jev-1.13` / `jev-1.14` 版本化名称是存根，`/v1/decisions` 拒绝服务；可服务入口是 `typesafe/jev-latest` | 网关 400 原文「TypeSafe Jev has no OpenAI-style API for /decisions」（版本化名称）；`/v1/models` 清单 74 个模型不含任何 jev/decision 条目，路由判别模型不在清单暴露 |
+| `/v1/systemone` 是 alpha 方言入口，适配器翻译层输出与其线上形态逐字段吻合 | 适配器 `request_to_openrouter_alpha` 原样载荷实测 200（jev-latest 0.69s、gemini-decision-1 1.49s）：answers 字典按名索引、choice 概率字典按选项名、score 概率字典按数字索引并附 `legend` 回显 |
+| 早期手工探测脚本误用单数 `instruction` 字段（官方为复数 `instructions`）导致 jev 侧翻译丢字段，曾误判 jev 不可用；适配器代码始终使用正确的复数字段 | 对比探测：同批次仅字段名差异时 400「Noul question must have criteria or instructions」对 200 |
 
 ## 3. 消费侧集成契约
 
 1. **问题构造**：用 `PredicateQuestion / ChoiceQuestion / ScoreQuestion` 声明指令与选项；单批最多 400 问，同一 evidence 的多问共享一次 input tokens 计费。金额分桶等定量前置在 Python 侧完成后再写入 input（对齐 PRD v1.1.2 REV-03）。
-2. **后端选择**：`OpenAIDecisionsBackend`（GA 方言端点，当前唯一实测可用路径）或 `OpenRouterDecisionsBackend`（OpenRouter 直连 Jev，待密钥资格化）；两者输出同一组 `PredicateAnswer / ChoiceAnswer / ScoreAnswer / DecisionRefusal`。
+2. **后端选择**：`OpenAIDecisionsBackend`（GA 方言端点；网关上 gemini 与 jev-latest 均已实测）或 `OpenRouterDecisionsBackend`（alpha 方言；网关 `/v1/systemone` 与 OpenRouter 官方 schema 同构，适配器翻译载荷已在 systemone 实测 200）；两者输出同一组 `PredicateAnswer / ChoiceAnswer / ScoreAnswer / DecisionRefusal`。
 3. **逐问容错**：单问 `refusal` 不阻断同批他题；消费侧按名取用（`response.require_named` 对缺失/拒绝 fail-closed）。
 4. **离线零调用**：回放后端按 canonical 请求 SHA256 命中封存响应，任何 evidence/问题/模型偏差都是 miss 并 fail-closed（`DECISION_REPLAY_MISS`）；录制后端在授权在线窗口产出封存夹具。
 5. **预算归集**：`response.usage` 暴露 input/output/cached tokens 与 cost（OpenRouter）；适配器不做自动重试、不做费用决策，超时与计费策略归消费侧（v2 设计 §3.2：`≤60s/T`、首轮禁重试）。
@@ -42,7 +43,7 @@
 
 ## 4. 非目标与已知限制
 
-* 不实现 `box` 视觉定位、音频/视频部件、OpenRouter `assets` 复用映射、提示缓存断点调优；图像输入与 `input_json` 走通用部件透传（见 §5）。
+* 不实现 `box` 视觉定位、音频/视频部件、OpenRouter `assets` 复用映射、提示缓存断点调优、GA 官方的逐问图像 instructions（`instructions` 数组形态，可给每个问题单独配图）；图像输入与 `input_json` 走通用部件透传（见 §5）。
 * `score` 响应在 OpenRouter 方言下的标签从请求侧重建；若后端乱序返回索引，按索引对位而非标签。
 * 烟测脚本的本地 config.toml 密钥解析仅为维护者开发机便利，不构成部署形态；正式运行显式注入 `QUANTHUS_DECISION_API_KEY`。
 
@@ -60,7 +61,12 @@
 
 ### 5.2 PDF 的工程处置原则
 
-通用 Schema 在两套方言下都不承载 PDF，这不是适配器缺陷而是协议边界。P11 消费侧（对齐 v2.3 L3 文本边界与 PRD v1.1.2）应在上游完成确定性处理后再进入判别：
+通用 Schema 在两套方言下都不承载 PDF，这不是适配器缺陷而是协议边界。需要区分两层事实：
+
+* **Gemini 模型族在聊天补全 API 上确实原生支持 PDF**——这一点用户认知正确；但本网关的两个路由判别模型（`google/gemini-decision-1`、`typesafe/jev-latest`）在聊天端点拒绝服务，网关原文「only decides a routing group's model and effort; it holds no conversation」，因此无法借道聊天端点验证或利用该能力。
+* **Decisions/System One 协议本身无文件通道**：OpenAI 官方 GA 文档明确「Files, audio, and item references aren't supported」（2026-11-27 核对），网关实测四种文件部件变体（`input_file file_data/file_url`、`input_document`、`file`）全部 400「System One has no counterpart」。`/v1/models` 清单中的 pdf modality 描述的是同族聊天模型的能力，不延伸进判别协议。
+
+P11 消费侧（对齐 v2.3 L3 文本边界与 PRD v1.1.2）应在上游完成确定性处理后再进入判别：
 
 1. **文本化路径（首选）**：PDF 文本抽取产物（如巨潮 Markdown 摘要）以 `input_text` 或 `input_json` 送入，附 `truncated / extraction_status` 元信息；抽取器版本与核 PDF SHA 的审计绑定留在消费侧证据链，与适配器无关。
 2. **栅格化路径（版式语义必需时）**：将关键页渲染为 PNG 后走 `input_image`；成本按图像 token 计，远高于文本。
@@ -70,3 +76,15 @@
 * `google/gemini-decision-1` 实测接受 base64 `input_image`（2026-11-27：120x80 测试图，1297 input tokens / 2.76s 返回）。
 * **像素级定向问答不可靠**：对一张左红右蓝渐变图，模型以 0.84 置信度错判为左蓝右红；对角线方向判别 0.84 命中。结论：图像通道可用于版式/存在性粗判，像素级方向与细节问答必须配合独立真值校验或弃用，高置信度不等于正确性。
 * `input_json` 实测 200（155 input tokens / 0.96s），结构化证据（指标、分桶结果）可不经字符串拼接直接送入，与 PRD 定量前置原则一致。
+
+## 6. OpenAI 官方直连路径（2026-11-27 核对）
+
+| 事实 | 证据 |
+| --- | --- |
+| `POST https://api.openai.com/v1/decisions` 真实存在且已 GA，官方字段名为 `instructions`（复数），与适配器实现一致 | OpenAI 官方文档与 OpenAPI 规范；唯一支持模型 `gpt-6-luna`，定价 $0.10/1M input tokens、输出免费 |
+| 官方 schema 与适配器 canonical 方言同构：三原语、`choices[{value,description}]`、`levels[{label,description}]`、`input_text/input_image/input_json`、上限 400 问、逐问 `instructions` 可为图像部件数组 | 官方指南逐节核对（choice/score 响应语义、概率加权平均分、confidence 字段全部与适配器解析一致） |
+| 访问凭证是 platform.openai.com 的 API key，按量计费 | 官方示例统一 `Authorization: Bearer $OPENAI_API_KEY`；ChatGPT 订阅凭证不是 API key，订阅是否附带 Decisions 配额在本机无凭证可验证 |
+| 本机当前无法直连实测：`~/.codex/auth.json` 的 `OPENAI_API_KEY` 为空（仅有 ChatGPT 订阅 tokens），环境变量无 `OPENAI_API_KEY` | 2026-11-27 本机凭证清点 |
+| 网关不代理 OpenAI 系模型的 decisions 端点 | 网关 400 原文「Codex/G-OpenAI has no OpenAI-style API for /decisions」（gpt-6-luna 各变体实测） |
+
+若后续取得 platform API key，`OpenAIDecisionsBackend` 仅需把 `HttpBackendConfig.url` 指向 `https://api.openai.com/v1/decisions`、model 用 `gpt-6-luna` 即可零改动复用；smoke 脚本 `--base-url https://api.openai.com` 同一流程可产出官方直连封存夹具。

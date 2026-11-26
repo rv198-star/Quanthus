@@ -107,6 +107,63 @@ class SmokeCredentialGuardTests(unittest.TestCase):
         self.assertIn("SMOKE_CHAIN_CONFIG", result.stderr)
         self.assertIn("KEY_MISSING", result.stderr)
 
+    def test_chain_mode_unapproved_host_rejected_before_backend_build(self) -> None:
+        # chain mode must reuse the same approved-endpoint rule as the
+        # single-endpoint path: a bearer credential is never resolved
+        # for a host outside the approved list, even when every key is
+        # present and the chain document itself is valid.
+        chain = {
+            "schema_version": "quanthus.decision-providers.v1",
+            "providers": [
+                {
+                    "id": "probe",
+                    "type": "openai-ga",
+                    "base_url": "https://unapproved-host.example.com",
+                    "endpoint_path": "/v1/decisions",
+                    "model": "google/gemini-decision-1",
+                    "api_key_env": "QUANTHUS_SMOKE_PROBE_KEY",
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            chain_path = Path(tmp) / "chain.json"
+            chain_path.write_text(json.dumps(chain))
+            result = run_smoke(
+                ["--chain", str(chain_path), "--output", str(Path(tmp) / "out.json")],
+                env_extra={"QUANTHUS_SMOKE_PROBE_KEY": "probe-fake-key"},
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("SMOKE_CHAIN_ENDPOINT", result.stderr)
+        self.assertIn("SMOKE_ENDPOINT_UNAPPROVED", result.stderr)
+
+    def test_chain_mode_plain_http_rejected(self) -> None:
+        # a bearer credential must never travel over plain http: chain
+        # validation itself rejects non-https base urls before any
+        # whitelist check or backend construction.
+        chain = {
+            "schema_version": "quanthus.decision-providers.v1",
+            "providers": [
+                {
+                    "id": "probe",
+                    "type": "openai-ga",
+                    "base_url": "http://gw.72live.com",
+                    "endpoint_path": "/v1/decisions",
+                    "model": "google/gemini-decision-1",
+                    "api_key_env": "QUANTHUS_SMOKE_PROBE_KEY",
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            chain_path = Path(tmp) / "chain.json"
+            chain_path.write_text(json.dumps(chain))
+            result = run_smoke(
+                ["--chain", str(chain_path), "--output", str(Path(tmp) / "out.json")],
+                env_extra={"QUANTHUS_SMOKE_PROBE_KEY": "probe-fake-key"},
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("SMOKE_CHAIN_CONFIG", result.stderr)
+        self.assertIn("SPEC_URL", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

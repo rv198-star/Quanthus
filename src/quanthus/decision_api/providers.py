@@ -6,28 +6,30 @@ endpoint: base URL, dialect type, endpoint path, model, the environment
 variable holding its API key, enablement, timeout and optional published
 per-million-token prices.  Keys never enter the versioned document.
 
-R2 hardening after the independent cold review of PR #756:
+R3 hardening after the second independent review of PR #756:
 
-* the dialect type and endpoint path binding is validated: openai-ga
-  entries must target the GA decisions path, alpha entries an alpha
-  decisions path, so retargeting an entry at a foreign dialect fails at
-  configuration time; provider base URLs must be HTTPS because every
-  request carries a bearer credential;
-* failover is status-first and restricted to the approved transient set
-  {408, 409, 425, 429, 500, 502, 503, 504}: deterministic 4xx and schema
-  errors never switch providers, whatever the response body looks like;
-* callers may pass one absolute DecisionDeadline reused across batches;
-  each attempt truncates its socket budget to the remaining time and the
-  chain stops dispatching once the remainder is below the useful sliver;
-* every dispatched attempt leaves evidence: provider, model, dialect,
-  outcome, elapsed seconds, a usage snapshot when the wire offered one
-  (including billed non-2xx failures), and a usage_status of metered,
-  unknown or none.  Failed attempts without wire usage count as unknown
-  usage and must be reserved at worst case by the consumer;
-* last_attempts is reset at the start of every decide() call, and
-  post-2xx schema failures are recorded before propagating, so a parse
-  failure can no longer erase the attempt history or leak stale records
-  across calls.
+* every logical decide() call -- success or failure -- discharges exactly
+  one independent attempts tuple: the success response carries it in
+  DecisionResponse.attempts, and every error raised out of the chain
+  carries it in error.attempts.  The tuple is built locally inside the
+  call, so two concurrent batches sharing one chain instance can never
+  overwrite each other's billing evidence; last_attempts remains as a
+  best-effort diagnostic mirror only;
+* every provider inside the attempt budget leaves a ledger record:
+  dispatched providers record their outcome (answer, timeout,
+  late_answer, transport, http_<status>, schema_error), and providers
+  that never went on the wire record outcome not_dispatched with a
+  skip_reason (deadline, deterministic_stop or local_validation), which
+  is positive proof of zero dispatch and zero cost for the ledger;
+* usage evidence is four-state: metered (well-formed usage with
+  positive tokens or cost, input and output counters present), zero
+  (well-formed usage explicitly reporting zero tokens), unknown (usage
+  absent, incomplete or untrustworthy -- the consumer must account
+  worst case), plus certain-zero evidence when the wire was never
+  reached (wire_dispatched=false) or the provider was never dispatched;
+* reservation entry points validate their volume arguments: negative or
+  non-integer token volumes are typed schema errors, never negative
+  quotes.
 """
 
 from __future__ import annotations
@@ -35,7 +37,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +55,7 @@ from quanthus.decision_api.types import (
     DecisionDeadline,
     DecisionError,
     DecisionHttpError,
+    DecisionLateAnswerError,
     DecisionRequest,
     DecisionResponse,
     DecisionSchemaError,
@@ -101,8 +104,9 @@ class DecisionProviderExhaustedError(DecisionError):
     """Every dispatched provider in the chain failed with a failover-class error.
 
     deadline_stopped is true when the shared absolute deadline prevented
-    dispatching further providers; those skipped providers never went on
-    the wire and therefore have no attempt record.
+    dispatching further providers.  Skipped providers are still visible
+    in attempts as outcome not_dispatched with skip_reason deadline:
+    positive ledger proof that they never went on the wire.
     """
 
     def __init__(self, attempts: tuple[AttemptRecord, ...], deadline_stopped: bool = False) -> None:
@@ -309,43 +313,95 @@ def build_priority_backend(
     return PriorityBackend(backends, max_attempts=chain.max_attempts)
 
 
-def _usage_snapshot(usage: TokenUsage | None) -> dict[str, Any]:
-    """Attempt-level billing evidence.
+def _usage_snapshot(usage: TokenUsage | None, *, wire_reached: bool) -> dict[str, Any]:
+    """Attempt-level billing evidence in four states plus certainty detail.
 
-    metered means the wire carried a positive token count or a cost;
-    none means the wire carried a well-formed empty usage object (no
-    billing event); unknown means no trustworthy usage existed -- a
-    failure before or during the wire exchange -- and the consumer must
-    reserve worst case.
+    metered: the wire carried a complete usage object with positive
+      tokens or a cost -- bill as reported.
+    zero: the wire carried a complete usage object explicitly reporting
+      zero input and output tokens and no cost -- certain zero bill.
+    unknown: usage evidence is absent, incomplete or untrustworthy --
+      the consumer must reserve worst case.  The detail field says why
+      (no_wire_response, usage_object_absent, usage_object_empty or
+      usage_incomplete).
+    A failure proven to happen before any request byte was sent is
+      certain zero cost (detail wire_not_reached), and a provider that
+      was never dispatched is recorded through the not_dispatched
+      outcome instead of this snapshot.
     """
-    if usage is not None and (
-        usage.input_tokens > 0 or usage.output_tokens > 0 or usage.cost is not None
-    ):
-        return {
-            "status": "metered",
-            "input_tokens": usage.input_tokens,
-            "output_tokens": usage.output_tokens,
-            "total_tokens": usage.total_tokens,
-            "cached_tokens": usage.cached_tokens,
-            "cost": usage.cost,
-        }
-    if usage is not None:
-        return {
-            "status": "none",
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "total_tokens": 0,
-            "cached_tokens": 0,
-            "cost": None,
-        }
-    return {
-        "status": "unknown",
+    base = {
         "input_tokens": 0,
         "output_tokens": 0,
         "total_tokens": 0,
         "cached_tokens": 0,
         "cost": None,
     }
+    if not wire_reached:
+        return {"status": "zero", "detail": "wire_not_reached", **base}
+    if usage is None or not usage.present:
+        detail = "no_wire_response" if usage is None else "usage_object_absent"
+        return {"status": "unknown", "detail": detail, **base}
+    if not usage.complete:
+        detail = (
+            "usage_object_empty"
+            if (
+                usage.input_tokens == 0
+                and usage.output_tokens == 0
+                and usage.total_tokens == 0
+                and usage.cost is None
+            )
+            else "usage_incomplete"
+        )
+        return {
+            "status": "unknown",
+            "detail": detail,
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "total_tokens": usage.total_tokens,
+            "cached_tokens": usage.cached_tokens,
+            "cost": usage.cost,
+        }
+    positive = (
+        usage.input_tokens > 0
+        or usage.output_tokens > 0
+        or (usage.cost is not None and usage.cost > 0)
+    )
+    return {
+        "status": "metered" if positive else "zero",
+        "detail": "wire_reported",
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "total_tokens": usage.total_tokens,
+        "cached_tokens": usage.cached_tokens,
+        "cost": usage.cost,
+    }
+
+
+def _zero_usage_snapshot(detail: str) -> dict[str, Any]:
+    """Certain-zero billing evidence for providers that never dispatched."""
+    return {
+        "status": "zero",
+        "detail": detail,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "cached_tokens": 0,
+        "cost": None,
+    }
+
+
+def _validate_volume(max_input_tokens: int, max_output_tokens: int) -> None:
+    """Reservation volumes must be non-negative integers.
+
+    A negative or fractional volume must never produce a negative or
+    misleading quote: the budget gate fails closed instead.
+    """
+    for label, value in (
+        ("max_input_tokens", max_input_tokens),
+        ("max_output_tokens", max_output_tokens),
+    ):
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise DecisionSchemaError(f"DECISION_RESERVATION_VOLUME:{label}")
 
 
 def reserve_worst_case_usd(
@@ -359,6 +415,7 @@ def reserve_worst_case_usd(
     case for decision endpoints; output volume is still parameterized
     because jev emits nonzero output tokens.
     """
+    _validate_volume(max_input_tokens, max_output_tokens)
     if spec.input_price_usd_per_mtok is None or spec.output_price_usd_per_mtok is None:
         return None
     return (
@@ -377,6 +434,7 @@ def chain_worst_case_usd(
     undeclared prices report None; the consumer must treat them as
     unbounded and refuse online dispatch for that chain configuration.
     """
+    _validate_volume(max_input_tokens, max_output_tokens)
     enabled = chain.enabled()
     budget = len(enabled) if chain.max_attempts is None else min(chain.max_attempts, len(enabled))
     rows = []
@@ -398,6 +456,8 @@ def chain_worst_case_usd(
 
 
 def _outcome_of(error: DecisionError) -> str:
+    if isinstance(error, DecisionLateAnswerError):
+        return "late_answer"
     if isinstance(error, DecisionTimeoutError):
         return "timeout"
     if isinstance(error, DecisionTransportError):
@@ -420,8 +480,16 @@ class PriorityBackend(DecisionBackend):
     dialect attribute remains exact for replay recording.  Failover
     substitutes the provider, never the question content: the canonical
     model field is overridden per attempt with the provider model, and
-    the answering model is visible verbatim in the response and in
-    last_attempts.
+    the answering model is visible verbatim in the response and in the
+    attempt records.
+
+    Credential contract: each logical decide() call builds its attempt
+    records in local state and discharges exactly one independent tuple
+    -- attached to the returned response as response.attempts, or to any
+    raised error as error.attempts.  Concurrent calls sharing this
+    instance never observe each other's records.  last_attempts mirrors
+    the most recent completed call for diagnostics only; the ledger must
+    read the per-call tuple, never the mirror.
     """
 
     def __init__(
@@ -440,21 +508,59 @@ class PriorityBackend(DecisionBackend):
         self.dialect = backends[0][1].dialect
         self.last_attempts: tuple[AttemptRecord, ...] = ()
 
+    def _fill_not_dispatched(
+        self,
+        attempts: list[AttemptRecord],
+        fill_from: int,
+        candidates: tuple[tuple[DecisionProviderSpec, DecisionBackend], ...],
+        skip_reason: str,
+    ) -> None:
+        """Complete the ledger for in-budget providers that never dispatched.
+
+        outcome not_dispatched with usage detail never_dispatched is
+        positive proof of zero wire use and zero cost for every provider
+        the chain considered but did not call.
+        """
+        for spec, backend in candidates[fill_from:]:
+            attempts.append(
+                {
+                    "provider_id": spec.id,
+                    "model": spec.model,
+                    "dialect": backend.dialect,
+                    "outcome": "not_dispatched",
+                    "skip_reason": skip_reason,
+                    "elapsed_seconds": 0.0,
+                    "usage": _zero_usage_snapshot("never_dispatched"),
+                }
+            )
+
     def decide(
         self, request: DecisionRequest, deadline: DecisionDeadline | None = None
     ) -> DecisionResponse:
-        request.validate()
-        self.last_attempts = ()
         attempts: list[AttemptRecord] = []
-        budget = len(self._backends) if self._max_attempts is None else self._max_attempts
+        self.last_attempts = ()
+        depth = len(self._backends) if self._max_attempts is None else self._max_attempts
+        candidates = self._backends[:depth]
+        try:
+            request.validate()
+        except DecisionSchemaError as error:
+            error.wire_dispatched = False
+            # nothing was validated onto the wire at all: every in-budget
+            # provider is certain zero cost, and the error itself carries
+            # the completed credential tuple.
+            self._fill_not_dispatched(attempts, 0, candidates, "local_validation")
+            error.attempts = tuple(attempts)
+            self.last_attempts = tuple(attempts)
+            raise
         last_error: DecisionError | None = None
         deadline_stop = False
-        for spec, backend in self._backends[:budget]:
+        fill_from = 0
+        skip_reason = "deadline"
+        for position, (spec, backend) in enumerate(candidates):
+            fill_from = position
             if deadline is not None and deadline.remaining() < MIN_ATTEMPT_SLIVER_SECONDS:
-                # No dispatch happens here, so no attempt record is made:
-                # only actual wire calls leave evidence, and skipped
-                # providers are visible through deadline_stopped.
                 deadline_stop = True
+                skip_reason = "deadline"
                 break
             attempt_request = (
                 request if request.model == spec.model else _remodel(request, spec.model)
@@ -462,32 +568,61 @@ class PriorityBackend(DecisionBackend):
             started = time.monotonic()
             try:
                 response = backend.decide(attempt_request, deadline=deadline)
-            except DecisionSchemaError:
-                # post-2xx parse failures are deterministic; record the
-                # attempt (usage unknown: the wire shape was not trusted)
-                # before failing closed, and never switch providers.
-                attempts.append(
-                    self._record(spec, backend, "schema_error", time.monotonic() - started, None)
-                )
+            except DecisionSchemaError as error:
+                elapsed = time.monotonic() - started
+                if error.wire_dispatched:
+                    # post-2xx parse failures are deterministic; the wire
+                    # was reached but the response is untrusted, so usage
+                    # evidence is unknown and no failover happens.
+                    attempts.append(
+                        self._record(spec, backend, "schema_error", elapsed, None, True)
+                    )
+                else:
+                    # local validation rejected the request before any
+                    # byte was sent: zero-cost proof for this provider.
+                    attempts.append(
+                        {
+                            "provider_id": spec.id,
+                            "model": spec.model,
+                            "dialect": backend.dialect,
+                            "outcome": "not_dispatched",
+                            "skip_reason": "local_validation",
+                            "elapsed_seconds": round(elapsed, 3),
+                            "usage": _zero_usage_snapshot("never_dispatched"),
+                        }
+                    )
+                self._fill_not_dispatched(attempts, position + 1, candidates, "deterministic_stop")
+                error.attempts = tuple(attempts)
                 self.last_attempts = tuple(attempts)
                 raise
             except (DecisionTransportError, DecisionHttpError) as error:
                 elapsed = time.monotonic() - started
-                usage = error.usage if isinstance(error, DecisionHttpError) else None
-                attempts.append(self._record(spec, backend, _outcome_of(error), elapsed, usage))
+                usage = getattr(error, "usage", None)
+                attempts.append(
+                    self._record(
+                        spec, backend, _outcome_of(error), elapsed, usage, error.wire_dispatched
+                    )
+                )
                 last_error = error
                 if not _is_failover_class(error):
+                    self._fill_not_dispatched(
+                        attempts, position + 1, candidates, "deterministic_stop"
+                    )
+                    error.attempts = tuple(attempts)
                     self.last_attempts = tuple(attempts)
                     raise
+                fill_from = position + 1
                 continue
             elapsed = time.monotonic() - started
-            attempts.append(self._record(spec, backend, "answer", elapsed, response.usage))
-            self.last_attempts = tuple(attempts)
-            return response
-        self.last_attempts = tuple(attempts)
-        raise DecisionProviderExhaustedError(
-            tuple(attempts), deadline_stopped=deadline_stop
-        ) from last_error
+            attempts.append(self._record(spec, backend, "answer", elapsed, response.usage, True))
+            self._fill_not_dispatched(attempts, position + 1, candidates, "answered_upstream")
+            final = tuple(attempts)
+            self.last_attempts = final
+            return replace(response, attempts=final)
+        self._fill_not_dispatched(attempts, fill_from, candidates, skip_reason)
+        final = tuple(attempts)
+        self.last_attempts = final
+        raise DecisionProviderExhaustedError(final, deadline_stopped=deadline_stop) from last_error
 
     @staticmethod
     def _record(
@@ -496,14 +631,25 @@ class PriorityBackend(DecisionBackend):
         outcome: str,
         elapsed: float,
         usage: TokenUsage | None,
+        wire_reached: bool,
     ) -> AttemptRecord:
+        snapshot = _usage_snapshot(usage, wire_reached=wire_reached)
+        if usage is None and wire_reached and outcome not in ("timeout", "transport"):
+            # some response bytes did assemble -- an http_<status> answer,
+            # a post-2xx schema failure or a late answer -- but the wire
+            # carried no usable usage object (absent, delayed past budget
+            # or unparseable).  distinguish that from a timeout or reset
+            # where no response ever assembled: the accounting is unknown
+            # worst-case either way, but the ledger detail must describe
+            # the wire truthfully.
+            snapshot["detail"] = "usage_object_absent"
         return {
             "provider_id": spec.id,
             "model": spec.model,
             "dialect": backend.dialect,
             "outcome": outcome,
             "elapsed_seconds": round(elapsed, 3),
-            "usage": _usage_snapshot(usage),
+            "usage": snapshot,
         }
 
 

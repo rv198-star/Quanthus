@@ -671,6 +671,76 @@ class OpenRouterDialectTests(unittest.TestCase):
             parse_openrouter_alpha_response(body, sample_request())
 
 
+class MalformedNumericTests(unittest.TestCase):
+    """Malformed wire numerics are typed schema errors, never bare escapes.
+
+    json surfaces arbitrarily large integers whose float() conversion
+    raises a raw OverflowError, and NaN/Infinity literals decode into
+    non-finite floats.  Every numeric the adapter accepts passes one
+    strict gate, so a malformed wire value can never bypass the attempt
+    ledger through an untyped exception.
+    """
+
+    def test_oversized_integer_probability_is_schema_error_not_overflow(self) -> None:
+        body = copy.deepcopy(GA_RESPONSE_BODY)
+        body["answers"][0]["probability"] = 10**400
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_PROBABILITY_TYPE"):
+            parse_openai_ga_response(body, sample_request())
+
+    def test_non_finite_probability_rejected(self) -> None:
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            body = copy.deepcopy(GA_RESPONSE_BODY)
+            body["answers"][0]["probability"] = bad
+            with self.assertRaisesRegex(DecisionSchemaError, "DECISION_PROBABILITY_TYPE"):
+                parse_openai_ga_response(body, sample_request())
+
+    def test_boolean_masquerading_probability_rejected(self) -> None:
+        body = copy.deepcopy(GA_RESPONSE_BODY)
+        body["answers"][0]["probability"] = True
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_PROBABILITY_TYPE"):
+            parse_openai_ga_response(body, sample_request())
+
+    def test_oversized_integer_in_score_and_confidence_rejected(self) -> None:
+        body = copy.deepcopy(GA_RESPONSE_BODY)
+        body["answers"][2]["score"] = 10**400
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_SCORE_ANSWER_TYPE"):
+            parse_openai_ga_response(body, sample_request())
+        body = copy.deepcopy(GA_RESPONSE_BODY)
+        body["answers"][2]["confidence"] = float("inf")
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_PROBABILITY_TYPE"):
+            parse_openai_ga_response(body, sample_request())
+
+    def test_negative_cost_in_usage_is_schema_error(self) -> None:
+        body = copy.deepcopy(GA_RESPONSE_BODY)
+        body["usage"] = {"input_tokens": 11, "output_tokens": 0, "cost": -0.07}
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_USAGE_FIELD"):
+            parse_openai_ga_response(body, sample_request())
+
+    def test_negative_and_boolean_token_counts_are_schema_errors(self) -> None:
+        for bad_usage in (
+            {"input_tokens": -3, "output_tokens": 0},
+            {"input_tokens": True, "output_tokens": 0},
+            {"input_tokens": 11, "output_tokens": -1},
+        ):
+            body = copy.deepcopy(GA_RESPONSE_BODY)
+            body["usage"] = bad_usage
+            with self.assertRaisesRegex(DecisionSchemaError, "DECISION_USAGE_FIELD"):
+                parse_openai_ga_response(body, sample_request())
+
+    def test_oversized_integer_in_usage_is_schema_error(self) -> None:
+        body = copy.deepcopy(GA_RESPONSE_BODY)
+        body["usage"] = {"input_tokens": 11, "output_tokens": 0, "cost": 10**400}
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_USAGE_FIELD"):
+            parse_openai_ga_response(body, sample_request())
+
+    def test_alpha_numeric_malformation_rejected_too(self) -> None:
+        body = copy.deepcopy(OPENROUTER_RESPONSE_BODY)
+        score_answer = body["answers"]["magnitude"]
+        score_answer["score"] = 10**400
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION"):
+            parse_openrouter_alpha_response(body, sample_request())
+
+
 class BackendTransportTests(unittest.TestCase):
     def test_openai_backend_end_to_end_with_spy_transport(self) -> None:
         transport = spy_transport(200, GA_RESPONSE_BODY)

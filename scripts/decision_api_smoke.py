@@ -141,6 +141,15 @@ def main() -> int:
 
         try:
             chain = load_provider_chain(args.chain)
+            # the same approved-host rule applies to chain mode: bearer
+            # credentials are only ever sent to approved HTTPS endpoints,
+            # so every enabled provider URL is validated before the
+            # backend is built and any key leaves the process.
+            for spec in chain.enabled():
+                endpoint_error = validate_approved_endpoint(spec.url)
+                if endpoint_error:
+                    print(f"SMOKE_CHAIN_ENDPOINT[{spec.id}]: {endpoint_error}", file=sys.stderr)
+                    return 2
             backend = build_priority_backend(chain)
         except DecisionError as error:
             print(f"SMOKE_CHAIN_CONFIG: {error}", file=sys.stderr)

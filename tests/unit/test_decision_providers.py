@@ -30,6 +30,7 @@ from quanthus.decision_api import (
     ReplayBackend,
     ScoreLevel,
     ScoreQuestion,
+    TokenUsage,
     build_priority_backend,
     build_provider_backends,
     chain_worst_case_usd,
@@ -134,7 +135,7 @@ def scripted_transport(script):
         if isinstance(behavior, BaseException):
             raise behavior
         if callable(behavior):
-            return behavior()
+            return behavior(url, payload, headers, timeout)
         status, body = behavior
         raw = body if isinstance(body, str) else json.dumps(body)
         return status, raw
@@ -332,11 +333,18 @@ class PriorityDispatchTests(unittest.TestCase):
         )
         response = backend.decide(sample_request(model="model-first"))
         self.assertIsInstance(response.answers[0], PredicateAnswer)
-        self.assertEqual(len(backend.last_attempts), 1)
         self.assertEqual(backend.last_attempts[0]["provider_id"], "first")
         self.assertEqual(backend.last_attempts[0]["outcome"], "answer")
         self.assertEqual(backend.last_attempts[0]["usage"]["status"], "metered")
         self.assertEqual(backend.last_attempts[0]["usage"]["input_tokens"], 300)
+        # the second provider never went on the wire: positive zero-cost proof
+        self.assertEqual(len(backend.last_attempts), 2)
+        self.assertEqual(backend.last_attempts[1]["outcome"], "not_dispatched")
+        self.assertEqual(backend.last_attempts[1]["skip_reason"], "answered_upstream")
+        self.assertEqual(backend.last_attempts[1]["usage"]["status"], "zero")
+        self.assertEqual(backend.last_attempts[1]["usage"]["detail"], "never_dispatched")
+        # the response itself carries the per-call credential tuple
+        self.assertEqual(tuple(response.attempts), backend.last_attempts)
 
     def test_model_substitution_hits_wire(self) -> None:
         script = {(FIRST_URL, "model-first"): (200, GA_RESPONSE_BODY)}
@@ -427,8 +435,13 @@ class PriorityDispatchTests(unittest.TestCase):
                 with self.assertRaises(DecisionHttpError) as ctx:
                     backend.decide(sample_request(model="model-first"))
                 self.assertEqual(ctx.exception.status, status)
-                self.assertEqual(len(backend.last_attempts), 1, f"status={status} body={raw!r}")
                 self.assertEqual(backend.last_attempts[0]["outcome"], f"http_{status}")
+                # the un-dispatched second provider is ledger-visible as zero cost
+                self.assertEqual(len(backend.last_attempts), 2, f"status={status} body={raw!r}")
+                self.assertEqual(backend.last_attempts[1]["outcome"], "not_dispatched")
+                self.assertEqual(backend.last_attempts[1]["skip_reason"], "deterministic_stop")
+                self.assertEqual(backend.last_attempts[1]["usage"]["status"], "zero")
+                self.assertEqual(tuple(ctx.exception.attempts), backend.last_attempts)
 
     def test_schema_error_after_2xx_is_recorded_and_never_fails_over(self) -> None:
         bad = copy.deepcopy(GA_RESPONSE_BODY)
@@ -442,9 +455,13 @@ class PriorityDispatchTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(DecisionSchemaError, "DECISION_ANSWER_COUNT"):
             backend.decide(sample_request(model="model-first"))
-        self.assertEqual(len(backend.last_attempts), 1)
         self.assertEqual(backend.last_attempts[0]["outcome"], "schema_error")
         self.assertEqual(backend.last_attempts[0]["usage"]["status"], "unknown")
+        # the 200 response did assemble -- only its answers were invalid --
+        # so the usage evidence is absent, never a no-response timeout
+        self.assertEqual(backend.last_attempts[0]["usage"]["detail"], "usage_object_absent")
+        self.assertEqual(len(backend.last_attempts), 2)
+        self.assertEqual(backend.last_attempts[1]["outcome"], "not_dispatched")
 
     def test_last_attempts_reset_between_calls(self) -> None:
         bad = copy.deepcopy(GA_RESPONSE_BODY)
@@ -457,11 +474,10 @@ class PriorityDispatchTests(unittest.TestCase):
         )
         with self.assertRaises(DecisionSchemaError):
             backend.decide(sample_request(model="model-first"))
-        self.assertEqual(len(backend.last_attempts), 1)
         script[(FIRST_URL, "model-first")] = (200, GA_RESPONSE_BODY)
         backend.decide(sample_request(model="model-first"))
-        self.assertEqual(len(backend.last_attempts), 1)
         self.assertEqual(backend.last_attempts[0]["outcome"], "answer")
+        self.assertEqual(len(backend.last_attempts), 2)
 
     def test_billed_http_failure_keeps_usage_evidence(self) -> None:
         error_body = {
@@ -536,7 +552,14 @@ class PriorityDeadlineTests(unittest.TestCase):
             backend.decide(sample_request(model="model-first"), deadline=deadline)
         self.assertTrue(ctx.exception.deadline_stopped)
         self.assertEqual(transport.calls, [])  # type: ignore[attr-defined]
-        self.assertEqual(ctx.exception.attempts, ())
+        # both providers stayed off the wire: positive zero-cost proof
+        # for the ledger instead of an empty record list.
+        self.assertEqual(len(ctx.exception.attempts), 2)
+        for record in ctx.exception.attempts:
+            self.assertEqual(record["outcome"], "not_dispatched")
+            self.assertEqual(record["skip_reason"], "deadline")
+            self.assertEqual(record["usage"]["status"], "zero")
+            self.assertEqual(record["usage"]["detail"], "never_dispatched")
 
     def test_deadline_shared_across_attempts_truncates_each_timeout(self) -> None:
         script = {
@@ -553,7 +576,7 @@ class PriorityDeadlineTests(unittest.TestCase):
             self.assertGreater(value, 0.0)
 
     def test_exhausted_deadline_mid_chain_marks_deadline_stopped(self) -> None:
-        def slow_timeout():
+        def slow_timeout(url, payload, headers, timeout):
             time.sleep(0.4)
             raise DecisionTimeoutError("t")
 
@@ -570,13 +593,25 @@ class PriorityDeadlineTests(unittest.TestCase):
                 sample_request(model="model-first"), deadline=DecisionDeadline.after(0.6)
             )
         self.assertTrue(ctx.exception.deadline_stopped)
-        # the second provider never went on the wire, so it leaves no record
         self.assertEqual(len(transport.calls), 1)  # type: ignore[attr-defined]
-        self.assertEqual(len(ctx.exception.attempts), 1)
         self.assertEqual(ctx.exception.attempts[0]["outcome"], "timeout")
+        # the skipped second provider is still ledger-visible as
+        # not_dispatched: positive proof it never went on the wire
+        self.assertEqual(len(ctx.exception.attempts), 2)
+        self.assertEqual(ctx.exception.attempts[1]["outcome"], "not_dispatched")
+        self.assertEqual(ctx.exception.attempts[1]["skip_reason"], "deadline")
+        self.assertEqual(ctx.exception.attempts[1]["usage"]["status"], "zero")
 
 
 class ReservationTests(unittest.TestCase):
+    def test_negative_or_fractional_volumes_are_typed_errors(self) -> None:
+        priced = spec(input_price_usd_per_mtok=0.10, output_price_usd_per_mtok=0.0)
+        for bad_input, bad_output in ((-1200, 50), (1200, -1), (True, 0), (1200, False)):
+            with self.assertRaisesRegex(DecisionSchemaError, "DECISION_RESERVATION_VOLUME"):
+                reserve_worst_case_usd(priced, bad_input, bad_output)
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_RESERVATION_VOLUME"):
+            chain_worst_case_usd(ProviderChain(providers=(priced,)), -100, 0)
+
     def test_worst_case_reservation_with_declared_prices(self) -> None:
         priced = spec(
             input_price_usd_per_mtok=0.10,
@@ -659,6 +694,246 @@ class PriorityRecordingReplayTests(unittest.TestCase):
             replayed = replay.decide(sample_request(model="model-first"))
             self.assertIsInstance(replayed.answers[0], PredicateAnswer)
             self.assertAlmostEqual(replayed.answers[0].probability, 0.93)
+
+
+class PerCallCredentialTests(unittest.TestCase):
+    """Every logical call discharges one independent, ledger-ready tuple."""
+
+    def test_success_response_carries_attempts_and_error_too(self) -> None:
+        script = {
+            (FIRST_URL, "model-first"): DecisionTimeoutError("t"),
+            (SECOND_URL, "model-second"): (200, GA_RESPONSE_BODY),
+        }
+        backend = build_priority_backend(
+            TWO_PROVIDER_CHAIN, transport=scripted_transport(script), environ=ENV
+        )
+        response = backend.decide(sample_request(model="model-first"))
+        self.assertEqual(len(response.attempts), 2)
+        outcomes = [record["outcome"] for record in response.attempts]
+        self.assertEqual(outcomes, ["timeout", "answer"])
+        # a second successful call returns its own tuple, never the first one's
+        second = backend.decide(sample_request(model="model-first"))
+        self.assertIsNot(response.attempts, second.attempts)
+        self.assertEqual(response.attempts, second.attempts)
+
+    def test_concurrent_batches_cannot_overwrite_each_others_credentials(self) -> None:
+        # reproduction of the review counterexample: batch A failover
+        # evidence must stay intact on A's own credential tuple even while
+        # batch B interleaves on the same chain instance.
+        def first_transport(url, payload, headers, timeout):
+            if payload["input"] == "batch-a":
+                # scripted transports replace the whole wire, so the raised
+                # error must carry the leniently parsed usage exactly as
+                # _send would after reading this error body
+                raise DecisionHttpError(
+                    503,
+                    json.dumps({"usage": {"input_tokens": 71, "output_tokens": 0, "cost": 0.002}}),
+                    usage=TokenUsage(
+                        input_tokens=71,
+                        output_tokens=0,
+                        cost=0.002,
+                        present=True,
+                        complete=True,
+                    ),
+                )
+            return 200, json.dumps(GA_RESPONSE_BODY)
+
+        script = {
+            (FIRST_URL, "model-first"): first_transport,
+            (SECOND_URL, "model-second"): (200, GA_RESPONSE_BODY),
+        }
+        backend = build_priority_backend(
+            TWO_PROVIDER_CHAIN, transport=scripted_transport(script), environ=ENV
+        )
+        import threading
+
+        can_start_b = threading.Event()
+        finish_b = threading.Event()
+        results: dict[str, object] = {}
+
+        def batch_a() -> None:
+            reply = backend.decide(
+                sample_request(model="model-first", input="batch-a"),
+                deadline=DecisionDeadline.after(4.0),
+            )
+            results["a"] = reply
+            can_start_b.set()
+            finish_b.wait(2)
+            # after B finished, A's own tuple must still show the 503 failover
+            results["a_after"] = [record["outcome"] for record in reply.attempts]
+
+        def batch_b() -> None:
+            can_start_b.wait(2)
+            reply = backend.decide(
+                sample_request(model="model-first", input="batch-b"),
+                deadline=DecisionDeadline.after(4.0),
+            )
+            results["b"] = reply
+            finish_b.set()
+
+        thread_a = threading.Thread(target=batch_a)
+        thread_b = threading.Thread(target=batch_b)
+        thread_a.start()
+        thread_b.start()
+        thread_a.join(4)
+        thread_b.join(4)
+        self.assertFalse(thread_a.is_alive())
+        reply_a = results["a"]
+        reply_b = results["b"]
+        self.assertEqual(
+            [record["outcome"] for record in reply_a.attempts],
+            ["http_503", "answer"],
+        )
+        self.assertEqual(results["a_after"], ["http_503", "answer"])
+        # B never hit the scripted failure because its input differs; it
+        # answers on the first provider, and the second provider stays
+        # ledger-visible as never dispatched with zero cost
+        self.assertEqual(
+            [record["outcome"] for record in reply_b.attempts],
+            ["answer", "not_dispatched"],
+        )
+        self.assertEqual(reply_b.attempts[1]["skip_reason"], "answered_upstream")
+        # the billed 503 stays metered on A's credential tuple
+        failure = reply_a.attempts[0]
+        self.assertEqual(failure["usage"]["status"], "metered")
+        self.assertEqual(failure["usage"]["cost"], 0.002)
+
+    def test_invalid_request_leaves_zero_cost_proof_without_stale_records(self) -> None:
+        transport = scripted_transport({(FIRST_URL, "model-first"): (200, GA_RESPONSE_BODY)})
+        backend = build_priority_backend(TWO_PROVIDER_CHAIN, transport=transport, environ=ENV)
+        backend.decide(sample_request(model="model-first"))
+        self.assertEqual(backend.last_attempts[0]["outcome"], "answer")
+        with self.assertRaises(DecisionSchemaError) as ctx:
+            backend.decide(sample_request(model="model-first", questions=()))
+        self.assertEqual(transport.calls and len(transport.calls), 1)  # type: ignore[attr-defined]
+        records = ctx.exception.attempts
+        self.assertEqual(len(records), 2)
+        for record in records:
+            self.assertEqual(record["outcome"], "not_dispatched")
+            self.assertEqual(record["skip_reason"], "local_validation")
+            self.assertEqual(record["usage"]["status"], "zero")
+        # the diagnostic mirror no longer shows the earlier success
+        self.assertEqual(tuple(backend.last_attempts), tuple(records))
+
+    def test_wire_validation_failure_records_not_dispatched_zero_cost(self) -> None:
+        # openrouter pre-wire rejection reproduced with a GA-shaped payload
+        # defect: the canonical boolean choice reaches dialect translation
+        # only on alpha; here we emulate the same class of failure through
+        # an unnamed batch failing canonical validation inside the backend.
+        transport = scripted_transport({(FIRST_URL, "model-first"): (200, GA_RESPONSE_BODY)})
+        backend = build_priority_backend(TWO_PROVIDER_CHAIN, transport=transport, environ=ENV)
+        bad_questions = (
+            PredicateQuestion(instructions="", name="broken"),
+            *sample_questions()[1:],
+        )
+        with self.assertRaises(DecisionSchemaError) as ctx:
+            backend.decide(sample_request(model="model-first", questions=bad_questions))
+        self.assertEqual(transport.calls, [])  # type: ignore[attr-defined]
+        outcomes = [record["outcome"] for record in ctx.exception.attempts]
+        self.assertEqual(outcomes, ["not_dispatched", "not_dispatched"])
+
+    def test_usage_state_matrix(self) -> None:
+        def single(body):
+            script = {(FIRST_URL, "model-first"): (200, body)}
+            chain = ProviderChain(providers=(TWO_PROVIDER_CHAIN.providers[0],))
+            return build_priority_backend(chain, transport=scripted_transport(script), environ=ENV)
+
+        absent = {k: v for k, v in GA_RESPONSE_BODY.items() if k != "usage"}
+        backend = single(absent)
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("unknown", "usage_object_absent"))
+
+        backend = single({**GA_RESPONSE_BODY, "usage": {}})
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("unknown", "usage_object_empty"))
+
+        backend = single({**GA_RESPONSE_BODY, "usage": {"total_tokens": 71}})
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("unknown", "usage_incomplete"))
+        self.assertEqual(usage["total_tokens"], 71)
+
+        backend = single({**GA_RESPONSE_BODY, "usage": {"input_tokens": 0, "output_tokens": 0}})
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("zero", "wire_reported"))
+
+        backend = single(GA_RESPONSE_BODY)
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("metered", "wire_reported"))
+
+    def test_malformed_usage_fails_closed_as_schema_error(self) -> None:
+        for bad_usage in (
+            {"input_tokens": 11, "output_tokens": 0, "cost": -0.07},
+            {"input_tokens": True, "output_tokens": 0},
+            {"input_tokens": -3, "output_tokens": 0},
+        ):
+            body = {**GA_RESPONSE_BODY, "usage": bad_usage}
+            script = {(FIRST_URL, "model-first"): (200, body)}
+            chain = ProviderChain(providers=(TWO_PROVIDER_CHAIN.providers[0],))
+            backend = build_priority_backend(
+                chain, transport=scripted_transport(script), environ=ENV
+            )
+            with self.assertRaisesRegex(DecisionSchemaError, "DECISION_USAGE_FIELD"):
+                backend.decide(sample_request(model="model-first"))
+            self.assertEqual(backend.last_attempts[0]["outcome"], "schema_error")
+            self.assertEqual(backend.last_attempts[0]["usage"]["status"], "unknown")
+
+    def test_wire_not_reached_failure_is_certain_zero_cost(self) -> None:
+        prewire = DecisionTimeoutError("DECISION_TIMEOUT")
+        prewire.wire_dispatched = False
+        script = {
+            (FIRST_URL, "model-first"): prewire,
+            (SECOND_URL, "model-second"): (200, GA_RESPONSE_BODY),
+        }
+        backend = build_priority_backend(
+            TWO_PROVIDER_CHAIN, transport=scripted_transport(script), environ=ENV
+        )
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("zero", "wire_not_reached"))
+        # a dispatched wire failure stays unknown (conservative reservation)
+        script[(FIRST_URL, "model-first")] = DecisionTimeoutError("DECISION_TIMEOUT")
+        backend = build_priority_backend(
+            TWO_PROVIDER_CHAIN, transport=scripted_transport(script), environ=ENV
+        )
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual(usage["status"], "unknown")
+
+
+class LateAnswerChainTests(unittest.TestCase):
+    def test_late_answer_rejected_with_metered_usage_and_no_delivery(self) -> None:
+        def slow_transport(url, payload, headers, timeout):
+            time.sleep(0.35)
+            return 200, json.dumps(GA_RESPONSE_BODY)
+
+        script = {
+            (FIRST_URL, "model-first"): slow_transport,
+            (SECOND_URL, "model-second"): (200, GA_RESPONSE_BODY),
+        }
+        backend = build_priority_backend(
+            TWO_PROVIDER_CHAIN, transport=scripted_transport(script), environ=ENV
+        )
+        # the first answer assembles at ~0.35s, past the shared 0.3s deadline:
+        # it must be rejected as a late answer, never delivered, and the
+        # deadline leaves no useful sliver, so the second provider is never
+        # dispatched even though ordinary timeouts are failover-class.
+        deadline = DecisionDeadline.after(0.3)
+        with self.assertRaises(DecisionProviderExhaustedError) as ctx:
+            backend.decide(sample_request(model="model-first"), deadline=deadline)
+        error = ctx.exception
+        outcomes = [record["outcome"] for record in error.attempts]
+        self.assertEqual(outcomes, ["late_answer", "not_dispatched"])
+        # the vendor did process the request, so the rejection is billable
+        # evidence, metered from the wire usage object
+        self.assertEqual(error.attempts[0]["usage"]["status"], "metered")
+        self.assertEqual(error.attempts[0]["usage"]["input_tokens"], 300)
+        self.assertEqual(error.attempts[1]["skip_reason"], "deadline")
+        self.assertTrue(error.deadline_stopped)
 
 
 if __name__ == "__main__":

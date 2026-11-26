@@ -15,7 +15,23 @@ from typing import Any, Literal
 
 
 class DecisionError(Exception):
-    """Base error for all decision-adapter failures."""
+    """Base error for all decision-adapter failures.
+
+    wire_dispatched records whether request bytes may have reached the
+    vendor before this failure: false only for failures proven to happen
+    before the first byte of the request went on the wire (local request
+    validation, connect or TLS setup).  Billing evidence treats
+    wire_dispatched=False as certain zero cost.  attempts carries the
+    per-call credential records when a chain raises: every logical call
+    -- success or failure -- discharges exactly one independent attempts
+    tuple, so concurrent batches sharing one backend instance can never
+    overwrite each other's billing evidence.
+    """
+
+    def __init__(self, message: str = "", *, wire_dispatched: bool = True) -> None:
+        super().__init__(message)
+        self.wire_dispatched = wire_dispatched
+        self.attempts: tuple[Any, ...] = ()
 
 
 class DecisionTransportError(DecisionError):
@@ -23,7 +39,27 @@ class DecisionTransportError(DecisionError):
 
 
 class DecisionTimeoutError(DecisionTransportError):
-    """The strict wall-clock request timeout expired."""
+    """The strict wall-clock request timeout expired.
+
+    usage carries best-effort billing evidence when the timeout fired
+    after a billable wire response was already assembled (see
+    DecisionLateAnswerError); it stays None for ordinary timeouts.
+    """
+
+    def __init__(self, message: str = "", usage: TokenUsage | None = None) -> None:
+        super().__init__(message)
+        self.usage = usage
+
+
+class DecisionLateAnswerError(DecisionTimeoutError):
+    """A complete wire response was assembled only after the absolute deadline.
+
+    The answer is never delivered: the deadline covers the logical call
+    from dispatch to return, so a response completed past it is rejected
+    even when every byte is well-formed.  Because the vendor did process
+    the request, the attempt is billable; usage carries the parsed
+    billing evidence whenever the wire offered it.
+    """
 
 
 class DecisionHttpError(DecisionError):
@@ -300,21 +336,42 @@ DecisionAnswer = PredicateAnswer | ChoiceAnswer | ScoreAnswer
 
 @dataclass(frozen=True)
 class TokenUsage:
+    """Wire billing evidence with explicit presence and completeness.
+
+    present distinguishes a usage object that actually appeared on the
+    wire from the default empty value: an absent object is missing
+    evidence, never a zero bill.  complete is true only when the wire
+    object carried every token counter needed for accounting (input and
+    output); a partial object -- for example total_tokens alone -- is
+    incomplete evidence and must be accounted at worst case, not as a
+    smaller bill.
+    """
+
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
     cached_tokens: int = 0
     cost: float | None = None
+    present: bool = False
+    complete: bool = False
 
 
 @dataclass(frozen=True)
 class DecisionResponse:
-    """Answers in question order plus the model and token accounting."""
+    """Answers in question order plus the model and token accounting.
+
+    attempts carries the per-call credential records when the response
+    came through a priority chain: one independent, ledger-ready tuple
+    per logical call.  Single-backend responses leave it empty.  The
+    field never participates in equality or hashing so recorded and
+    replayed responses compare on answer content alone.
+    """
 
     answers: tuple[DecisionAnswer | DecisionRefusal, ...]
     model: str
     usage: TokenUsage
     raw: dict[str, Any] = field(default_factory=dict, compare=False, hash=False)
+    attempts: tuple[Any, ...] = field(default=(), compare=False, hash=False, repr=False)
 
     def named(self) -> dict[str, DecisionAnswer | DecisionRefusal]:
         """Answers keyed by question name; unnamed answers are excluded."""

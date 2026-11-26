@@ -1,0 +1,46 @@
+{
+  "schema_version": "quanthus.decision-providers.v1",
+  "max_attempts": 3,
+  "providers": [
+    {
+      "id": "gw72-gemini-decision-1",
+      "type": "openai-ga",
+      "base_url": "https://gw.72live.com",
+      "endpoint_path": "/v1/decisions",
+      "model": "google/gemini-decision-1",
+      "api_key_env": "QUANTHUS_DECISION_KEY_MAGPIE",
+      "enabled": true,
+      "timeout_seconds": 15.0
+    },
+    {
+      "id": "openai-gpt-6-luna",
+      "type": "openai-ga",
+      "base_url": "https://api.openai.com",
+      "endpoint_path": "/v1/decisions",
+      "model": "gpt-6-luna",
+      "api_key_env": "QUANTHUS_DECISION_KEY_OPENAI",
+      "enabled": true,
+      "timeout_seconds": 15.0
+    },
+    {
+      "id": "gw72-jev-latest",
+      "type": "openai-ga",
+      "base_url": "https://gw.72live.com",
+      "endpoint_path": "/v1/decisions",
+      "model": "typesafe/jev-latest",
+      "api_key_env": "QUANTHUS_DECISION_KEY_MAGPIE",
+      "enabled": true,
+      "timeout_seconds": 15.0
+    },
+    {
+      "id": "openrouter-jev-alpha",
+      "type": "openrouter-alpha",
+      "base_url": "https://openrouter.ai",
+      "endpoint_path": "/api/alpha/decisions",
+      "model": "typesafe/jev-1.14",
+      "api_key_env": "QUANTHUS_DECISION_KEY_OPENROUTER",
+      "enabled": false,
+      "timeout_seconds": 20.0
+    }
+  ]
+}

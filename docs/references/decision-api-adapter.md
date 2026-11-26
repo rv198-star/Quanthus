@@ -36,10 +36,15 @@
 
 1. **问题构造**：用 `PredicateQuestion / ChoiceQuestion / ScoreQuestion` 声明指令与选项；单批最多 400 问，同一 evidence 的多问共享一次 input tokens 计费。金额分桶等定量前置在 Python 侧完成后再写入 input（对齐 PRD v1.1.2 REV-03）。
 2. **后端选择**：`OpenAIDecisionsBackend`（GA 方言端点；网关上 gemini 与 jev-latest 均已实测）或 `OpenRouterDecisionsBackend`（alpha 方言；网关 `/v1/systemone` 与 OpenRouter 官方 schema 同构，适配器翻译载荷已在 systemone 实测 200）；两者输出同一组 `PredicateAnswer / ChoiceAnswer / ScoreAnswer / DecisionRefusal`。
-3. **逐问容错**：单问 `refusal` 不阻断同批他题；消费侧按名取用（`response.require_named` 对缺失/拒绝 fail-closed）。
-4. **离线零调用**：回放后端按 canonical 请求 SHA256 命中封存响应，任何 evidence/问题/模型偏差都是 miss 并 fail-closed（`DECISION_REPLAY_MISS`）；录制后端在授权在线窗口产出封存夹具。
-5. **预算归集**：`response.usage` 暴露 input/output/cached tokens 与 cost（OpenRouter）；适配器不做自动重试、不做费用决策，超时与计费策略归消费侧（v2 设计 §3.2：`≤60s/T`、首轮禁重试）。
-6. **隐私红线**：适配器不检查也不添加账户数据；消费侧在构造 input 前必须剔除持仓数量、资金与委托详情。
+3. **多供应商链（推荐入口）**：`config/decision-providers.v1.json` 声明有序供应商表（base_url / type / endpoint_path / model / api_key_env / enabled / timeout），`build_priority_backend(load_provider_chain(PATH))` 构造 `PriorityBackend`。当前默认优先级：gemini-decision-1（网关）→ gpt-6-luna（OpenAI 直连）→ jev-latest（网关）；OpenRouter alpha 直连以禁用条目预登记。密钥只进环境变量，永不进版本化文档。
+   * **failover 语义（窄于重试）**：仅传输失败（DNS/TCP/TLS/reset/畸形响应）、超时与瞬态 HTTP（408/409/425/429/5xx）切换下一供应商；确定性 4xx（认证失败、schema 拒绝）与 schema 错误立即 fail-closed——换供应商不改变结果类，只会放大成本。
+   * **成本上限透明**：链长 N 即单次逻辑请求最多 N 次调用，消费侧的 `≤60s/T` 与 `≤$0.30/信号日` 预算必须按最坏情形核算；`max_attempts` 可截断链深。单供应商内部仍无自动重试。
+   * **审计溯源**：`backend.last_attempts` 记录每次尝试的 provider_id/model/dialect/结果/耗时；全部失败抛 `DecisionProviderExhaustedError` 并携带完整尝试历史。应答模型以响应 `model` 字段原样可见。
+   * **构建期 fail-closed**：启用供应商缺 key 环境变量、链内混用方言（回放夹具按单一方言封存）都在构造时拒绝，不留到运行时。
+4. **逐问容错**：单问 `refusal` 不阻断同批他题；消费侧按名取用（`response.require_named` 对缺失/拒绝 fail-closed）。
+5. **离线零调用**：回放后端按 canonical 请求 SHA256 命中封存响应，任何 evidence/问题/模型偏差都是 miss 并 fail-closed（`DECISION_REPLAY_MISS`）；录制后端在授权在线窗口产出封存夹具。failover 录制与回放按**原始请求 digest** 键控——回放复现的是该逻辑请求的既判答案，不重演供应商选择。
+6. **预算归集**：`response.usage` 暴露 input/output/cached tokens 与 cost（OpenRouter）；适配器不做费用决策，超时与计费策略归消费侧（v2 设计 §3.2：`≤60s/T`、首轮禁重试）。
+7. **隐私红线**：适配器不检查也不添加账户数据；消费侧在构造 input 前必须剔除持仓数量、资金与委托详情。
 
 ## 4. 非目标与已知限制
 
@@ -89,3 +94,15 @@ P11 消费侧（对齐 v2.3 L3 文本边界与 PRD v1.1.2）应在上游完成�
 | 访问凭证是 platform.openai.com 的 API key，按量计费（$0.10/1M input tokens、输出免费） | Owner 提供 key 后本机实测通过；网关不代理 OpenAI 系模型的 decisions 端点（400），两条路径互不替代 |
 
 直连与网关的取舍：直连校准质量在实测样本上更锐利（方向判别 1.0 对网关 0.82/0.84 错判样本），逐问配图可用，输出 token 恒零（计费只有 input）；网关路径提供 gemini 与 jev 双模型交叉校准能力。消费侧选型属于 G1 后的专家链设计决策，适配器对两条路径同等支持。
+
+## 7. 密钥部署与运行环境（2026-11-27）
+
+| 环境变量 | 内容 | 当前部署位置 |
+| --- | --- | --- |
+| `QUANTHUS_DECISION_KEY_OPENAI` | platform.openai.com API key（gpt-6-luna 直连） | CN02 `~/.quanthus/decision-api.env`（chmod 600，`.bashrc` 顶部受保护引用，登录与 ssh-exec shell 均已验证加载）；本机开发按需在 shell 临时注入 |
+| `QUANTHUS_DECISION_KEY_MAGPIE` | gw.72live.com 网关 bearer token（gemini/jev） | 同上（从 CN02 本机 codex config 提取注入，未出网） |
+| `QUANTHUS_DECISION_KEY_OPENROUTER` | OpenRouter key（alpha 直连，未资格化） | 未部署，对应条目默认禁用 |
+
+密钥轮换原则：版本化配置只引用环境变量名；轮换时更新各节点 env 文件即可，配置文档与代码不变。已在对话明文出现的 key 建议在稳定运行后轮换。
+
+链条在线核验（2026-11-27，CN 本机）：`--chain config/decision-providers.v1.json` 一次通过，首选供应商 gw72-gemini-decision-1 应答 5.0s，390 input tokens；封存夹具 `sha256:c625daad…`（`artifacts/p11-decision-adapter-755/smoke-20261127-chain.replay.json`），回放往返一致。failover 路径由离线脚本化传输测试覆盖（transport/timeout/429/5xx 切换、确定性 4xx 不切换、exhaustion 携带完整历史）。

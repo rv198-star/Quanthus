@@ -112,27 +112,47 @@ def main() -> int:
     parser.add_argument("--base-url", default="https://gw.72live.com")
     parser.add_argument("--model", default="google/gemini-decision-1")
     parser.add_argument("--timeout", type=float, default=30.0)
+    parser.add_argument(
+        "--chain",
+        default=None,
+        help="provider chain JSON (quanthus.decision-providers.v1); overrides --base-url/--model "
+        "and resolves keys from the configured api_key_env environment variables",
+    )
     parser.add_argument("--output", required=True, help="sealed replay fixture path")
     args = parser.parse_args()
 
-    api_key = resolve_api_key()
-    if not api_key:
-        print("SMOKE_KEY_UNAVAILABLE: set QUANTHUS_DECISION_API_KEY", file=sys.stderr)
-        return 2
+    if args.chain:
+        from quanthus.decision_api.providers import build_priority_backend, load_provider_chain
 
-    url = args.base_url.rstrip("/") + "/v1/decisions"
-    backend = OpenAIDecisionsBackend(
-        HttpBackendConfig(url=url, api_key=api_key, timeout_seconds=args.timeout)
-    )
+        try:
+            chain = load_provider_chain(args.chain)
+            backend = build_priority_backend(chain)
+        except DecisionError as error:
+            print(f"SMOKE_CHAIN_CONFIG: {error}", file=sys.stderr)
+            return 2
+        request = build_request(chain.enabled()[0].model)
+    else:
+        api_key = resolve_api_key()
+        if not api_key:
+            print("SMOKE_KEY_UNAVAILABLE: set QUANTHUS_DECISION_API_KEY", file=sys.stderr)
+            return 2
+        url = args.base_url.rstrip("/") + "/v1/decisions"
+        backend = OpenAIDecisionsBackend(
+            HttpBackendConfig(url=url, api_key=api_key, timeout_seconds=args.timeout)
+        )
+        request = build_request(args.model)
+
     parser_fn = dialect_parser(DECISIONS_DIALECT_OPENAI_GA)
     output = pathlib.Path(args.output)
     recording = RecordingBackend(backend, output, parser_fn)
-    request = build_request(args.model)
 
     try:
         response = recording.decide(request)
     except DecisionError as error:
         print(f"SMOKE_LIVE_FAILED: {error}", file=sys.stderr)
+        last_attempts = getattr(backend, "last_attempts", ())
+        if last_attempts:
+            print("attempts: " + json.dumps(last_attempts, ensure_ascii=False), file=sys.stderr)
         return 3
 
     digest = request_digest(request)
@@ -163,6 +183,14 @@ def main() -> int:
             "output_tokens": response.usage.output_tokens,
             "total_tokens": response.usage.total_tokens,
         },
+        "attempts": [
+            {
+                "provider_id": attempt["provider_id"],
+                "outcome": attempt["outcome"],
+                "elapsed_seconds": attempt["elapsed_seconds"],
+            }
+            for attempt in getattr(backend, "last_attempts", ())
+        ],
         "answers": {
             "is_macro_policy": round(named["is_macro_policy"].probability, 4),
             "event_tier": {

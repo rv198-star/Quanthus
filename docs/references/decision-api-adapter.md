@@ -1,8 +1,8 @@
 # Decision API 适配器参考（issue #755）
 
 * 状态：已交付研究资产（P11 v2 专案线 G0/G1 前工程准备，离线契约零外呼）
-* 代码：`src/quanthus/decision_api/`（types / backends / replay）
-* 测试：`tests/unit/test_decision_api.py`（30 项，全部离线固件）
+* 代码：`src/quanthus/decision_api/`（types / backends / providers / replay）
+* 测试：`tests/unit/test_decision_api.py`、`tests/unit/test_decision_providers.py`、`tests/unit/test_decision_transport.py`（117 项，全部离线；传输层测试只打本地环回模拟服务器）
 * 授权在线烟测：`scripts/decision_api_smoke.py`（单批次 3 问，一次调用）
 
 ## 1. 两套现存方言与翻译关系
@@ -37,20 +37,22 @@
 1. **问题构造**：用 `PredicateQuestion / ChoiceQuestion / ScoreQuestion` 声明指令与选项；单批最多 400 问，同一 evidence 的多问共享一次 input tokens 计费。金额分桶等定量前置在 Python 侧完成后再写入 input（对齐 PRD v1.1.2 REV-03）。
 2. **后端选择**：`OpenAIDecisionsBackend`（GA 方言端点；网关上 gemini 与 jev-latest 均已实测）或 `OpenRouterDecisionsBackend`（alpha 方言；网关 `/v1/systemone` 与 OpenRouter 官方 schema 同构，适配器翻译载荷已在 systemone 实测 200）；两者输出同一组 `PredicateAnswer / ChoiceAnswer / ScoreAnswer / DecisionRefusal`。
 3. **多供应商链（推荐入口）**：`config/decision-providers.v1.json` 声明有序供应商表（base_url / type / endpoint_path / model / api_key_env / enabled / timeout），`build_priority_backend(load_provider_chain(PATH))` 构造 `PriorityBackend`。当前默认优先级：gemini-decision-1（网关）→ gpt-6-luna（OpenAI 直连）→ jev-latest（网关）；OpenRouter alpha 直连以禁用条目预登记。密钥只进环境变量，永不进版本化文档。
-   * **failover 语义（窄于重试）**：仅传输失败（DNS/TCP/TLS/reset/畸形响应）、超时与瞬态 HTTP（408/409/425/429/5xx）切换下一供应商；确定性 4xx（认证失败、schema 拒绝）与 schema 错误立即 fail-closed——换供应商不改变结果类，只会放大成本。
-   * **成本上限透明**：链长 N 即单次逻辑请求最多 N 次调用，消费侧的 `≤60s/T` 与 `≤$0.30/信号日` 预算必须按最坏情形核算；`max_attempts` 可截断链深。单供应商内部仍无自动重试。
-   * **审计溯源**：`backend.last_attempts` 记录每次尝试的 provider_id/model/dialect/结果/耗时；全部失败抛 `DecisionProviderExhaustedError` 并携带完整尝试历史。应答模型以响应 `model` 字段原样可见。
+   * **failover 语义（窄于重试，精确集合）**：仅传输失败（DNS/TCP/TLS/reset）、超时与获准瞬态 HTTP 集合 `{408, 409, 425, 429, 500, 502, 503, 504}` 切换下一供应商；其余一切确定性 HTTP 状态（全部其他 4xx 与 5xx，如 400/401/403/404/418/422/520/524/529）与 schema 错误立即 fail-closed——换供应商不改变结果类，只会放大成本。**分类只由 HTTP 状态决定**：适配器在任何非 2xx 上保留状态码原样抛出 `DecisionHttpError`，不解析错误体；空体、HTML、JSON 数组或 JSON 对象都不能改变确定性状态的处置（离线矩阵测试覆盖 16 个状态 × 4 类响应体）。
+   * **在线预算接口（适配器提供机制，消费侧持有预算）**：消费侧为每个预算窗口构造一次 `DecisionDeadline.after(秒)`（单调时钟绝对截止），跨批次复用同一对象传入每次 `decide()`；链在每次尝试前把 socket 预算截断到剩余时间，剩余不足 0.25s 即停止派发并降级（`DecisionProviderExhaustedError.deadline_stopped` 为真）。停止派发即停止计费：未派发的供应商不上网、无计费风险，因此不占用尝试记录。`max_attempts` 可截断链深；单供应商内部无自动重试。
+   * **成本上限透明**：链长 N 即单次逻辑请求最多 N 次调用，消费侧的 `≤60s/T` 与 `≤$0.30/信号日` 预算必须按最坏情形核算。`reserve_worst_case_usd(spec, max_input, max_output)` 与 `chain_worst_case_usd(chain, ...)` 给出逐供应商与整链最坏预留；任一供应商未声明单价时返回 None，消费侧必须按不可预留处理并阻断该配置的在线派发，直到单价在版本化配置中钉死。超时、传输失败与畸形错误体的尝试按未知用量处理，同样按最坏情形归账。
+   * **审计溯源**：`backend.last_attempts` 在每次 `decide()` 开头重置，逐次记录实际出网尝试的 provider_id/model/dialect/结果/耗时/用量快照（metered 带计费证据、none 为空载确认、unknown 为未知用量按最坏归账）；2xx 后 schema 解析失败也会先落记录再 fail-closed，非 2xx 错误体内形态完好的 usage 会作为失败计费证据保留。全部失败抛 `DecisionProviderExhaustedError` 并携带完整尝试历史。应答模型以响应 `model` 字段原样可见。
    * **构建期 fail-closed**：启用供应商缺 key 环境变量、链内混用方言（回放夹具按单一方言封存）都在构造时拒绝，不留到运行时。
 4. **逐问容错**：单问 `refusal` 不阻断同批他题；消费侧按名取用（`response.require_named` 对缺失/拒绝 fail-closed）。
-5. **离线零调用**：回放后端按 canonical 请求 SHA256 命中封存响应，任何 evidence/问题/模型偏差都是 miss 并 fail-closed（`DECISION_REPLAY_MISS`）；录制后端在授权在线窗口产出封存夹具。failover 录制与回放按**原始请求 digest** 键控——回放复现的是该逻辑请求的既判答案，不重演供应商选择。
-6. **预算归集**：`response.usage` 暴露 input/output/cached tokens 与 cost（OpenRouter）；适配器不做费用决策，超时与计费策略归消费侧（v2 设计 §3.2：`≤60s/T`、首轮禁重试）。
+5. **离线零调用**：回放后端按 canonical 请求 SHA256 命中封存响应，任何 evidence/问题/模型偏差都是 miss 并 fail-closed（`DECISION_REPLAY_MISS`）；录制后端在授权在线窗口产出封存夹具。failover 录制与回放按**原始请求 digest** 键控——回放复现的是该逻辑请求的既判答案，不重演供应商选择。回放与录制都按声明方言构造，封存条目的方言标签与后端方言不符时构建期或命中期 fail-closed（`DECISION_REPLAY_DIALECT_MISMATCH` / `DECISION_RECORD_DIALECT_MISMATCH`）；回放答案与线上同样逐题绑定当批请求的数量、位置、原语与选项/索引，概率分布按声明序输出，线上与离线答案可直接相等比较。
+6. **预算归集**：`response.usage` 暴露 input/output/cached tokens 与 cost（OpenRouter）；信号日额度（`≤$0.30/信号日`）与节奏（`≤60s/T`、首轮禁重试）归消费侧持有，适配器提供本节第 3 条的截止、留证与最坏预留机制。消费侧集成时的可用边界：(a) 每预算窗口一个共享 `DecisionDeadline`，跨批次复用；(b) 每次在线派发前用 `chain_worst_case_usd` 校验该批次最坏预留仍在信号日余额内，不完整（unpriced）即阻断；(c) 派发后按 `last_attempts` 的 metered/none/unknown 逐次归账，unknown 按最坏值计；(d) `deadline_stopped` 为真时按降级路径处理，不补发。
+   并发与重跑的统一预留：所有共享同一窗口的批次使用同一个 `DecisionDeadline`（单调时钟，挂钟调整与挂起都不能延长它）；每一次独立派发——包括并发批次与人工重跑——都按整链最坏情形另行预留，重跑不复用首次预留。窗口内实际归账以 metered 证据为准、unknown 按最坏值计，超出预留即停止派发并按降级路径处理。
 7. **隐私红线**：适配器不检查也不添加账户数据；消费侧在构造 input 前必须剔除持仓数量、资金与委托详情。
 
 ## 4. 非目标与已知限制
 
 * 不实现 `box` 视觉定位、音频/视频部件、OpenRouter `assets` 复用映射、提示缓存断点调优、GA 官方的逐问图像 instructions（`instructions` 数组形态，可给每个问题单独配图）；图像输入与 `input_json` 走通用部件透传（见 §5）。
 * `score` 响应在 OpenRouter 方言下的标签从请求侧重建；若后端乱序返回索引，按索引对位而非标签。
-* 烟测脚本的本地 config.toml 密钥解析仅为维护者开发机便利，不构成部署形态；正式运行显式注入 `QUANTHUS_DECISION_API_KEY`。
+* 烟测脚本只接受显式注入的环境变量凭据（单端点模式 `QUANTHUS_DECISION_API_KEY`，链模式逐条目的 `api_key_env`），无任何本地配置回退；带 bearer 的端点被约束在获准 HTTPS 主机白名单（gw.72live.com、api.openai.com、gw.mindthus.com），版本化供应商链一律要求 HTTPS base_url。
 
 ## 5. 多模态与文档输入（2026-11-27 补测）
 
@@ -105,4 +107,4 @@ P11 消费侧（对齐 v2.3 L3 文本边界与 PRD v1.1.2）应在上游完成�
 
 密钥轮换原则：版本化配置只引用环境变量名；轮换时更新各节点 env 文件即可，配置文档与代码不变。已在对话明文出现的 key 建议在稳定运行后轮换。
 
-链条在线核验（2026-11-27，CN 本机）：`--chain config/decision-providers.v1.json` 一次通过，首选供应商 gw72-gemini-decision-1 应答 5.0s，390 input tokens；封存夹具 `sha256:c625daad…`（`artifacts/p11-decision-adapter-755/smoke-20261127-chain.replay.json`），回放往返一致。failover 路径由离线脚本化传输测试覆盖（transport/timeout/429/5xx 切换、确定性 4xx 不切换、exhaustion 携带完整历史）。
+链条在线核验（2026-11-27，CN 本机）：`--chain config/decision-providers.v1.json` 一次通过，首选供应商 gw72-gemini-decision-1 应答 5.0s，390 input tokens；封存夹具 `sha256:c625daad…`（`artifacts/p11-decision-adapter-755/smoke-20261127-chain.replay.json`），回放往返一致。failover 路径由离线脚本化传输测试覆盖（transport/timeout 与精确获准瞬态集合内状态切换、其余确定性状态不切换、exhaustion 携带完整历史），并经真实 `UrllibJsonTransport` 对本地模拟服务器的 16×4 状态码×响应体矩阵与分段滴注超时测试复核。

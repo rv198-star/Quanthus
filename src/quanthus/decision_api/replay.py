@@ -5,8 +5,19 @@ offline contracts, historical replay and regression harnesses.  A
 RecordingBackend wraps any live backend during the small number of
 explicitly authorized online probes and persists every raw wire response
 under the canonical request digest.  A ReplayBackend later answers the
-byte-identical request from that sealed fixture; any deviation -- different
-model, input, question set or dialect -- is a miss and fails closed.
+byte-identical request from that sealed fixture; any deviation --
+different model, input, question set or dialect -- is a miss and fails
+closed.
+
+R2 hardening after the independent cold review of PR #756:
+
+* both backends are constructed with their declared dialect, and the
+  replay backend validates the sealed fixture dialect at construction:
+  a fixture recorded for one dialect can no longer be answered through
+  the parser of another;
+* replayed responses are parsed against the exact incoming batch, so
+  answer counts, primitives, names and option/index ranges are bound to
+  the request the same way as live traffic.
 """
 
 from __future__ import annotations
@@ -18,7 +29,13 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from quanthus.decision_api.backends import DecisionBackend
+from quanthus.decision_api.backends import (
+    DECISIONS_DIALECT_OPENAI_GA,
+    DECISIONS_DIALECT_OPENROUTER_ALPHA,
+    DecisionBackend,
+    parse_openai_ga_response,
+    parse_openrouter_alpha_response,
+)
 from quanthus.decision_api.types import (
     DecisionRequest,
     DecisionResponse,
@@ -27,6 +44,8 @@ from quanthus.decision_api.types import (
 )
 
 REPLAY_SCHEMA_VERSION = "quanthus.decision-api-replay.v1"
+
+_KNOWN_DIALECTS = frozenset({DECISIONS_DIALECT_OPENAI_GA, DECISIONS_DIALECT_OPENROUTER_ALPHA})
 
 
 def load_replay_fixture(path: Path) -> dict[str, Any]:
@@ -52,20 +71,41 @@ def load_replay_fixture(path: Path) -> dict[str, Any]:
     return fixture
 
 
+def _parse_for_dialect(
+    dialect: str, body: dict[str, Any], request: DecisionRequest
+) -> DecisionResponse:
+    if dialect == DECISIONS_DIALECT_OPENAI_GA:
+        return parse_openai_ga_response(body, request)
+    if dialect == DECISIONS_DIALECT_OPENROUTER_ALPHA:
+        return parse_openrouter_alpha_response(body, request)
+    raise DecisionSchemaError(f"DECISION_DIALECT_UNKNOWN: {dialect}")
+
+
 class ReplayBackend(DecisionBackend):
     """Answer canonical requests from a sealed fixture without any network use.
 
     Every lookup keys on the canonical request digest, so the replay cannot
     silently serve a response recorded for different evidence, questions or
-    model.  Replayed responses are parsed through the same dialect parsers as
-    live traffic, so schema drift surfaces identically offline and online.
+    model.  The fixture dialect is validated at construction against the
+    declared dialect, and each hit is re-validated: mixed-dialect fixtures
+    fail closed entry by entry.  Replayed responses are parsed against the
+    exact incoming batch through the same dialect parsers as live traffic,
+    so schema drift surfaces identically offline and online.
     """
 
-    def __init__(self, fixture_path: Path, parser: Any) -> None:
+    def __init__(self, fixture_path: Path, dialect: str) -> None:
+        if dialect not in _KNOWN_DIALECTS:
+            raise DecisionSchemaError(f"DECISION_DIALECT_UNKNOWN: {dialect}")
         fixture = load_replay_fixture(Path(fixture_path))
         self._fixture_path = Path(fixture_path)
         self._responses: dict[str, dict[str, Any]] = fixture["responses"]
-        self._parser = parser
+        self.dialect = dialect
+        for entry in self._responses.values():
+            entry_dialect = str(entry.get("dialect"))
+            if entry_dialect != dialect:
+                raise DecisionSchemaError(
+                    f"DECISION_REPLAY_DIALECT_MISMATCH[{dialect}]:{entry_dialect}"
+                )
         self.fixture_digests = tuple(sorted(self._responses))
         self.misses: list[str] = []
 
@@ -73,14 +113,19 @@ class ReplayBackend(DecisionBackend):
     def fixture_path(self) -> Path:
         return self._fixture_path
 
-    def decide(self, request: DecisionRequest) -> DecisionResponse:
+    def decide(self, request: DecisionRequest, deadline: Any = None) -> DecisionResponse:
         request.validate()
         digest = request_digest(request)
         entry = self._responses.get(digest)
         if entry is None:
             self.misses.append(digest)
             raise DecisionSchemaError(f"DECISION_REPLAY_MISS: {digest}")
-        return self._parser(entry["body"], request)
+        entry_dialect = str(entry.get("dialect"))
+        if entry_dialect != self.dialect:
+            raise DecisionSchemaError(
+                f"DECISION_REPLAY_DIALECT_MISMATCH[{self.dialect}]:{entry_dialect}"
+            )
+        return _parse_for_dialect(self.dialect, entry["body"], request)
 
 
 def recording_entry(dialect: str, body: dict[str, Any]) -> dict[str, Any]:
@@ -95,29 +140,43 @@ class RecordingBackend(DecisionBackend):
     """Wrap a live backend and persist raw responses into a replay fixture.
 
     The wrapped backend's own errors propagate unchanged; only successful
-    responses are recorded.  Writes are atomic per process and the fixture is
-    rewritten as a whole so a partial response set never replaces a complete
-    earlier recording.
+    responses are recorded.  Writes are atomic per process and the fixture
+    is rewritten as a whole so a partial response set never replaces a
+    complete earlier recording.  The declared dialect is validated against
+    the wrapped backend at construction, so a recording can never seal
+    bodies under a foreign dialect label.
     """
 
-    def __init__(self, backend: DecisionBackend, fixture_path: Path, parser: Any) -> None:
+    def __init__(self, backend: DecisionBackend, fixture_path: Path, dialect: str) -> None:
+        backend_dialect = getattr(backend, "dialect", None)
+        if dialect not in _KNOWN_DIALECTS:
+            raise DecisionSchemaError(f"DECISION_DIALECT_UNKNOWN: {dialect}")
+        if backend_dialect is not None and backend_dialect != dialect:
+            raise DecisionSchemaError(
+                f"DECISION_RECORD_DIALECT_MISMATCH[{dialect}]:{backend_dialect}"
+            )
         self._backend = backend
+        self.dialect = dialect
         self._path = Path(fixture_path)
-        self._parser = parser
         self._entries: dict[str, dict[str, Any]] = {}
         if self._path.exists():
             existing = load_replay_fixture(self._path)
             for digest, entry in existing["responses"].items():
+                existing_dialect = str(entry.get("dialect"))
+                if existing_dialect != dialect:
+                    raise DecisionSchemaError(
+                        f"DECISION_RECORD_FIXTURE_DIALECT_MISMATCH[{dialect}]:{existing_dialect}"
+                    )
                 self._entries[digest] = entry
 
     @property
     def inner(self) -> DecisionBackend:
         return self._backend
 
-    def decide(self, request: DecisionRequest) -> DecisionResponse:
-        response = self._backend.decide(request)
+    def decide(self, request: DecisionRequest, deadline: Any = None) -> DecisionResponse:
+        response = self._backend.decide(request, deadline=deadline)
         digest = request_digest(request)
-        self._entries[digest] = recording_entry(self._backend.dialect, response.raw)
+        self._entries[digest] = recording_entry(self.dialect, response.raw)
         self.flush()
         return response
 
@@ -136,26 +195,9 @@ class RecordingBackend(DecisionBackend):
         os.replace(temporary, self._path)
 
 
-def dialect_parser(dialect: str) -> Any:
-    """Resolve the canonical response parser for one wire dialect."""
-    from quanthus.decision_api.backends import (
-        DECISIONS_DIALECT_OPENAI_GA,
-        DECISIONS_DIALECT_OPENROUTER_ALPHA,
-        parse_openai_ga_response,
-        parse_openrouter_alpha_response,
-    )
-
-    if dialect == DECISIONS_DIALECT_OPENAI_GA:
-        return lambda body, _request: parse_openai_ga_response(body)
-    if dialect == DECISIONS_DIALECT_OPENROUTER_ALPHA:
-        return lambda body, request: parse_openrouter_alpha_response(body, request)
-    raise DecisionSchemaError(f"DECISION_DIALECT_UNKNOWN: {dialect}")
-
-
 __all__ = [
     "REPLAY_SCHEMA_VERSION",
     "RecordingBackend",
     "ReplayBackend",
-    "dialect_parser",
     "load_replay_fixture",
 ]

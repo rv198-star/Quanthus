@@ -20,7 +20,9 @@
       "model": "gpt-6-luna",
       "api_key_env": "QUANTHUS_DECISION_KEY_OPENAI",
       "enabled": true,
-      "timeout_seconds": 15.0
+      "timeout_seconds": 15.0,
+      "input_price_usd_per_mtok": 0.1,
+      "output_price_usd_per_mtok": 0.0
     },
     {
       "id": "gw72-jev-latest",

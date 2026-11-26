@@ -41,14 +41,15 @@ from quanthus.decision_api.providers import (
     ProviderChain,
     build_priority_backend,
     build_provider_backends,
+    chain_worst_case_usd,
     load_provider_chain,
     parse_provider_chain,
+    reserve_worst_case_usd,
 )
 from quanthus.decision_api.replay import (
     REPLAY_SCHEMA_VERSION,
     RecordingBackend,
     ReplayBackend,
-    dialect_parser,
     load_replay_fixture,
 )
 from quanthus.decision_api.types import (
@@ -56,6 +57,7 @@ from quanthus.decision_api.types import (
     ChoiceOption,
     ChoiceQuestion,
     DecisionAnswer,
+    DecisionDeadline,
     DecisionError,
     DecisionHttpError,
     DecisionQuestion,
@@ -83,6 +85,7 @@ __all__ = [
     "PROVIDERS_SCHEMA_VERSION",
     "DecisionAnswer",
     "DecisionBackend",
+    "DecisionDeadline",
     "DecisionError",
     "DecisionHttpError",
     "DecisionProviderExhaustedError",
@@ -111,9 +114,10 @@ __all__ = [
     "UrllibJsonTransport",
     "build_priority_backend",
     "build_provider_backends",
-    "dialect_parser",
+    "chain_worst_case_usd",
     "load_provider_chain",
     "load_replay_fixture",
     "parse_provider_chain",
+    "reserve_worst_case_usd",
     "request_digest",
 ]

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -26,16 +27,54 @@ class DecisionTimeoutError(DecisionTransportError):
 
 
 class DecisionHttpError(DecisionError):
-    """The backend answered with a non-2xx HTTP status."""
+    """The backend answered with a non-2xx HTTP status.
 
-    def __init__(self, status: int, body: str) -> None:
+    The status is preserved no matter what the error body looks like, so
+    failover classification never depends on body parsing.  When the wire
+    carried a well-formed usage object, it is attached as billing
+    evidence for the failed attempt; otherwise usage stays None and the
+    consumer accounts the attempt at worst case.
+    """
+
+    def __init__(self, status: int, body: str, usage: TokenUsage | None = None) -> None:
         super().__init__(f"DECISION_HTTP_{status}: {body[:400]}")
         self.status = status
         self.body = body
+        self.usage = usage
 
 
 class DecisionSchemaError(DecisionError):
     """Request or response violates the canonical or backend dialect schema."""
+
+
+@dataclass(frozen=True)
+class DecisionDeadline:
+    """Absolute wall-clock budget shared across batches and chain attempts.
+
+    Consumers compute one deadline per budgeted window (for example the
+    60-seconds-per-trading-day allowance) and pass the same object to every
+    decide() call of every batch.  The deadline is monotonic-clock based,
+    so suspension or wall-clock adjustments cannot extend it.  Backends
+    truncate per-attempt timeouts to the remaining budget; chains stop
+    dispatching new attempts once the remaining budget is below the
+    minimum useful sliver.
+    """
+
+    at_monotonic: float
+
+    @classmethod
+    def after(cls, seconds: float) -> DecisionDeadline:
+        """Return a deadline the given number of seconds from now."""
+        if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
+            raise DecisionSchemaError("DECISION_DEADLINE_RANGE")
+        return cls(at_monotonic=time.monotonic() + float(seconds))
+
+    def remaining(self) -> float:
+        """Seconds left; negative once exceeded."""
+        return self.at_monotonic - time.monotonic()
+
+    def exceeded(self) -> bool:
+        return self.remaining() <= 0.0
 
 
 ChoiceValue = str | bool
@@ -76,6 +115,8 @@ class PredicateQuestion:
     def validate(self) -> None:
         if not self.instructions.strip():
             raise DecisionSchemaError("DECISION_INSTRUCTIONS_EMPTY")
+        if self.type != "predicate":
+            raise DecisionSchemaError("DECISION_PRIMITIVE_INCONSISTENT")
 
 
 @dataclass(frozen=True)
@@ -90,6 +131,8 @@ class ChoiceQuestion:
     def validate(self) -> None:
         if not self.instructions.strip():
             raise DecisionSchemaError("DECISION_INSTRUCTIONS_EMPTY")
+        if self.type != "choice":
+            raise DecisionSchemaError("DECISION_PRIMITIVE_INCONSISTENT")
         if not 2 <= len(self.choices) <= 255:
             raise DecisionSchemaError("DECISION_CHOICE_ARITY")
         seen: list[ChoiceValue] = []
@@ -112,6 +155,8 @@ class ScoreQuestion:
     def validate(self) -> None:
         if not self.instructions.strip():
             raise DecisionSchemaError("DECISION_INSTRUCTIONS_EMPTY")
+        if self.type != "score":
+            raise DecisionSchemaError("DECISION_PRIMITIVE_INCONSISTENT")
         if not 2 <= len(self.levels) <= 255:
             raise DecisionSchemaError("DECISION_SCORE_ARITY")
         labels = [level.label for level in self.levels]
@@ -145,8 +190,13 @@ class DecisionRequest:
             raise DecisionSchemaError("DECISION_INPUT_TYPE")
         if not 1 <= len(self.questions) <= 400:
             raise DecisionSchemaError("DECISION_QUESTION_ARITY")
+        seen_names: set[str] = set()
         for question in self.questions:
             question.validate()
+            if question.name is not None:
+                if question.name in seen_names:
+                    raise DecisionSchemaError(f"DECISION_QUESTION_NAME_DUPLICATE:{question.name}")
+                seen_names.add(question.name)
 
     def canonical_json(self) -> dict[str, Any]:
         """Dialect-neutral canonical serialization used for digests and replay."""

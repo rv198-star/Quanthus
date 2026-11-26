@@ -3,29 +3,31 @@
 Operators declare an ordered provider list in a versioned JSON document
 (schema quanthus.decision-providers.v1).  Each entry binds one vendor
 endpoint: base URL, dialect type, endpoint path, model, the environment
-variable holding its API key, enablement and timeout.  Keys never enter the
-versioned document; only the names of the environment variables that carry
-them.
+variable holding its API key, enablement, timeout and optional published
+per-million-token prices.  Keys never enter the versioned document.
 
-PriorityBackend dispatches each canonical request to the providers in
-configuration order.  Failover is deliberately narrower than a retry:
+R2 hardening after the independent cold review of PR #756:
 
-* failover triggers are transport failure (DNS/TCP/TLS/reset/malformed
-  body), timeout, and transient HTTP statuses {408, 409, 425, 429, 500,
-  502, 503, 504};
-* deterministic HTTP 4xx (authentication failure, schema rejection) and
-  schema errors fail closed immediately -- retrying them on another
-  vendor would multiply cost without changing the outcome class;
-* each provider is attempted at most once per call, so a chain of N
-  providers costs at most N calls per logical request.  Consumers owning
-  the <=60s/T and per-signal-day budgets must account for this worst case;
-  max_attempts can cap the chain depth.
-
-Every attempt is recorded in memory (last_attempts) with provider id,
-model, dialect, outcome and elapsed seconds so audit and budget
-attribution stay exact.  All enabled providers in one chain must share a
-single wire dialect; mixing dialects in one chain is rejected at build
-time because a replay fixture entry keys on one dialect.
+* the dialect type and endpoint path binding is validated: openai-ga
+  entries must target the GA decisions path, alpha entries an alpha
+  decisions path, so retargeting an entry at a foreign dialect fails at
+  configuration time; provider base URLs must be HTTPS because every
+  request carries a bearer credential;
+* failover is status-first and restricted to the approved transient set
+  {408, 409, 425, 429, 500, 502, 503, 504}: deterministic 4xx and schema
+  errors never switch providers, whatever the response body looks like;
+* callers may pass one absolute DecisionDeadline reused across batches;
+  each attempt truncates its socket budget to the remaining time and the
+  chain stops dispatching once the remainder is below the useful sliver;
+* every dispatched attempt leaves evidence: provider, model, dialect,
+  outcome, elapsed seconds, a usage snapshot when the wire offered one
+  (including billed non-2xx failures), and a usage_status of metered,
+  unknown or none.  Failed attempts without wire usage count as unknown
+  usage and must be reserved at worst case by the consumer;
+* last_attempts is reset at the start of every decide() call, and
+  post-2xx schema failures are recorded before propagating, so a parse
+  failure can no longer erase the attempt history or leak stale records
+  across calls.
 """
 
 from __future__ import annotations
@@ -44,8 +46,11 @@ from quanthus.decision_api.backends import (
     HttpBackendConfig,
     OpenAIDecisionsBackend,
     OpenRouterDecisionsBackend,
+    TransportCallable,
+    UrllibJsonTransport,
 )
 from quanthus.decision_api.types import (
+    DecisionDeadline,
     DecisionError,
     DecisionHttpError,
     DecisionRequest,
@@ -53,6 +58,7 @@ from quanthus.decision_api.types import (
     DecisionSchemaError,
     DecisionTimeoutError,
     DecisionTransportError,
+    TokenUsage,
 )
 
 PROVIDERS_SCHEMA_VERSION = "quanthus.decision-providers.v1"
@@ -65,22 +71,50 @@ _PROVIDER_TYPES = frozenset(
     {PROVIDER_TYPE_OPENAI_GA, PROVIDER_TYPE_SYSTEMONE_ALPHA, PROVIDER_TYPE_OPENROUTER_ALPHA}
 )
 
-# Transient HTTP statuses where a different vendor may legitimately succeed.
+# Approved transient statuses: only these HTTP failures may switch provider.
+# Everything else in the 4xx range is deterministic for every vendor and
+# fails closed immediately; 5xx statuses outside this set are unusual enough
+# to surface rather than multiply cost across the chain.
 FAILOVER_HTTP_STATUSES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 
+# Versioned binding between the declared dialect type and the endpoint path
+# shape.  Retargeting a GA entry at an alpha path (or vice versa) is a
+# configuration error, not a runtime surprise.
+TYPE_ENDPOINT_PATHS = {
+    PROVIDER_TYPE_OPENAI_GA: ("/v1/decisions",),
+    PROVIDER_TYPE_SYSTEMONE_ALPHA: ("/v1/systemone",),
+    PROVIDER_TYPE_OPENROUTER_ALPHA: ("/api/alpha/decisions",),
+}
+
+# Minimum remaining budget worth dispatching a new attempt with.
+MIN_ATTEMPT_SLIVER_SECONDS = 0.25
+
 _SPEC_REQUIRED_KEYS = frozenset({"id", "type", "base_url", "endpoint_path", "model", "api_key_env"})
-_SPEC_ALLOWED_KEYS = _SPEC_REQUIRED_KEYS | frozenset({"enabled", "timeout_seconds"})
+_SPEC_ALLOWED_KEYS = _SPEC_REQUIRED_KEYS | frozenset(
+    {"enabled", "timeout_seconds", "input_price_usd_per_mtok", "output_price_usd_per_mtok"}
+)
+
+AttemptRecord = dict[str, Any]
 
 
 class DecisionProviderExhaustedError(DecisionError):
-    """Every enabled provider in the chain failed with a failover-class error."""
+    """Every dispatched provider in the chain failed with a failover-class error.
 
-    def __init__(self, attempts: tuple[dict[str, Any], ...]) -> None:
-        summary = "; ".join(
-            f"{attempt['provider_id']}={attempt['outcome']}" for attempt in attempts
+    deadline_stopped is true when the shared absolute deadline prevented
+    dispatching further providers; those skipped providers never went on
+    the wire and therefore have no attempt record.
+    """
+
+    def __init__(self, attempts: tuple[AttemptRecord, ...], deadline_stopped: bool = False) -> None:
+        parts = []
+        for attempt in attempts:
+            parts.append(str(attempt.get("provider_id")) + "=" + str(attempt.get("outcome")))
+        suffix = "; deadline_stopped" if deadline_stopped else ""
+        super().__init__(
+            "DECISION_PROVIDER_EXHAUSTED[" + str(len(attempts)) + "]: " + "; ".join(parts) + suffix
         )
-        super().__init__(f"DECISION_PROVIDER_EXHAUSTED[{len(attempts)}]: {summary}")
         self.attempts = attempts
+        self.deadline_stopped = deadline_stopped
 
 
 @dataclass(frozen=True)
@@ -95,6 +129,8 @@ class DecisionProviderSpec:
     api_key_env: str
     enabled: bool = True
     timeout_seconds: float = 20.0
+    input_price_usd_per_mtok: float | None = None
+    output_price_usd_per_mtok: float | None = None
 
     @property
     def url(self) -> str:
@@ -135,7 +171,7 @@ def parse_provider_chain(document: Any) -> ProviderChain:
     if not isinstance(entries, list) or not entries:
         raise DecisionSchemaError("DECISION_PROVIDER_CONFIG_EMPTY")
     max_attempts_raw = document.get("max_attempts")
-    max_attempts: int | None = None
+    max_attempts = None
     if max_attempts_raw is not None:
         if (
             not isinstance(max_attempts_raw, int)
@@ -144,7 +180,7 @@ def parse_provider_chain(document: Any) -> ProviderChain:
         ):
             raise DecisionSchemaError("DECISION_PROVIDER_MAX_ATTEMPTS")
         max_attempts = max_attempts_raw
-    specs: list[DecisionProviderSpec] = []
+    specs = []
     seen_ids: set[str] = set()
     for index, entry in enumerate(entries):
         specs.append(_parse_provider_spec(entry, index, seen_ids))
@@ -164,12 +200,17 @@ def _parse_provider_spec(entry: Any, index: int, seen_ids: set[str]) -> Decision
     for key in ("id", "type", "base_url", "endpoint_path", "model", "api_key_env"):
         if not isinstance(entry[key], str) or not entry[key].strip():
             raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_FIELD{where}:{key}")
-    if entry["type"] not in _PROVIDER_TYPES:
-        raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_TYPE{where}:{entry['type']}")
-    if not entry["base_url"].startswith(("https://", "http://")):
+    spec_type = str(entry["type"])
+    spec_id = str(entry["id"])
+    if spec_type not in _PROVIDER_TYPES:
+        raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_TYPE{where}:{spec_type}")
+    if not entry["base_url"].startswith("https://"):
         raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_URL{where}")
     if not entry["endpoint_path"].startswith("/"):
         raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_PATH{where}")
+    allowed_paths = TYPE_ENDPOINT_PATHS[spec_type]
+    if entry["endpoint_path"] not in allowed_paths:
+        raise DecisionSchemaError(f"DECISION_PROVIDER_TYPE_PATH_MISMATCH{where}")
     enabled = entry.get("enabled", True)
     if not isinstance(enabled, bool):
         raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_ENABLED{where}")
@@ -180,25 +221,36 @@ def _parse_provider_spec(entry: Any, index: int, seen_ids: set[str]) -> Decision
         or not 0.5 <= timeout <= 300.0
     ):
         raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_TIMEOUT{where}")
-    if entry["id"] in seen_ids:
-        raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_DUPLICATE{where}:{entry['id']}")
-    seen_ids.add(entry["id"])
+    prices: dict[str, float | None] = {}
+    for price_key in ("input_price_usd_per_mtok", "output_price_usd_per_mtok"):
+        value = entry.get(price_key)
+        if value is None:
+            prices[price_key] = None
+            continue
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_PRICE{where}:{price_key}")
+        prices[price_key] = float(value)
+    if spec_id in seen_ids:
+        raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_DUPLICATE{where}:{spec_id}")
+    seen_ids.add(spec_id)
     return DecisionProviderSpec(
-        id=entry["id"],
-        type=entry["type"],
-        base_url=entry["base_url"],
-        endpoint_path=entry["endpoint_path"],
-        model=entry["model"],
-        api_key_env=entry["api_key_env"],
+        id=spec_id,
+        type=spec_type,
+        base_url=str(entry["base_url"]),
+        endpoint_path=str(entry["endpoint_path"]),
+        model=str(entry["model"]),
+        api_key_env=str(entry["api_key_env"]),
         enabled=enabled,
         timeout_seconds=float(timeout),
+        input_price_usd_per_mtok=prices["input_price_usd_per_mtok"],
+        output_price_usd_per_mtok=prices["output_price_usd_per_mtok"],
     )
 
 
 def build_provider_backends(
     chain: ProviderChain,
     *,
-    transport: Any = None,
+    transport: TransportCallable | UrllibJsonTransport | None = None,
     environ: dict[str, str] | None = None,
 ) -> tuple[tuple[DecisionProviderSpec, DecisionBackend], ...]:
     """Construct backends for every enabled provider, failing closed on gaps.
@@ -214,7 +266,7 @@ def build_provider_backends(
     dialects = {_dialect_for_type(spec.type) for spec in enabled}
     if len(dialects) != 1:
         raise DecisionSchemaError("DECISION_PROVIDER_DIALECT_MIXED")
-    built: list[tuple[DecisionProviderSpec, DecisionBackend]] = []
+    built = []
     for spec in enabled:
         key = env.get(spec.api_key_env)
         if not key:
@@ -249,7 +301,7 @@ def _dialect_for_type(provider_type: str) -> str:
 def build_priority_backend(
     chain: ProviderChain,
     *,
-    transport: Any = None,
+    transport: TransportCallable | UrllibJsonTransport | None = None,
     environ: dict[str, str] | None = None,
 ) -> PriorityBackend:
     """Construct the failover backend for one validated chain."""
@@ -257,7 +309,95 @@ def build_priority_backend(
     return PriorityBackend(backends, max_attempts=chain.max_attempts)
 
 
-def _outcome_of(error: BaseException) -> str:
+def _usage_snapshot(usage: TokenUsage | None) -> dict[str, Any]:
+    """Attempt-level billing evidence.
+
+    metered means the wire carried a positive token count or a cost;
+    none means the wire carried a well-formed empty usage object (no
+    billing event); unknown means no trustworthy usage existed -- a
+    failure before or during the wire exchange -- and the consumer must
+    reserve worst case.
+    """
+    if usage is not None and (
+        usage.input_tokens > 0 or usage.output_tokens > 0 or usage.cost is not None
+    ):
+        return {
+            "status": "metered",
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "total_tokens": usage.total_tokens,
+            "cached_tokens": usage.cached_tokens,
+            "cost": usage.cost,
+        }
+    if usage is not None:
+        return {
+            "status": "none",
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "cached_tokens": 0,
+            "cost": None,
+        }
+    return {
+        "status": "unknown",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "cached_tokens": 0,
+        "cost": None,
+    }
+
+
+def reserve_worst_case_usd(
+    spec: DecisionProviderSpec, max_input_tokens: int, max_output_tokens: int
+) -> float | None:
+    """Worst-case reservation for one attempt at declared volumes.
+
+    Returns None when either price is undeclared: the consumer must treat
+    an unpriced vendor as unreservable and block online dispatch until the
+    price is pinned in configuration.  Zero output tokens is the common
+    case for decision endpoints; output volume is still parameterized
+    because jev emits nonzero output tokens.
+    """
+    if spec.input_price_usd_per_mtok is None or spec.output_price_usd_per_mtok is None:
+        return None
+    return (
+        max_input_tokens * spec.input_price_usd_per_mtok
+        + max_output_tokens * spec.output_price_usd_per_mtok
+    ) / 1_000_000.0
+
+
+def chain_worst_case_usd(
+    chain: ProviderChain, max_input_tokens: int, max_output_tokens: int
+) -> dict[str, Any]:
+    """Per-provider and total worst-case reservation for one logical batch.
+
+    The total assumes every enabled provider up to max_attempts fails over
+    and each attempt bills the full declared volume.  Entries with
+    undeclared prices report None; the consumer must treat them as
+    unbounded and refuse online dispatch for that chain configuration.
+    """
+    enabled = chain.enabled()
+    budget = len(enabled) if chain.max_attempts is None else min(chain.max_attempts, len(enabled))
+    rows = []
+    total = 0.0
+    complete = True
+    for spec in enabled[:budget]:
+        value = reserve_worst_case_usd(spec, max_input_tokens, max_output_tokens)
+        rows.append({"provider_id": spec.id, "worst_case_usd": value})
+        if value is None:
+            complete = False
+        else:
+            total += value
+    return {
+        "per_provider": rows,
+        "total_worst_case_usd": total if complete else None,
+        "complete": complete,
+        "attempts_budgeted": budget,
+    }
+
+
+def _outcome_of(error: DecisionError) -> str:
     if isinstance(error, DecisionTimeoutError):
         return "timeout"
     if isinstance(error, DecisionTransportError):
@@ -267,7 +407,7 @@ def _outcome_of(error: BaseException) -> str:
     return type(error).__name__
 
 
-def _is_failover_class(error: BaseException) -> bool:
+def _is_failover_class(error: DecisionError) -> bool:
     if isinstance(error, DecisionTransportError):
         return True
     return isinstance(error, DecisionHttpError) and error.status in FAILOVER_HTTP_STATUSES
@@ -279,9 +419,9 @@ class PriorityBackend(DecisionBackend):
     The chain shares one dialect (enforced at build time), so the static
     dialect attribute remains exact for replay recording.  Failover
     substitutes the provider, never the question content: the canonical
-    request's model field is overridden per attempt with the provider's
-    configured model, and the answering model is visible verbatim in the
-    response's model field and in last_attempts.
+    model field is overridden per attempt with the provider model, and
+    the answering model is visible verbatim in the response and in
+    last_attempts.
     """
 
     def __init__(
@@ -298,52 +438,73 @@ class PriorityBackend(DecisionBackend):
         self._backends = backends
         self._max_attempts = max_attempts
         self.dialect = backends[0][1].dialect
-        self.last_attempts: tuple[dict[str, Any], ...] = ()
+        self.last_attempts: tuple[AttemptRecord, ...] = ()
 
-    def decide(self, request: DecisionRequest) -> DecisionResponse:
+    def decide(
+        self, request: DecisionRequest, deadline: DecisionDeadline | None = None
+    ) -> DecisionResponse:
         request.validate()
-        attempts: list[dict[str, Any]] = []
+        self.last_attempts = ()
+        attempts: list[AttemptRecord] = []
         budget = len(self._backends) if self._max_attempts is None else self._max_attempts
-        last_error: BaseException | None = None
+        last_error: DecisionError | None = None
+        deadline_stop = False
         for spec, backend in self._backends[:budget]:
+            if deadline is not None and deadline.remaining() < MIN_ATTEMPT_SLIVER_SECONDS:
+                # No dispatch happens here, so no attempt record is made:
+                # only actual wire calls leave evidence, and skipped
+                # providers are visible through deadline_stopped.
+                deadline_stop = True
+                break
             attempt_request = (
                 request if request.model == spec.model else _remodel(request, spec.model)
             )
             started = time.monotonic()
             try:
-                response = backend.decide(attempt_request)
+                response = backend.decide(attempt_request, deadline=deadline)
             except DecisionSchemaError:
+                # post-2xx parse failures are deterministic; record the
+                # attempt (usage unknown: the wire shape was not trusted)
+                # before failing closed, and never switch providers.
+                attempts.append(
+                    self._record(spec, backend, "schema_error", time.monotonic() - started, None)
+                )
                 self.last_attempts = tuple(attempts)
                 raise
             except (DecisionTransportError, DecisionHttpError) as error:
-                attempts.append(
-                    {
-                        "provider_id": spec.id,
-                        "model": spec.model,
-                        "dialect": backend.dialect,
-                        "outcome": _outcome_of(error),
-                        "elapsed_seconds": round(time.monotonic() - started, 3),
-                    }
-                )
+                elapsed = time.monotonic() - started
+                usage = error.usage if isinstance(error, DecisionHttpError) else None
+                attempts.append(self._record(spec, backend, _outcome_of(error), elapsed, usage))
                 last_error = error
                 if not _is_failover_class(error):
                     self.last_attempts = tuple(attempts)
                     raise
                 continue
-            attempts.append(
-                {
-                    "provider_id": spec.id,
-                    "model": spec.model,
-                    "dialect": backend.dialect,
-                    "outcome": "answer",
-                    "elapsed_seconds": round(time.monotonic() - started, 3),
-                }
-            )
+            elapsed = time.monotonic() - started
+            attempts.append(self._record(spec, backend, "answer", elapsed, response.usage))
             self.last_attempts = tuple(attempts)
             return response
         self.last_attempts = tuple(attempts)
-        assert last_error is not None  # at least one backend always runs
-        raise DecisionProviderExhaustedError(tuple(attempts)) from last_error
+        raise DecisionProviderExhaustedError(
+            tuple(attempts), deadline_stopped=deadline_stop
+        ) from last_error
+
+    @staticmethod
+    def _record(
+        spec: DecisionProviderSpec,
+        backend: DecisionBackend,
+        outcome: str,
+        elapsed: float,
+        usage: TokenUsage | None,
+    ) -> AttemptRecord:
+        return {
+            "provider_id": spec.id,
+            "model": spec.model,
+            "dialect": backend.dialect,
+            "outcome": outcome,
+            "elapsed_seconds": round(elapsed, 3),
+            "usage": _usage_snapshot(usage),
+        }
 
 
 def _remodel(request: DecisionRequest, model: str) -> DecisionRequest:
@@ -353,16 +514,21 @@ def _remodel(request: DecisionRequest, model: str) -> DecisionRequest:
 
 __all__ = [
     "FAILOVER_HTTP_STATUSES",
+    "MIN_ATTEMPT_SLIVER_SECONDS",
     "PROVIDERS_SCHEMA_VERSION",
     "PROVIDER_TYPE_OPENAI_GA",
     "PROVIDER_TYPE_OPENROUTER_ALPHA",
     "PROVIDER_TYPE_SYSTEMONE_ALPHA",
+    "TYPE_ENDPOINT_PATHS",
+    "AttemptRecord",
     "DecisionProviderExhaustedError",
     "DecisionProviderSpec",
     "PriorityBackend",
     "ProviderChain",
     "build_priority_backend",
     "build_provider_backends",
+    "chain_worst_case_usd",
     "load_provider_chain",
     "parse_provider_chain",
+    "reserve_worst_case_usd",
 ]

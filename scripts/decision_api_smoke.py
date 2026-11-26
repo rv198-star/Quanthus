@@ -10,11 +10,15 @@ authorized schema verification only; offline tests, CI, historical replay
 and regression harnesses must never call it.  The batch content is a fixed
 public-style news sample and carries no account, position or order data.
 
-Credential resolution order:
+Credential rules (hardened after the independent cold review of PR #756):
 
-1. QUANTHUS_DECISION_API_KEY environment variable;
-2. the magpie provider experimental_bearer_token in the local Codex
-   config.toml -- a development convenience for the maintainer host only.
+* the API key must come from an explicit environment variable --
+  QUANTHUS_DECISION_API_KEY for single-endpoint mode, or the per-entry
+  api_key_env variables for chain mode.  There is no fallback to any
+  local tool configuration: an undeclared credential is a hard error;
+* bearer credentials are only ever sent to approved HTTPS decision
+  endpoints (see APPROVED_SMOKE_HOSTS); any other destination is
+  rejected before the key leaves the process.
 
 Exit codes: 0 success; 2 usage/config error; 3 transport/http failure;
 4 schema verification failure.
@@ -27,8 +31,8 @@ import hashlib
 import json
 import os
 import pathlib
-import re
 import sys
+import urllib.parse
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "src"))
 
@@ -42,7 +46,6 @@ from quanthus.decision_api import (  # noqa: E402
     ReplayBackend,
     ScoreLevel,
     ScoreQuestion,
-    dialect_parser,
     request_digest,
 )
 from quanthus.decision_api.backends import (  # noqa: E402
@@ -56,20 +59,32 @@ SMOKE_INPUT = (
     "拟对高频交易实施差异化收费并强化异常交易监控；央行今日开展3800亿元7天期逆回购操作，净投放2100亿元。"
 )
 
+# Bearer credentials may only leave this process toward these HTTPS hosts.
+# Adding a host is a deliberate approval decision tied to the vendor
+# qualification evidence in docs/references/decision-api-adapter.md.
+APPROVED_SMOKE_HOSTS = frozenset({"gw.72live.com", "api.openai.com", "gw.mindthus.com"})
+
 
 def resolve_api_key() -> str | None:
-    env_key = os.environ.get("QUANTHUS_DECISION_API_KEY")
-    if env_key:
-        return env_key
-    config = pathlib.Path.home() / ".codex" / "config.toml"
-    if config.exists():
-        text = config.read_text(encoding="utf-8", errors="ignore")
-        match = re.search(r"\[model_providers\.magpie\](.*?)(?:\n\[|\Z)", text, flags=re.S)
-        for line in (match.group(1) if match else "").splitlines():
-            if "=" in line:
-                key, value = [part.strip() for part in line.split("=", 1)]
-                if key == "experimental_bearer_token":
-                    return value.strip('"').strip("'")
+    """Explicit environment-only credential resolution; no local config fallback."""
+    return os.environ.get("QUANTHUS_DECISION_API_KEY") or None
+
+
+def validate_approved_endpoint(url: str) -> str | None:
+    """Return an error string when the URL may not receive a bearer credential."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != "https":
+        return (
+            f"SMOKE_ENDPOINT_SCHEME: bearer credentials require https, got {parts.scheme or 'none'}"
+        )
+    if parts.hostname not in APPROVED_SMOKE_HOSTS:
+        return f"SMOKE_ENDPOINT_UNAPPROVED: {parts.hostname} not in " + ",".join(
+            sorted(APPROVED_SMOKE_HOSTS)
+        )
+    if parts.port not in (None, 443):
+        return "SMOKE_ENDPOINT_PORT: only the default https port is approved"
+    if parts.username or parts.password:
+        return "SMOKE_ENDPOINT_USERINFO: credentials must not be embedded in the URL"
     return None
 
 
@@ -130,21 +145,30 @@ def main() -> int:
         except DecisionError as error:
             print(f"SMOKE_CHAIN_CONFIG: {error}", file=sys.stderr)
             return 2
+        dialect = backend.dialect
         request = build_request(chain.enabled()[0].model)
     else:
         api_key = resolve_api_key()
         if not api_key:
-            print("SMOKE_KEY_UNAVAILABLE: set QUANTHUS_DECISION_API_KEY", file=sys.stderr)
+            print(
+                "SMOKE_KEY_UNAVAILABLE: set QUANTHUS_DECISION_API_KEY explicitly; "
+                "no local configuration fallback exists",
+                file=sys.stderr,
+            )
             return 2
         url = args.base_url.rstrip("/") + "/v1/decisions"
+        endpoint_error = validate_approved_endpoint(url)
+        if endpoint_error:
+            print(endpoint_error, file=sys.stderr)
+            return 2
         backend = OpenAIDecisionsBackend(
             HttpBackendConfig(url=url, api_key=api_key, timeout_seconds=args.timeout)
         )
+        dialect = DECISIONS_DIALECT_OPENAI_GA
         request = build_request(args.model)
 
-    parser_fn = dialect_parser(DECISIONS_DIALECT_OPENAI_GA)
     output = pathlib.Path(args.output)
-    recording = RecordingBackend(backend, output, parser_fn)
+    recording = RecordingBackend(backend, output, dialect)
 
     try:
         response = recording.decide(request)
@@ -167,7 +191,7 @@ def main() -> int:
         )
         return 4
 
-    replay = ReplayBackend(output, parser_fn)
+    replay = ReplayBackend(output, dialect)
     replayed = replay.decide(request)
     same_shape = [answer.type for answer in replayed.answers] == ["predicate", "choice", "score"]
 
@@ -188,6 +212,7 @@ def main() -> int:
                 "provider_id": attempt["provider_id"],
                 "outcome": attempt["outcome"],
                 "elapsed_seconds": attempt["elapsed_seconds"],
+                "usage_status": attempt["usage"]["status"],
             }
             for attempt in getattr(backend, "last_attempts", ())
         ],

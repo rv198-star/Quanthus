@@ -31,6 +31,7 @@ from quanthus.decision_api.backends import (
     HttpBackendConfig,
     OpenAIDecisionsBackend,
     OpenRouterDecisionsBackend,
+    TransportBudget,
     UrllibJsonTransport,
 )
 from quanthus.decision_api.providers import (
@@ -113,6 +114,7 @@ __all__ = [
     "ScoreLevel",
     "ScoreQuestion",
     "TokenUsage",
+    "TransportBudget",
     "UrllibJsonTransport",
     "build_priority_backend",
     "build_provider_backends",

@@ -683,100 +683,108 @@ class ContentNegotiationTests(unittest.TestCase):
 
 
 class WriteProgressAccountingTests(unittest.TestCase):
-    """wire_dispatched follows the first accepted request byte, not connect alone."""
+    """wire_dispatched follows the first accepted request byte, not connect alone.
 
-    def _run_with_double(self, worker) -> DecisionTimeoutError:
-        config = HttpBackendConfig(
-            url="https://unresolvable.invalid/v1/decisions",
-            api_key="test-key",
-            timeout_seconds=1.0,
-        )
-        backend = OpenAIDecisionsBackend(config)
-        from quanthus.decision_api import backends as backend_module
+    Since R6 the transport never enters socket.create_connection: the
+    legacy test double seam is gone by design.  These tests instead use
+    a real loopback listener -- the client socket genuinely connects,
+    kernel bytes genuinely flow -- and patch only socket.send behaviour
+    on client sockets, so write progress is controlled while the
+    resolution, dial and send paths under test are the real ones.
+    """
 
-        def refuse_resolution(host, port, *args, **kwargs):
-            raise socket.gaierror(8, "synthetic offline resolution failure")
+    def _run_with_send_stall(self, partial: bool) -> tuple[DecisionTimeoutError, dict]:
+        evidence: dict = {"client_sends": [], "accepted_bytes": 0}
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(4)
+            port = listener.getsockname()[1]
+            config = HttpBackendConfig(
+                url=f"http://127.0.0.1:{port}/v1/decisions",
+                api_key="test-key",
+                timeout_seconds=1.0,
+            )
+            backend = OpenAIDecisionsBackend(config)
+            real_connect = socket.socket.connect
+            real_send = socket.socket.send
+            client_sockets: set[int] = set()
+            state = {"written": 0}
 
-        with (
-            patch.object(socket, "getaddrinfo", refuse_resolution),
-            patch.object(socket, "create_connection", return_value=worker),
-            patch.object(backend_module, "_tls_context") as tls,
-        ):
-            tls.return_value.wrap_socket.return_value = worker
-            try:
-                backend.decide(small_request())
-            except DecisionTimeoutError as error:
-                return error
-        raise AssertionError("expected DecisionTimeoutError")
+            def track_connect(self_sock, address):
+                if isinstance(address, tuple) and address[1] == port:
+                    client_sockets.add(id(self_sock))
+                return real_connect(self_sock, address)
+
+            def controlled_send(self_sock, data):
+                if id(self_sock) not in client_sockets:
+                    return real_send(self_sock, data)
+                if partial and state["written"] == 0:
+                    # the first send accepts exactly 64 bytes; the kernel
+                    # really carries them, then the next send stalls.
+                    accepted = min(64, len(data))
+                    state["written"] += real_send(self_sock, data[:accepted])
+                    return accepted
+                raise TimeoutError("synthetic send stall")
+
+            def counting_accept():
+                conn, _addr = listener.accept()
+                with conn:
+                    conn.settimeout(1.0)
+                    try:
+                        evidence["accepted_bytes"] = len(conn.recv(65536))
+                    except TimeoutError:
+                        evidence["accepted_bytes"] = 0
+
+            acceptor = threading.Thread(target=counting_accept, daemon=True)
+            acceptor.start()
+            with (
+                patch.object(socket.socket, "connect", track_connect),
+                patch.object(socket.socket, "send", controlled_send),
+            ):
+                try:
+                    backend.decide(small_request())
+                except DecisionTimeoutError as error:
+                    outcome = error
+                else:
+                    raise AssertionError("expected DecisionTimeoutError")
+            acceptor.join(timeout=1.5)
+        return outcome, evidence
 
     def test_partial_write_is_conservatively_billable(self) -> None:
-        class PartialWrite:
-            def __init__(self) -> None:
-                self.size = 0
-                self.timeouts: list[float | None] = []
-
-            def settimeout(self, value) -> None:
-                self.timeouts.append(value)
-
-            def send(self, data) -> int:
-                if self.size:
-                    raise TimeoutError("synthetic send stall after a partial write")
-                self.size = min(64, len(data))
-                return self.size
-
-            def close(self) -> None:
-                pass
-
-        worker = PartialWrite()
-        error = self._run_with_double(worker)
-        self.assertGreater(worker.size, 0)
+        error, evidence = self._run_with_send_stall(partial=True)
+        # wire evidence: 64 genuine kernel bytes reached the peer before
+        # the stall, so the attempt is conservatively billable.
+        self.assertEqual(evidence["accepted_bytes"], 64)
         self.assertTrue(error.wire_dispatched)
 
-    def test_unstarted_write_and_tls_failure_are_certain_zero_cost(self) -> None:
-        class UnstartedWrite:
-            def settimeout(self, value) -> None:
-                pass
-
-            def send(self, data) -> int:
-                raise TimeoutError("synthetic send stall before the first byte")
-
-            def close(self) -> None:
-                pass
-
-        error = self._run_with_double(UnstartedWrite())
+    def test_unstarted_write_is_certain_zero_cost(self) -> None:
+        error, evidence = self._run_with_send_stall(partial=False)
+        self.assertEqual(evidence["accepted_bytes"], 0)
         self.assertFalse(error.wire_dispatched)
 
     def test_tls_failure_before_request_bytes_is_certain_zero_cost(self) -> None:
-        class ConnectedOnly:
-            def settimeout(self, value) -> None:
-                pass
+        # a TLS failure before the first accepted request byte is certain
+        # zero cost.  the dial path is real: a genuine loopback TCP
+        # connect completes, and only the TLS wrap is failed.
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(4)
+            port = listener.getsockname()[1]
+            config = HttpBackendConfig(
+                url=f"https://127.0.0.1:{port}/v1/decisions",
+                api_key="test-key",
+                timeout_seconds=1.0,
+            )
+            backend = OpenAIDecisionsBackend(config)
+            from quanthus.decision_api import backends as backend_module
 
-            def close(self) -> None:
-                pass
+            def fail_handshake(sock, server_hostname=None):
+                raise ssl.SSLError("certificate verify failed: synthetic")
 
-        worker = ConnectedOnly()
-        config = HttpBackendConfig(
-            url="https://unresolvable.invalid/v1/decisions",
-            api_key="test-key",
-            timeout_seconds=1.0,
-        )
-        backend = OpenAIDecisionsBackend(config)
-        from quanthus.decision_api import backends as backend_module
-
-        def refuse_resolution(host, port, *args, **kwargs):
-            raise socket.gaierror(8, "synthetic offline resolution failure")
-
-        def fail_handshake(sock, server_hostname=None):
-            raise ssl.SSLError("certificate verify failed: synthetic")
-
-        with (
-            patch.object(socket, "getaddrinfo", refuse_resolution),
-            patch.object(socket, "create_connection", return_value=worker),
-            patch.object(backend_module, "_tls_context") as tls,
-        ):
-            tls.return_value.wrap_socket.side_effect = fail_handshake
-            with self.assertRaises(Exception) as ctx:
-                backend.decide(small_request())
+            with patch.object(backend_module, "_tls_context") as tls:
+                tls.return_value.wrap_socket.side_effect = fail_handshake
+                with self.assertRaises(Exception) as ctx:
+                    backend.decide(small_request())
         self.assertFalse(ctx.exception.wire_dispatched)
 
 
@@ -813,6 +821,85 @@ class ResolutionDeadlineTests(unittest.TestCase):
         self.assertEqual(events, [])
         self.assertLessEqual(elapsed, 0.31 + 0.25)
         self.assertGreaterEqual(elapsed, 0.25)
+
+    def test_fast_negative_then_slow_positive_never_dials_after_wall(self) -> None:
+        # R6 audit reproduction: the first resolution fails fast, the
+        # re-resolution answers with a valid loopback address only after
+        # 0.72s -- past the 0.31s deadline.  The fused pre-R6 fallback
+        # started a fresh TCP connect 420ms past the wall; now the dial
+        # phase re-checks the original deadline after resolution, so no
+        # TCP connect ever starts and the server accepts nothing.
+        events: list[str] = []
+        ordinal = {"count": 0}
+
+        def failing_then_slow(host, port, *args, **kwargs):
+            ordinal["count"] += 1
+            if ordinal["count"] == 1:
+                raise socket.gaierror(8, "synthetic fast negative answer")
+            time.sleep(0.72)
+            # fabricate a valid-looking loopback answer without touching
+            # real DNS: if any dial ever starts, the patched connect
+            # fails the test regardless of where the address points.
+            return [
+                (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("127.0.0.1", port))
+            ]
+
+        def record_connect(self_sock, address):
+            events.append("connect_started")
+            raise AssertionError("no TCP connect may start after the deadline")
+
+        config = HttpBackendConfig(
+            url="https://unresolvable.invalid/v1/decisions",
+            api_key="test-key",
+            timeout_seconds=1.0,
+        )
+        backend = OpenAIDecisionsBackend(config)
+        deadline = DecisionDeadline.after(0.31)
+        started = time.monotonic()
+        with (
+            patch.object(socket, "getaddrinfo", failing_then_slow),
+            patch.object(socket.socket, "connect", record_connect),
+            self.assertRaises(DecisionTimeoutError),
+        ):
+            backend.decide(small_request(), deadline=deadline)
+        elapsed = time.monotonic() - started
+        self.assertEqual(events, [])
+        self.assertLessEqual(elapsed, 0.31 + 0.25)
+        self.assertGreaterEqual(elapsed, 0.25)
+
+    def test_fast_negative_then_fast_positive_dials_inside_window(self) -> None:
+        # control: a fast negative answer followed by a fast positive
+        # re-resolution legitimately dials inside the window.
+        original = socket.getaddrinfo
+        ordinal = {"count": 0}
+        dials: list[float] = []
+
+        def failing_then_fast(host, port, *args, **kwargs):
+            ordinal["count"] += 1
+            if ordinal["count"] == 1:
+                raise socket.gaierror(8, "synthetic transient negative answer")
+            return original(host, port, *args, **kwargs)
+
+        real_connect = socket.socket.connect
+
+        def record_connect(self_sock, address):
+            dials.append(time.monotonic())
+            return real_connect(self_sock, address)
+
+        with MockServer() as server:
+            server.set(respond_fixed(200, json.dumps(ANSWER_BODY)))
+            backend = OpenAIDecisionsBackend(
+                HttpBackendConfig(url=server.url, api_key="test-key", timeout_seconds=1.0)
+            )
+            deadline = DecisionDeadline.after(1.0)
+            with (
+                patch.object(socket, "getaddrinfo", failing_then_fast),
+                patch.object(socket.socket, "connect", record_connect),
+            ):
+                response = backend.decide(small_request(), deadline=deadline)
+        self.assertEqual(len(response.answers), 3)
+        self.assertTrue(dials)
+        self.assertLess(dials[0], deadline.at_monotonic)
 
 
 class DispatchStallTests(unittest.TestCase):
@@ -974,48 +1061,49 @@ class TlsRearmTests(unittest.TestCase):
     def test_handshake_timeout_reflects_remaining_budget_not_connect_snapshot(self) -> None:
         from quanthus.decision_api import backends as backend_module
 
-        class RecordingSocket:
-            def __init__(self) -> None:
-                self.timeouts: list[float] = []
-
-            def settimeout(self, value) -> None:
-                self.timeouts.append(value)
-
-            def send(self, data) -> int:
-                raise TimeoutError("unreachable in this probe")
-
-            def close(self) -> None:
-                pass
-
-        worker = RecordingSocket()
-
-        def refuse_resolution(host, port, *args, **kwargs):
-            raise socket.gaierror(8, "synthetic offline resolution failure")
-
         def stall_handshake(sock, server_hostname=None):
             raise ssl.SSLError("The read operation timed out")
 
-        config = HttpBackendConfig(
-            url="https://unresolvable.invalid/v1/decisions",
-            api_key="test-key",
-            timeout_seconds=1.0,
-        )
-        backend = OpenAIDecisionsBackend(config)
-        deadline = DecisionDeadline.after(0.6)
-        with (
-            patch.object(socket, "getaddrinfo", refuse_resolution),
-            patch.object(socket, "create_connection", return_value=worker),
-            patch.object(backend_module, "_tls_context") as tls,
-        ):
-            tls.return_value.wrap_socket.side_effect = stall_handshake
-            with self.assertRaises(DecisionTimeoutError):
-                backend.decide(small_request(), deadline=deadline)
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(4)
+            port = listener.getsockname()[1]
+            config = HttpBackendConfig(
+                url=f"https://127.0.0.1:{port}/v1/decisions",
+                api_key="test-key",
+                timeout_seconds=1.0,
+            )
+            backend = OpenAIDecisionsBackend(config)
+            deadline = DecisionDeadline.after(0.6)
+            real_connect = socket.socket.connect
+            real_settimeout = socket.socket.settimeout
+            client_sockets: set[int] = set()
+            timeouts: list[float | None] = []
+
+            def track_connect(self_sock, address):
+                if isinstance(address, tuple) and address[1] == port:
+                    client_sockets.add(id(self_sock))
+                return real_connect(self_sock, address)
+
+            def record_settimeout(self_sock, value):
+                if id(self_sock) in client_sockets:
+                    timeouts.append(value)
+                return real_settimeout(self_sock, value)
+
+            with (
+                patch.object(socket.socket, "connect", track_connect),
+                patch.object(socket.socket, "settimeout", record_settimeout),
+                patch.object(backend_module, "_tls_context") as tls,
+            ):
+                tls.return_value.wrap_socket.side_effect = stall_handshake
+                with self.assertRaises(DecisionTimeoutError):
+                    backend.decide(small_request(), deadline=deadline)
         # the socket timeout passed into the handshake is the remaining
         # shared budget at handshake start, never the stale connect-time
         # snapshot: it must not exceed the 0.6s absolute window.
-        self.assertTrue(worker.timeouts)
-        self.assertLessEqual(worker.timeouts[-1], 0.6)
-        self.assertGreater(worker.timeouts[-1], 0.0)
+        self.assertTrue(timeouts)
+        self.assertLessEqual(timeouts[-1], 0.6)
+        self.assertGreater(timeouts[-1], 0.0)
 
 
 if __name__ == "__main__":

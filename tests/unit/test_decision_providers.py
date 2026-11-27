@@ -40,7 +40,7 @@ from quanthus.decision_api import (
     parse_provider_chain,
     reserve_worst_case_usd,
 )
-from quanthus.decision_api.backends import DECISIONS_DIALECT_OPENAI_GA
+from quanthus.decision_api.backends import DECISIONS_DIALECT_OPENAI_GA, TransportBudget
 from quanthus.decision_api.providers import (
     FAILOVER_HTTP_STATUSES,
     PROVIDERS_SCHEMA_VERSION,
@@ -595,11 +595,16 @@ class PriorityDeadlineTests(unittest.TestCase):
         timeouts = [call["timeout"] for call in transport.calls]  # type: ignore[attr-defined]
         self.assertEqual(len(timeouts), 2)
         for value in timeouts:
-            # both attempts receive the same shared clock as the absolute
-            # instant of the caller-supplied deadline, truncated by the
-            # shorter configured timeout -- never a relative sample that
-            # a stall could re-base downstream.
-            self.assertIsInstance(value, DecisionDeadline)
+            # both attempts receive one TransportBudget: a float of the
+            # remaining seconds (legacy arithmetic keeps working),
+            # carrying the absolute instant of the shared caller-supplied
+            # deadline, truncated by the shorter configured timeout --
+            # never a bare relative sample that a stall could re-base
+            # downstream.
+            self.assertIsInstance(value, TransportBudget)
+            self.assertIsInstance(value, float)
+            self.assertLessEqual(float(value), 4.0)
+            self.assertGreater(float(value), 0.0)
             remaining = value.at_monotonic - time.monotonic()
             self.assertLessEqual(remaining, 4.0)
             self.assertGreater(remaining, 0.0)

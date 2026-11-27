@@ -68,12 +68,6 @@ R5 hardening after the fourth independent review of PR #756:
   timeout -- never as a relative sample.  A stall after the remaining
   budget was sampled cannot be re-based onto the current clock at
   transport entry: the window expires ahead of any dial or POST.
-* the fallback resolution path for a fast negative or empty answer is
-  bounded by the same absolute clock: socket.create_connection runs in a
-  daemon worker joined for the remaining budget, so its internal second
-  resolution can never park the caller thread past the wall, and a
-  socket completed only after the deadline is closed abandoned rather
-  than handed to the HTTP layer.
 * the chain re-checks the shared clock after the answer and every
   per-attempt credential are assembled: a bookkeeping stall spanning the
   deadline rejects the answer as DecisionLateAnswerError with the
@@ -83,6 +77,29 @@ R5 hardening after the fourth independent review of PR #756:
   with the same typed error as after(), and reserve_worst_case_usd
   rejects negative, boolean, non-finite or overflowing prices on
   code-built provider specs before any quote is formed.
+
+R6 hardening after the fifth independent review of PR #756:
+
+* resolution and dialing are separate phases, each independently bound
+  by the original deadline.  socket.create_connection is no longer used
+  anywhere in this transport: its fused internal re-resolution plus dial
+  could start a fresh TCP connect after the deadline when the second
+  answer arrived late.  A fast negative or empty first answer now
+  triggers one bounded re-resolution inside the same machinery; only an
+  answer that completes inside the budget may feed the dial loop, and
+  every connect re-checks the original deadline immediately before it
+  starts.  Orphaned late workers resolve names only -- they can never
+  dial.
+* the fourth transport parameter is TransportBudget, a float carrying
+  the remaining budget in seconds.  Legacy injected callbacks that
+  compute ordinary float arithmetic on it (time.monotonic() + timeout)
+  work unchanged with or without a shared deadline.  The budget object
+  also carries the absolute wall instant of the original deadline as
+  its at_monotonic attribute: the standard transport honours that
+  instant verbatim, so an expired window still raises ahead of any
+  dial or POST when a pass-through shim forwards the object after a
+  stall.  The compatibility branch is fixed before invocation -- one
+  object, both contracts, never a retry with a different parameter.
 """
 
 from __future__ import annotations
@@ -98,7 +115,7 @@ import urllib.parse
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from quanthus.decision_api.types import (
     ChoiceAnswer,
@@ -124,13 +141,43 @@ DECISIONS_DIALECT_OPENAI_GA = "openai-ga"
 DECISIONS_DIALECT_OPENROUTER_ALPHA = "openrouter-alpha"
 
 JsonObject = dict[str, Any]
-# the fourth transport parameter is the absolute wall instant of the shared
-# non-extensible deadline, passed as a DecisionDeadline: the clock must reach
-# the transport verbatim, never as a relative sample that a stall can turn
-# into a fresh, extended budget when the transport re-adds the current clock.
-# legacy call sites passing a float of relative seconds remain accepted.
+
+
+class TransportBudget(float):
+    """The fourth transport parameter: float seconds plus the absolute instant.
+
+    Backends hand one object to the transport, whichever transport it is.
+    As a float it carries the remaining budget in relative seconds, so a
+    legacy injected callback can compute ordinary float arithmetic on it
+    (for example time.monotonic() + timeout_seconds) exactly as before
+    R5, with or without a shared deadline.  The at_monotonic attribute
+    carries the absolute wall instant of the original non-extensible
+    deadline (capped by the backend's shorter configured timeout): the
+    standard transport and any deadline-aware consumer honour that
+    instant verbatim, so a stall before the real transport entry cannot
+    re-base the clock onto the current time and smuggle an expired dial
+    or POST onto the wire.  The compatibility branch is fixed before
+    invocation -- a single object serving both contracts, never a failed
+    first call retried with a different parameter type.
+    """
+
+    at_monotonic: float
+
+    def __new__(cls, seconds: float, at_monotonic: float) -> TransportBudget:
+        instance = super().__new__(cls, seconds)
+        instance.at_monotonic = at_monotonic
+        return instance
+
+
+# the fourth transport parameter contract:
+#   backends always pass a TransportBudget (a float of the remaining
+#   seconds, carrying the original absolute deadline as at_monotonic);
+#   UrllibJsonTransport.post additionally accepts a plain float of
+#   relative seconds for its standalone direct entry, and a bare
+#   DecisionDeadline for pre-R6 compatibility.
 TransportCallable = Callable[
-    [str, JsonObject, Mapping[str, str], "DecisionDeadline | float"], "tuple[int, str]"
+    [str, JsonObject, Mapping[str, str], "TransportBudget | DecisionDeadline | float"],
+    "tuple[int, str]",
 ]
 
 _MAX_HEAD_BYTES = 65536
@@ -165,14 +212,21 @@ class UrllibJsonTransport:
     """Synchronous JSON-over-HTTP transport with one strict wall-clock budget.
 
     post(url, payload, headers, timeout_seconds) returns the HTTP status
-    and the raw response body text.  The implementation is a minimal
-    HTTP/1.x client over raw sockets: framing (Content-Length, chunked,
-    close-delimited EOF) is parsed explicitly so every blocking socket
-    operation is re-armed to the remaining budget before it starts and
-    the deadline is re-checked after every read and at each phase
-    boundary.  Nothing in the response path can outlive the budget:
-    slow headers, a trickling body and a close-delimited body all hit
-    the same hard wall.
+    and the raw response body text.  The fourth parameter contract:
+    a plain float is a relative budget in seconds from now (the
+    standalone direct entry), while a TransportBudget or bare
+    DecisionDeadline pins the original absolute wall instant through its
+    at_monotonic attribute and that instant governs verbatim.  The
+    implementation is a minimal HTTP/1.x client over raw sockets:
+    framing (Content-Length, chunked, close-delimited EOF) is parsed
+    explicitly so every blocking socket operation is re-armed to the
+    remaining budget before it starts and the deadline is re-checked
+    after every read and at each phase boundary.  Resolution and dialing
+    are separate phases, each bound by the original deadline: nothing in
+    the connect path -- neither resolution nor the TCP connect itself --
+    can start after the wall, and nothing in the response path can
+    outlive the budget: slow headers, a trickling body and a
+    close-delimited body all hit the same hard wall.
 
     Non-2xx handling: the status is fixed as soon as the response
     headers are complete.  The error body is then read best-effort
@@ -193,7 +247,7 @@ class UrllibJsonTransport:
         url: str,
         payload: JsonObject,
         headers: Mapping[str, str],
-        timeout_seconds: DecisionDeadline | float,
+        timeout_seconds: TransportBudget | DecisionDeadline | float,
     ) -> tuple[int, str]:
         parts = urllib.parse.urlsplit(url)
         if parts.scheme not in ("http", "https") or not parts.hostname:
@@ -202,16 +256,27 @@ class UrllibJsonTransport:
         target = parts.path or "/"
         if parts.query:
             target += "?" + parts.query
-        # the caller hands down the absolute instant of the shared clock,
-        # never a relative sample: re-adding the current time here would
-        # extend the budget by whatever stall happened between sampling
-        # and transport entry.  a legacy float of relative seconds is
-        # interpreted from now, preserving the pre-R5 standalone entry.
+        # deadline contract, in priority order:
+        #   * a TransportBudget (or anything exposing at_monotonic, such
+        #     as a bare DecisionDeadline) pins the original absolute wall
+        #     instant verbatim: re-adding the current time here would
+        #     extend the budget by whatever stall happened between
+        #     sampling and transport entry, so that never happens;
+        #   * a plain float is relative seconds interpreted from now --
+        #     the standalone direct-entry contract, unchanged since
+        #     before R5.
         if isinstance(timeout_seconds, DecisionDeadline):
-            deadline = timeout_seconds.at_monotonic
-            timeout_seconds = deadline - time.monotonic()
+            absolute_instant: float | None = timeout_seconds.at_monotonic
         else:
-            deadline = time.monotonic() + timeout_seconds
+            candidate = getattr(timeout_seconds, "at_monotonic", None)
+            absolute_instant = float(candidate) if isinstance(candidate, (int, float)) else None
+        if absolute_instant is not None:
+            deadline = absolute_instant
+            budget_seconds = deadline - time.monotonic()
+        else:
+            budget_seconds = float(cast(float, timeout_seconds))
+            deadline = time.monotonic() + budget_seconds
+        timeout_seconds = budget_seconds
         progress = {"sent_any": False}
         sock: socket.socket | None = None
         try:
@@ -284,9 +349,11 @@ class UrllibJsonTransport:
         Resolution runs in a daemon worker joined for the remaining
         budget: once the budget expires the worker is orphaned, the
         caller returns at the wall, and no TCP connect follows even when
-        the resolver finishes later because the connect phase re-checks
-        the same absolute deadline before dialing.  Each connect attempt
-        and the TLS handshake re-arm to the budget left when they start.
+        the resolver finishes later, because resolution and dialing are
+        separate phases and the connect loop re-checks the same absolute
+        deadline immediately before every connect starts.  Each connect
+        attempt and the TLS handshake re-arm to the budget left when
+        they start.
         """
         sock = self._connect(host, port, deadline, budget)
         self._require_budget(deadline, budget, "CONNECT")
@@ -304,19 +371,20 @@ class UrllibJsonTransport:
         self._require_budget(deadline, budget, "CONNECT")
         return wrapped
 
-    def _resolve_bounded(
+    def _resolve_once(
         self, host: str, port: int, deadline: float, budget: float
-    ) -> list[Any] | None:
-        """Resolve host inside the remaining budget.
+    ) -> tuple[str, list[Any] | OSError]:
+        """One bounded resolution attempt inside the remaining budget.
 
-        Returns the address list on success or None when resolution
-        completed inside budget with a definitive negative answer; the
-        caller then reproduces that failure through the standard connect
-        entry point.  Budget expiry raises DecisionTimeoutError: the
-        blocking platform resolver cannot be killed, so it runs in a
-        daemon worker joined for the remaining budget, and an orphaned
-        late resolver can never cause a dispatch because every later
-        phase re-checks the same absolute clock.
+        Returns ("addresses", infos) on a non-empty answer, ("error", the
+        original OSError) on a resolver failure, or ("empty", []) on an
+        empty answer -- the error object is preserved verbatim so the
+        failover classification sees the genuine resolution error rather
+        than a re-synthesized one.  Budget expiry raises
+        DecisionTimeoutError: the blocking platform resolver cannot be
+        killed, so it runs in a daemon worker joined for the remaining
+        budget.  An orphaned late worker only resolves names -- it holds
+        no connection logic and can never dial.
         """
         self._require_budget(deadline, budget, "RESOLVE")
         result: dict[str, Any] = {}
@@ -336,75 +404,73 @@ class UrllibJsonTransport:
             raise DecisionTimeoutError(f"DECISION_TIMEOUT_RESOLVE after {budget}s")
         self._require_budget(deadline, budget, "RESOLVE")
         if "failure" in result:
-            return None
+            failure: OSError = result["failure"]
+            return "error", failure
         infos = result.get("infos") or []
-        return infos if infos else None
+        return ("addresses", infos) if infos else ("empty", [])
 
     def _connect(self, host: str, port: int, deadline: float, budget: float) -> socket.socket:
-        """Connect to the resolved addresses with per-attempt budget re-arming."""
-        infos = self._resolve_bounded(host, port, deadline, budget)
-        if infos is None:
-            # resolution finished inside budget with a definitive negative
-            # answer; reproduce exactly that failure through the standard
-            # connect entry point, bounded by the same absolute clock.  the
-            # entry point re-resolves internally, so it must never run
-            # synchronously on the caller thread: a fast first failure
-            # followed by a slow or empty second answer would otherwise
-            # park the caller past the wall and start dialing after it.
-            return self._create_connection_bounded(host, port, deadline, budget)
-        last_error: OSError | None = None
-        for family, socktype, proto, _canonname, sockaddr in infos:
-            self._require_budget(deadline, budget, "CONNECT")
-            candidate = socket.socket(family, socktype, proto)
-            try:
-                self._rearm(candidate, deadline)
-                candidate.connect(sockaddr)
-            except OSError as error:
-                with contextlib.suppress(Exception):
-                    candidate.close()
-                last_error = error
-                continue
-            self._require_budget(deadline, budget, "CONNECT")
-            return candidate
-        if last_error is not None:
-            raise last_error
-        raise DecisionTransportError("DECISION_TRANSPORT_RESOLVE_EMPTY")
+        """Resolve, then dial, as two separate deadline-bound phases.
 
-    def _create_connection_bounded(
-        self, host: str, port: int, deadline: float, budget: float
-    ) -> socket.socket:
-        """Run the standard connect entry point inside the shared budget.
+        Resolution and dialing are never fused: socket.create_connection
+        is deliberately unused because its internal re-resolution would
+        delay the dial decision past the deadline and then start a fresh
+        TCP connect after it.  A fast negative or empty first answer
+        earns exactly one bounded re-resolution -- transient resolver
+        failures legitimately recover -- but only an answer completed
+        inside the budget may feed the dial loop.  Every connect
+        re-checks the original deadline immediately before it starts,
+        so no new TCP connect can begin after the wall; a connect that
+        began inside the window may complete late and is then closed
+        unused, which the audit control group accepts.
+        """
+        status, outcome = self._resolve_once(host, port, deadline, budget)
+        if status != "addresses":
+            # deferrable second resolution: a fast negative or empty
+            # answer may be transient, so re-resolve once inside the
+            # same absolute budget before giving up.  the re-resolution
+            # itself returns addresses or a checkable error; it never
+            # dials.
+            status, outcome = self._resolve_once(host, port, deadline, budget)
+        if status == "error":
+            assert isinstance(outcome, OSError)
+            raise outcome
+        if status == "empty":
+            raise DecisionTransportError("DECISION_TRANSPORT_RESOLVE_EMPTY")
+        infos = outcome
+        assert isinstance(infos, list)
+        return self._dial_bounded(infos, deadline, budget)
 
-        socket.create_connection re-resolves the host internally, which
-        cannot be interrupted: the whole call therefore runs in a daemon
-        worker joined for the remaining budget, exactly like the primary
-        resolution path.  Budget expiry returns DecisionTimeoutError at
-        the wall.  The worker may still be resolving or dialing when it
-        is orphaned; a socket it eventually produces is closed the moment
-        creation completes past the deadline and is never handed to the
-        HTTP layer, so an abandoned late dial can never carry a request.
-        A resolution failure reproduced inside the budget surfaces as the
-        original OSError, keeping the transport failover classification.
+    def _dial_bounded(self, infos: list[Any], deadline: float, budget: float) -> socket.socket:
+        """Dial the resolved addresses from a daemon worker joined at the wall.
+
+        The dial loop cannot be interrupted once the kernel holds a
+        connect, so it runs in a daemon worker joined for the remaining
+        budget: the caller returns at the wall even when a connect begun
+        inside the window completes late.  Every connect still re-checks
+        the original deadline immediately before it starts -- inside the
+        worker -- so an orphaned worker running past the wall never
+        starts a new TCP connect: its per-iteration budget check fails
+        first.  A socket produced only after the deadline is closed
+        abandoned rather than handed to the HTTP layer, and a connect
+        interrupted mid-flight is closed as soon as it returns.
         """
         self._require_budget(deadline, budget, "CONNECT")
         result: dict[str, Any] = {}
 
         def attempt() -> None:
             try:
-                sock = socket.create_connection(
-                    (host, port), timeout=max(self._remaining(deadline), 0.001)
-                )
-            except OSError as error:
+                result["socket"] = self._dial_loop(infos, deadline, budget)
+            except BaseException as error:  # noqa: BLE001 -- re-raised on the caller thread
                 result["failure"] = error
                 return
             if self._remaining(deadline) <= 0.0:
-                # the entry point returned only after the shared wall:
-                # the connection is abandoned, never used for a request.
+                # the dial completed only after the shared wall: close
+                # the connection unused, never hand it to the HTTP layer.
                 result["abandoned"] = True
                 with contextlib.suppress(Exception):
-                    sock.close()
-                return
-            result["socket"] = sock
+                    result["socket"].close()
+                del result["socket"]
 
         worker = threading.Thread(target=attempt, daemon=True)
         worker.start()
@@ -418,6 +484,36 @@ class UrllibJsonTransport:
         if sock is None:
             raise DecisionTransportError("DECISION_TRANSPORT_CONNECT_EMPTY")
         return sock
+
+    def _dial_loop(self, infos: list[Any], deadline: float, budget: float) -> socket.socket:
+        """Iterate resolved addresses, each connect gated by the original deadline."""
+        last_error: OSError | None = None
+        for family, socktype, proto, _canonname, sockaddr in infos:
+            # the dial gate: the original deadline is re-checked in the
+            # instruction stream immediately before this connect starts,
+            # so the only residual overrun is scheduler wake latency of
+            # a few milliseconds, never an unbounded second phase.
+            self._require_budget(deadline, budget, "CONNECT")
+            candidate = socket.socket(family, socktype, proto)
+            try:
+                self._rearm(candidate, deadline)
+                candidate.connect(sockaddr)
+            except OSError as error:
+                with contextlib.suppress(Exception):
+                    candidate.close()
+                last_error = error
+                continue
+            if self._remaining(deadline) <= 0.0:
+                # this connect began inside the window but its result
+                # arrived late: close it unused so it never carries a
+                # request, and surface the timeout to the worker.
+                with contextlib.suppress(Exception):
+                    candidate.close()
+                raise DecisionTimeoutError(f"DECISION_TIMEOUT_CONNECT after {budget}s")
+            return candidate
+        if last_error is not None:
+            raise last_error
+        raise DecisionTransportError("DECISION_TRANSPORT_RESOLVE_EMPTY")
 
     @staticmethod
     def _rearm(sock: socket.socket, deadline: float) -> None:
@@ -750,27 +846,38 @@ class _BaseHttpBackend(DecisionBackend):
         return min(timeout, remaining)
 
     def _send(self, payload: JsonObject, deadline: DecisionDeadline | None) -> JsonObject:
-        # the shared clock is handed to the transport as the absolute
-        # instant of the deadline itself, capped by this backend's shorter
-        # configured timeout.  a relative sample is never forwarded: any
-        # stall between sampling and transport entry cannot be re-based
-        # onto the current clock downstream, so an expired window raises
-        # here ahead of any dial or POST instead of starting fresh.
+        # one TransportBudget object reaches whichever transport is
+        # installed, decided once here before invocation.  as a float it
+        # is the remaining relative seconds legacy callbacks compute
+        # with; its at_monotonic attribute is the absolute instant of
+        # the original shared deadline, capped by this backend's shorter
+        # configured timeout.  a bare relative sample is never forwarded:
+        # any stall between this handoff and the real transport entry
+        # cannot re-base the clock downstream, so an expired window
+        # raises ahead of any dial or POST instead of starting fresh.
         headers = self._headers()
         timeout_seconds = self._effective_timeout(deadline)
         if deadline is None:
             # no shared clock participates in this call: the configured
-            # relative timeout is the entire budget contract, forwarded
-            # verbatim for the standalone entry point.
-            budget: DecisionDeadline | float = timeout_seconds
+            # relative timeout is the entire budget contract.  it is
+            # still handed down as one TransportBudget so deadline-aware
+            # transports pin its absolute instant while legacy float
+            # arithmetic keeps working.
+            sampled_at = time.monotonic()
+            budget: TransportBudget | float = TransportBudget(
+                timeout_seconds, sampled_at + timeout_seconds
+            )
         elif deadline.exceeded():
             error = DecisionTimeoutError("DECISION_DEADLINE_EXCEEDED")
             error.wire_dispatched = False
             raise error
         else:
-            wall = time.monotonic() + timeout_seconds
-            wall = min(wall, deadline.at_monotonic)
-            budget = DecisionDeadline(wall)
+            # the float value carries the remaining seconds sampled at
+            # this handoff; the absolute instant pins the shared clock
+            # verbatim so a stall downstream can never extend it.
+            sampled_at = time.monotonic()
+            wall = min(sampled_at + timeout_seconds, deadline.at_monotonic)
+            budget = TransportBudget(wall - sampled_at, wall)
         status, raw = self._transport(
             self._config.url,
             payload,

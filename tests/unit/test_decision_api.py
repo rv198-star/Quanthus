@@ -32,6 +32,7 @@ from quanthus.decision_api.backends import (
     HttpBackendConfig,
     OpenAIDecisionsBackend,
     OpenRouterDecisionsBackend,
+    TransportBudget,
     parse_openai_ga_response,
     parse_openrouter_alpha_response,
     request_to_openai_ga,
@@ -845,11 +846,15 @@ class BackendTransportTests(unittest.TestCase):
         )
         backend.decide(sample_request(), deadline=DecisionDeadline.after(3.0))
         call = transport.calls[0]  # type: ignore[attr-defined]
-        # the transport receives the shared clock as the absolute instant
-        # of the deadline itself, never a relative sample: a stall after
-        # sampling cannot extend the budget downstream.
+        # the transport receives one TransportBudget: a float of the
+        # remaining seconds for legacy arithmetic, carrying the absolute
+        # instant of the original shared clock as at_monotonic, so a
+        # stall after this handoff cannot extend the budget downstream.
         budget = call["timeout"]
-        self.assertIsInstance(budget, DecisionDeadline)
+        self.assertIsInstance(budget, TransportBudget)
+        self.assertIsInstance(budget, float)
+        self.assertLessEqual(float(budget), 3.0)
+        self.assertGreater(float(budget), 0.0)
         remaining = budget.at_monotonic - time.monotonic()
         self.assertLessEqual(remaining, 3.0)
         self.assertGreater(remaining, 0.0)
@@ -921,6 +926,57 @@ class BackendTransportTests(unittest.TestCase):
         response = backend.decide(sample_request(), deadline=DecisionDeadline.after(2.0))
         self.assertEqual(len(response.answers), 3)
         self.assertEqual(len(transport.calls), 1)  # type: ignore[attr-defined]
+
+    def test_legacy_float_arithmetic_callback_works_with_shared_deadline(self) -> None:
+        # pre-R5 injected callbacks compute ordinary float arithmetic on
+        # the fourth parameter.  R5 passed a DecisionDeadline when a
+        # shared deadline participated and broke that arithmetic with a
+        # bare TypeError; the TransportBudget restores the numeric
+        # contract while still pinning the absolute instant downstream.
+        calls = []
+
+        def legacy(url, payload, headers, timeout_seconds: float):
+            expiry = time.monotonic() + timeout_seconds
+            calls.append(
+                {
+                    "arithmetic_ok": isinstance(expiry, float),
+                    "is_float": isinstance(timeout_seconds, float),
+                    "carries_absolute": hasattr(timeout_seconds, "at_monotonic"),
+                    "remaining": expiry - time.monotonic(),
+                }
+            )
+            return 200, json.dumps(GA_RESPONSE_BODY)
+
+        backend = OpenAIDecisionsBackend(
+            HttpBackendConfig(url="https://gw.example.test/v1/decisions", api_key="test-key"),
+            transport=legacy,
+        )
+        with_deadline = backend.decide(sample_request(), deadline=DecisionDeadline.after(3.0))
+        without_deadline = backend.decide(sample_request())
+        self.assertEqual(len(with_deadline.answers), 3)
+        self.assertEqual(len(without_deadline.answers), 3)
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            self.assertTrue(call["arithmetic_ok"])
+            self.assertTrue(call["is_float"])
+            self.assertTrue(call["carries_absolute"])
+            self.assertGreater(call["remaining"], 0.0)
+        # the shared deadline caps the budget; the standalone call uses
+        # the configured timeout
+        self.assertLessEqual(calls[0]["remaining"], 3.0)
+        self.assertAlmostEqual(calls[1]["remaining"], 30.0, delta=1.0)
+
+    def test_transport_budget_object_supports_both_contracts(self) -> None:
+        budget = TransportBudget(0.5, time.monotonic() + 0.5)
+        # legacy arithmetic contract
+        expiry = time.monotonic() + budget
+        self.assertIsInstance(expiry, float)
+        self.assertAlmostEqual(expiry - budget.at_monotonic, 0.0, delta=0.05)
+        # deadline-aware contract
+        self.assertTrue(hasattr(budget, "at_monotonic"))
+        # never a retry with a different parameter: the same object
+        # serves both consumers in one invocation
+        self.assertIsInstance(budget, float)
 
     def test_backend_config_validation(self) -> None:
         with self.assertRaisesRegex(DecisionSchemaError, "DECISION_BACKEND_URL_SCHEME"):

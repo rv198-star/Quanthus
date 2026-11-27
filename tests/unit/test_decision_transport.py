@@ -15,11 +15,16 @@ two review-critical transport properties:
 from __future__ import annotations
 
 import contextlib
+import gzip
 import http.server
 import json
+import socket
+import ssl
+import sys
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 from quanthus.decision_api.backends import (
     HttpBackendConfig,
@@ -39,6 +44,7 @@ from quanthus.decision_api.types import (
     DecisionLateAnswerError,
     DecisionRequest,
     DecisionTimeoutError,
+    DecisionTransportError,
     PredicateQuestion,
     ScoreLevel,
     ScoreQuestion,
@@ -644,6 +650,372 @@ class CrossBatchSharedDeadlineTests(unittest.TestCase):
             self.assertTrue(all(outcome == "not_dispatched" for outcome in outcomes))
             for record in ctx.exception.attempts:
                 self.assertEqual(record["usage"]["status"], "zero")
+
+
+class ContentNegotiationTests(unittest.TestCase):
+    """The raw transport declares identity, matching pre-R3 urllib behaviour."""
+
+    def test_identity_accept_encoding_is_declared_and_plain_body_parsed(self) -> None:
+        def negotiate(handler) -> None:
+            accepted = handler.headers.get("Accept-Encoding")
+            handler.server.negotiation_seen = accepted  # type: ignore[attr-defined]
+            payload = json.dumps(ANSWER_BODY).encode("utf-8")
+            # a server that gzips whenever the client does not ask for
+            # identity would otherwise feed this transport unreadable
+            # bytes; with the declared identity preference it must send
+            # plain JSON.
+            if accepted != "identity":
+                payload = gzip.compress(payload)
+            handler.send_response(200)
+            if accepted != "identity":
+                handler.send_header("Content-Encoding", "gzip")
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+
+        with MockServer() as server:
+            server.set(negotiate)
+            response = OpenAIDecisionsBackend(
+                HttpBackendConfig(url=server.url, api_key="test-key", timeout_seconds=2.0)
+            ).decide(small_request(), deadline=DecisionDeadline.after(2.0))
+            self.assertEqual(len(response.answers), 3)
+            self.assertEqual(server._server.negotiation_seen, "identity")  # type: ignore[attr-defined]
+
+
+class WriteProgressAccountingTests(unittest.TestCase):
+    """wire_dispatched follows the first accepted request byte, not connect alone."""
+
+    def _run_with_double(self, worker) -> DecisionTimeoutError:
+        config = HttpBackendConfig(
+            url="https://unresolvable.invalid/v1/decisions",
+            api_key="test-key",
+            timeout_seconds=1.0,
+        )
+        backend = OpenAIDecisionsBackend(config)
+        from quanthus.decision_api import backends as backend_module
+
+        def refuse_resolution(host, port, *args, **kwargs):
+            raise socket.gaierror(8, "synthetic offline resolution failure")
+
+        with (
+            patch.object(socket, "getaddrinfo", refuse_resolution),
+            patch.object(socket, "create_connection", return_value=worker),
+            patch.object(backend_module, "_tls_context") as tls,
+        ):
+            tls.return_value.wrap_socket.return_value = worker
+            try:
+                backend.decide(small_request())
+            except DecisionTimeoutError as error:
+                return error
+        raise AssertionError("expected DecisionTimeoutError")
+
+    def test_partial_write_is_conservatively_billable(self) -> None:
+        class PartialWrite:
+            def __init__(self) -> None:
+                self.size = 0
+                self.timeouts: list[float | None] = []
+
+            def settimeout(self, value) -> None:
+                self.timeouts.append(value)
+
+            def send(self, data) -> int:
+                if self.size:
+                    raise TimeoutError("synthetic send stall after a partial write")
+                self.size = min(64, len(data))
+                return self.size
+
+            def close(self) -> None:
+                pass
+
+        worker = PartialWrite()
+        error = self._run_with_double(worker)
+        self.assertGreater(worker.size, 0)
+        self.assertTrue(error.wire_dispatched)
+
+    def test_unstarted_write_and_tls_failure_are_certain_zero_cost(self) -> None:
+        class UnstartedWrite:
+            def settimeout(self, value) -> None:
+                pass
+
+            def send(self, data) -> int:
+                raise TimeoutError("synthetic send stall before the first byte")
+
+            def close(self) -> None:
+                pass
+
+        error = self._run_with_double(UnstartedWrite())
+        self.assertFalse(error.wire_dispatched)
+
+    def test_tls_failure_before_request_bytes_is_certain_zero_cost(self) -> None:
+        class ConnectedOnly:
+            def settimeout(self, value) -> None:
+                pass
+
+            def close(self) -> None:
+                pass
+
+        worker = ConnectedOnly()
+        config = HttpBackendConfig(
+            url="https://unresolvable.invalid/v1/decisions",
+            api_key="test-key",
+            timeout_seconds=1.0,
+        )
+        backend = OpenAIDecisionsBackend(config)
+        from quanthus.decision_api import backends as backend_module
+
+        def refuse_resolution(host, port, *args, **kwargs):
+            raise socket.gaierror(8, "synthetic offline resolution failure")
+
+        def fail_handshake(sock, server_hostname=None):
+            raise ssl.SSLError("certificate verify failed: synthetic")
+
+        with (
+            patch.object(socket, "getaddrinfo", refuse_resolution),
+            patch.object(socket, "create_connection", return_value=worker),
+            patch.object(backend_module, "_tls_context") as tls,
+        ):
+            tls.return_value.wrap_socket.side_effect = fail_handshake
+            with self.assertRaises(Exception) as ctx:
+                backend.decide(small_request())
+        self.assertFalse(ctx.exception.wire_dispatched)
+
+
+class ResolutionDeadlineTests(unittest.TestCase):
+    """Resolution shares the absolute budget and never dispatches after expiry."""
+
+    def test_slow_resolution_returns_at_wall_without_connect(self) -> None:
+        events: list[str] = []
+        original = socket.getaddrinfo
+
+        def stalled_lookup(host, port, *args, **kwargs):
+            time.sleep(0.72)
+            return original(host, port, *args, **kwargs)
+
+        def record_connect(self_sock, address):
+            events.append("connect")
+            raise AssertionError("connect must never start after the deadline")
+
+        config = HttpBackendConfig(
+            url="https://unresolvable.invalid/v1/decisions",
+            api_key="test-key",
+            timeout_seconds=1.0,
+        )
+        backend = OpenAIDecisionsBackend(config)
+        deadline = DecisionDeadline.after(0.31)
+        started = time.monotonic()
+        with (
+            patch.object(socket, "getaddrinfo", stalled_lookup),
+            patch.object(socket.socket, "connect", record_connect),
+            self.assertRaises(DecisionTimeoutError),
+        ):
+            backend.decide(small_request(), deadline=deadline)
+        elapsed = time.monotonic() - started
+        self.assertEqual(events, [])
+        self.assertLessEqual(elapsed, 0.31 + 0.25)
+        self.assertGreaterEqual(elapsed, 0.25)
+
+
+class DispatchStallTests(unittest.TestCase):
+    """A stall before transport entry can never smuggle an expired POST."""
+
+    def test_stall_inside_header_building_dispatches_nothing(self) -> None:
+        with MockServer() as server:
+            hits: list[float] = []
+
+            def counting(behavior):
+                def wrapped(handler) -> None:
+                    hits.append(time.monotonic())
+                    behavior(handler)
+
+                return wrapped
+
+            server.set(counting(respond_fixed(200, json.dumps(ANSWER_BODY))))
+            backend = OpenAIDecisionsBackend(
+                HttpBackendConfig(url=server.url, api_key="test-key", timeout_seconds=1.0)
+            )
+            original_headers = backend._headers  # noqa: SLF001 -- the stall reproduces the audit injection
+
+            def stalled_headers():
+                time.sleep(0.44)
+                return original_headers()
+
+            backend._headers = stalled_headers  # type: ignore[method-assign]
+            deadline = DecisionDeadline.after(0.32)
+            with self.assertRaises(DecisionTimeoutError) as ctx:
+                backend.decide(small_request(), deadline=deadline)
+            self.assertFalse(ctx.exception.wire_dispatched)
+            self.assertEqual(hits, [])
+
+
+class ParseDeadlineGateTests(unittest.TestCase):
+    """The final delivery gate runs after typed-answer parsing."""
+
+    def test_parse_injected_delay_rejects_delivery_and_keeps_usage(self) -> None:
+        raw = json.dumps(ANSWER_BODY)
+
+        def instant(url, payload, headers, timeout):
+            return 200, raw
+
+        backend = OpenAIDecisionsBackend(
+            HttpBackendConfig(
+                url="https://synthetic.invalid/v1/decisions",
+                api_key="test-key",
+                timeout_seconds=5.0,
+            ),
+            transport=instant,
+        )
+        from quanthus.decision_api import backends as backend_module
+
+        original = backend_module.parse_openai_ga_response
+
+        def delayed_parse(body, request):
+            time.sleep(0.35)
+            return original(body, request)
+
+        deadline = DecisionDeadline.after(0.3)
+        with (
+            patch.object(backend_module, "parse_openai_ga_response", delayed_parse),
+            self.assertRaises(DecisionLateAnswerError) as ctx,
+        ):
+            backend.decide(small_request(), deadline=deadline)
+        # the vendor processed the request, so the rejection keeps the
+        # wire usage as billable evidence
+        assert ctx.exception.usage is not None
+        self.assertEqual(ctx.exception.usage.input_tokens, 10)
+
+    def test_parse_inside_deadline_still_delivers(self) -> None:
+        raw = json.dumps(ANSWER_BODY)
+
+        def instant(url, payload, headers, timeout):
+            return 200, raw
+
+        backend = OpenAIDecisionsBackend(
+            HttpBackendConfig(
+                url="https://synthetic.invalid/v1/decisions",
+                api_key="test-key",
+                timeout_seconds=5.0,
+            ),
+            transport=instant,
+        )
+        deadline = DecisionDeadline.after(2.0)
+        response = backend.decide(small_request(), deadline=deadline)
+        self.assertEqual(len(response.answers), 3)
+
+
+class JsonDepthTests(unittest.TestCase):
+    """Decoder depth rejections stay typed; statuses and credentials survive."""
+
+    def _deep_body(self) -> str:
+        depth = sys.getrecursionlimit() + 16
+        return '{"detail":' + "[" * depth + "0" + "]" * depth + "}"
+
+    def test_2xx_deep_body_is_typed_transport_error(self) -> None:
+        def deep(url, payload, headers, timeout):
+            return 200, self._deep_body()
+
+        backend = OpenAIDecisionsBackend(
+            HttpBackendConfig(
+                url="https://synthetic.invalid/v1/decisions",
+                api_key="test-key",
+                timeout_seconds=5.0,
+            ),
+            transport=deep,
+        )
+        with self.assertRaisesRegex(DecisionTransportError, "DECISION_RESPONSE_JSON_DEPTH"):
+            backend.decide(small_request())
+
+    def test_deep_401_body_preserves_status_and_zero_failover(self) -> None:
+        deep_text = self._deep_body()
+
+        def first(url, payload, headers, timeout):
+            return 401, deep_text
+
+        fallback_calls: list[str] = []
+
+        def backup(url, payload, headers, timeout):
+            fallback_calls.append("hit")
+            return 200, json.dumps(ANSWER_BODY)
+
+        first_spec = DecisionProviderSpec(
+            id="first",
+            type="openai-ga",
+            base_url="https://synthetic.invalid",
+            endpoint_path="/v1/decisions",
+            model="test-model",
+            api_key_env="UNUSED",
+        )
+        second_spec = DecisionProviderSpec(
+            id="second",
+            type="openai-ga",
+            base_url="https://synthetic.invalid",
+            endpoint_path="/v1/decisions",
+            model="test-model",
+            api_key_env="UNUSED",
+        )
+        first_backend = OpenAIDecisionsBackend(
+            HttpBackendConfig(first_spec.url, "test-key", 1.0), first
+        )
+        second_backend = OpenAIDecisionsBackend(
+            HttpBackendConfig(second_spec.url, "test-key", 1.0), backup
+        )
+        chain = PriorityBackend(((first_spec, first_backend), (second_spec, second_backend)))
+        with self.assertRaises(DecisionHttpError) as ctx:
+            chain.decide(small_request())
+        self.assertEqual(ctx.exception.status, 401)
+        self.assertEqual(fallback_calls, [])
+        self.assertEqual(len(ctx.exception.attempts), 2)
+        self.assertEqual(ctx.exception.attempts[0]["outcome"], "http_401")
+        self.assertEqual(ctx.exception.attempts[1]["skip_reason"], "deterministic_stop")
+
+
+class TlsRearmTests(unittest.TestCase):
+    """The TLS handshake re-arms to the budget left when the handshake starts."""
+
+    def test_handshake_timeout_reflects_remaining_budget_not_connect_snapshot(self) -> None:
+        from quanthus.decision_api import backends as backend_module
+
+        class RecordingSocket:
+            def __init__(self) -> None:
+                self.timeouts: list[float] = []
+
+            def settimeout(self, value) -> None:
+                self.timeouts.append(value)
+
+            def send(self, data) -> int:
+                raise TimeoutError("unreachable in this probe")
+
+            def close(self) -> None:
+                pass
+
+        worker = RecordingSocket()
+
+        def refuse_resolution(host, port, *args, **kwargs):
+            raise socket.gaierror(8, "synthetic offline resolution failure")
+
+        def stall_handshake(sock, server_hostname=None):
+            raise ssl.SSLError("The read operation timed out")
+
+        config = HttpBackendConfig(
+            url="https://unresolvable.invalid/v1/decisions",
+            api_key="test-key",
+            timeout_seconds=1.0,
+        )
+        backend = OpenAIDecisionsBackend(config)
+        deadline = DecisionDeadline.after(0.6)
+        with (
+            patch.object(socket, "getaddrinfo", refuse_resolution),
+            patch.object(socket, "create_connection", return_value=worker),
+            patch.object(backend_module, "_tls_context") as tls,
+        ):
+            tls.return_value.wrap_socket.side_effect = stall_handshake
+            with self.assertRaises(DecisionTimeoutError):
+                backend.decide(small_request(), deadline=deadline)
+        # the socket timeout passed into the handshake is the remaining
+        # shared budget at handshake start, never the stale connect-time
+        # snapshot: it must not exceed the 0.6s absolute window.
+        self.assertTrue(worker.timeouts)
+        self.assertLessEqual(worker.timeouts[-1], 0.6)
+        self.assertGreater(worker.timeouts[-1], 0.0)
 
 
 if __name__ == "__main__":

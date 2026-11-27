@@ -20,10 +20,6 @@ R3 hardening after the second independent review of PR #756:
   starts and re-checked after it returns.  A slow-header server, a
   trickling body and an HTTP/1.0 close-delimited body are all bounded
   by the same strict deadline;
-* the absolute deadline covers the logical call from dispatch to
-  return: a complete response assembled only after the deadline is
-  rejected as DecisionLateAnswerError, never delivered, while its
-  parsed usage is preserved because the vendor did process the request;
 * a non-2xx status is locked for failover classification the moment the
   response headers are complete.  The error body and its usage evidence
   are then read best-effort inside the remaining budget only; a delayed,
@@ -33,6 +29,37 @@ R3 hardening after the second independent review of PR #756:
   NaN or infinite probabilities, boolean masquerading, negative token
   counts or negative cost -- are typed schema errors, never bare
   OverflowError/ValueError escapes and never silently accepted.
+
+R4 hardening after the third independent review of PR #756:
+
+* the same absolute clock covers resolution, connect, TLS, send, the
+  response read, typed parsing and final delivery.  Name resolution
+  runs in a daemon worker joined for the remaining budget: once the
+  budget expires the caller returns at the wall and no TCP or HTTP
+  dispatch follows even if the resolver finishes later.  The TCP
+  connect iterates the resolved addresses with a per-attempt timeout
+  re-armed to the remaining budget, and the TLS handshake re-arms to
+  the budget left when the handshake actually starts, not the stale
+  value snapshot before dialing.  The effective relative timeout is
+  computed after request headers are built, immediately before the
+  transport is entered, so a scheduling stall before dispatch cannot
+  smuggle an expired POST onto the wire.  Delivery is gated after
+  typed-answer parsing: an answer whose binding completes past the
+  shared deadline is rejected as DecisionLateAnswerError, never
+  delivered, while its parsed usage is preserved because the vendor
+  did process the request;
+* wire progress is tracked byte-accurately: a failure after zero
+  accepted request bytes is certain zero cost (wire_dispatched=False),
+  while a failure after a partial write is conservatively billable
+  because the vendor may have received request bytes;
+* decoding failures stay typed: a body the JSON decoder rejects at any
+  depth surfaces as DecisionTransportError with the deterministic HTTP
+  status already locked, never as a bare RecursionError, and a post-2xx
+  typed-parse failure keeps the well-formed wire usage as billing
+  evidence on the schema error;
+* ordinary HTTP content negotiation is preserved: the transport
+  declares Accept-Encoding: identity because it does not implement
+  response decompression, matching the pre-R3 urllib behaviour.
 """
 
 from __future__ import annotations
@@ -42,6 +69,7 @@ import json
 import math
 import socket
 import ssl
+import threading
 import time
 import urllib.parse
 from abc import ABC, abstractmethod
@@ -53,6 +81,7 @@ from quanthus.decision_api.types import (
     ChoiceAnswer,
     ChoiceQuestion,
     DecisionDeadline,
+    DecisionError,
     DecisionHttpError,
     DecisionLateAnswerError,
     DecisionRefusal,
@@ -144,21 +173,16 @@ class UrllibJsonTransport:
         if parts.query:
             target += "?" + parts.query
         deadline = time.monotonic() + timeout_seconds
-        sent_any = False
+        progress = {"sent_any": False}
         sock: socket.socket | None = None
         try:
             body_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             request_bytes = self._request_bytes(parts, target, body_bytes, headers)
             self._require_budget(deadline, timeout_seconds, "CONNECT")
-            sock = socket.create_connection(
-                (parts.hostname, port), timeout=max(self._remaining(deadline), 0.001)
+            sock = self._open_connection(
+                parts.hostname, port, parts.scheme == "https", deadline, timeout_seconds
             )
-            self._require_budget(deadline, timeout_seconds, "CONNECT")
-            if parts.scheme == "https":
-                sock = _tls_context().wrap_socket(sock, server_hostname=parts.hostname)
-                self._require_budget(deadline, timeout_seconds, "CONNECT")
-            self._send_all(sock, request_bytes, deadline, timeout_seconds)
-            sent_any = True
+            self._send_all(sock, request_bytes, deadline, timeout_seconds, progress)
             status, head_rest, response_headers = self._read_head(sock, deadline, timeout_seconds)
             self._require_budget(deadline, timeout_seconds, "HEADERS")
             if 200 <= status < 300:
@@ -181,23 +205,134 @@ class UrllibJsonTransport:
                 body_raw = b""
             return status, body_raw.decode("utf-8", errors="replace")
         except DecisionTimeoutError as error:
-            error.wire_dispatched = error.wire_dispatched and sent_any
+            error.wire_dispatched = error.wire_dispatched and progress["sent_any"]
             raise
         except DecisionTransportError as error:
-            error.wire_dispatched = error.wire_dispatched and sent_any
+            error.wire_dispatched = error.wire_dispatched and progress["sent_any"]
             raise
         except TimeoutError as error:
-            raise DecisionTimeoutError(f"DECISION_TIMEOUT after {timeout_seconds}s") from error
+            converted = DecisionTimeoutError(f"DECISION_TIMEOUT after {timeout_seconds}s")
+            converted.wire_dispatched = progress["sent_any"]
+            raise converted from error
         except ssl.SSLError as error:
+            # a TLS failure before the first accepted request byte is
+            # certain zero cost: nothing was dispatched onto the wire.
             if "timed out" in str(error).lower():
-                raise DecisionTimeoutError(f"DECISION_TIMEOUT after {timeout_seconds}s") from error
-            raise DecisionTransportError(f"DECISION_TRANSPORT_TLS: {error}") from error
+                converted_timeout: DecisionError = DecisionTimeoutError(
+                    f"DECISION_TIMEOUT after {timeout_seconds}s"
+                )
+                converted_timeout.wire_dispatched = progress["sent_any"]
+                raise converted_timeout from error
+            converted_tls: DecisionError = DecisionTransportError(
+                f"DECISION_TRANSPORT_TLS: {error}"
+            )
+            converted_tls.wire_dispatched = progress["sent_any"]
+            raise converted_tls from error
         except OSError as error:
-            raise DecisionTransportError(f"DECISION_TRANSPORT: {error}") from error
+            converted_io: DecisionError = DecisionTransportError(f"DECISION_TRANSPORT: {error}")
+            converted_io.wire_dispatched = progress["sent_any"]
+            raise converted_io from error
         finally:
             if sock is not None:
                 with contextlib.suppress(Exception):
                     sock.close()
+
+    def _open_connection(
+        self, host: str, port: int, use_tls: bool, deadline: float, budget: float
+    ) -> socket.socket:
+        """Resolve, connect and optionally wrap TLS, all inside one budget.
+
+        Resolution runs in a daemon worker joined for the remaining
+        budget: once the budget expires the worker is orphaned, the
+        caller returns at the wall, and no TCP connect follows even when
+        the resolver finishes later because the connect phase re-checks
+        the same absolute deadline before dialing.  Each connect attempt
+        and the TLS handshake re-arm to the budget left when they start.
+        """
+        sock = self._connect(host, port, deadline, budget)
+        self._require_budget(deadline, budget, "CONNECT")
+        if not use_tls:
+            return sock
+        # the handshake consumes the budget left at handshake start, never
+        # the stale connect-time snapshot
+        self._rearm(sock, deadline)
+        try:
+            wrapped = _tls_context().wrap_socket(sock, server_hostname=host)
+        except BaseException:
+            with contextlib.suppress(Exception):
+                sock.close()
+            raise
+        self._require_budget(deadline, budget, "CONNECT")
+        return wrapped
+
+    def _resolve_bounded(
+        self, host: str, port: int, deadline: float, budget: float
+    ) -> list[Any] | None:
+        """Resolve host inside the remaining budget.
+
+        Returns the address list on success or None when resolution
+        completed inside budget with a definitive negative answer; the
+        caller then reproduces that failure through the standard connect
+        entry point.  Budget expiry raises DecisionTimeoutError: the
+        blocking platform resolver cannot be killed, so it runs in a
+        daemon worker joined for the remaining budget, and an orphaned
+        late resolver can never cause a dispatch because every later
+        phase re-checks the same absolute clock.
+        """
+        self._require_budget(deadline, budget, "RESOLVE")
+        result: dict[str, Any] = {}
+
+        def lookup() -> None:
+            try:
+                result["infos"] = socket.getaddrinfo(
+                    host, port, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP
+                )
+            except OSError as error:
+                result["failure"] = error
+
+        worker = threading.Thread(target=lookup, daemon=True)
+        worker.start()
+        worker.join(max(self._remaining(deadline), 0.0))
+        if worker.is_alive():
+            raise DecisionTimeoutError(f"DECISION_TIMEOUT_RESOLVE after {budget}s")
+        self._require_budget(deadline, budget, "RESOLVE")
+        if "failure" in result:
+            return None
+        infos = result.get("infos") or []
+        return infos if infos else None
+
+    def _connect(self, host: str, port: int, deadline: float, budget: float) -> socket.socket:
+        """Connect to the resolved addresses with per-attempt budget re-arming."""
+        infos = self._resolve_bounded(host, port, deadline, budget)
+        if infos is None:
+            # resolution finished inside budget with a definitive negative
+            # answer; reproduce exactly that failure through the standard
+            # connect entry point.
+            return socket.create_connection(
+                (host, port), timeout=max(self._remaining(deadline), 0.001)
+            )
+        last_error: OSError | None = None
+        for family, socktype, proto, _canonname, sockaddr in infos:
+            self._require_budget(deadline, budget, "CONNECT")
+            candidate = socket.socket(family, socktype, proto)
+            try:
+                self._rearm(candidate, deadline)
+                candidate.connect(sockaddr)
+            except OSError as error:
+                with contextlib.suppress(Exception):
+                    candidate.close()
+                last_error = error
+                continue
+            self._require_budget(deadline, budget, "CONNECT")
+            return candidate
+        if last_error is not None:
+            raise last_error
+        raise DecisionTransportError("DECISION_TRANSPORT_RESOLVE_EMPTY")
+
+    @staticmethod
+    def _rearm(sock: socket.socket, deadline: float) -> None:
+        """Point the socket timeout at the remaining shared budget."""
+        sock.settimeout(max(deadline - time.monotonic(), 0.001))
 
     @staticmethod
     def _remaining(deadline: float) -> float:
@@ -231,13 +366,33 @@ class UrllibJsonTransport:
             merged[key.lower()] = str(value)
         merged.setdefault("host", parts.netloc)
         merged.setdefault("content-type", "application/json")
+        # this transport does not implement response decompression, so it
+        # must negotiate identity; omitting the header silently re-opens
+        # content codings the client cannot read (the pre-R3 urllib
+        # behaviour already declared identity).
+        merged["accept-encoding"] = "identity"
         merged["content-length"] = str(len(body))
         merged["connection"] = "close"
         head = [f"POST {target} HTTP/1.1"]
         head.extend(f"{key}: {value}" for key, value in merged.items())
         return ("\r\n".join(head) + "\r\n\r\n").encode("utf-8") + body
 
-    def _send_all(self, sock: socket.socket, data: bytes, deadline: float, budget: float) -> None:
+    def _send_all(
+        self,
+        sock: socket.socket,
+        data: bytes,
+        deadline: float,
+        budget: float,
+        progress: dict[str, bool],
+    ) -> None:
+        """Write the full request, recording the first accepted byte.
+
+        progress["sent_any"] flips true exactly when the first byte is
+        accepted by the socket.  Billing depends on the distinction: a
+        failure before that byte is certain zero cost, while a failure
+        after a partial write is conservatively billable because request
+        bytes may have reached the vendor.
+        """
         view = memoryview(data)
         while view:
             remaining = self._remaining(deadline)
@@ -250,6 +405,7 @@ class UrllibJsonTransport:
                 raise DecisionTimeoutError(f"DECISION_TIMEOUT_SEND after {budget}s") from error
             if written <= 0:
                 raise DecisionTransportError("DECISION_TRANSPORT_SEND_ZERO")
+            progress["sent_any"] = True
             view = view[written:]
 
     def _read_head(
@@ -406,6 +562,12 @@ def _decode_json_or_raise(raw: str) -> Any:
         return json.loads(raw)
     except (json.JSONDecodeError, ValueError) as error:
         raise DecisionTransportError("DECISION_RESPONSE_NOT_JSON") from error
+    except RecursionError as error:
+        # a diagnostic body nested beyond the decoder's depth limit is a
+        # malformed wire response, not a bare runtime escape: it must stay
+        # typed so the deterministic HTTP status, the error class and the
+        # per-call credential records survive.
+        raise DecisionTransportError("DECISION_RESPONSE_JSON_DEPTH") from error
 
 
 def _as_finite_float(value: Any, reason: str) -> float:
@@ -497,11 +659,18 @@ class _BaseHttpBackend(DecisionBackend):
         # must yield a tiny budget rather than an overrun allowance
         return min(timeout, remaining)
 
-    def _send(self, payload: JsonObject, timeout_seconds: float) -> JsonObject:
+    def _send(self, payload: JsonObject, deadline: DecisionDeadline | None) -> JsonObject:
+        # the relative timeout is computed after the headers are built,
+        # at the last evaluation before the transport is entered: a
+        # scheduling stall anywhere before this point cannot smuggle a
+        # dispatch past the shared absolute wall because an expired
+        # deadline raises here, ahead of any wire use.
+        headers = self._headers()
+        timeout_seconds = self._effective_timeout(deadline)
         status, raw = self._transport(
             self._config.url,
             payload,
-            self._headers(),
+            headers,
             timeout_seconds,
         )
         # Status-first classification: the HTTP status alone decides
@@ -516,21 +685,41 @@ class _BaseHttpBackend(DecisionBackend):
             raise DecisionSchemaError("DECISION_RESPONSE_NOT_OBJECT")
         return decoded
 
-    def _reject_if_late(self, deadline: DecisionDeadline | None, decoded: JsonObject) -> None:
+    def _reject_if_late(
+        self, deadline: DecisionDeadline | None, response: DecisionResponse
+    ) -> DecisionResponse:
         """Refuse to deliver a complete response assembled past the deadline.
 
-        The deadline covers dispatch-to-return, so a late answer is never
-        usable evidence.  The vendor did process the request, so the
-        rejection carries the leniently parsed usage as billing evidence.
+        The final delivery gate runs after typed-answer parsing: the
+        deadline covers the logical call from dispatch to return, so an
+        answer whose per-question binding completes past the wall is
+        rejected even when every byte is well-formed.  The vendor did
+        process the request, so the rejection carries the parsed usage
+        as billing evidence.
         """
         if deadline is None or not deadline.exceeded():
-            return
-        usage = None
-        try:
-            usage = _parse_usage(decoded.get("usage"))
-        except DecisionSchemaError:
-            usage = None
+            return response
+        usage = response.usage if response.usage.present else None
         raise DecisionLateAnswerError("DECISION_LATE_ANSWER", usage=usage)
+
+    def _parse_response_or_raise(
+        self,
+        parser: Callable[[JsonObject, DecisionRequest], DecisionResponse],
+        body: JsonObject,
+        request: DecisionRequest,
+    ) -> DecisionResponse:
+        """Bind typed answers, preserving wire usage on a schema failure.
+
+        A post-2xx parse failure is deterministic and the response is
+        untrusted, but the wire may still carry well-formed usage: the
+        vendor processed the request, so that evidence is attached to
+        the typed error instead of being dropped.
+        """
+        try:
+            return parser(body, request)
+        except DecisionSchemaError as error:
+            error.usage = _lenient_usage_from_object(body)
+            raise
 
 
 def _lenient_usage(raw: str) -> TokenUsage | None:
@@ -545,13 +734,26 @@ def _lenient_usage(raw: str) -> TokenUsage | None:
     """
     try:
         decoded = json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError, RecursionError):
         return None
+    if not isinstance(decoded, dict):
+        return None
+    return _lenient_usage_from_object(decoded)
+
+
+def _lenient_usage_from_object(decoded: Any) -> TokenUsage | None:
+    """Best-effort usage extraction from an already-decoded response object.
+
+    Shares the lenient contract of _lenient_usage: anything short of a
+    well-formed, present usage object yields None, and the extraction
+    never raises -- including for a usage object nested beyond the
+    decoder's depth or otherwise malformed.
+    """
     if not isinstance(decoded, dict):
         return None
     try:
         usage = _parse_usage(decoded.get("usage"))
-    except (DecisionSchemaError, TypeError, AttributeError):
+    except (DecisionSchemaError, TypeError, AttributeError, RecursionError):
         return None
     if not usage.present:
         return None
@@ -572,10 +774,9 @@ class OpenAIDecisionsBackend(_BaseHttpBackend):
         except DecisionSchemaError as error:
             error.wire_dispatched = False
             raise
-        timeout = self._effective_timeout(deadline)
-        body = self._send(payload, timeout)
-        self._reject_if_late(deadline, body)
-        return parse_openai_ga_response(body, request)
+        body = self._send(payload, deadline)
+        response = self._parse_response_or_raise(parse_openai_ga_response, body, request)
+        return self._reject_if_late(deadline, response)
 
 
 def request_to_openai_ga(request: DecisionRequest) -> JsonObject:
@@ -842,10 +1043,9 @@ class OpenRouterDecisionsBackend(_BaseHttpBackend):
         except DecisionSchemaError as error:
             error.wire_dispatched = False
             raise
-        timeout = self._effective_timeout(deadline)
-        body = self._send(payload, timeout)
-        self._reject_if_late(deadline, body)
-        return parse_openrouter_alpha_response(body, request)
+        body = self._send(payload, deadline)
+        response = self._parse_response_or_raise(parse_openrouter_alpha_response, body, request)
+        return self._reject_if_late(deadline, response)
 
 
 def request_to_openrouter_alpha(request: DecisionRequest) -> JsonObject:

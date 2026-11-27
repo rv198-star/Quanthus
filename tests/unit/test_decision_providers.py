@@ -456,9 +456,30 @@ class PriorityDispatchTests(unittest.TestCase):
         with self.assertRaisesRegex(DecisionSchemaError, "DECISION_ANSWER_COUNT"):
             backend.decide(sample_request(model="model-first"))
         self.assertEqual(backend.last_attempts[0]["outcome"], "schema_error")
+        # the vendor processed the request and the same body carried a
+        # well-formed positive usage object, so the billing evidence is
+        # preserved on the credential record even though the response
+        # itself is rejected as untrusted.
+        self.assertEqual(backend.last_attempts[0]["usage"]["status"], "metered")
+        self.assertEqual(backend.last_attempts[0]["usage"]["input_tokens"], 300)
+        self.assertEqual(len(backend.last_attempts), 2)
+        self.assertEqual(backend.last_attempts[1]["outcome"], "not_dispatched")
+
+    def test_schema_error_after_2xx_without_wire_usage_stays_unknown(self) -> None:
+        bad = copy.deepcopy(GA_RESPONSE_BODY)
+        bad["answers"] = bad["answers"][:2]  # count mismatch -> schema error after a 200
+        del bad["usage"]
+        script = {
+            (FIRST_URL, "model-first"): (200, bad),
+            (SECOND_URL, "model-second"): (200, GA_RESPONSE_BODY),
+        }
+        backend = build_priority_backend(
+            TWO_PROVIDER_CHAIN, transport=scripted_transport(script), environ=ENV
+        )
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_ANSWER_COUNT"):
+            backend.decide(sample_request(model="model-first"))
+        self.assertEqual(backend.last_attempts[0]["outcome"], "schema_error")
         self.assertEqual(backend.last_attempts[0]["usage"]["status"], "unknown")
-        # the 200 response did assemble -- only its answers were invalid --
-        # so the usage evidence is absent, never a no-response timeout
         self.assertEqual(backend.last_attempts[0]["usage"]["detail"], "usage_object_absent")
         self.assertEqual(len(backend.last_attempts), 2)
         self.assertEqual(backend.last_attempts[1]["outcome"], "not_dispatched")
@@ -934,6 +955,127 @@ class LateAnswerChainTests(unittest.TestCase):
         self.assertEqual(error.attempts[0]["usage"]["input_tokens"], 300)
         self.assertEqual(error.attempts[1]["skip_reason"], "deadline")
         self.assertTrue(error.deadline_stopped)
+
+
+class ContradictoryUsageTests(unittest.TestCase):
+    """A zero input/output pair with positive total or cached is never zero-cost proof."""
+
+    def _single(self, body):
+        script = {(FIRST_URL, "model-first"): (200, body)}
+        chain = ProviderChain(providers=(TWO_PROVIDER_CHAIN.providers[0],))
+        return build_priority_backend(chain, transport=scripted_transport(script), environ=ENV)
+
+    def test_positive_declared_total_with_zero_pair_is_unverifiable(self) -> None:
+        body = {
+            **GA_RESPONSE_BODY,
+            "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 20, "cost": 0.0},
+        }
+        backend = self._single(body)
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("unknown", "usage_contradictory"))
+        # the reported counts stay verbatim for audit even though the
+        # ledger must reserve worst case
+        self.assertEqual(usage["total_tokens"], 20)
+        self.assertEqual(usage["input_tokens"], 0)
+
+    def test_positive_cached_with_zero_pair_is_unverifiable(self) -> None:
+        body = {
+            **GA_RESPONSE_BODY,
+            "usage": {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "input_tokens_details": {"cached_tokens": 20},
+            },
+        }
+        backend = self._single(body)
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("unknown", "usage_contradictory"))
+        self.assertEqual(usage["cached_tokens"], 20)
+
+    def test_consistent_explicit_zero_stays_certain_zero(self) -> None:
+        body = {
+            **GA_RESPONSE_BODY,
+            "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "cost": 0.0},
+        }
+        backend = self._single(body)
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("zero", "wire_reported"))
+
+    def test_positive_cost_with_zero_counters_stays_metered(self) -> None:
+        body = {
+            **GA_RESPONSE_BODY,
+            "usage": {"input_tokens": 0, "output_tokens": 0, "cost": 0.004},
+        }
+        backend = self._single(body)
+        backend.decide(sample_request(model="model-first"))
+        usage = backend.last_attempts[0]["usage"]
+        self.assertEqual((usage["status"], usage["detail"]), ("metered", "wire_reported"))
+        self.assertEqual(usage["cost"], 0.004)
+
+
+def _minimal_chain_document() -> dict:
+    return {
+        "schema_version": "quanthus.decision-providers.v1",
+        "providers": [
+            {
+                "id": "boundary-first",
+                "type": "openai-ga",
+                "base_url": "https://boundary.example.test",
+                "endpoint_path": "/v1/decisions",
+                "model": "boundary-model",
+                "api_key_env": "BOUNDARY_KEY",
+            }
+        ],
+    }
+
+
+class NumericBoundaryTests(unittest.TestCase):
+    """Non-finite or overflowing values can never enter a budget comparison."""
+
+    def test_deadline_rejects_nan_infinity_and_overflow(self) -> None:
+        for value in (float("nan"), float("inf"), 10**400):
+            with self.assertRaisesRegex(DecisionSchemaError, "DECISION_DEADLINE_RANGE"):
+                DecisionDeadline.after(value)
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_DEADLINE_RANGE"):
+            DecisionDeadline(at_monotonic=float("nan"))
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_DEADLINE_RANGE"):
+            DecisionDeadline(at_monotonic=float("inf"))
+        # finite durations still construct normally
+        self.assertGreater(DecisionDeadline.after(0.5).at_monotonic, 0.0)
+
+    def test_provider_price_rejects_nan_infinity_and_overflow(self) -> None:
+        document = _minimal_chain_document()
+        for value in (float("nan"), float("inf"), 10**400, -0.01):
+            variant = json.loads(json.dumps(document))
+            variant["providers"][0]["input_price_usd_per_mtok"] = value
+            with self.assertRaisesRegex(DecisionSchemaError, "DECISION_PROVIDER_SPEC_PRICE"):
+                parse_provider_chain(variant)
+        finite = json.loads(json.dumps(document))
+        finite["providers"][0]["input_price_usd_per_mtok"] = 0.75
+        parsed = parse_provider_chain(finite)
+        self.assertEqual(parsed.providers[0].input_price_usd_per_mtok, 0.75)
+
+    def test_reservation_rejects_overflowing_products_and_volumes(self) -> None:
+        document = _minimal_chain_document()
+        document["providers"][0]["input_price_usd_per_mtok"] = 0.75
+        document["providers"][0]["output_price_usd_per_mtok"] = 0.0
+        paid = parse_provider_chain(document).providers[0]
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_RESERVATION_OVERFLOW"):
+            reserve_worst_case_usd(paid, 10**400, 50)
+        expensive = parse_provider_chain(
+            {
+                **document,
+                "providers": [{**document["providers"][0], "input_price_usd_per_mtok": 1e308}],
+            }
+        ).providers[0]
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_RESERVATION_OVERFLOW"):
+            reserve_worst_case_usd(expensive, 10, 10)
+        # finite inputs still quote exactly
+        self.assertAlmostEqual(reserve_worst_case_usd(paid, 1200, 50) or 0.0, 0.0009, places=9)
 
 
 if __name__ == "__main__":

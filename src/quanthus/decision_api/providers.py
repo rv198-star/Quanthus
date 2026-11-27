@@ -30,11 +30,26 @@ R3 hardening after the second independent review of PR #756:
 * reservation entry points validate their volume arguments: negative or
   non-integer token volumes are typed schema errors, never negative
   quotes.
+
+R4 hardening after the third independent review of PR #756:
+
+* a usage object whose input and output counters are both zero but
+  whose declared total or cached count is positive is contradictory
+  evidence, never certain-zero proof: it keeps its reported counters
+  verbatim and is accounted as unknown at worst case;
+* the chain applies the final delivery gate: an answer that completes
+  its bookkeeping past the shared absolute deadline is rejected as
+  late_answer with its usage evidence attached, never delivered;
+* prices and reservation arithmetic are finite-checked end to end:
+  NaN, infinite or overflowing prices, volumes and products are typed
+  schema errors, never NaN/Infinity quotes or bare OverflowError
+  escapes, so every computed quote is usable in a budget comparison.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from dataclasses import dataclass, replace
@@ -233,7 +248,16 @@ def _parse_provider_spec(entry: Any, index: int, seen_ids: set[str]) -> Decision
             continue
         if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
             raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_PRICE{where}:{price_key}")
-        prices[price_key] = float(value)
+        try:
+            converted = float(value)
+        except (OverflowError, ValueError) as error:
+            raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_PRICE{where}:{price_key}") from error
+        # NaN and infinity can never participate in a budget comparison:
+        # a non-finite published price is a configuration error, not a
+        # quote the consumer must defend against downstream.
+        if not math.isfinite(converted):
+            raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_PRICE{where}:{price_key}")
+        prices[price_key] = converted
     if spec_id in seen_ids:
         raise DecisionSchemaError(f"DECISION_PROVIDER_SPEC_DUPLICATE{where}:{spec_id}")
     seen_ids.add(spec_id)
@@ -366,6 +390,21 @@ def _usage_snapshot(usage: TokenUsage | None, *, wire_reached: bool) -> dict[str
         or usage.output_tokens > 0
         or (usage.cost is not None and usage.cost > 0)
     )
+    if not positive and (usage.total_tokens > 0 or usage.cached_tokens > 0):
+        # both billable counters are zero yet the declared total or the
+        # cached count is positive: the wire evidence contradicts itself,
+        # so it is unverifiable rather than certain-zero proof.  the
+        # reported counts stay verbatim for audit while the ledger
+        # reserves worst case.
+        return {
+            "status": "unknown",
+            "detail": "usage_contradictory",
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "total_tokens": usage.total_tokens,
+            "cached_tokens": usage.cached_tokens,
+            "cost": usage.cost,
+        }
     return {
         "status": "metered" if positive else "zero",
         "detail": "wire_reported",
@@ -418,10 +457,19 @@ def reserve_worst_case_usd(
     _validate_volume(max_input_tokens, max_output_tokens)
     if spec.input_price_usd_per_mtok is None or spec.output_price_usd_per_mtok is None:
         return None
-    return (
-        max_input_tokens * spec.input_price_usd_per_mtok
-        + max_output_tokens * spec.output_price_usd_per_mtok
-    ) / 1_000_000.0
+    try:
+        total = (
+            max_input_tokens * spec.input_price_usd_per_mtok
+            + max_output_tokens * spec.output_price_usd_per_mtok
+        ) / 1_000_000.0
+    except (OverflowError, ValueError) as error:
+        raise DecisionSchemaError("DECISION_RESERVATION_OVERFLOW") from error
+    # a quote outside the finite range cannot participate in any budget
+    # comparison, so the reservation fails closed instead of returning
+    # NaN or Infinity as accounting evidence.
+    if not math.isfinite(total):
+        raise DecisionSchemaError("DECISION_RESERVATION_OVERFLOW")
+    return total
 
 
 def chain_worst_case_usd(
@@ -573,9 +621,11 @@ class PriorityBackend(DecisionBackend):
                 if error.wire_dispatched:
                     # post-2xx parse failures are deterministic; the wire
                     # was reached but the response is untrusted, so usage
-                    # evidence is unknown and no failover happens.
+                    # evidence is taken from whatever the wire offered
+                    # (the backend attaches leniently parsed usage to the
+                    # error) and no failover happens.
                     attempts.append(
-                        self._record(spec, backend, "schema_error", elapsed, None, True)
+                        self._record(spec, backend, "schema_error", elapsed, error.usage, True)
                     )
                 else:
                     # local validation rejected the request before any
@@ -614,10 +664,29 @@ class PriorityBackend(DecisionBackend):
                 fill_from = position + 1
                 continue
             elapsed = time.monotonic() - started
-            attempts.append(self._record(spec, backend, "answer", elapsed, response.usage, True))
+            late = deadline is not None and deadline.exceeded()
+            attempts.append(
+                self._record(
+                    spec,
+                    backend,
+                    "late_answer" if late else "answer",
+                    elapsed,
+                    response.usage,
+                    True,
+                )
+            )
             self._fill_not_dispatched(attempts, position + 1, candidates, "answered_upstream")
             final = tuple(attempts)
             self.last_attempts = final
+            if late:
+                # final delivery gate: the answer completed its
+                # bookkeeping past the shared absolute deadline, so it
+                # is rejected rather than delivered.  the vendor did
+                # process the request, so the rejection carries the
+                # wire usage and the full per-call credential tuple.
+                late_error = DecisionLateAnswerError("DECISION_LATE_ANSWER", usage=response.usage)
+                late_error.attempts = final
+                raise late_error
             return replace(response, attempts=final)
         self._fill_not_dispatched(attempts, fill_from, candidates, skip_reason)
         final = tuple(attempts)

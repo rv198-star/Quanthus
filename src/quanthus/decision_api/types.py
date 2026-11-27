@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import time
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -25,13 +26,18 @@ class DecisionError(Exception):
     per-call credential records when a chain raises: every logical call
     -- success or failure -- discharges exactly one independent attempts
     tuple, so concurrent batches sharing one backend instance can never
-    overwrite each other's billing evidence.
+    overwrite each other's billing evidence.  usage carries the
+    best-effort billing evidence the wire offered for this failure: it
+    is set on late answers, billed HTTP failures and post-2xx parse
+    failures whose body carried well-formed usage, and stays None when
+    the wire offered nothing usable.
     """
 
     def __init__(self, message: str = "", *, wire_dispatched: bool = True) -> None:
         super().__init__(message)
         self.wire_dispatched = wire_dispatched
         self.attempts: tuple[Any, ...] = ()
+        self.usage: TokenUsage | None = None
 
 
 class DecisionTransportError(DecisionError):
@@ -98,12 +104,29 @@ class DecisionDeadline:
 
     at_monotonic: float
 
+    def __post_init__(self) -> None:
+        # a NaN or infinite budget point can never participate in a sound
+        # budget comparison: NaN fails every ordering check and infinity
+        # silently disables the wall.  both are typed input errors.
+        if (
+            not isinstance(self.at_monotonic, (int, float))
+            or isinstance(self.at_monotonic, bool)
+            or not math.isfinite(float(self.at_monotonic))
+        ):
+            raise DecisionSchemaError("DECISION_DEADLINE_RANGE")
+
     @classmethod
     def after(cls, seconds: float) -> DecisionDeadline:
         """Return a deadline the given number of seconds from now."""
-        if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
+        if not isinstance(seconds, (int, float)) or isinstance(seconds, bool):
             raise DecisionSchemaError("DECISION_DEADLINE_RANGE")
-        return cls(at_monotonic=time.monotonic() + float(seconds))
+        try:
+            duration = float(seconds)
+        except (OverflowError, ValueError) as error:
+            raise DecisionSchemaError("DECISION_DEADLINE_RANGE") from error
+        if not math.isfinite(duration) or duration <= 0:
+            raise DecisionSchemaError("DECISION_DEADLINE_RANGE")
+        return cls(at_monotonic=time.monotonic() + duration)
 
     def remaining(self) -> float:
         """Seconds left; negative once exceeded."""

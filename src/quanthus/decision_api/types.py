@@ -107,12 +107,17 @@ class DecisionDeadline:
     def __post_init__(self) -> None:
         # a NaN or infinite budget point can never participate in a sound
         # budget comparison: NaN fails every ordering check and infinity
-        # silently disables the wall.  both are typed input errors.
-        if (
-            not isinstance(self.at_monotonic, (int, float))
-            or isinstance(self.at_monotonic, bool)
-            or not math.isfinite(float(self.at_monotonic))
-        ):
+        # silently disables the wall, and a giant integer overflows the
+        # float conversion with a bare OverflowError.  every
+        # unrepresentable or non-finite instant is the same typed input
+        # error.
+        if not isinstance(self.at_monotonic, (int, float)) or isinstance(self.at_monotonic, bool):
+            raise DecisionSchemaError("DECISION_DEADLINE_RANGE")
+        try:
+            converted = float(self.at_monotonic)
+        except (OverflowError, ValueError) as error:
+            raise DecisionSchemaError("DECISION_DEADLINE_RANGE") from error
+        if not math.isfinite(converted):
             raise DecisionSchemaError("DECISION_DEADLINE_RANGE")
 
     @classmethod

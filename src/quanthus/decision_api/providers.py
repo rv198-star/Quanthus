@@ -457,6 +457,24 @@ def reserve_worst_case_usd(
     _validate_volume(max_input_tokens, max_output_tokens)
     if spec.input_price_usd_per_mtok is None or spec.output_price_usd_per_mtok is None:
         return None
+    # the versioned JSON loader already rejects negative, boolean,
+    # non-finite and overflowing prices, but DecisionProviderSpec is a
+    # public constructor: code-built specs reach this quote path without
+    # that validation.  a negative or non-finite price must never form a
+    # quote, so the reservation fails closed here as well.  zero is a
+    # legitimate declared-free price.
+    for label, price in (
+        ("input_price_usd_per_mtok", spec.input_price_usd_per_mtok),
+        ("output_price_usd_per_mtok", spec.output_price_usd_per_mtok),
+    ):
+        converted = None
+        if isinstance(price, (int, float)) and not isinstance(price, bool):
+            try:
+                converted = float(price)
+            except (OverflowError, ValueError):
+                converted = None
+        if converted is None or not math.isfinite(converted) or converted < 0:
+            raise DecisionSchemaError(f"DECISION_RESERVATION_PRICE:{label}")
     try:
         total = (
             max_input_tokens * spec.input_price_usd_per_mtok
@@ -664,12 +682,11 @@ class PriorityBackend(DecisionBackend):
                 fill_from = position + 1
                 continue
             elapsed = time.monotonic() - started
-            late = deadline is not None and deadline.exceeded()
             attempts.append(
                 self._record(
                     spec,
                     backend,
-                    "late_answer" if late else "answer",
+                    "answer",
                     elapsed,
                     response.usage,
                     True,
@@ -678,12 +695,23 @@ class PriorityBackend(DecisionBackend):
             self._fill_not_dispatched(attempts, position + 1, candidates, "answered_upstream")
             final = tuple(attempts)
             self.last_attempts = final
+            # final delivery gate re-checks the shared clock after the
+            # answer and every per-attempt credential are assembled: a
+            # bookkeeping stall that spans the deadline must reject the
+            # answer here, exactly as a backend-side late parse does.
+            # the vendor did process the request, so the rejection
+            # carries the wire usage and the full credential tuple, and
+            # the answering attempt is recorded as late_answer.
+            late = deadline is not None and deadline.exceeded()
             if late:
-                # final delivery gate: the answer completed its
-                # bookkeeping past the shared absolute deadline, so it
-                # is rejected rather than delivered.  the vendor did
-                # process the request, so the rejection carries the
-                # wire usage and the full per-call credential tuple.
+                # the answering record sits exactly at this position; the
+                # trailing entries are never-dispatched fills, which stay
+                # as they are.
+                final = tuple(
+                    {**record, "outcome": "late_answer"} if index == position else record
+                    for index, record in enumerate(final)
+                )
+                self.last_attempts = final
                 late_error = DecisionLateAnswerError("DECISION_LATE_ANSWER", usage=response.usage)
                 late_error.attempts = final
                 raise late_error

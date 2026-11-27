@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -844,8 +845,14 @@ class BackendTransportTests(unittest.TestCase):
         )
         backend.decide(sample_request(), deadline=DecisionDeadline.after(3.0))
         call = transport.calls[0]  # type: ignore[attr-defined]
-        self.assertLessEqual(call["timeout"], 3.0)
-        self.assertGreater(call["timeout"], 0.0)
+        # the transport receives the shared clock as the absolute instant
+        # of the deadline itself, never a relative sample: a stall after
+        # sampling cannot extend the budget downstream.
+        budget = call["timeout"]
+        self.assertIsInstance(budget, DecisionDeadline)
+        remaining = budget.at_monotonic - time.monotonic()
+        self.assertLessEqual(remaining, 3.0)
+        self.assertGreater(remaining, 0.0)
 
     def test_expired_deadline_fails_before_transport(self) -> None:
         transport = spy_transport(200, GA_RESPONSE_BODY)
@@ -869,7 +876,51 @@ class BackendTransportTests(unittest.TestCase):
         )
         with self.assertRaises(DecisionSchemaError):
             backend.decide(sample_request(questions=()))
+
+    def test_stall_after_sampling_never_rebases_the_transport_clock(self) -> None:
+        """A scheduling stall after the timeout sample must not extend the budget.
+
+        The transport receives the absolute instant of the shared deadline,
+        so a stall between sampling and transport entry expires the window
+        instead of restarting it: the transport is never entered and the
+        failure carries wire_dispatched=False.
+        """
+        transport = spy_transport(200, GA_RESPONSE_BODY)
+        backend = OpenAIDecisionsBackend(
+            HttpBackendConfig(url="https://gw.example.test/v1/decisions", api_key="test-key"),
+            transport=transport,
+        )
+        real_timeout = backend._effective_timeout
+
+        def stalled(deadline):
+            remaining = real_timeout(deadline)
+            time.sleep(0.30)
+            return remaining
+
+        backend._effective_timeout = stalled
+        deadline = DecisionDeadline.after(0.2)
+        with self.assertRaises(DecisionTimeoutError) as ctx:
+            backend.decide(sample_request(), deadline=deadline)
+        self.assertFalse(ctx.exception.wire_dispatched)
         self.assertEqual(transport.calls, [])  # type: ignore[attr-defined]
+
+    def test_unstalled_call_still_dispatches_after_sampling_control(self) -> None:
+        transport = spy_transport(200, GA_RESPONSE_BODY)
+        backend = OpenAIDecisionsBackend(
+            HttpBackendConfig(url="https://gw.example.test/v1/decisions", api_key="test-key"),
+            transport=transport,
+        )
+        real_timeout = backend._effective_timeout
+
+        def brief(deadline):
+            remaining = real_timeout(deadline)
+            time.sleep(0.02)
+            return remaining
+
+        backend._effective_timeout = brief
+        response = backend.decide(sample_request(), deadline=DecisionDeadline.after(2.0))
+        self.assertEqual(len(response.answers), 3)
+        self.assertEqual(len(transport.calls), 1)  # type: ignore[attr-defined]
 
     def test_backend_config_validation(self) -> None:
         with self.assertRaisesRegex(DecisionSchemaError, "DECISION_BACKEND_URL_SCHEME"):

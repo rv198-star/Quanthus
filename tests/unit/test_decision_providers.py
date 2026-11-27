@@ -11,6 +11,7 @@ import json
 import tempfile
 import time
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from quanthus.decision_api import (
@@ -19,6 +20,7 @@ from quanthus.decision_api import (
     ChoiceQuestion,
     DecisionDeadline,
     DecisionHttpError,
+    DecisionLateAnswerError,
     DecisionProviderExhaustedError,
     DecisionRequest,
     DecisionSchemaError,
@@ -593,8 +595,14 @@ class PriorityDeadlineTests(unittest.TestCase):
         timeouts = [call["timeout"] for call in transport.calls]  # type: ignore[attr-defined]
         self.assertEqual(len(timeouts), 2)
         for value in timeouts:
-            self.assertLessEqual(value, 4.0)
-            self.assertGreater(value, 0.0)
+            # both attempts receive the same shared clock as the absolute
+            # instant of the caller-supplied deadline, truncated by the
+            # shorter configured timeout -- never a relative sample that
+            # a stall could re-base downstream.
+            self.assertIsInstance(value, DecisionDeadline)
+            remaining = value.at_monotonic - time.monotonic()
+            self.assertLessEqual(remaining, 4.0)
+            self.assertGreater(remaining, 0.0)
 
     def test_exhausted_deadline_mid_chain_marks_deadline_stopped(self) -> None:
         def slow_timeout(url, payload, headers, timeout):
@@ -956,6 +964,58 @@ class LateAnswerChainTests(unittest.TestCase):
         self.assertEqual(error.attempts[1]["skip_reason"], "deadline")
         self.assertTrue(error.deadline_stopped)
 
+    def test_bookkeeping_stall_spanning_deadline_rejects_the_answer(self) -> None:
+        """The final delivery gate re-checks the clock after credential assembly.
+
+        A stall injected while the chain completes its never-dispatched
+        bookkeeping crosses the shared deadline: the in-budget answer is
+        still rejected as late, its usage is preserved as billable
+        evidence and the answering attempt carries its own attribution.
+        """
+        script = {
+            (FIRST_URL, "model-first"): (200, GA_RESPONSE_BODY),
+            (SECOND_URL, "model-second"): (200, GA_RESPONSE_BODY),
+        }
+        backend = build_priority_backend(
+            TWO_PROVIDER_CHAIN, transport=scripted_transport(script), environ=ENV
+        )
+        real_fill = backend._fill_not_dispatched
+
+        def stalled_fill(*args, **kwargs):
+            time.sleep(0.45)
+            return real_fill(*args, **kwargs)
+
+        backend._fill_not_dispatched = stalled_fill
+        deadline = DecisionDeadline.after(0.3)
+        with self.assertRaises(DecisionLateAnswerError) as ctx:
+            backend.decide(sample_request(model="model-first"), deadline=deadline)
+        error = ctx.exception
+        outcomes = [record["outcome"] for record in error.attempts]
+        self.assertEqual(outcomes, ["late_answer", "not_dispatched"])
+        self.assertEqual(error.attempts[0]["provider_id"], "first")
+        self.assertEqual(error.attempts[0]["usage"]["status"], "metered")
+        self.assertEqual(error.attempts[1]["skip_reason"], "answered_upstream")
+        self.assertIsNotNone(error.usage)
+
+    def test_bookkeeping_inside_budget_still_delivers(self) -> None:
+        script = {
+            (FIRST_URL, "model-first"): (200, GA_RESPONSE_BODY),
+            (SECOND_URL, "model-second"): (200, GA_RESPONSE_BODY),
+        }
+        backend = build_priority_backend(
+            TWO_PROVIDER_CHAIN, transport=scripted_transport(script), environ=ENV
+        )
+        real_fill = backend._fill_not_dispatched
+
+        def quick_fill(*args, **kwargs):
+            time.sleep(0.05)
+            return real_fill(*args, **kwargs)
+
+        backend._fill_not_dispatched = quick_fill
+        deadline = DecisionDeadline.after(2.0)
+        response = backend.decide(sample_request(model="model-first"), deadline=deadline)
+        self.assertEqual(response.attempts[0]["outcome"], "answer")
+
 
 class ContradictoryUsageTests(unittest.TestCase):
     """A zero input/output pair with positive total or cached is never zero-cost proof."""
@@ -1044,8 +1104,38 @@ class NumericBoundaryTests(unittest.TestCase):
             DecisionDeadline(at_monotonic=float("nan"))
         with self.assertRaisesRegex(DecisionSchemaError, "DECISION_DEADLINE_RANGE"):
             DecisionDeadline(at_monotonic=float("inf"))
+        # direct construction with a giant integer overflows float()
+        # conversion: the same typed input error, never a bare OverflowError.
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_DEADLINE_RANGE"):
+            DecisionDeadline(10**400)
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_DEADLINE_RANGE"):
+            DecisionDeadline(at_monotonic=True)
         # finite durations still construct normally
         self.assertGreater(DecisionDeadline.after(0.5).at_monotonic, 0.0)
+
+    def test_programmatic_negative_price_is_rejected_before_quoting(self) -> None:
+        document = _minimal_chain_document()
+        document["providers"][0]["input_price_usd_per_mtok"] = 0.10
+        document["providers"][0]["output_price_usd_per_mtok"] = 0.0
+        paid = parse_provider_chain(document).providers[0]
+        # DecisionProviderSpec is a public constructor: code can attach a
+        # negative price without the versioned JSON validation.  the quote
+        # path itself must fail closed instead of returning a negative
+        # worst case.
+        negative = replace(paid, input_price_usd_per_mtok=-0.1)
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_RESERVATION_PRICE"):
+            reserve_worst_case_usd(negative, 1200, 50)
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_RESERVATION_PRICE"):
+            chain_worst_case_usd(ProviderChain(providers=(negative,), max_attempts=None), 1200, 50)
+        huge = replace(paid, input_price_usd_per_mtok=10**400)
+        with self.assertRaisesRegex(DecisionSchemaError, "DECISION_RESERVATION_PRICE"):
+            reserve_worst_case_usd(huge, 1200, 50)
+        # zero remains a legitimate declared-free price and quotes exactly.
+        free = replace(paid, input_price_usd_per_mtok=0.0, output_price_usd_per_mtok=0.0)
+        self.assertEqual(reserve_worst_case_usd(free, 1200, 50), 0.0)
+        quote = chain_worst_case_usd(ProviderChain(providers=(free,), max_attempts=None), 1200, 50)
+        self.assertTrue(quote["complete"])
+        self.assertEqual(quote["total_worst_case_usd"], 0.0)
 
     def test_provider_price_rejects_nan_infinity_and_overflow(self) -> None:
         document = _minimal_chain_document()

@@ -60,6 +60,29 @@ R4 hardening after the third independent review of PR #756:
 * ordinary HTTP content negotiation is preserved: the transport
   declares Accept-Encoding: identity because it does not implement
   response decompression, matching the pre-R3 urllib behaviour.
+
+R5 hardening after the fourth independent review of PR #756:
+
+* the transport receives the shared clock as the absolute instant of the
+  caller-supplied deadline, capped by the backend's shorter configured
+  timeout -- never as a relative sample.  A stall after the remaining
+  budget was sampled cannot be re-based onto the current clock at
+  transport entry: the window expires ahead of any dial or POST.
+* the fallback resolution path for a fast negative or empty answer is
+  bounded by the same absolute clock: socket.create_connection runs in a
+  daemon worker joined for the remaining budget, so its internal second
+  resolution can never park the caller thread past the wall, and a
+  socket completed only after the deadline is closed abandoned rather
+  than handed to the HTTP layer.
+* the chain re-checks the shared clock after the answer and every
+  per-attempt credential are assembled: a bookkeeping stall spanning the
+  deadline rejects the answer as DecisionLateAnswerError with the
+  answering attempt recorded as late_answer and its usage preserved.
+* the public numeric entries match the versioned-config validation:
+  direct DecisionDeadline construction rejects unrepresentable instants
+  with the same typed error as after(), and reserve_worst_case_usd
+  rejects negative, boolean, non-finite or overflowing prices on
+  code-built provider specs before any quote is formed.
 """
 
 from __future__ import annotations
@@ -101,7 +124,14 @@ DECISIONS_DIALECT_OPENAI_GA = "openai-ga"
 DECISIONS_DIALECT_OPENROUTER_ALPHA = "openrouter-alpha"
 
 JsonObject = dict[str, Any]
-TransportCallable = Callable[[str, JsonObject, Mapping[str, str], float], "tuple[int, str]"]
+# the fourth transport parameter is the absolute wall instant of the shared
+# non-extensible deadline, passed as a DecisionDeadline: the clock must reach
+# the transport verbatim, never as a relative sample that a stall can turn
+# into a fresh, extended budget when the transport re-adds the current clock.
+# legacy call sites passing a float of relative seconds remain accepted.
+TransportCallable = Callable[
+    [str, JsonObject, Mapping[str, str], "DecisionDeadline | float"], "tuple[int, str]"
+]
 
 _MAX_HEAD_BYTES = 65536
 _MAX_BODY_BYTES = 4 * 1024 * 1024
@@ -163,7 +193,7 @@ class UrllibJsonTransport:
         url: str,
         payload: JsonObject,
         headers: Mapping[str, str],
-        timeout_seconds: float,
+        timeout_seconds: DecisionDeadline | float,
     ) -> tuple[int, str]:
         parts = urllib.parse.urlsplit(url)
         if parts.scheme not in ("http", "https") or not parts.hostname:
@@ -172,7 +202,16 @@ class UrllibJsonTransport:
         target = parts.path or "/"
         if parts.query:
             target += "?" + parts.query
-        deadline = time.monotonic() + timeout_seconds
+        # the caller hands down the absolute instant of the shared clock,
+        # never a relative sample: re-adding the current time here would
+        # extend the budget by whatever stall happened between sampling
+        # and transport entry.  a legacy float of relative seconds is
+        # interpreted from now, preserving the pre-R5 standalone entry.
+        if isinstance(timeout_seconds, DecisionDeadline):
+            deadline = timeout_seconds.at_monotonic
+            timeout_seconds = deadline - time.monotonic()
+        else:
+            deadline = time.monotonic() + timeout_seconds
         progress = {"sent_any": False}
         sock: socket.socket | None = None
         try:
@@ -307,10 +346,12 @@ class UrllibJsonTransport:
         if infos is None:
             # resolution finished inside budget with a definitive negative
             # answer; reproduce exactly that failure through the standard
-            # connect entry point.
-            return socket.create_connection(
-                (host, port), timeout=max(self._remaining(deadline), 0.001)
-            )
+            # connect entry point, bounded by the same absolute clock.  the
+            # entry point re-resolves internally, so it must never run
+            # synchronously on the caller thread: a fast first failure
+            # followed by a slow or empty second answer would otherwise
+            # park the caller past the wall and start dialing after it.
+            return self._create_connection_bounded(host, port, deadline, budget)
         last_error: OSError | None = None
         for family, socktype, proto, _canonname, sockaddr in infos:
             self._require_budget(deadline, budget, "CONNECT")
@@ -328,6 +369,55 @@ class UrllibJsonTransport:
         if last_error is not None:
             raise last_error
         raise DecisionTransportError("DECISION_TRANSPORT_RESOLVE_EMPTY")
+
+    def _create_connection_bounded(
+        self, host: str, port: int, deadline: float, budget: float
+    ) -> socket.socket:
+        """Run the standard connect entry point inside the shared budget.
+
+        socket.create_connection re-resolves the host internally, which
+        cannot be interrupted: the whole call therefore runs in a daemon
+        worker joined for the remaining budget, exactly like the primary
+        resolution path.  Budget expiry returns DecisionTimeoutError at
+        the wall.  The worker may still be resolving or dialing when it
+        is orphaned; a socket it eventually produces is closed the moment
+        creation completes past the deadline and is never handed to the
+        HTTP layer, so an abandoned late dial can never carry a request.
+        A resolution failure reproduced inside the budget surfaces as the
+        original OSError, keeping the transport failover classification.
+        """
+        self._require_budget(deadline, budget, "CONNECT")
+        result: dict[str, Any] = {}
+
+        def attempt() -> None:
+            try:
+                sock = socket.create_connection(
+                    (host, port), timeout=max(self._remaining(deadline), 0.001)
+                )
+            except OSError as error:
+                result["failure"] = error
+                return
+            if self._remaining(deadline) <= 0.0:
+                # the entry point returned only after the shared wall:
+                # the connection is abandoned, never used for a request.
+                result["abandoned"] = True
+                with contextlib.suppress(Exception):
+                    sock.close()
+                return
+            result["socket"] = sock
+
+        worker = threading.Thread(target=attempt, daemon=True)
+        worker.start()
+        worker.join(max(self._remaining(deadline), 0.0))
+        if worker.is_alive() or "abandoned" in result:
+            raise DecisionTimeoutError(f"DECISION_TIMEOUT_CONNECT after {budget}s")
+        self._require_budget(deadline, budget, "CONNECT")
+        if "failure" in result:
+            raise result["failure"]
+        sock: socket.socket | None = result.get("socket")
+        if sock is None:
+            raise DecisionTransportError("DECISION_TRANSPORT_CONNECT_EMPTY")
+        return sock
 
     @staticmethod
     def _rearm(sock: socket.socket, deadline: float) -> None:
@@ -660,18 +750,32 @@ class _BaseHttpBackend(DecisionBackend):
         return min(timeout, remaining)
 
     def _send(self, payload: JsonObject, deadline: DecisionDeadline | None) -> JsonObject:
-        # the relative timeout is computed after the headers are built,
-        # at the last evaluation before the transport is entered: a
-        # scheduling stall anywhere before this point cannot smuggle a
-        # dispatch past the shared absolute wall because an expired
-        # deadline raises here, ahead of any wire use.
+        # the shared clock is handed to the transport as the absolute
+        # instant of the deadline itself, capped by this backend's shorter
+        # configured timeout.  a relative sample is never forwarded: any
+        # stall between sampling and transport entry cannot be re-based
+        # onto the current clock downstream, so an expired window raises
+        # here ahead of any dial or POST instead of starting fresh.
         headers = self._headers()
         timeout_seconds = self._effective_timeout(deadline)
+        if deadline is None:
+            # no shared clock participates in this call: the configured
+            # relative timeout is the entire budget contract, forwarded
+            # verbatim for the standalone entry point.
+            budget: DecisionDeadline | float = timeout_seconds
+        elif deadline.exceeded():
+            error = DecisionTimeoutError("DECISION_DEADLINE_EXCEEDED")
+            error.wire_dispatched = False
+            raise error
+        else:
+            wall = time.monotonic() + timeout_seconds
+            wall = min(wall, deadline.at_monotonic)
+            budget = DecisionDeadline(wall)
         status, raw = self._transport(
             self._config.url,
             payload,
             headers,
-            timeout_seconds,
+            budget,
         )
         # Status-first classification: the HTTP status alone decides
         # failover semantics, whatever the error body looks like.  The

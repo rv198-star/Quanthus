@@ -13,6 +13,42 @@ ADR 0016's purpose-relative quality and finite investigation rules apply.
 
 ## Current recovery checkpoint
 
+### 2026-11-28 vendor-lane and governance update
+
+Three material changes since the tranches below; the older sections remain
+accurate operational history for the v1-v4 watches:
+
+1. **astock fork governance.** `rv198-star/astock` is now private (upstream
+   fork relation retained; unauthenticated access 404; release assets intact).
+   Vendor credentials are centralized in the private Gitea repository
+   `rv192/quanthus-secrets` (vendor-keys.json) and mirrored read-only on CN02
+   at `/srv/agentdock/quanthus-secrets/vendor-keys.json`; rotation updates
+   both atomically. No keys exist in the astock repository. Future source-watch
+   rebuilds can no longer pull GitHub release assets anonymously; existing
+   containers embed their wheels and are unaffected.
+2. **astock 0.2.x.** Vendor MCP adapters `vendor_wind`/`vendor_choice` merged
+   (PR #6), upstream v3.10.4 synced (PR #7), 0.2.1 released with wheel/sdist/
+   SHA256SUMS, and `docs/capability-inventory.md` now indexes all three
+   capability planes. CN02 checkout and library verified at 0.2.1. Existing
+   v1-v4 watches need no re-pinning: the 0.1.4-to-0.2.1 wheel diff only adds
+   new modules, and their hash-verified modules are byte-identical.
+3. **Vendor lanes validated as reference capabilities**
+   ([P10-DATA-SUPPLY-006 / #777](https://github.com/rv198-star/Quanthus/issues/777)).
+   Live evidence: Wind Alice (0.0001 points per get_stock_kline call),
+   Eastmoney MX free tier, iFinD trial tier restricted (core tool unauthorized),
+   Tushare community transit (low-trust, http-only, excluded from astock
+   adapters; consumer-side reference lane only). Cross-source check on
+   600519.SH 2026-11-24 shows price agreement across three lanes and a 5-share
+   volume divergence from MX display scaling — per-field provenance remains
+   mandatory when comparing lanes; MX volume is never share-exact truth.
+   Automated vendor watch (v5) is deliberately deferred: the supplement
+   runtime is a single-request no-key model, vendor MCP sessions need a new
+   transport path plus container credential injection, and no consumer has
+   named a recurring cross-verification need. Revisit when a consumer names
+   one; manual bounded probes cost fractions of a point meanwhile.
+
+
+
 The CN02 runtime lineage is established. A complete new upstream reference checkout
 is pinned locally; the production collector is a different, Quanthus-owned code
 bundle. The declaration inventory and bounded request manifests are frozen outside
